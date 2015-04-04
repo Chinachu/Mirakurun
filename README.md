@@ -1,5 +1,5 @@
 # Mirakurun
-An Open Source DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)**
+An Open Source DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 
 [![npm version][npm-img]][npm-url]
 [![Linux Build][travis-img]][travis-url]
