@@ -3,12 +3,6 @@
 
 import util = require('util');
 
-export interface ILogLevel {
-    level: number;
-    label: string;
-    isStderr?: boolean;
-}
-
 export enum ELogLevel {
     'FATAL' = -1,
     'ERROR' = 0,
