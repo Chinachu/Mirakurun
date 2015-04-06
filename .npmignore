@@ -1,0 +1,10 @@
+logs
+*.log
+pids
+*.pid
+*.seed
+node_modules
+/src
+/typings
+tsd.json
+gulpfile.js
