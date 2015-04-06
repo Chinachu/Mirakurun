@@ -1,0 +1,15 @@
+language: node_js
+node_js:
+  - "0.12"
+
+install:
+  - npm install
+  - npm run tsd reinstall
+  - npm run tsd rebundle
+
+script:
+  - npm run build
+  #- npm test
+
+notifications:
+  email: false
