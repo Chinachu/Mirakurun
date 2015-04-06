@@ -1,0 +1,47 @@
+{
+  "name": "mirakurun",
+  "version": "1.0.0",
+  "description": "DVR Tuner Server Service for Chinachu Air.",
+  "main": "./lib/index.js",
+  "scripts": {
+    "test": "gulp test",
+    "build": "gulp build",
+    "watch": "gulp watch",
+    "tsd": "tsd",
+    "start": "bin/server.js",
+    "preinstall": "bin/preinstall.sh",
+    "postinstall": "bin/postinstall.js",
+    "preuninstall": "bin/preuninstall.js",
+    "postuninstall": "bin/postuninstall.sh"
+  },
+  "bin": {
+    "mirakurun": "bin/service.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kanreisa/Mirakurun.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kanreisa/Mirakurun/issues"
+  },
+  "keywords": [
+    "mirakurun",
+    "chinachu"
+  ],
+  "author": "Yuki KAN <re@pixely.jp> (https://github.com/kanreisa)",
+  "license": "MIT",
+  "homepage": "https://github.com/kanreisa/Mirakurun",
+  "dependencies": {
+    "node-uuid": "^1.4.3",
+    "pm2": "^0.12.9"
+  },
+  "devDependencies": {
+    "gulp": "^3.8.11",
+    "gulp-mocha": "^2.0.1",
+    "gulp-rename": "^1.2.2",
+    "gulp-typescript": "^2.6.0",
+    "merge2": "^0.3.2",
+    "tsd": "^0.6.0-beta.5",
+    "typescript": "^1.5.0-alpha"
+  }
+}
