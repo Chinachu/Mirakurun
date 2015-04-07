@@ -4,6 +4,9 @@ node_js:
 
 sudo: required
 
+before_install:
+  - sudo -i
+
 install:
   - npm install
   - npm run tsd reinstall
