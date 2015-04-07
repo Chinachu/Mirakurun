@@ -5,13 +5,13 @@ node_js:
 sudo: required
 
 install:
-  - npm install --no-bin-links
+  - npm install
   - npm run tsd reinstall
   - npm run tsd rebundle
 
 script:
   - npm run build
-  - sudo npm install -g
+  - npm install -g
   #- npm test
 
 notifications:
