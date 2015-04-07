@@ -9,7 +9,6 @@
     "watch": "gulp watch",
     "tsd": "tsd",
     "start": "bin/server.js",
-    "preinstall": "bin/preinstall.sh",
     "postinstall": "bin/postinstall.js",
     "preuninstall": "bin/preuninstall.js",
     "postuninstall": "bin/postuninstall.sh"
