@@ -1,8 +1,4 @@
-logs
-*.log
-pids
-*.pid
-*.seed
-node_modules
-/lib
+/node_modules
 /typings
+/lib
+/*.log

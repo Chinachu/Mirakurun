@@ -1,20 +1,19 @@
 {
   "name": "mirakurun",
-  "version": "1.0.0",
   "description": "DVR Tuner Server Service for Chinachu Air.",
-  "main": "./lib/index.js",
-  "scripts": {
-    "test": "gulp test",
-    "build": "gulp build",
-    "watch": "gulp watch",
-    "tsd": "tsd",
-    "start": "bin/server.js",
-    "postinstall": "bin/postinstall.js",
-    "preuninstall": "bin/preuninstall.js",
-    "postuninstall": "bin/postuninstall.sh"
-  },
-  "bin": {
-    "mirakurun": "bin/service.js"
+  "version": "1.0.0",
+  "homepage": "https://github.com/kanreisa/Mirakurun",
+  "keywords": [
+    "mirakurun",
+    "chinachu",
+    "chinachu air",
+    "dvr",
+    "tv",
+    "linux"
+  ],
+  "author": {
+    "name": "Yuki KAN",
+    "url": "https://github.com/kanreisa"
   },
   "repository": {
     "type": "git",
@@ -23,24 +22,43 @@
   "bugs": {
     "url": "https://github.com/kanreisa/Mirakurun/issues"
   },
-  "keywords": [
-    "mirakurun",
-    "chinachu"
-  ],
-  "author": "Yuki KAN <re@pixely.jp> (https://github.com/kanreisa)",
-  "license": "MIT",
-  "homepage": "https://github.com/kanreisa/Mirakurun",
+  "license": "Apache-2.0",
+  "main": "./lib/common.js",
+  "bin": {
+    "mirakurun": "bin/cli.sh"
+  },
+  "scripts": {
+    "start": "node lib/server.js",
+    "tsd": "tsd",
+    "tsd-install": "tsd reinstall && tsd rebundle",
+    "build": "gulp build",
+    "watch": "gulp watch",
+    "test": "gulp test",
+    "preinstall": "bin/preinstall.sh",
+    "postinstall": "bin/postinstall.sh",
+    "preuninstall": "bin/preuninstall.sh"
+  },
+  "directories": {
+    "doc": "doc",
+    "lib": "lib"
+  },
   "dependencies": {
-    "node-uuid": "^1.4.3",
-    "pm2": "^0.12.9"
+    "js-yaml": "^3.5.2",
+    "node-uuid": "^1.4.3"
   },
   "devDependencies": {
-    "gulp": "^3.8.11",
-    "gulp-mocha": "^2.0.1",
+    "del": "^2.2.0",
+    "gulp": "^3.9.0",
     "gulp-rename": "^1.2.2",
-    "gulp-typescript": "^2.6.0",
-    "merge2": "^0.3.2",
-    "tsd": "^0.6.0-beta.5",
-    "typescript": "^1.5.0-alpha"
-  }
+    "gulp-sourcemaps": "^1.6.0",
+    "gulp-typescript": "^2.10.0",
+    "tsd": "^0.6.5",
+    "typescript": "^1.7.5"
+  },
+  "engines": {
+    "node": ">=4.1.1"
+  },
+  "os": [
+    "linux"
+  ]
 }

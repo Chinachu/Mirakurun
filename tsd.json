@@ -6,10 +6,13 @@
   "bundle": "typings/tsd.d.ts",
   "installed": {
     "node/node.d.ts": {
-      "commit": "a0ee360d4751aa3fc928159d618442e208fd8b23"
+      "commit": "b937e64fc9245d299fa4ba26c6eddbeaed42a920"
     },
     "node-uuid/node-uuid.d.ts": {
-      "commit": "a0ee360d4751aa3fc928159d618442e208fd8b23"
+      "commit": "b937e64fc9245d299fa4ba26c6eddbeaed42a920"
+    },
+    "js-yaml/js-yaml.d.ts": {
+      "commit": "b937e64fc9245d299fa4ba26c6eddbeaed42a920"
     }
   }
 }
