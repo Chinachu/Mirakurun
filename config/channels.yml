@@ -1,0 +1,150 @@
+- name: MX
+  type: GR
+  channel: '16'
+
+- name: CX
+  type: GR
+  channel: '21'
+
+- name: TBS
+  type: GR
+  channel: '22'
+
+- name: TX
+  type: GR
+  channel: '23'
+
+- name: EX
+  type: GR
+  channel: '24'
+
+- name: NTV
+  type: GR
+  channel: '25'
+
+- name: NHK E
+  type: GR
+  channel: '26'
+
+- name: NHK G
+  type: GR
+  channel: '27'
+
+- name: NHK BS1
+  type: BS
+  channel: BS15_0
+  serviceId: 101
+
+- name: NHK BS1 (Sub)
+  type: BS
+  channel: BS15_0
+  serviceId: 102
+
+- name: NHK BS Premium
+  type: BS
+  channel: BS15_1
+  serviceId: 103
+
+- name: NHK BS Premium (Sub)
+  type: BS
+  channel: BS15_1
+  serviceId: 104
+
+- name: BS Nippon
+  type: BS
+  channel: BS13_0
+  serviceId: 141
+
+- name: BS Nippon (Sub)
+  type: BS
+  channel: BS13_0
+  serviceId: 142
+
+- name: BS Asahi
+  type: BS
+  channel: BS01_0
+  serviceId: 151
+
+- name: BS Asahi (Sub)
+  type: BS
+  channel: BS01_0
+  serviceId: 152
+
+- name: BS-TBS
+  type: BS
+  channel: BS01_1
+  serviceId: 161
+
+- name: BS JAPAN
+  type: BS
+  channel: BS03_1
+  serviceId: 171
+
+- name: BS Fuji
+  type: BS
+  channel: BS13_1
+  serviceId: 181
+
+- name: WOWOW Prime
+  type: BS
+  channel: BS03_0
+  serviceId: 191
+  isDisabled: true
+
+- name: WOWOW Live
+  type: BS
+  channel: BS05_0
+  serviceId: 192
+  isDisabled: true
+
+- name: WOWOW Cinema
+  type: BS
+  channel: BS05_1
+  serviceId: 193
+  isDisabled: true
+
+- name: BS11
+  type: BS
+  channel: BS09_0
+  serviceId: 211
+
+- name: BS SPTV
+  type: BS
+  channel: BS11_1
+  serviceId: 241
+  isDisabled: true
+
+- name: SPTV Promo
+  type: CS
+  channel: CS4
+  serviceId: 100
+
+- name: TV Asahi Ch. 1
+  type: CS
+  channel: CS2
+  serviceId: 298
+  isDisabled: true
+
+- name: TV Asahi Ch. 2
+  type: CS
+  channel: CS2
+  serviceId: 299
+  isDisabled: true
+
+- name: AT-X
+  type: CS
+  channel: CS16
+  serviceId: 333
+  isDisabled: true
+
+- name: BS SPTV
+  type: SKY
+  channel: CH585
+  serviceId: 33353
+  isDisabled: true
+
+- name: AT-X HD
+  type: SKY
+  channel: ATXHD
+  serviceId: 33435
+  isDisabled: true
