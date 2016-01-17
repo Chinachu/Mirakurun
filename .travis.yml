@@ -1,18 +1,16 @@
 language: node_js
 node_js:
-  - "0.12"
-
+  - "4"
 sudo: required
-
-install:
+before_install:
   - npm install
-  - npm run tsd reinstall
-  - npm run tsd rebundle
-
-script:
+  - npm run tsd-install
   - npm run build
-  - npm install -g
-  #- npm test
-
+install:
+  - sudo npm install . -g --unsafe --production
+script:
+  - npm test
+after_script:
+  - sudo npm uninstall . -g --unsafe
 notifications:
   email: false
