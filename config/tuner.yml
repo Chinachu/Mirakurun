@@ -66,7 +66,6 @@ devices:
   - name: TBS6922
     types:
       - SKY
-    group: dvb-s2
     dvbTuneCommand: szap-s2j -c /usr/local/etc/szap-s2j.conf -l <satelite> -S 1 -p -r -M 5 -C 35 -ch <channel>
     dvbDevicePath: /dev/dvb/adapter0/dvr0
     decoder: b1 -v 0 -s 1 /dev/stdin /dev/stdout
