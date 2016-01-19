@@ -1,0 +1,16 @@
+{
+  "apps": [
+    {
+      "name": "mirakurun-server",
+      "script": "lib/server.js",
+      "error_file": "/usr/local/var/log/mirakurun.stderr.log",
+      "out_file": "/usr/local/var/log/mirakurun.stdout.log",
+      "pid_file": "/usr/local/var/run/mirakurun.pid",
+      "exec_mode": "fork",
+      "autorestart": true,
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  ]
+}
