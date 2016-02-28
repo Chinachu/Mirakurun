@@ -71,7 +71,7 @@ paths:
     get:
       operationId: getChannel
       tags:
-        - services
+        - channels
       responses:
         200:
           description: OK
