@@ -848,14 +848,23 @@ definitions:
 
   ConfigChannels:
     type: object
+    required:
+      - name
+      - type
+      - channel
     properties:
-      host:
+      name:
         type: string
-      port:
+      type:
+        $ref: '#/definitions/ChannelType'
+      channel:
+        type: string
+      serviceId:
         type: number
-      sock:
+      satelite:
         type: string
-        pattern: ^\/[^\/]+\/.+\.sock$
+      isDisabled:
+        type: boolean
 
   Version:
     type: object
