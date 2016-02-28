@@ -26,7 +26,7 @@ mkdir -vp /usr/local/var/run
 mkdir -vp /usr/local/var/db
 
 cp -vn config/server.yml /usr/local/etc/mirakurun/server.yml
-cp -vn config/tuner.yml /usr/local/etc/mirakurun/tuner.yml
+cp -vn config/tuners.yml /usr/local/etc/mirakurun/tuners.yml
 cp -vn config/channels.yml /usr/local/etc/mirakurun/channels.yml
 
 # pm2
