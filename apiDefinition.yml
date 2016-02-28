@@ -112,8 +112,6 @@ paths:
           description: OK
         404:
           description: Not Found
-        410:
-          description: Gone
         503:
           description: Tuner Resource Unavailable
         default:
@@ -218,8 +216,6 @@ paths:
           description: OK
         404:
           description: Not Found
-        410:
-          description: Gone
         503:
           description: Tuner Resource Unavailable
         default:
