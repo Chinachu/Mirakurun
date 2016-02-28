@@ -667,6 +667,28 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/ProgramAttribute'
+      video:
+        type: object
+        properties:
+          type:
+            $ref: '#/definitions/ProgramVideoType'
+          resolution:
+            $ref: '#/definitions/ProgramVideoResolution'
+          streamContent:
+            type: number
+          componentType:
+            type: number
+      audio:
+        type: object
+        properties:
+          type:
+            $ref: '#/definitions/ProgramAudioType'
+          qualityIndicator:
+            $ref: '#/definitions/ProgramAudioQuality'
+          samplingRate:
+            $ref: '#/definitions/ProgramAudioSamplingRate'
+          componentType:
+            type: number
       series:
         type: object
         properties:
@@ -718,6 +740,47 @@ definitions:
       - live
       - prequel
       - sequel
+
+  ProgramVideoType:
+    type: string
+    enum:
+      - mpeg2
+      - h.264
+
+  ProgramVideoResolution:
+    type: string
+    enum:
+      - 240p
+      - 480i
+      - 480p
+      - 720p
+      - 1080i
+      - 1080p
+      - 2160p
+
+  ProgramAudioType:
+    type: string
+    enum:
+      - bc
+      - aac
+
+  ProgramAudioQuality:
+    type: number
+    enum:
+      - 1 # 現行の衛星標準テレビ放送のB モードに相当する音声品質
+      - 2 # モード 1 以外の音声品質でモード 3 に分類しないもの
+      - 3 # モード 1、2 に比べて限定的な音声品質
+
+  ProgramAudioSamplingRate:
+    type: number
+    enum:
+      - 16000 # 001
+      - 22050 # 010
+      - 24000 # 011
+      - 32000 # 101
+      - 44100 # 110
+      - 48000 # 111
+    # ARIB STD-B10 Vol.2
 
   ProgramPattern:
     type: number
