@@ -28,41 +28,41 @@ export enum LogLevel {
 
 export var logLevel: LogLevel = LogLevel.INFO;
 
-function getLogString(lvstr: string, msgs: string[]) {
+function getLogString(lvstr: string, msgs: any[]) {
     return new Date().toISOString() + ' ' + lvstr + ': ' + util.format.apply(null, msgs);
 };
 
-export function debug(...msgs: string[]);
+export function debug(...msgs: any[]);
 export function debug(): void {
     if (logLevel >= LogLevel.DEBUG) {
         console.debug(getLogString.call(this, 'debug', arguments));
     }
 };
 
-export function info(...msgs: string[]);
+export function info(...msgs: any[]);
 export function info(): void {
-    if (logLevel >= LogLevel.DEBUG) {
+    if (logLevel >= LogLevel.INFO) {
         console.info(getLogString.call(this, 'info', arguments));
     }
 };
 
-export function warn(...msgs: string[]);
+export function warn(...msgs: any[]);
 export function warn(): void {
-    if (logLevel >= LogLevel.DEBUG) {
+    if (logLevel >= LogLevel.WARN) {
         console.warn(getLogString.call(this, 'warn', arguments));
     }
 };
 
-export function error(...msgs: string[]);
+export function error(...msgs: any[]);
 export function error(): void {
-    if (logLevel >= LogLevel.DEBUG) {
+    if (logLevel >= LogLevel.ERROR) {
         console.error(getLogString.call(this, 'error', arguments));
     }
 };
 
-export function fatal(...msgs: string[]);
+export function fatal(...msgs: any[]);
 export function fatal(): void {
-    if (logLevel >= LogLevel.DEBUG) {
+    if (logLevel >= LogLevel.FATAL) {
         console.error(getLogString.call(this, 'fatal', arguments));
     }
 };

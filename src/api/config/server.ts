@@ -13,12 +13,14 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../typings/tsd.d.ts" />
+/// <reference path="../../../typings/express/express.d.ts" />
 'use strict';
 
-process.title = 'Mirakurun: Server';
+import common = require('../../common');
+import express = require('express');
 
-import mirakurun = require('./common');
-import instance = require('./instance');
+export function get(req: express.Request, res: express.Response) {
 
-instance.server = new mirakurun.Server();
+    res.status(200);
+    res.json(common.config.getServer());
+}

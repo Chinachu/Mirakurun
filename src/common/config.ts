@@ -36,19 +36,12 @@ module config {
 
         // as Remote Server
         port?: number;
-        host?: string;
 
         logLevel?: log.LogLevel;
     }
 
     export interface Tuner {
-        devices: TunerDevice[];
-        group: { [key: string]: TunerGroup }
-    }
-
-    export interface TunerDevice {
         name: string;
-        group?: string;
 
         types: ChannelType[];
 
@@ -62,11 +55,10 @@ module config {
         // decoder
         decoder?: string;
 
-        isDisabled?: boolean;
-    }
+        // special flags
+        isPT2?: boolean;
 
-    export interface TunerGroup {
-        controlWait?: number;
+        isDisabled?: boolean;
     }
 
     export interface Channel {
@@ -86,9 +78,9 @@ module config {
 
         return yaml.safeLoad(fs.readFileSync('/usr/local/etc/mirakurun/server.yml', 'utf8'));
     }
-    export function getTuner(): Tuner {
+    export function getTuners(): Tuner[] {
 
-        return yaml.safeLoad(fs.readFileSync('/usr/local/etc/mirakurun/tuner.yml', 'utf8'));
+        return yaml.safeLoad(fs.readFileSync('/usr/local/etc/mirakurun/tuners.yml', 'utf8'));
     }
     export function getChannels(): Channel[] {
 

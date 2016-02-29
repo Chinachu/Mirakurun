@@ -13,12 +13,39 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../typings/tsd.d.ts" />
+/// <reference path="../../typings/tsd.d.ts" />
 'use strict';
 
-process.title = 'Mirakurun: Server';
+import common = require('../common');
+//import log = require('../log');
+import events = require('events');
+//import fs = require('fs');
 
-import mirakurun = require('./common');
-import instance = require('./instance');
+/* interface User {
+    id: string;
+    agent: string;
+} */
 
-instance.server = new mirakurun.Server();
+class Tuner extends events.EventEmitter {
+
+    tuners: common.config.Tuner[] = [];
+
+    constructor() {
+        super();
+
+        this.getTuners();
+    }
+
+    getTuners() {
+
+        this.tuners = common.config.getTuners();
+    }
+
+    reloadTuners() {
+
+        this.getTuners();
+        //
+    }
+}
+
+export = Tuner;

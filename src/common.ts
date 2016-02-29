@@ -16,15 +16,12 @@
 /// <reference path="../typings/node/node.d.ts" />
 'use strict';
 
+export import util = require('./common/util');
 export import config = require('./common/config');
 export import Server = require('./common/Server');
+export import Tuner = require('./common/Tuner');
 
-export interface ServerOption {
-    server: config.Server,
-    tuner: config.Tuner,
-    channels: config.Channel[]
-}
+export module regexp {
 
-export function createServer(option: ServerOption): Server {
-    return new Server(option);
+    export var privateIPv4Address = /^(?:127\.)|(?:10\.)|(?:172\.1[6-9]\.)|(?:172\.2[0-9]\.)|(?:172\.3[0-1]\.)|(?:192\.168\.)/
 }

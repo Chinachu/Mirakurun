@@ -13,12 +13,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../typings/tsd.d.ts" />
+/// <reference path="../typings/node/node.d.ts" />
 'use strict';
 
-process.title = 'Mirakurun: Server';
+import common = require('./common');
 
-import mirakurun = require('./common');
-import instance = require('./instance');
-
-instance.server = new mirakurun.Server();
+export var server: common.Server;
