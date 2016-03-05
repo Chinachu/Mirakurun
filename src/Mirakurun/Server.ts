@@ -16,8 +16,6 @@
 /// <reference path="../../typings/tsd.d.ts" />
 'use strict';
 
-import common = require('../common');
-import log = require('../log');
 import events = require('events');
 import fs = require('fs');
 import http = require('http');
@@ -26,40 +24,46 @@ import swaggerize = require('swaggerize-express');
 import morgan = require('morgan');
 import bodyParser = require('body-parser');
 import yaml = require('js-yaml');
+import log = require('./log');
+import hammer = require('./hammer');
+import regexp = require('./regexp');
+import config = require('./config');
+import system = require('./system');
+import Tuner = require('./Tuner');
 
-var pkg = require('../../package.json');
+const pkg = require('../../package.json');
 
 class Server extends events.EventEmitter {
 
-    config = common.config.getServer();
-
-    tuner = new common.Tuner();
-
-    private servers: http.Server[] = [];
+    private _servers: http.Server[] = [];
 
     constructor() {
         super();
 
-        var config = this.config;
+        hammer.tuner = new Tuner();
 
-        if (typeof config.logLevel === 'number') {
-            log.logLevel = config.logLevel;
+        const serverConfig = config.getServer();
+
+        if (typeof serverConfig.logLevel === 'number') {
+            log.logLevel = serverConfig.logLevel;
         }
 
-        var addresses: string[] = [];
+        const addresses: string[] = [];
 
-        if (config.path) {
-            addresses.push(config.path);
+        if (serverConfig.path) {
+            addresses.push(serverConfig.path);
         }
 
-        if (config.port) {
-            addresses = addresses.concat(common.util.getPrivateIPv4Addresses().concat(['127.0.0.1']));
+        if (serverConfig.port) {
+            system.getPrivateIPv4Addresses().concat(['127.0.0.1']).forEach((address) => {
+                addresses.push(address);
+            });
         }
 
         addresses.forEach(address => {
 
-            var app = express();
-            var server = http.createServer(app);
+            const app = express();
+            const server = http.createServer(app);
 
             app.disable('x-powered-by');
 
@@ -69,7 +73,7 @@ class Server extends events.EventEmitter {
 
             app.use((req: express.Request, res: express.Response, next) => {
 
-                if (common.regexp.privateIPv4Address.test(req.ip) === true) {
+                if (regexp.privateIPv4Address.test(req.ip) === true) {
                     res.setHeader('Server', 'Mirakurun/' + pkg.version);
                     next();
                 } else {
@@ -103,12 +107,12 @@ class Server extends events.EventEmitter {
                     log.info('listening on http://unix:%s', address);
                 });
             } else {
-                server.listen(config.port, address, () => {
-                    log.info('listening on http://%s:%d', address, config.port);
+                server.listen(serverConfig.port, address, () => {
+                    log.info('listening on http://%s:%d', address, serverConfig.port);
                 });
             }
 
-            this.servers.push(server);
+            this._servers.push(server);
         });
     }
 }

@@ -17,18 +17,11 @@
 /// <reference path="../../typings/js-yaml/js-yaml.d.ts" />
 'use strict';
 
-import log = require('../log');
 import fs = require('fs');
 import yaml = require('js-yaml');
+import log = require('./log');
 
 module config {
-
-    export enum ChannelType {
-        'GR' = 0,
-        'BS' = 1,
-        'CS' = 2,
-        'SKY' = 10
-    }
 
     export interface Server {
         // as Local Server
@@ -43,13 +36,13 @@ module config {
     export interface Tuner {
         name: string;
 
-        types: ChannelType[];
+        // GR / BS / CS / SKY
+        types: string[];
 
-        // for chardev
+        // for chardev / dvb
         command?: string;
 
         // for dvb
-        dvbTuneCommand?: string;
         dvbDevicePath?: string;
 
         // decoder
@@ -64,7 +57,8 @@ module config {
     export interface Channel {
         name: string;
 
-        type: ChannelType;
+        // GR / BS / CS / SKY
+        type: string;
 
         // passed to tuning command
         channel: string;

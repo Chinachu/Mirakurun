@@ -13,39 +13,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../../typings/tsd.d.ts" />
 'use strict';
 
-import common = require('../common');
-//import log = require('../log');
-import events = require('events');
-//import fs = require('fs');
+module regexp {
 
-/* interface User {
-    id: string;
-    agent: string;
-} */
-
-class Tuner extends events.EventEmitter {
-
-    tuners: common.config.Tuner[] = [];
-
-    constructor() {
-        super();
-
-        this.getTuners();
-    }
-
-    getTuners() {
-
-        this.tuners = common.config.getTuners();
-    }
-
-    reloadTuners() {
-
-        this.getTuners();
-        //
-    }
+    export const privateIPv4Address = /^(?:127\.)|(?:10\.)|(?:172\.1[6-9]\.)|(?:172\.2[0-9]\.)|(?:172\.3[0-1]\.)|(?:192\.168\.)/;
 }
 
-export = Tuner;
+export = regexp;

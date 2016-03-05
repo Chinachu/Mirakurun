@@ -16,11 +16,11 @@
 /// <reference path="../../../typings/express/express.d.ts" />
 'use strict';
 
-import common = require('../../common');
 import express = require('express');
+import config = require('../../Mirakurun/config');
 
 export function get(req: express.Request, res: express.Response) {
 
     res.status(200);
-    res.json(common.config.getServer());
+    res.json(config.getServer());
 }

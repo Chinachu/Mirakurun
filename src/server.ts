@@ -13,12 +13,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../typings/tsd.d.ts" />
+/// <reference path="../typings/node/node.d.ts" />
 'use strict';
 
 process.title = 'Mirakurun: Server';
 
-import mirakurun = require('./common');
-import instance = require('./instance');
+import Server = require('./Mirakurun/Server');
 
-instance.server = new mirakurun.Server();
+new Server();

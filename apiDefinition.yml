@@ -894,8 +894,6 @@ definitions:
           $ref: '#/definitions/ChannelType'
       command:
         type: string
-      dvbTuneCommand:
-        type: string
       dvbDevicePath:
         type: string
       decoder:
@@ -950,8 +948,10 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/ChannelType'
-      currentCommand:
+      command:
         type: string
+      pid:
+        type: number
       users:
         type: array
         items:

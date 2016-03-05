@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../typings/tsd.d.ts" />
+/// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
 import util = require('util');
@@ -26,7 +26,7 @@ export enum LogLevel {
     'DEBUG' = 3
 }
 
-export var logLevel: LogLevel = LogLevel.INFO;
+export let logLevel: LogLevel = LogLevel.INFO;
 
 function getLogString(lvstr: string, msgs: any[]) {
     return new Date().toISOString() + ' ' + lvstr + ': ' + util.format.apply(null, msgs);
