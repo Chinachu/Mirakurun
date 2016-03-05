@@ -175,13 +175,34 @@ class TunerDevice extends events.EventEmitter {
         }
 
         this._process.once('exit', (code, signal) => {
+
             this._stream.unpipe();
             this._stream.emit('end');
+
+            log.info(
+                'TunerDevice#' + this._index + ' process has exited with exit code `' + code +
+                '` by signal `' + signal + '` (pid=' + this._process.pid + ')'
+            );
         });
 
         this._process.once('close', (code, signal) => {
+
             this.release();
+
+            log.debug(
+                'TunerDevice#' + this._index + ' process closed with exit code `' + code +
+                '` by signal `' + signal + '` (pid=' + this._process.pid + ')'
+            );
         });
+
+        this._process.stderr.on('data', data => {
+            log.info('TunerDevice#' + this._index + ' stderr `' + data + '`');
+        });
+
+        log.info(
+            'TunerDevice#' + this._index + ' process has spawned by command `' + cmd +
+            '` (pid=' + this._process.pid + ')'
+        );
 
         return Promise.resolve();
     }
@@ -211,7 +232,7 @@ class TunerDevice extends events.EventEmitter {
         this._users = [];
         this._isAvailable = true;
 
-        log.debug('TunerDevice#' + this._index + ' release');
+        log.debug('TunerDevice#' + this._index + ' released');
     }
 }
 
