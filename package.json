@@ -23,7 +23,6 @@
     "url": "https://github.com/kanreisa/Mirakurun/issues"
   },
   "license": "Apache-2.0",
-  "main": "./lib/common.js",
   "bin": {
     "mirakurun": "bin/cli.sh"
   },

@@ -22,6 +22,18 @@ import hammer = require('./hammer');
 import config = require('./config');
 import TunerDevice = require('./TunerDevice');
 
+interface User {
+    id: string;
+    priority: number;
+    agent?: string;
+}
+
+interface Channel {
+    type: string;
+    channel: string;
+    satelite?: string;
+}
+
 class Tuner extends events.EventEmitter {
 
     private _devices: TunerDevice[] = [];
@@ -30,6 +42,8 @@ class Tuner extends events.EventEmitter {
         super();
 
         this.loadTuners();
+
+        hammer.tuner = this;
     }
 
     loadTuners() {

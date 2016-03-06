@@ -35,7 +35,7 @@ function getLogString(lvstr: string, msgs: any[]) {
 export function debug(...msgs: any[]);
 export function debug(): void {
     if (logLevel >= LogLevel.DEBUG) {
-        console.debug(getLogString.call(this, 'debug', arguments));
+        console.log(getLogString.call(this, 'debug', arguments));
     }
 };
 

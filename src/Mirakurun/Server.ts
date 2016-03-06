@@ -25,7 +25,6 @@ import morgan = require('morgan');
 import bodyParser = require('body-parser');
 import yaml = require('js-yaml');
 import log = require('./log');
-import hammer = require('./hammer');
 import regexp = require('./regexp');
 import config = require('./config');
 import system = require('./system');
@@ -39,8 +38,6 @@ class Server extends events.EventEmitter {
 
     constructor() {
         super();
-
-        hammer.tuner = new Tuner();
 
         const serverConfig = config.getServer();
 
@@ -114,6 +111,8 @@ class Server extends events.EventEmitter {
 
             this._servers.push(server);
         });
+
+        new Tuner();
     }
 }
 

@@ -27,6 +27,8 @@ interface User {
     id: string;
     priority: number;
     agent?: string;
+
+    _stream?: stream.Writable;
 }
 
 interface Channel {
@@ -92,27 +94,28 @@ class TunerDevice extends events.EventEmitter {
         return ret;
     }
 
-    getStream(user: User, channel?: Channel): Promise<stream.Readable> {
+    startStream(user: User, stream: stream.Writable, channel?: Channel): Promise<void> {
 
         if (this._isAvailable === false) {
-            return Promise.reject<stream.Readable>(new Error('TunerDevice#' + this._index + ' is not available'));
+            return Promise.reject(new Error('TunerDevice#' + this._index + ' is not available'));
         }
 
         const resolve = () => {
+            user._stream = stream;
             this._users.push(user);
-            return Promise.resolve(this._stream);
+            return Promise.resolve();
         };
 
         if (!channel) {
             if (!this._stream) {
-                return Promise.reject<stream.Readable>(new Error('TunerDevice#' + this._index + ' has not stream'));
+                return Promise.reject(new Error('TunerDevice#' + this._index + ' has not stream'));
             } else {
                 return resolve();
             }
         }
 
         if (this._config.types.indexOf(channel.type) === -1) {
-            return Promise.reject<stream.Readable>(
+            return Promise.reject(
                 new Error('TunerDevice#' + this._index + ' is not supported for channel type `' + channel.type + '`')
             );
         }
@@ -121,7 +124,7 @@ class TunerDevice extends events.EventEmitter {
             if (channel.channel === this._channel.channel) {
                 return resolve();
             } else if (user.priority <= this.getPriority()) {
-                return Promise.reject<stream.Readable>(new Error('TunerDevice#' + this._index + ' has higher priority user'));
+                return Promise.reject(new Error('TunerDevice#' + this._index + ' has higher priority user'));
             }
 
             return this.kill()
@@ -133,12 +136,17 @@ class TunerDevice extends events.EventEmitter {
         }
     }
 
-    releasingStream(user: User): void {
+    endStream(user: User): void {
 
         let i, l = this._users.length;
         for (i = 0; i < l; i++) {
             if (this._users[i].id === user.id && this._users[i].priority === user.priority) {
                 this._users.splice(i, 1);
+
+                if (this._users[i]._stream) {
+                    this._users[i]._stream.end();
+                }
+
                 break;
             }
         }
@@ -176,7 +184,6 @@ class TunerDevice extends events.EventEmitter {
 
         this._process.once('exit', (code, signal) => {
 
-            this._stream.unpipe();
             this._stream.emit('end');
 
             log.info(
@@ -197,6 +204,29 @@ class TunerDevice extends events.EventEmitter {
 
         this._process.stderr.on('data', data => {
             log.info('TunerDevice#' + this._index + ' stderr `' + data + '`');
+        });
+
+        // flowing start
+        this._stream.on('data', chunk => {
+
+            let i, l = this._users.length;
+            for (i = 0; i < l; i++) {
+                if (this._users[i]._stream) {
+                    this._users[i]._stream.write(chunk);
+                }
+            }
+        });
+
+        this._stream.once('end', chunk => {
+
+            this._stream.removeAllListeners('data');
+
+            let i, l = this._users.length;
+            for (i = 0; i < l; i++) {
+                if (this._users[i]._stream) {
+                    this._users[i]._stream.end(chunk);
+                }
+            }
         });
 
         log.info(

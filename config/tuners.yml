@@ -3,7 +3,7 @@
     - BS
     - CS
   command: recpt1 --device /dev/pt3video0 --lnb 15 <channel> - -
-  decoder: b25 -v 0 -s 1 /dev/stdin /dev/stdout
+  decoder: arib-b25-stream-test
   isDisabled: true
 
 - name: PT3-S2
@@ -11,21 +11,21 @@
     - BS
     - CS
   command: recpt1 --device /dev/pt3video1 --lnb 15 <channel> - -
-  decoder: b25 -v 0 -s 1 /dev/stdin /dev/stdout
+  decoder: arib-b25-stream-test
   isDisabled: true
 
 - name: PT3-T1
   types:
     - GR
   command: recpt1 --device /dev/pt3video2 <channel> - -
-  decoder: b25 -v 0 -s 1 /dev/stdin /dev/stdout
+  decoder: arib-b25-stream-test
   isDisabled: true
 
 - name: PT3-T2
   types:
     - GR
   command: recpt1 --device /dev/pt3video3 <channel> - -
-  decoder: b25 -v 0 -s 1 /dev/stdin /dev/stdout
+  decoder: arib-b25-stream-test
   isDisabled: true
 
 - name: PT2-S1
@@ -34,7 +34,7 @@
     - CS
   isPT2: true
   command: recpt1 --device /dev/pt1video0 --lnb 15 <channel> - -
-  decoder: b25 -v 0 -s 1 /dev/stdin /dev/stdout
+  decoder: arib-b25-stream-test
   isDisabled: true
 
 - name: PT2-S2
@@ -43,7 +43,7 @@
     - CS
   isPT2: true
   command: recpt1 --device /dev/pt1video1 --lnb 15 <channel> - -
-  decoder: b25 -v 0 -s 1 /dev/stdin /dev/stdout
+  decoder: arib-b25-stream-test
   isDisabled: true
 
 - name: PT2-T1
@@ -51,7 +51,7 @@
     - GR
   isPT2: true
   command: recpt1 --device /dev/pt1video2 <channel> - -
-  decoder: b25 -v 0 -s 1 /dev/stdin /dev/stdout
+  decoder: arib-b25-stream-test
   isDisabled: true
 
 - name: PT2-T2
@@ -59,7 +59,7 @@
     - GR
   isPT2: true
   command: recpt1 --device /dev/pt1video3 <channel> - -
-  decoder: b25 -v 0 -s 1 /dev/stdin /dev/stdout
+  decoder: arib-b25-stream-test
   isDisabled: true
 
 - name: TBS6922
@@ -67,5 +67,5 @@
     - SKY
   command: szap-s2j -c /usr/local/etc/szap-s2j.conf -l <satelite> -S 1 -p -r -M 5 -C 35 -ch <channel>
   dvbDevicePath: /dev/dvb/adapter0/dvr0
-  decoder: b1 -v 0 -s 1 /dev/stdin /dev/stdout
+  decoder: arib-b1-stream-test
   isDisabled: true
