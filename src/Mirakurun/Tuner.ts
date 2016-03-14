@@ -16,89 +16,231 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import events = require('events');
+import child_process = require('child_process');
+import stream = require('stream');
+import _ = require('./_');
+import common = require('./common');
 import log = require('./log');
-import hammer = require('./hammer');
 import config = require('./config');
 import TunerDevice = require('./TunerDevice');
+import ChannelItem = require('./ChannelItem');
+import ServiceItem = require('./ServiceItem');
+import ProgramItem = require('./ProgramItem');
+import TSFilter = require('./TSFilter');
 
-interface User {
-    id: string;
-    priority: number;
-    agent?: string;
+interface StreamSetting {
+    channel: ChannelItem;
+    serviceId?: number;
+    eventId?: number;
 }
 
-interface Channel {
-    type: string;
-    channel: string;
-    satelite?: string;
-}
-
-class Tuner extends events.EventEmitter {
+class Tuner {
 
     private _devices: TunerDevice[] = [];
 
     constructor() {
-        super();
 
-        this.loadTuners();
+        this._load();
 
-        hammer.tuner = this;
+        _.tuner = this;
     }
 
-    loadTuners() {
+    typeExists(type: string): boolean {
+
+        let i, l = this._devices.length;
+        for (i = 0; i < l; i++) {
+            if (this._devices[i].config.types.indexOf(type) !== -1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    getChannelStream(channel: ChannelItem, user: common.User): Promise<stream.Readable> {
+
+        const setting: StreamSetting = {
+            channel: channel
+        };
+
+        return this._getStream(setting, user);
+    }
+
+    getServiceStream(service: ServiceItem, user: common.User): Promise<stream.Readable> {
+
+        const setting: StreamSetting = {
+            channel: service.channel,
+            serviceId: service.id
+        };
+
+        return this._getStream(setting, user);
+    }
+
+    getProgramStream(program: ProgramItem, user: common.User): Promise<stream.Readable> {
+
+        const setting: StreamSetting = {
+            channel: program.service.channel,
+            serviceId: program.data.serviceId,
+            eventId: program.data.eventId
+        };
+
+        return this._getStream(setting, user);
+    }
+
+    private _load(): this {
 
         log.debug('loading tuners...');
 
-        const tuners = config.getTuners();
+        const tuners = config.loadTuners();
 
-        tuners
-            .filter((tuner, i) => {
-                // validate config
+        tuners.forEach((tuner, i) => {
 
-                if (!tuner.name || !tuner.types || !tuner.command) {
-                    log.error('missing required property in tuner#%s configuration', i);
-                    return false;
-                }
+            if (!tuner.name || !tuner.types || !tuner.command) {
+                log.error('missing required property in tuner#%s configuration', i);
+                return;
+            }
 
-                if (typeof tuner.name !== 'string') {
-                    log.error('invalid type of property `name` in tuner#%s configuration', i);
-                    return false;
-                }
+            if (typeof tuner.name !== 'string') {
+                log.error('invalid type of property `name` in tuner#%s configuration', i);
+                return;
+            }
 
-                if (Array.isArray(tuner.types) === false) {
-                    console.log(tuner);
-                    log.error('invalid type of property `types` in tuner#%s configuration', i);
-                    return false;
-                }
+            if (Array.isArray(tuner.types) === false) {
+                console.log(tuner);
+                log.error('invalid type of property `types` in tuner#%s configuration', i);
+                return;
+            }
 
-                if (typeof tuner.command !== 'string') {
-                    log.error('invalid type of property `command` in tuner#%s configuration', i);
-                    return false;
-                }
+            if (typeof tuner.command !== 'string') {
+                log.error('invalid type of property `command` in tuner#%s configuration', i);
+                return;
+            }
 
-                if (tuner.dvbDevicePath && typeof tuner.dvbDevicePath !== 'string') {
-                    log.error('invalid type of property `dvbDevicePath` in tuner#%s configuration', i);
-                    return false;
-                }
+            if (tuner.dvbDevicePath && typeof tuner.dvbDevicePath !== 'string') {
+                log.error('invalid type of property `dvbDevicePath` in tuner#%s configuration', i);
+                return;
+            }
 
-                if (tuner.isDisabled) {
-                    return false;
-                }
+            if (tuner.isDisabled) {
+                return;
+            }
 
-                return true;
-            })
-            .forEach((tuner, i) => {
-                // get tuner device instance
-                this._devices.push(
-                    new TunerDevice(i, tuner)
-                );
-            });
+            this._devices.push(
+                new TunerDevice(i, tuner)
+            );
+        });
 
         log.info('%s of %s tuners loaded', this._devices.length, tuners.length);
+
+        return this;
     }
 
-    //getStream
+    private _getStream(setting: StreamSetting, user: common.User): Promise<stream.Readable> {
+
+        return new Promise<stream.Readable>((resolve, reject) => {
+
+            const devices = this._getDevicesByType(setting.channel.type);
+
+            let tryCount = 3;
+            let i, l = devices.length;
+
+            function find() {
+
+                let device: TunerDevice = null;
+
+                // 1.
+                for (i = 0; i < l; i++) {
+                    if (devices[i].isAvailable === false) {
+                        continue;
+                    }
+                    if (devices[i].channel === setting.channel) {
+                        device = devices[i];
+                        break;
+                    }
+                }
+
+                // 2.
+                if (device === null) {
+                    for (i = 0; i < l; i++) {
+                        if (devices[i].isFree === true) {
+                            device = devices[i];
+                            break;
+                        }
+                    }
+                }
+
+                // 3.
+                if (device === null) {
+                    for (i = 0; i < l; i++) {
+                        if (devices[i].isUsing === true && devices[i].getPriority() < user.priority) {
+                            device = devices[i];
+                            break;
+                        }
+                    }
+                }
+
+                if (device === null) {
+                    --tryCount;
+                    if (tryCount > 0) {
+                        setTimeout(find, 500);
+                    } else {
+                        reject(new Error('no available tuners'));
+                    }
+                } else {
+                    const tsFilter = new TSFilter({
+                        serviceId: setting.serviceId,
+                        eventId: setting.eventId
+                    });
+
+                    device.startStream(user, tsFilter, setting.channel)
+                        .catch((err) => {
+                            tsFilter.end();
+                            reject(err);
+                        })
+                        .then(() => {
+                            if (user.id === '@' || device.decoder === null) {
+                                resolve(tsFilter);
+                            } else {
+                                const decoder = child_process.spawn(device.decoder);
+                                tsFilter.pipe(decoder.stdin);
+                                resolve(decoder.stdout);
+                            }
+                        });
+                }
+            }
+            find();
+        });
+    }
+
+    private _getDevicesByType(type: string): TunerDevice[] {
+
+        const devices = [];
+
+        let i, l = this._devices.length;
+        for (i = 0; i < l; i++) {
+            if (this._devices[i].config.types.indexOf(type) !== -1) {
+                devices.push(this._devices[i]);
+            }
+        }
+
+        return devices;
+    }
+
+    static typeExists(type: string): boolean {
+        return _.tuner.typeExists(type);
+    }
+
+    static getChannelStream(channel: ChannelItem, user: common.User): Promise<stream.Readable> {
+        return _.tuner.getChannelStream(channel, user);
+    }
+
+    static getServiceStream(service: ServiceItem, user: common.User): Promise<stream.Readable> {
+        return _.tuner.getServiceStream(service, user);
+    }
+
+    static getProgramStream(program: ProgramItem, user: common.User): Promise<stream.Readable> {
+        return _.tuner.getProgramStream(program, user);
+    }
 }
 
 export = Tuner;

@@ -48,8 +48,17 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
-  /channels/{channel}:
+  /channels/{type}/{channel}:
     parameters:
+      - in: path
+        name: type
+        type: string
+        enum:
+          - GR
+          - BS
+          - CS
+          - SKY
+        required: true
       - in: path
         name: channel
         type: string
@@ -90,8 +99,17 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
-  /channels/{channel}/stream:
+  /channels/{type}/{channel}/stream:
     parameters:
+      - in: path
+        name: type
+        type: string
+        enum:
+          - GR
+          - BS
+          - CS
+          - SKY
+        required: true
       - in: path
         name: channel
         type: string
@@ -605,12 +623,12 @@ definitions:
       - type
       - channel
     properties:
+      type:
+        $ref: '#/definitions/ChannelType'
       channel:
         type: string
       name:
         type: string
-      type:
-        $ref: '#/definitions/ChannelType'
       services:
         type: array
         items:
@@ -645,6 +663,8 @@ definitions:
     properties:
       id:
         $ref: '#/definitions/ProgramId'
+      eventId:
+        type: number
       startAt:
         $ref: '#/definitions/UnixtimeMS'
       endAt:
@@ -655,10 +675,6 @@ definitions:
         $ref: '#/definitions/Service'
       name:
         type: string
-      #topic:
-      #  type: string
-      #title:
-      #  type: string
       description:
         type: string
       genre:
@@ -806,56 +822,18 @@ definitions:
   Event:
     type: object
     properties:
-      type:
-        $ref: '#/definitions/EventType'
-      level:
-        $ref: '#/definitions/EventLevel'
-      action:
-        $ref: '#/definitions/EventAction'
-      result:
-        $ref: '#/definitions/EventResult'
-      path:
-        type: string
-      description:
-        type: string
-      createdAt:
+      resource:
+        $ref: '#/definitions/EventResource'
+      data:
+        type: object
+      time:
         $ref: '#/definitions/UnixtimeMS'
 
-  EventType:
+  EventResource:
     type: string
     enum:
-      - epg
-      - stream
-      - system
-      - process
-
-  EventLevel:
-    type: string
-    enum:
-      - fatal
-      - error
-      - warn
-      - info
-      - debug
-
-  EventAction:
-    type: string
-    enum:
-      - create
-      - update
-      - change
-      - connect
-      - disconnect
-      - start
-      - stop
-      - spawn
-      - kill
-
-  EventResult:
-    type: string
-    enum:
-      - success
-      - failure
+      - program
+      - service
 
   # config --------------------------------------------------------------------
 

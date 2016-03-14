@@ -16,7 +16,6 @@
 /// <reference path="../../typings/tsd.d.ts" />
 'use strict';
 
-import events = require('events');
 import fs = require('fs');
 import http = require('http');
 import express = require('express');
@@ -29,17 +28,19 @@ import regexp = require('./regexp');
 import config = require('./config');
 import system = require('./system');
 import Tuner = require('./Tuner');
+import Channel = require('./Channel');
+import Service = require('./Service');
+import Program = require('./Program');
 
 const pkg = require('../../package.json');
 
-class Server extends events.EventEmitter {
+class Server {
 
     private _servers: http.Server[] = [];
 
     constructor() {
-        super();
 
-        const serverConfig = config.getServer();
+        const serverConfig = config.loadServer();
 
         if (typeof serverConfig.logLevel === 'number') {
             log.logLevel = serverConfig.logLevel;
@@ -81,7 +82,7 @@ class Server extends events.EventEmitter {
             app.use(swaggerize({
                 api: yaml.safeLoad(fs.readFileSync('apiDefinition.yml', 'utf8')),
                 docspath: '/docs',
-                handlers: '../api'
+                handlers: './api'
             }));
 
             app.use((err, req, res: express.Response, next) => {
@@ -113,6 +114,9 @@ class Server extends events.EventEmitter {
         });
 
         new Tuner();
+        new Channel();
+        new Service();
+        new Program();
     }
 }
 

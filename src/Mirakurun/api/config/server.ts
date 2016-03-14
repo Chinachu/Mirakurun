@@ -13,21 +13,14 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../typings/node/node.d.ts" />
+/// <reference path="../../../../typings/express/express.d.ts" />
 'use strict';
 
-import Server = require('./Mirakurun/Server');
+import express = require('express');
+import config = require('../../config');
 
-process.title = 'Mirakurun: Server';
+export function get(req: express.Request, res: express.Response) {
 
-setEnv('SERVER_CONFIG_PATH', '/usr/local/etc/mirakurun/server.yml');
-setEnv('TUNERS_CONFIG_PATH', '/usr/local/etc/mirakurun/tuners.yml');
-setEnv('CHANNELS_CONFIG_PATH', '/usr/local/etc/mirakurun/channels.yml');
-setEnv('SERVICES_DB_PATH', '/usr/local/var/db/mirakurun/services.json');
-setEnv('PROGRAMS_DB_PATH', '/usr/local/var/db/mirakurun/programs.json');
-
-new Server();
-
-function setEnv(name: string, value: string) {
-    process.env[name] = process.env[name] || value;
+    res.status(200);
+    res.json(config.loadServer());
 }

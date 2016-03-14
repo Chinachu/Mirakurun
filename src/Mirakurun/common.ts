@@ -13,14 +13,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../../../typings/express/express.d.ts" />
-'use strict';
 
-import express = require('express');
-import config = require('../../Mirakurun/config');
-
-export function get(req: express.Request, res: express.Response) {
-
-    res.status(200);
-    res.json(config.getServer());
+export interface User {
+    id: string;
+    priority: number;
+    agent?: string;
 }

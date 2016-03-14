@@ -23,7 +23,7 @@ fi
 mkdir -vp /usr/local/etc/mirakurun
 mkdir -vp /usr/local/var/log
 mkdir -vp /usr/local/var/run
-mkdir -vp /usr/local/var/db
+mkdir -vp /usr/local/var/db/mirakurun
 
 cp -vn config/server.yml /usr/local/etc/mirakurun/server.yml
 cp -vn config/tuners.yml /usr/local/etc/mirakurun/tuners.yml

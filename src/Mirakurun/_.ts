@@ -15,12 +15,20 @@
 */
 'use strict';
 
+import Event = require('./Event');
 import Tuner = require('./Tuner');
+import Channel = require('./Channel');
+import Service = require('./Service');
+import Program = require('./Program');
 
-interface Hammer {
+interface _ {
+    event?: Event;
     tuner?: Tuner;
+    channel?: Channel;
+    service?: Service;
+    program?: Program;
 }
 
-const hammer: Hammer = {};
+const _: _ = {};
 
-export = hammer;
+export = _;

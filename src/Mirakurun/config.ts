@@ -66,19 +66,56 @@ module config {
 
         // service id
         serviceId?: number;
+
+        isDisabled?: boolean;
     }
 
-    export function getServer(): Server {
-
-        return yaml.safeLoad(fs.readFileSync('/usr/local/etc/mirakurun/server.yml', 'utf8'));
+    export function loadServer(): Server {
+        return load(process.env.SERVER_CONFIG_PATH);
     }
-    export function getTuners(): Tuner[] {
 
-        return yaml.safeLoad(fs.readFileSync('/usr/local/etc/mirakurun/tuners.yml', 'utf8'));
+    export function saveServer(data: Server): Promise<void> {
+        return save(process.env.SERVER_CONFIG_PATH, data);
     }
-    export function getChannels(): Channel[] {
 
-        return yaml.safeLoad(fs.readFileSync('/usr/local/etc/mirakurun/channels.yml', 'utf8'));
+    export function loadTuners(): Tuner[] {
+        return load(process.env.TUNERS_CONFIG_PATH);
+    }
+
+    export function saveTuners(data: Tuner[]): Promise<void> {
+        return save(process.env.TUNERS_CONFIG_PATH, data);
+    }
+
+    export function loadChannels(): Channel[] {
+        return load(process.env.CHANNELS_CONFIG_PATH);
+    }
+
+    export function saveChannels(data: Channel[]): Promise<void> {
+        return save(process.env.CHANNELS_CONFIG_PATH, data);
+    }
+
+    function load(path) {
+
+        log.debug('load config `%s`', path);
+
+        return yaml.safeLoad(fs.readFileSync(path, 'utf8'));
+    }
+
+    function save(path, data): Promise<void> {
+
+        log.debug('save config `%s`', path);
+
+        return new Promise<void>((resolve, reject) => {
+
+            fs.writeFile(path, JSON.stringify(data), err => {
+
+                if (err) {
+                    return reject(err);
+                }
+
+                resolve();
+            });
+        });
     }
 }
 

@@ -16,30 +16,22 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import events = require('events');
 import child_process = require('child_process');
 import stream = require('stream');
 import fs = require('fs');
+import util = require('util');
+import common = require('./common');
 import log = require('./log');
 import config = require('./config');
+import ChannelItem = require('./ChannelItem');
 
-interface User {
-    id: string;
-    priority: number;
-    agent?: string;
-
+interface User extends common.User {
     _stream?: stream.Writable;
 }
 
-interface Channel {
-    type: string;
-    channel: string;
-    satelite?: string;
-}
+class TunerDevice {
 
-class TunerDevice extends events.EventEmitter {
-
-    private _channel: Channel;
+    private _channel: ChannelItem;
     private _command: string;
     private _process: child_process.ChildProcess;
     private _stream: stream.Readable;
@@ -47,9 +39,7 @@ class TunerDevice extends events.EventEmitter {
     private _isAvailable: boolean;
 
     constructor(private _index: number, private _config: config.Tuner) {
-        super();
-
-        this.release();
+        this._release();
     }
 
     get index(): number {
@@ -60,7 +50,7 @@ class TunerDevice extends events.EventEmitter {
         return this._config;
     }
 
-    get channel(): Channel {
+    get channel(): ChannelItem {
         return this._channel;
     }
 
@@ -73,11 +63,29 @@ class TunerDevice extends events.EventEmitter {
     }
 
     get users(): User[] {
-        return this._users;
+        return this._users.map(user => {
+            return {
+                id: user.id,
+                priority: user.priority,
+                agent: user.agent
+            };
+        });
+    }
+
+    get decoder(): string {
+        return this._config.decoder || null;
     }
 
     get isAvailable(): boolean {
         return this._isAvailable;
+    }
+
+    get isFree(): boolean {
+        return this._isAvailable === true && this._channel === null && this._users.length === 0;
+    }
+
+    get isUsing(): boolean {
+        return this._isAvailable === true && this._channel !== null && this._users.length !== 0;
     }
 
     getPriority(): number {
@@ -94,21 +102,29 @@ class TunerDevice extends events.EventEmitter {
         return ret;
     }
 
-    startStream(user: User, stream: stream.Writable, channel?: Channel): Promise<void> {
+    startStream(user: User, stream: stream.Writable, channel?: ChannelItem): Promise<void> {
+
+        log.debug('TunerDevice#%d start stream for user `%s` (priority=%d)...', this._index, user.id, user.priority);
 
         if (this._isAvailable === false) {
-            return Promise.reject(new Error('TunerDevice#' + this._index + ' is not available'));
+            return Promise.reject(new Error(util.format('TunerDevice#%d is not available', this._index)));
         }
 
         const resolve = () => {
+
+            log.info('TunerDevice#%d streaming to user `%s` (priority=%d)', this._index, user.id, user.priority);
+
             user._stream = stream;
             this._users.push(user);
+
+            stream.once('close', () => this._endStream(user));
+
             return Promise.resolve();
         };
 
         if (!channel) {
             if (!this._stream) {
-                return Promise.reject(new Error('TunerDevice#' + this._index + ' has not stream'));
+                return Promise.reject(new Error(util.format('TunerDevice#%d has not stream', this._index)));
             } else {
                 return resolve();
             }
@@ -116,7 +132,7 @@ class TunerDevice extends events.EventEmitter {
 
         if (this._config.types.indexOf(channel.type) === -1) {
             return Promise.reject(
-                new Error('TunerDevice#' + this._index + ' is not supported for channel type `' + channel.type + '`')
+                new Error(util.format('TunerDevice#%d is not supported for channel type `%s`', this._index, channel.type))
             );
         }
 
@@ -124,44 +140,44 @@ class TunerDevice extends events.EventEmitter {
             if (channel.channel === this._channel.channel) {
                 return resolve();
             } else if (user.priority <= this.getPriority()) {
-                return Promise.reject(new Error('TunerDevice#' + this._index + ' has higher priority user'));
+                return Promise.reject(new Error(util.format('TunerDevice#%d has higher priority user', this._index)));
             }
 
-            return this.kill()
-                .then(() => this.spawn(channel))
+            return this._kill()
+                .then(() => this._spawn(channel))
                 .catch(log.error)
                 .then(resolve);
         } else {
-            return this.spawn(channel).then(resolve);
+            return this._spawn(channel).then(resolve);
         }
     }
 
-    endStream(user: User): void {
+    private _endStream(user: User): void {
+
+        log.debug('TunerDevice#%d end stream for user `%s` (priority=%d)...', this._index, user.id, user.priority);
 
         let i, l = this._users.length;
         for (i = 0; i < l; i++) {
             if (this._users[i].id === user.id && this._users[i].priority === user.priority) {
                 this._users.splice(i, 1);
-
-                if (this._users[i]._stream) {
-                    this._users[i]._stream.end();
-                }
-
+                this._users[i]._stream.end();
                 break;
             }
         }
 
         if (this._users.length === 0) {
-            this.kill().catch(log.error);
+            this._kill().catch(log.error);
         }
+
+        log.info('TunerDevice#%d end streaming to user `%s` (priority=%d)', this._index, user.id, user.priority);
     }
 
-    private spawn(ch): Promise<void> {
+    private _spawn(ch): Promise<void> {
 
-        log.debug('TunerDevice#' + this._index + ' spawn...');
+        log.debug('TunerDevice#%d spawn...', this._index);
 
         if (this._process) {
-            return Promise.reject(new Error('TunerDevice#' + this._index + ' has process'));
+            return Promise.reject(new Error(util.format('TunerDevice#%d has process', this._index)));
         }
 
         let cmd = this._config.command;
@@ -187,23 +203,23 @@ class TunerDevice extends events.EventEmitter {
             this._stream.emit('end');
 
             log.info(
-                'TunerDevice#' + this._index + ' process has exited with exit code `' + code +
-                '` by signal `' + signal + '` (pid=' + this._process.pid + ')'
+                'TunerDevice#%d process has exited with exit code=%d by signal `%s` (pid=%d)',
+                this._index, code, signal, this._process.pid
             );
         });
 
         this._process.once('close', (code, signal) => {
 
-            this.release();
+            this._release();
 
             log.debug(
-                'TunerDevice#' + this._index + ' process closed with exit code `' + code +
-                '` by signal `' + signal + '` (pid=' + this._process.pid + ')'
+                'TunerDevice#%d process closed with exit code=%d by signal `%s` (pid=%d)',
+                this._index, code, signal, this._process.pid
             );
         });
 
         this._process.stderr.on('data', data => {
-            log.info('TunerDevice#' + this._index + ' stderr `' + data + '`');
+            log.info('TunerDevice#%d stderr `%s`', this._index, data);
         });
 
         // flowing start
@@ -211,9 +227,7 @@ class TunerDevice extends events.EventEmitter {
 
             let i, l = this._users.length;
             for (i = 0; i < l; i++) {
-                if (this._users[i]._stream) {
-                    this._users[i]._stream.write(chunk);
-                }
+                this._users[i]._stream.write(chunk);
             }
         });
 
@@ -223,26 +237,21 @@ class TunerDevice extends events.EventEmitter {
 
             let i, l = this._users.length;
             for (i = 0; i < l; i++) {
-                if (this._users[i]._stream) {
-                    this._users[i]._stream.end(chunk);
-                }
+                this._users[i]._stream.end(chunk);
             }
         });
 
-        log.info(
-            'TunerDevice#' + this._index + ' process has spawned by command `' + cmd +
-            '` (pid=' + this._process.pid + ')'
-        );
+        log.info('TunerDevice#%d process has spawned by command `%s` (pid=%d)', this._index, cmd, this._process.pid);
 
         return Promise.resolve();
     }
 
-    private kill(): Promise<void> {
+    private _kill(): Promise<void> {
 
-        log.debug('TunerDevice#' + this._index + ' kill...');
+        log.debug('TunerDevice#%d kill...', this._index);
 
         if (!this._process) {
-            return Promise.reject(new Error('TunerDevice#' + this._index + ' has not process'));
+            return Promise.reject(new Error(util.format('TunerDevice#%d has not process', this._index)));
         }
 
         this._isAvailable = false;
@@ -253,7 +262,7 @@ class TunerDevice extends events.EventEmitter {
         });
     }
 
-    private release(): void {
+    private _release(): this {
 
         this._channel = null;
         this._command = null;
@@ -262,7 +271,9 @@ class TunerDevice extends events.EventEmitter {
         this._users = [];
         this._isAvailable = true;
 
-        log.debug('TunerDevice#' + this._index + ' released');
+        log.debug('TunerDevice#%d released', this._index);
+
+        return this;
     }
 }
 
