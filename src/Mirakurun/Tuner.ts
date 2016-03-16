@@ -193,18 +193,23 @@ class Tuner {
                     });
 
                     device.startStream(user, tsFilter, setting.channel)
-                        .catch((err) => {
-                            tsFilter.end();
-                            reject(err);
-                        })
                         .then(() => {
-                            if (user.id === '@' || device.decoder === null) {
+                            if (user.disableDecoder === true || device.decoder === null) {
                                 resolve(tsFilter);
                             } else {
                                 const decoder = child_process.spawn(device.decoder);
+                                decoder.stdout.once('close', () => tsFilter.emit('close'));
+                                tsFilter.once('close', () => decoder.kill('SIGKILL'));
                                 tsFilter.pipe(decoder.stdin);
                                 resolve(decoder.stdout);
                             }
+                        })
+                        .catch((err) => {
+                            //tsFilter.end();
+                            tsFilter.emit('close');
+                            reject(err);
+
+                            return Promise.reject(err);
                         });
                 }
             }

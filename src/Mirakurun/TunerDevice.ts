@@ -117,7 +117,7 @@ class TunerDevice {
             user._stream = stream;
             this._users.push(user);
 
-            stream.once('close', () => this._endStream(user));
+            stream.once('close', () => this.endStream(user));
 
             return Promise.resolve();
         };
@@ -145,22 +145,22 @@ class TunerDevice {
 
             return this._kill()
                 .then(() => this._spawn(channel))
-                .catch(log.error)
+                .catch(err => Promise.reject(err))
                 .then(resolve);
         } else {
             return this._spawn(channel).then(resolve);
         }
     }
 
-    private _endStream(user: User): void {
+    endStream(user: User): void {
 
         log.debug('TunerDevice#%d end stream for user `%s` (priority=%d)...', this._index, user.id, user.priority);
 
         let i, l = this._users.length;
         for (i = 0; i < l; i++) {
             if (this._users[i].id === user.id && this._users[i].priority === user.priority) {
-                this._users.splice(i, 1);
                 this._users[i]._stream.end();
+                this._users.splice(i, 1);
                 break;
             }
         }
@@ -194,13 +194,38 @@ class TunerDevice {
 
         if (this._config.dvbDevicePath) {
             this._stream = fs.createReadStream(this._config.dvbDevicePath);
+
+            this._stream.once('error', (err) => {
+
+                log.error('TunerDevice#%d fs.ReadStream error `%s`', this._index, err.code);
+
+                this._kill();
+            });
+
+            this._stream.once('open', fd => {
+
+                log.debug('TunerDevice#%d fs.ReadStream has opened (fd=%d)', this._index, fd);
+
+                this._process.once('exit', () => {
+
+                    fs.closeSync(fd);
+                    this._stream['close']();
+
+                    log.debug('TunerDevice#%d fs.ReadStream has closed (fd=%d)', this._index, fd);
+                });
+            });
         } else {
             this._stream = this._process.stdout;
         }
 
-        this._process.once('exit', (code, signal) => {
+        this._process.once('error', (err) => {
 
-            this._stream.emit('end');
+            log.error('TunerDevice#%d process error `%s` (pid=%d)', this._index, err.code, this._process.pid);
+
+            this._kill();
+        });
+
+        this._process.once('exit', (code, signal) => {
 
             log.info(
                 'TunerDevice#%d process has exited with exit code=%d by signal `%s` (pid=%d)',
@@ -210,16 +235,24 @@ class TunerDevice {
 
         this._process.once('close', (code, signal) => {
 
-            this._release();
-
             log.debug(
                 'TunerDevice#%d process closed with exit code=%d by signal `%s` (pid=%d)',
                 this._index, code, signal, this._process.pid
             );
+
+            this._stream.removeAllListeners('data');
+
+            let i, l = this._users.length;
+            for (i = 0; i < l; i++) {
+                this._users[i]._stream.end();
+                this._users.splice(i, 1);
+            }
+
+            this._release();
         });
 
         this._process.stderr.on('data', data => {
-            log.info('TunerDevice#%d stderr `%s`', this._index, data);
+            log.info('TunerDevice#%d > %s', this._index, data.toString().trim());
         });
 
         // flowing start
@@ -228,16 +261,6 @@ class TunerDevice {
             let i, l = this._users.length;
             for (i = 0; i < l; i++) {
                 this._users[i]._stream.write(chunk);
-            }
-        });
-
-        this._stream.once('end', chunk => {
-
-            this._stream.removeAllListeners('data');
-
-            let i, l = this._users.length;
-            for (i = 0; i < l; i++) {
-                this._users[i]._stream.end(chunk);
             }
         });
 
@@ -257,7 +280,7 @@ class TunerDevice {
         this._isAvailable = false;
 
         return new Promise<void>(resolve => {
-            this._process.once('close', () => resolve());
+            this._process.once('close', resolve.bind(this));
             this._process.kill('SIGTERM');
         });
     }

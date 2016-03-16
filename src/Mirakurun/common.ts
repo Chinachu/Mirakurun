@@ -18,4 +18,5 @@ export interface User {
     id: string;
     priority: number;
     agent?: string;
+    disableDecoder?: boolean;
 }

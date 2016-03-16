@@ -32,6 +32,8 @@ class Event extends events.EventEmitter {
     constructor() {
         super();
 
+        _.event = this;
+
         this.on('event', message => {
 
             this._log.unshift(message);
@@ -41,8 +43,6 @@ class Event extends events.EventEmitter {
                 this._log.pop();
             }
         });
-
-        _.event = this;
     }
 
     get log(): EventMessage[] {

@@ -16,26 +16,23 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import events = require('events');
 import stream = require('stream');
 import _ = require('./_');
 import log = require('./log');
 import db = require('./db');
-import Channel = require('./Channel');
 import ChannelItem = require('./ChannelItem');
 import ServiceItem = require('./ServiceItem');
 
-class Service extends events.EventEmitter {
+class Service {
 
-    private _items: ServiceItem[];
+    private _items: ServiceItem[] = [];
     private _saveTimerId: NodeJS.Timer;
 
     constructor() {
-        super();
-
-        this._load();
 
         _.service = this;
+
+        this._load();
     }
 
     add(item: ServiceItem): void {
@@ -90,7 +87,7 @@ class Service extends events.EventEmitter {
 
         db.loadServices().forEach(service => {
 
-            const channelItem = Channel.get(service.channel.type, service.channel.channel);
+            const channelItem = _.channel.get(service.channel.type, service.channel.channel);
 
             if (channelItem === null) {
                 dropped = true;

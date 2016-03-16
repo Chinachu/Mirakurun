@@ -27,6 +27,7 @@ import log = require('./log');
 import regexp = require('./regexp');
 import config = require('./config');
 import system = require('./system');
+import Event = require('./Event');
 import Tuner = require('./Tuner');
 import Channel = require('./Channel');
 import Service = require('./Service');
@@ -65,7 +66,7 @@ class Server {
 
             app.disable('x-powered-by');
 
-            app.use(morgan('combined'));
+            app.use(morgan('short'));
             app.use(bodyParser.urlencoded({ extended: false }));
             app.use(bodyParser.json());
 
@@ -87,13 +88,21 @@ class Server {
 
             app.use((err, req, res: express.Response, next) => {
 
-                console.error(err.stack);
-                console.error(JSON.stringify(err, null, '  '));
+                log.debug(err.stack);
+                log.debug(JSON.stringify(err, null, '  '));
 
-                res.json({
+                if (res.headersSent === false) {
+                    res.writeHead(err.status, err.name, {
+                        'Content-Type': 'application/json'
+                    });
+                }
+
+                res.end(JSON.stringify({
                     code: res.statusCode,
-                    reason: '@' + err.toString()
-                });
+                    reason: err.message
+                }));
+
+                next();
             });
 
             if (/^\//.test(address) === true) {
@@ -113,6 +122,7 @@ class Server {
             this._servers.push(server);
         });
 
+        new Event();
         new Tuner();
         new Channel();
         new Service();

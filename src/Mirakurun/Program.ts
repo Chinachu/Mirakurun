@@ -32,9 +32,9 @@ class Program {
 
     constructor() {
 
-        this._load();
-
         _.program = this;
+
+        this._load();
     }
 
     add(item: ProgramItem): void {

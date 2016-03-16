@@ -20,6 +20,10 @@ import Server = require('./Mirakurun/Server');
 
 process.title = 'Mirakurun: Server';
 
+process.on('uncaughtException', err => {
+    console.error(err, err.stack);
+});
+
 setEnv('SERVER_CONFIG_PATH', '/usr/local/etc/mirakurun/server.yml');
 setEnv('TUNERS_CONFIG_PATH', '/usr/local/etc/mirakurun/tuners.yml');
 setEnv('CHANNELS_CONFIG_PATH', '/usr/local/etc/mirakurun/channels.yml');

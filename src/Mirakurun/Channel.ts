@@ -25,13 +25,13 @@ import Tuner = require('./Tuner');
 
 class Channel {
 
-    private _items: ChannelItem[];
+    private _items: ChannelItem[] = [];
 
     constructor() {
 
-        this.load();
-
         _.channel = this;
+
+        this.load();
     }
 
     add(item: ChannelItem): void {
@@ -90,7 +90,7 @@ class Channel {
                 return;
             }
 
-            if (typeof channel.satelite !== 'string') {
+            if (channel.satelite && typeof channel.satelite !== 'string') {
                 log.error('invalid type of property `satelite` in channel#%d (%s) configuration', i, channel.name);
                 return;
             }

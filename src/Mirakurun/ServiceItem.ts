@@ -17,22 +17,22 @@
 'use strict';
 
 import stream = require('stream');
+import _ = require('./_');
 import common = require('./common');
 import db = require('./db');
 import Event = require('./Event');
 import Tuner = require('./Tuner');
 import ChannelItem = require('./ChannelItem');
-import Service = require('./Service');
 
 class ServiceItem {
 
-    constructor(private _channel: ChannelItem, private _id: number, private _name: string = '') {
+    constructor(private _channel: ChannelItem, private _id: number, private _name?: string) {
 
-        if (Service.exists(_id) === true) {
+        if (_.service.exists(_id) === true) {
             return this;
         }
 
-        Service.add(this);
+        _.service.add(this);
         this._updated();
     }
 
@@ -41,7 +41,7 @@ class ServiceItem {
     }
 
     get name(): string {
-        return this._name;
+        return this._name || '';
     }
 
     get channel(): ChannelItem {
@@ -53,7 +53,7 @@ class ServiceItem {
         if (this._name !== name) {
             this._name = name;
 
-            Service.save();
+            _.service.save();
             this._updated();
         }
     }
@@ -61,7 +61,7 @@ class ServiceItem {
     export(): db.Service {
         return {
             id: this._id,
-            name: this._name,
+            name: this._name || '',
             channel: {
                 type: this._channel.type,
                 channel: this._channel.channel

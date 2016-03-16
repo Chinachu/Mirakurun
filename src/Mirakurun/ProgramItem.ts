@@ -17,6 +17,7 @@
 'use strict';
 
 import stream = require('stream');
+import _ = require('./_');
 import common = require('./common');
 import db = require('./db');
 import Event = require('./Event');
@@ -24,17 +25,16 @@ import Tuner = require('./Tuner');
 import ChannelItem = require('./ChannelItem');
 import Service = require('./Service');
 import ServiceItem = require('./ServiceItem');
-import Program = require('./Program');
 
 class ProgramItem {
 
     constructor(private _data: db.Program) {
 
-        if (Program.exists(_data.id) === true) {
+        if (_.program.exists(_data.id) === true) {
             return this;
         }
 
-        Program.add(this);
+        _.program.add(this);
         this._updated();
     }
 
@@ -53,15 +53,15 @@ class ProgramItem {
     update(data: db.Program): void {
 
         if (data.id !== this._data.id) {
-            if (Program.exists(data.id) === true) {
-                Program.remove(this);
+            if (_.program.exists(data.id) === true) {
+                _.program.remove(this);
                 return;
             }
         }
 
         this._data = data;
 
-        Program.save();
+        _.program.save();
         this._updated();
     }
 

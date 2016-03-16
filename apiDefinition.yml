@@ -69,10 +69,6 @@ paths:
       responses:
         200:
           description: OK
-          headers:
-            Last-Modified:
-              type: string
-              format: dateTime
         404:
           description: Not Found
         default:
@@ -86,10 +82,6 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Channel'
-          headers:
-            Last-Modified:
-              type: string
-              format: dateTime
         404:
           description: Not Found
           schema:

@@ -17,9 +17,9 @@
 'use strict';
 
 import stream = require('stream');
+import _ = require('./_');
 import common = require('./common');
 import config = require('./config');
-import Channel = require('./Channel');
 import Service = require('./Service');
 import ServiceItem = require('./ServiceItem');
 import Tuner = require('./Tuner');
@@ -33,13 +33,13 @@ class ChannelItem {
 
     constructor(config: config.Channel) {
 
-        const pre = Channel.get(config.type, config.channel);
+        const pre = _.channel.get(config.type, config.channel);
         if (pre !== null) {
             if (config.serviceId) {
                 pre.addService(config.serviceId, config.name);
             }
 
-            Channel.add(pre);
+            _.channel.add(pre);
             return;
         }
 
@@ -52,7 +52,7 @@ class ChannelItem {
             this.addService(config.serviceId);
         }
 
-        Channel.add(this);
+        _.channel.add(this);
     }
 
     get name(): string {
@@ -71,8 +71,23 @@ class ChannelItem {
         return this._satelite;
     }
 
-    addService(id: number, name: string = this._name): this {
-        new ServiceItem(this, id, name);
+    export(): config.Channel {
+        return {
+            name: this._name,
+            type: this._type,
+            channel: this._channel,
+            satelite: this._satelite
+        };
+    }
+
+    addService(id: number, name?: string): this {
+
+        if (!_.service) {
+            process.nextTick(() => this.addService(id, name));
+            return;
+        }
+
+        new ServiceItem(this, id, name || this._name);
         return this;
     }
 
