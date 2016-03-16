@@ -193,62 +193,47 @@ class TunerDevice {
         this._channel = ch;
 
         if (this._config.dvbDevicePath) {
-            this._stream = fs.createReadStream(this._config.dvbDevicePath);
+            const cat = child_process.spawn('cat', [this._config.dvbDevicePath]);
 
-            this._stream.once('error', (err) => {
+            cat.once('error', (err) => {
 
-                log.error('TunerDevice#%d fs.ReadStream error `%s`', this._index, err.code);
+                log.error('TunerDevice#%d cat process error `%s` (pid=%d)', this._index, err.code, cat.pid);
 
                 this._kill();
             });
 
-            this._stream.once('open', fd => {
+            cat.once('close', (code, signal) => {
 
-                log.debug('TunerDevice#%d fs.ReadStream has opened (fd=%d)', this._index, fd);
+                log.debug(
+                    'TunerDevice#%d cat process has closed with code=%d by signal `%s` (pid=%d)',
+                    this._index, code, signal, cat.pid
+                );
 
-                this._process.once('exit', () => {
-
-                    fs.closeSync(fd);
-                    this._stream['close']();
-
-                    log.debug('TunerDevice#%d fs.ReadStream has closed (fd=%d)', this._index, fd);
-                });
+                this._kill();
             });
+
+            this._process.once('exit', () => cat.kill('SIGKILL'));
+
+            this._stream = cat.stdout;
         } else {
             this._stream = this._process.stdout;
         }
 
         this._process.once('error', (err) => {
 
-            log.error('TunerDevice#%d process error `%s` (pid=%d)', this._index, err.code, this._process.pid);
+            log.fatal('TunerDevice#%d process error `%s` (pid=%d)', this._index, err.code, this._process.pid);
 
-            this._kill();
-        });
-
-        this._process.once('exit', (code, signal) => {
-
-            log.info(
-                'TunerDevice#%d process has exited with exit code=%d by signal `%s` (pid=%d)',
-                this._index, code, signal, this._process.pid
-            );
+            this._end()._release();
         });
 
         this._process.once('close', (code, signal) => {
 
-            log.debug(
-                'TunerDevice#%d process closed with exit code=%d by signal `%s` (pid=%d)',
+            log.info(
+                'TunerDevice#%d process has closed with exit code=%d by signal `%s` (pid=%d)',
                 this._index, code, signal, this._process.pid
             );
 
-            this._stream.removeAllListeners('data');
-
-            let i, l = this._users.length;
-            for (i = 0; i < l; i++) {
-                this._users[i]._stream.end();
-                this._users.splice(i, 1);
-            }
-
-            this._release();
+            this._end()._release();
         });
 
         this._process.stderr.on('data', data => {
@@ -269,11 +254,24 @@ class TunerDevice {
         return Promise.resolve();
     }
 
+    private _end(): this {
+
+        this._stream.removeAllListeners('data');
+
+        let i, l = this._users.length;
+        for (i = 0; i < l; i++) {
+            this._users[i]._stream.end();
+            this._users.splice(i, 1);
+        }
+
+        return this;
+    }
+
     private _kill(): Promise<void> {
 
         log.debug('TunerDevice#%d kill...', this._index);
 
-        if (!this._process) {
+        if (!this._process || !this._process.pid) {
             return Promise.reject(new Error(util.format('TunerDevice#%d has not process', this._index)));
         }
 
