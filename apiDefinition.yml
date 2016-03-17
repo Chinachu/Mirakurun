@@ -22,10 +22,6 @@ paths:
       responses:
         200:
           description: OK
-          headers:
-            Last-Modified:
-              type: string
-              format: dateTime
         default:
           description: Unexpected Error
     get:
@@ -39,10 +35,41 @@ paths:
             type: array
             items:
               $ref: '#/definitions/Channel'
-          headers:
-            Last-Modified:
-              type: string
-              format: dateTime
+        default:
+          description: Unexpected Error
+          schema:
+            $ref: '#/definitions/Error'
+
+  /channels/{type}:
+    parameters:
+      - in: path
+        name: type
+        type: string
+        enum:
+          - GR
+          - BS
+          - CS
+          - SKY
+        required: true
+    head:
+      tags:
+        - channels
+      responses:
+        200:
+          description: OK
+        default:
+          description: Unexpected Error
+    get:
+      operationId: getChannelsByType
+      tags:
+        - channels
+      responses:
+        200:
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Channel'
         default:
           description: Unexpected Error
           schema:

@@ -34,6 +34,10 @@ class Channel {
         this.load();
     }
 
+    get items(): ChannelItem[] {
+        return this._items;
+    }
+
     add(item: ChannelItem): void {
 
         if (this.get(item.type, item.channel) === null) {
@@ -122,6 +126,10 @@ class Channel {
 
     static findByType(type: string): ChannelItem[] {
         return _.channel.findByType(type);
+    }
+
+    static all(): ChannelItem[] {
+        return _.channel.items;
     }
 }
 

@@ -13,28 +13,28 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../../../../../typings/express/express.d.ts" />
+/// <reference path="../../../../typings/express/express.d.ts" />
 'use strict';
 
 import express = require('express');
-import api = require('../../../api');
-import Channel = require('../../../Channel');
+import api = require('../../api');
+import Channel = require('../../Channel');
 
 export function get(req: express.Request, res: express.Response) {
 
-    const channel = Channel.get(req.params.type, req.params.channel);
+    const channels = Channel.findByType(req.params.type);
 
-    if (channel === null) {
-        api.responseError(res, 404);
-        return;
-    }
+    res.json(
+        channels.map(channel => {
 
-    const body: any = channel.export();
+            const ch: any = channel.export();
 
-    body.services = channel.getServices().map(service => ({
-        id: service.id,
-        name: service.name
-    }));
+            ch.services = channel.getServices().map(service => ({
+                id: service.id,
+                name: service.name
+            }));
 
-    res.json(body);
+            return ch;
+        })
+    );
 }
