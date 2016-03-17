@@ -35,7 +35,8 @@ export function get(req: express.Request, res: express.Response) {
     channel.getStream({
         id: req.ip + ':' + req.connection.remotePort,
         priority: parseInt(req.get('X-Mirakurun-Priority') || '0', 10),
-        agent: req.get('User-Agent')
+        agent: req.get('User-Agent'),
+        disableDecoder: (req.query.decode === '0')
     })
         .then(stream => {
 

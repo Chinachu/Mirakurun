@@ -110,6 +110,11 @@ paths:
         name: X-Mirakurun-Priority
         type: number
         minimum: 0
+      - in: query
+        name: decode
+        type: number
+        minimum: 0
+        maximum: 1
     get:
       operationId: getChannelStream
       tags:
