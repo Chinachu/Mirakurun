@@ -14,6 +14,7 @@
    limitations under the License.
 */
 /// <reference path="../../typings/express/express.d.ts" />
+/// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
 import express = require('express');
@@ -39,6 +40,15 @@ module api {
         res.end(JSON.stringify(error));
 
         return res;
+    }
+
+    export function responseStreamErrorHandler(res: express.Response, err: NodeJS.ErrnoException): express.Response {
+
+        if (err.message === 'no available tuners') {
+            return api.responseError(res, 503, 'Tuner Resource Unavailable');
+        }
+
+        return api.responseError(res, 500, err.message);
     }
 }
 

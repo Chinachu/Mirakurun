@@ -73,9 +73,9 @@ class ChannelItem {
 
     export(): config.Channel {
         return {
-            name: this._name,
             type: this._type,
             channel: this._channel,
+            name: this._name,
             satelite: this._satelite
         };
     }

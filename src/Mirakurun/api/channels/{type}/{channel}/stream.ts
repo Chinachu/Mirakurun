@@ -43,17 +43,10 @@ export function get(req: express.Request, res: express.Response) {
                 return stream.emit('close');
             }
 
+            req.once('close', () => stream.emit('close'));
+
             res.status(200);
             stream.pipe(res);
-
-            req.once('close', () => stream.emit('close'));
         })
-        .catch((err) => {
-
-            if (err.message === 'no available tuners') {
-                api.responseError(res, 503, 'Tuner Resource Unavailable');
-            } else {
-                api.responseError(res, 500, err.message);
-            }
-        });
+        .catch((err) => api.responseStreamErrorHandler(res, err));
 }

@@ -611,7 +611,6 @@ definitions:
   Channel:
     type: object
     required:
-      - name
       - type
       - channel
     properties:
@@ -621,12 +620,12 @@ definitions:
         type: string
       name:
         type: string
+      satelite:
+        type: string
       services:
         type: array
         items:
           $ref: '#/definitions/Service'
-      isDisabled:
-        type: boolean
 
   ChannelType:
     type: string
