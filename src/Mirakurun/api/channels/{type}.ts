@@ -22,10 +22,8 @@ import Channel = require('../../Channel');
 
 export function get(req: express.Request, res: express.Response) {
 
-    const channels = Channel.findByType(req.params.type);
-
     res.json(
-        channels.map(channel => {
+        Channel.findByType(req.params.type).map(channel => {
 
             const ch: any = channel.export();
 
