@@ -141,7 +141,7 @@ class Tuner {
 
             const devices = this._getDevicesByType(setting.channel.type);
 
-            let tryCount = 3;
+            let tryCount = 20;
             let i, l = devices.length;
 
             function find() {
@@ -182,7 +182,7 @@ class Tuner {
                 if (device === null) {
                     --tryCount;
                     if (tryCount > 0) {
-                        setTimeout(find, 500);
+                        setTimeout(find, 250);
                     } else {
                         reject(new Error('no available tuners'));
                     }
@@ -209,7 +209,7 @@ class Tuner {
                             tsFilter.emit('close');
                             reject(err);
 
-                            return Promise.reject(err);
+                            //return Promise.reject(err);
                         });
                 }
             }

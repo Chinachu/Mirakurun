@@ -223,7 +223,8 @@ class TunerDevice {
 
             log.fatal('TunerDevice#%d process error `%s` (pid=%d)', this._index, err.code, this._process.pid);
 
-            this._end()._release();
+            this._end();
+            setTimeout(this._release.bind(this), this._config.dvbDevicePath ? 1000 : 100);
         });
 
         this._process.once('close', (code, signal) => {
@@ -233,7 +234,8 @@ class TunerDevice {
                 this._index, code, signal, this._process.pid
             );
 
-            this._end()._release();
+            this._end();
+            setTimeout(this._release.bind(this), this._config.dvbDevicePath ? 1000 : 100);
         });
 
         this._process.stderr.on('data', data => {
@@ -255,6 +257,8 @@ class TunerDevice {
     }
 
     private _end(): this {
+
+        this._isAvailable = false;
 
         this._stream.removeAllListeners('data');
 
