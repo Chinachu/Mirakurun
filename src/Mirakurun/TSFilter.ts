@@ -211,10 +211,6 @@ class TSFilter extends stream.Duplex {
                         if (this._parsePids.indexOf(this._pmtPid) === -1) {
                             this._parsePids.push(this._pmtPid);
                         }
-
-                        if (this._serviceId !== null && this._eventId === null) {
-                            this._ready = true;
-                        }
                     }
                     break;
                 }
@@ -228,6 +224,10 @@ class TSFilter extends stream.Duplex {
     }
 
     private _onPMT(pid, data): void {
+
+        if (this._ready === false && this._serviceId !== null && this._eventId === null) {
+            this._ready = true;
+        }
 
         if (this._providePids.indexOf(data.program_info[0].CA_PID) === -1) {
             this._providePids.push(data.program_info[0].CA_PID);

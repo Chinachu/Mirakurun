@@ -198,6 +198,7 @@ class Tuner {
                                 resolve(tsFilter);
                             } else {
                                 const decoder = child_process.spawn(device.decoder);
+                                decoder.stderr.pipe(process.stderr);
                                 decoder.stdout.once('close', () => tsFilter.emit('close'));
                                 tsFilter.once('close', () => decoder.kill('SIGKILL'));
                                 tsFilter.pipe(decoder.stdin);
