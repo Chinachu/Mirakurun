@@ -13,21 +13,16 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../../../../typings/express/express.d.ts" />
+/// <reference path="../../../typings/express/express.d.ts" />
 'use strict';
 
 import express = require('express');
-import api = require('../../api');
-import Service = require('../../Service');
+import api = require('../api');
+import Service = require('../Service');
 
 export function get(req: express.Request, res: express.Response) {
 
-    const service = Service.get(parseInt(req.params.id, 10));
-
-    if (service === null) {
-        api.responseError(res, 404);
-        return;
-    }
-
-    res.json(service.export());
+    res.json(
+        Service.all().map(service => service.export())
+    );
 }

@@ -35,6 +35,10 @@ class Service {
         this._load();
     }
 
+    get items(): ServiceItem[] {
+        return this._items;
+    }
+
     add(item: ServiceItem): void {
 
         if (this.get(item.id) === null) {
@@ -125,6 +129,10 @@ class Service {
 
     static findByChannel(channel: ChannelItem): ServiceItem[] {
         return _.service.findByChannel(channel);
+    }
+
+    static all(): ServiceItem[] {
+        return _.service.items;
     }
 
     static save(): void {

@@ -168,10 +168,6 @@ paths:
       responses:
         200:
           description: OK
-          headers:
-            Last-Modified:
-              type: string
-              format: dateTime
         default:
           description: Unexpected Error
     get:
@@ -185,10 +181,6 @@ paths:
             type: array
             items:
               $ref: '#/definitions/Service'
-          headers:
-            Last-Modified:
-              type: string
-              format: dateTime
         default:
           description: Unexpected Error
           schema:
@@ -206,10 +198,6 @@ paths:
       responses:
         200:
           description: OK
-          headers:
-            Last-Modified:
-              type: string
-              format: dateTime
         404:
           description: Not Found
         default:
@@ -223,10 +211,6 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Service'
-          headers:
-            Last-Modified:
-              type: string
-              format: dateTime
         404:
           description: Not Found
           schema:
