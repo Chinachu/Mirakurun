@@ -17,6 +17,7 @@
 'use strict';
 
 import fs = require('fs');
+import common = require('./common');
 import log = require('./log');
 
 module db {
@@ -28,7 +29,7 @@ module db {
     }
 
     export interface Channel {
-        type: string;
+        type: common.ChannelType;
         channel: string;
     }
 

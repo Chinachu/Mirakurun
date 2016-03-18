@@ -6,28 +6,31 @@
   "bundle": "typings/tsd.d.ts",
   "installed": {
     "node/node.d.ts": {
-      "commit": "c0d876601e0f8236fd6b57626eb62c4e485f1563"
+      "commit": "ce8ae773688d2244ba11fdf3378fcd68f773e1c4"
     },
     "js-yaml/js-yaml.d.ts": {
-      "commit": "c0d876601e0f8236fd6b57626eb62c4e485f1563"
+      "commit": "ce8ae773688d2244ba11fdf3378fcd68f773e1c4"
     },
     "serve-static/serve-static.d.ts": {
-      "commit": "c0d876601e0f8236fd6b57626eb62c4e485f1563"
+      "commit": "ce8ae773688d2244ba11fdf3378fcd68f773e1c4"
     },
     "mime/mime.d.ts": {
-      "commit": "c0d876601e0f8236fd6b57626eb62c4e485f1563"
+      "commit": "ce8ae773688d2244ba11fdf3378fcd68f773e1c4"
     },
     "express/express.d.ts": {
-      "commit": "c0d876601e0f8236fd6b57626eb62c4e485f1563"
+      "commit": "ce8ae773688d2244ba11fdf3378fcd68f773e1c4"
     },
     "morgan/morgan.d.ts": {
-      "commit": "c0d876601e0f8236fd6b57626eb62c4e485f1563"
+      "commit": "ce8ae773688d2244ba11fdf3378fcd68f773e1c4"
     },
     "body-parser/body-parser.d.ts": {
-      "commit": "c0d876601e0f8236fd6b57626eb62c4e485f1563"
+      "commit": "ce8ae773688d2244ba11fdf3378fcd68f773e1c4"
     },
     "swaggerize-express/swaggerize-express.d.ts": {
-      "commit": "c0d876601e0f8236fd6b57626eb62c4e485f1563"
+      "commit": "ce8ae773688d2244ba11fdf3378fcd68f773e1c4"
+    },
+    "express-serve-static-core/express-serve-static-core.d.ts": {
+      "commit": "ce8ae773688d2244ba11fdf3378fcd68f773e1c4"
     }
   }
 }

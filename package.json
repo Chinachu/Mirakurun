@@ -54,9 +54,9 @@
     "gulp": "^3.9.0",
     "gulp-rename": "^1.2.2",
     "gulp-sourcemaps": "^1.6.0",
-    "gulp-typescript": "^2.10.0",
+    "gulp-typescript": "^2.12.1",
     "tsd": "^0.6.5",
-    "typescript": "^1.8.2"
+    "typescript": "^1.8.9"
   },
   "engines": {
     "node": ">=4.1.1"

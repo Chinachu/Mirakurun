@@ -20,3 +20,5 @@ export interface User {
     agent?: string;
     disableDecoder?: boolean;
 }
+
+export type ChannelType = "GR" | "BS" | "CS" | "SKY";

@@ -45,7 +45,7 @@ class Tuner {
         _.tuner = this;
     }
 
-    typeExists(type: string): boolean {
+    typeExists(type: common.ChannelType): boolean {
 
         let i, l = this._devices.length;
         for (i = 0; i < l; i++) {
@@ -216,7 +216,7 @@ class Tuner {
         });
     }
 
-    private _getDevicesByType(type: string): TunerDevice[] {
+    private _getDevicesByType(type: common.ChannelType): TunerDevice[] {
 
         const devices = [];
 
@@ -230,7 +230,7 @@ class Tuner {
         return devices;
     }
 
-    static typeExists(type: string): boolean {
+    static typeExists(type: common.ChannelType): boolean {
         return _.tuner.typeExists(type);
     }
 

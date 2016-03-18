@@ -27,7 +27,7 @@ import Tuner = require('./Tuner');
 class ChannelItem {
 
     private _name: string;
-    private _type: string;
+    private _type: common.ChannelType;
     private _channel: string;
     private _satelite: string;
 
@@ -59,7 +59,7 @@ class ChannelItem {
         return this._name;
     }
 
-    get type(): string {
+    get type(): common.ChannelType {
         return this._type;
     }
 

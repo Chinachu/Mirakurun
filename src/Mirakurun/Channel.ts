@@ -18,6 +18,7 @@
 
 import stream = require('stream');
 import _ = require('./_');
+import common = require('./common');
 import log = require('./log');
 import config = require('./config');
 import ChannelItem = require('./ChannelItem');
@@ -45,7 +46,7 @@ class Channel {
         }
     }
 
-    get(type: string, channel: string): ChannelItem {
+    get(type: common.ChannelType, channel: string): ChannelItem {
 
         let i, l = this._items.length;
         for (i = 0; i < l; i++) {
@@ -57,7 +58,7 @@ class Channel {
         return null;
     }
 
-    findByType(type: string): ChannelItem[] {
+    findByType(type: common.ChannelType): ChannelItem[] {
 
         const items = [];
 
@@ -120,11 +121,11 @@ class Channel {
         return _.channel.add(item);
     }
 
-    static get(type: string, channel: string): ChannelItem {
+    static get(type: common.ChannelType, channel: string): ChannelItem {
         return _.channel.get(type, channel);
     }
 
-    static findByType(type: string): ChannelItem[] {
+    static findByType(type: common.ChannelType): ChannelItem[] {
         return _.channel.findByType(type);
     }
 

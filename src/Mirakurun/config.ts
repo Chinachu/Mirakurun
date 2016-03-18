@@ -19,6 +19,7 @@
 
 import fs = require('fs');
 import yaml = require('js-yaml');
+import common = require('./common');
 import log = require('./log');
 
 module config {
@@ -37,7 +38,7 @@ module config {
         name: string;
 
         // GR / BS / CS / SKY
-        types: string[];
+        types: common.ChannelType[];
 
         // for chardev / dvb
         command?: string;
@@ -58,7 +59,7 @@ module config {
         name: string;
 
         // GR / BS / CS / SKY
-        type: string;
+        type: common.ChannelType;
 
         // passed to tuning command
         channel: string;
