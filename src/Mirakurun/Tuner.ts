@@ -188,6 +188,7 @@ class Tuner {
                     }
                 } else {
                     const tsFilter = new TSFilter({
+                        allowHalfOpen: false,
                         serviceId: setting.serviceId,
                         eventId: setting.eventId
                     });
@@ -206,11 +207,8 @@ class Tuner {
                             }
                         })
                         .catch((err) => {
-                            //tsFilter.end();
                             tsFilter.emit('close');
                             reject(err);
-
-                            //return Promise.reject(err);
                         });
                 }
             }

@@ -40,33 +40,31 @@ const PROVIDE_PIDS = [
     0x0028// SDTT
 ];
 
-const PARSE_PIDS = [
-    0x0000// PAT
-];
-
 class TSFilter extends stream.Duplex {
 
     // aribts
-    private _parser = new aribts.TsStream();
+    private _parser: stream.Transform = new aribts.TsStream();
     //private _tsUtil = new aribts.TsUtil();
 
     // buffer
     private _packet: Buffer = new Buffer(PACKET_SIZE);
     private _offset: number = -1;
     private _buffer: Buffer[] = [];
+    private _patsec: Buffer = new Buffer(20);
 
     // state
     private _closed: boolean = false;
     private _ready: boolean = true;
+    private _networkPid: number = 0;
     private _serviceId: number;
     private _eventId: number;
     private _providePids: number[] = null;// `null` to provides all
-    private _parsePids: number[] = PARSE_PIDS.concat();
+    private _parsePids: number[] = [];
+    private _patCRC: number = -1;
     private _pmtPid: number = -1;
     private _timer: any = {};
 
     // stream options
-    private allowHalfOpen: boolean = false;
     private highWaterMark: number = 1024 * 1024 * 4;
 
     // ReadableState in node/lib/_stream_readable.js
@@ -86,8 +84,9 @@ class TSFilter extends stream.Duplex {
             this._ready = false;
         }
 
-        this._parser.once('pat', this._onPAT.bind(this));
-        this._parser.once('pmt', this._onPMT.bind(this));
+        this._parser.resume();
+        this._parser.on('pat', this._onPAT.bind(this));
+        this._parser.on('pmt', this._onPMT.bind(this));
 
         this.once('finish', this._close.bind(this));
         this.once('close', this._close.bind(this));
@@ -163,7 +162,10 @@ class TSFilter extends stream.Duplex {
         }
 
         // parse
-        if (this._parsePids.indexOf(pid) !== -1) {
+        if (pid === 0 && this._patCRC !== packet.readInt32BE(packet[7] + 4)) {
+            this._patCRC = packet.readInt32BE(packet[7] + 4);
+            this._parser.write(packet);
+        } else if (this._parsePids.indexOf(pid) !== -1) {
             this._parser.write(packet);
         }
 
@@ -176,21 +178,10 @@ class TSFilter extends stream.Duplex {
 
         // PAT (0) rewriting
         if (pid === 0 && this._pmtPid !== -1) {
-            // section_length
-            packet[7] = 17;// 0x11
-
-            // program_number
-            packet[17] = this._serviceId >> 8;
-            packet[18] = this._serviceId & 255;
-            // program_map_PID
-            packet[19] = (this._pmtPid >> 8) + 224;
-            packet[20] = this._pmtPid & 255
-
-            // calculate CRC32
-            packet.writeInt32BE(calcCRC32(packet.slice(5, 21)), 21);
+            this._patsec.copy(packet, 5, 0);
 
             // 0xFF padding
-            packet.fill(255, 25);
+            //packet.fill(255, 25);
         }
 
         this._buffer.push(new Buffer(packet));
@@ -198,29 +189,65 @@ class TSFilter extends stream.Duplex {
 
     private _onPAT(pid, data): void {
 
-        if (this._serviceId !== null) {
-            let i = 0, l = data.programs.length;
-            for (; i < l; i++) {
-                if (data.programs[i].program_number === this._serviceId) {
-                    if (this._pmtPid !== data.programs[i].program_map_PID) {
-                        this._pmtPid = data.programs[i].program_map_PID;
+        let i = 0, l = data.programs.length;
+        for (; i < l; i++) {
+            if (data.programs[i].program_number === 0) {
+                this._networkPid = data.programs[i].network_PID;
 
-                        if (this._providePids.indexOf(this._pmtPid) === -1) {
-                            this._providePids.push(this._pmtPid);
-                        }
-                        if (this._parsePids.indexOf(this._pmtPid) === -1) {
-                            this._parsePids.push(this._pmtPid);
-                        }
+                log.debug(
+                    'TSFilter detected Network PID=%d',
+                    this._networkPid
+                );
+
+                if (this._providePids !== null && this._providePids.indexOf(this._networkPid) === -1) {
+                    this._providePids.push(this._networkPid);
+                }
+
+                continue;
+            }
+
+            log.debug(
+                'TSFilter detected PMT PID=%d as serviceId=%d',
+                data.programs[i].program_number, data.programs[i].program_map_PID
+            );
+
+            // detect PMT PID by specific service id
+            if (this._serviceId === data.programs[i].program_number) {
+                if (this._pmtPid !== data.programs[i].program_map_PID) {
+                    this._pmtPid = data.programs[i].program_map_PID;
+
+                    if (this._providePids.indexOf(this._pmtPid) === -1) {
+                        this._providePids.push(this._pmtPid);
                     }
-                    break;
+                    if (this._parsePids.indexOf(this._pmtPid) === -1) {
+                        this._parsePids.push(this._pmtPid);
+                    }
+
+                    // edit PAT section
+                    data._raw.copy(this._patsec, 0, 0, 8);
+
+                    // section_length
+                    this._patsec[2] = 17;// 0x11
+
+                    // network_number = 0
+                    this._patsec[8] = 0;
+                    this._patsec[9] = 0;
+                    // network_PID
+                    this._patsec[10] = (this._networkPid >> 8) + 224;
+                    this._patsec[11] = this._networkPid & 255;
+
+                    // program_number
+                    this._patsec[12] = this._serviceId >> 8;
+                    this._patsec[13] = this._serviceId & 255;
+                    // program_map_PID
+                    this._patsec[14] = (this._pmtPid >> 8) + 224;
+                    this._patsec[15] = this._pmtPid & 255
+
+                    // calculate CRC32
+                    this._patsec.writeInt32BE(calcCRC32(this._patsec.slice(0, 16)), 16);
                 }
             }
         }
-
-        // sleep
-        this._timer.onPAT = setTimeout(() => {
-            this._parser.once('pat', this._onPAT.bind(this));
-        }, 1000);
     }
 
     private _onPMT(pid, data): void {
@@ -245,9 +272,14 @@ class TSFilter extends stream.Duplex {
         }
 
         // sleep
-        this._timer.onPMT = setTimeout(() => {
-            this._parser.once('pmt', this._onPMT.bind(this));
-        }, 1000);
+        i = this._parsePids.indexOf(pid);
+        if (i !== -1) {
+            this._parsePids.splice(i, 1);
+
+            this._timer.onPMT = setTimeout(() => {
+                this._parsePids.push(pid);
+            }, 1000);
+        }
     }
 
     private _close(): void {
@@ -258,12 +290,13 @@ class TSFilter extends stream.Duplex {
         this._closed = true;
 
         // clear timer
-        clearTimeout(this._timer.onPAT);
         clearTimeout(this._timer.onPMT);
 
         // clear buffer
         this._readableState.buffer = [];
         this._readableState.length = 0;
+        this._patsec.fill(0);
+        this._patsec = null;
         this._packet.fill(0);
         this._packet = null;
         this._buffer.forEach(packet => {
@@ -272,6 +305,7 @@ class TSFilter extends stream.Duplex {
         });
         this._buffer = null;
 
+        this._parser.removeAllListeners();
         this._parser.end();
         this._parser = null;
         //this._tsUtil = null;

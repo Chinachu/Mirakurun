@@ -289,6 +289,14 @@ class TunerDevice {
 
     private _release(): this {
 
+        if (this._process) {
+            this._process.stderr.removeAllListeners();
+            this._process.removeAllListeners();
+        }
+        if (this._stream) {
+            this._stream.removeAllListeners();
+        }
+
         this._channel = null;
         this._command = null;
         this._process = null;
