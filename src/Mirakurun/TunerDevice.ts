@@ -16,6 +16,7 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
+import events = require('events');
 import child_process = require('child_process');
 import stream = require('stream');
 import fs = require('fs');
@@ -29,7 +30,7 @@ interface User extends common.User {
     _stream?: stream.Writable;
 }
 
-class TunerDevice {
+class TunerDevice extends events.EventEmitter {
 
     private _channel: ChannelItem;
     private _command: string;
@@ -39,6 +40,8 @@ class TunerDevice {
     private _isAvailable: boolean;
 
     constructor(private _index: number, private _config: config.Tuner) {
+        super();
+
         this._release();
     }
 
@@ -282,7 +285,7 @@ class TunerDevice {
         this._isAvailable = false;
 
         return new Promise<void>(resolve => {
-            this._process.once('close', resolve.bind(this));
+            this.once('release', resolve.bind(this));
             this._process.kill('SIGTERM');
         });
     }
@@ -303,6 +306,8 @@ class TunerDevice {
         this._stream = null;
         this._users = [];
         this._isAvailable = true;
+
+        this.emit('release');
 
         log.debug('TunerDevice#%d released', this._index);
 
