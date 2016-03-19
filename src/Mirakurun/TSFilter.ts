@@ -42,6 +42,10 @@ const PROVIDE_PIDS = [
 
 class TSFilter extends stream.Duplex {
 
+    // options
+    private _serviceId: number;
+    private _eventId: number;
+
     // aribts
     private _parser: stream.Transform = new aribts.TsStream();
     //private _tsUtil = new aribts.TsUtil();
@@ -55,14 +59,13 @@ class TSFilter extends stream.Duplex {
     // state
     private _closed: boolean = false;
     private _ready: boolean = true;
+    private _parseEpg: boolean = false;
     private _networkPid: number = 0;
-    private _serviceId: number;
-    private _eventId: number;
     private _providePids: number[] = null;// `null` to provides all
     private _parsePids: number[] = [];
     private _patCRC: number = -1;
     private _pmtPid: number = -1;
-    private _timer: any = {};
+    private _pmtTimer: NodeJS.Timer;
 
     // stream options
     private highWaterMark: number = 1024 * 1024 * 4;
@@ -87,11 +90,16 @@ class TSFilter extends stream.Duplex {
         this._parser.resume();
         this._parser.on('pat', this._onPAT.bind(this));
         this._parser.on('pmt', this._onPMT.bind(this));
+        this._parser.on('eit', this._onEIT.bind(this));
 
         this.once('finish', this._close.bind(this));
         this.once('close', this._close.bind(this));
 
         log.debug('TSFilter has created (serviceId=%s, eventId=%s)', this._serviceId, this._eventId);
+
+        if (this._ready === false) {
+            log.debug('TSFilter is waiting for serviceId=%s, eventId=%s', this._serviceId, this._eventId);
+        }
     }
 
     _read(size: number) {
@@ -106,7 +114,7 @@ class TSFilter extends stream.Duplex {
 
         // stringent safety measure
         if (this._readableState.length > this.highWaterMark) {
-            log.error('TSFilter closing because overflowing the buffer...');
+            log.error('TSFilter is closing because overflowing the buffer...');
             return this._close();
         }
 
@@ -165,7 +173,7 @@ class TSFilter extends stream.Duplex {
         if (pid === 0 && this._patCRC !== packet.readInt32BE(packet[7] + 4)) {
             this._patCRC = packet.readInt32BE(packet[7] + 4);
             this._parser.write(packet);
-        } else if (this._parsePids.indexOf(pid) !== -1) {
+        } else if ((pid === 18 && (this._eventId !== null || this._parseEpg === true)) || this._parsePids.indexOf(pid) !== -1) {
             this._parser.write(packet);
         }
 
@@ -254,6 +262,8 @@ class TSFilter extends stream.Duplex {
 
         if (this._ready === false && this._serviceId !== null && this._eventId === null) {
             this._ready = true;
+
+            log.debug('TSFilter is now ready for serviceId=%d', this._serviceId);
         }
 
         if (this._providePids.indexOf(data.program_info[0].CA_PID) === -1) {
@@ -276,9 +286,34 @@ class TSFilter extends stream.Duplex {
         if (i !== -1) {
             this._parsePids.splice(i, 1);
 
-            this._timer.onPMT = setTimeout(() => {
+            this._pmtTimer = setTimeout(() => {
                 this._parsePids.push(pid);
             }, 1000);
+        }
+    }
+
+    private _onEIT(pid, data): void {
+
+        // detect current event
+        if (
+            this._eventId !== null && data.table_id === 78 && data.section_number === 0 &&
+            (this._serviceId === null || this._serviceId === data.service_id)
+        ) {
+            if (data.events[0].event_id === this._eventId) {
+                if (this._ready === false) {
+                    this._ready = true;
+
+                    log.debug('TSFilter is now ready for eventId=%d', this._eventId);
+                }
+            } else {
+                if (this._ready === true) {
+                    this._ready = false;
+
+                    log.debug('TSFilter is closing because eventId=%d has ended...', this._eventId);
+
+                    return this._close();
+                }
+            }
         }
     }
 
@@ -290,7 +325,7 @@ class TSFilter extends stream.Duplex {
         this._closed = true;
 
         // clear timer
-        clearTimeout(this._timer.onPMT);
+        clearTimeout(this._pmtTimer);
 
         // clear buffer
         this._readableState.buffer = [];
