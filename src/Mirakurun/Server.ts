@@ -64,6 +64,8 @@ class Server {
             const app = express();
             const server = http.createServer(app);
 
+            server.timeout = 1000 * 60 * 3;// 3 minutes
+
             app.disable('x-powered-by');
 
             app.use(morgan('short'));
@@ -72,7 +74,7 @@ class Server {
 
             app.use((req: express.Request, res: express.Response, next) => {
 
-                if (regexp.privateIPv4Address.test(req.ip) === true) {
+                if (regexp.privateIPv4Address.test(req.ip) === true || !req.ip) {
                     res.setHeader('Server', 'Mirakurun/' + pkg.version);
                     next();
                 } else {
@@ -113,6 +115,8 @@ class Server {
                 server.listen(address, () => {
                     log.info('listening on http://unix:%s', address);
                 });
+
+                fs.chmodSync(address, '777');
             } else {
                 server.listen(serverConfig.port, address, () => {
                     log.info('listening on http://%s:%d', address, serverConfig.port);
