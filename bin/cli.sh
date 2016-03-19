@@ -63,7 +63,7 @@ main () {
 
 mirakurun_config () {
   case $1 in
-    server | tuner | channels )
+    server | tuners | channels )
       "${EDITOR:-vi}" /usr/local/etc/mirakurun/$1.yml
       ;;
     * )
@@ -111,7 +111,7 @@ Usage: mirakurun <command> ...
 <command>:
 
 config server     Edit server configuration.
-config tuner      Edit tuner configuration.
+config tuners     Edit tuner configuration.
 config channels   Edit channels configuration.
 
 log server        Show server log.
