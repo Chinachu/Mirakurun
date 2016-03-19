@@ -68,7 +68,7 @@ class TSFilter extends stream.Duplex {
     private _pmtTimer: NodeJS.Timer;
 
     // stream options
-    private highWaterMark: number = 1024 * 1024 * 4;
+    private highWaterMark: number = 1024 * 1024 * 16;
 
     // ReadableState in node/lib/_stream_readable.js
     private _readableState: any;
