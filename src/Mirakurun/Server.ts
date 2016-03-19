@@ -68,7 +68,7 @@ class Server {
 
             app.disable('x-powered-by');
 
-            app.use(morgan('short'));
+            app.use(morgan(':remote-addr :remote-user :method :url HTTP/:http-version :status :res[content-length] - :response-time ms :user-agent'));
             app.use(bodyParser.urlencoded({ extended: false }));
             app.use(bodyParser.json());
 
