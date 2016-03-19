@@ -1,5 +1,6 @@
 {
   "name": "mirakurun",
+  "preferGlobal": true,
   "description": "DVR Tuner Server Service for Chinachu Air.",
   "version": "1.0.0",
   "homepage": "https://github.com/kanreisa/Mirakurun",
@@ -7,6 +8,7 @@
     "mirakurun",
     "chinachu",
     "chinachu air",
+    "rivarun",
     "dvr",
     "tv",
     "linux"
