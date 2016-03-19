@@ -216,7 +216,7 @@ class TSFilter extends stream.Duplex {
 
             log.debug(
                 'TSFilter detected PMT PID=%d as serviceId=%d',
-                data.programs[i].program_number, data.programs[i].program_map_PID
+                data.programs[i].program_map_PID, data.programs[i].program_number
             );
 
             // detect PMT PID by specific service id
