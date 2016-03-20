@@ -19,7 +19,6 @@ if [ `whoami` != 'root' ]; then
   exit 0
 fi
 
-npm install pm2@1.0.2 -g
 pm2 update
 
 pm2 stop processes.json -s

@@ -16,6 +16,7 @@ An Open Source DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)*
 ## Install
 
 ```
+sudo npm install pm2 -g
 sudo npm install mirakurun -g --unsafe --production
 ```
 
@@ -66,8 +67,8 @@ mirakurun [status|start|stop|restart]
 
 **Commercial License/Support** is provided by [Pixely LLC](https://pixely.jp/).
 
-[npm-img]: https://img.shields.io/npm/v/Mirakurun.svg
-[npm-url]: https://npmjs.org/package/Mirakurun
+[npm-img]: https://img.shields.io/npm/v/mirakurun.svg
+[npm-url]: https://npmjs.org/package/mirakurun
 [travis-img]: https://img.shields.io/travis/kanreisa/Mirakurun.svg
 [travis-url]: https://travis-ci.org/kanreisa/Mirakurun
 [dep-img]: https://david-dm.org/kanreisa/Mirakurun.svg

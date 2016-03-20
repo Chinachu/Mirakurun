@@ -43,6 +43,7 @@ npm run build
 ### Install
 
 ```
+sudo npm install pm2 -g
 sudo npm install . -g --unsafe --production
 ```
 
