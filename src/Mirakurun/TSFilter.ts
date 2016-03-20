@@ -60,7 +60,6 @@ class TSFilter extends stream.Duplex {
     private _closed: boolean = false;
     private _ready: boolean = true;
     private _parseEpg: boolean = false;
-    private _networkPid: number = 0;
     private _providePids: number[] = null;// `null` to provides all
     private _parsePids: number[] = [];
     private _patCRC: number = -1;
@@ -200,16 +199,10 @@ class TSFilter extends stream.Duplex {
         let i = 0, l = data.programs.length;
         for (; i < l; i++) {
             if (data.programs[i].program_number === 0) {
-                this._networkPid = data.programs[i].network_PID;
-
                 log.debug(
-                    'TSFilter detected Network PID=%d',
-                    this._networkPid
+                    'TSFilter detected NIT PID=%d',
+                    data.programs[i].network_PID
                 );
-
-                if (this._providePids !== null && this._providePids.indexOf(this._networkPid) === -1) {
-                    this._providePids.push(this._networkPid);
-                }
 
                 continue;
             }
@@ -241,8 +234,8 @@ class TSFilter extends stream.Duplex {
                     this._patsec[8] = 0;
                     this._patsec[9] = 0;
                     // network_PID
-                    this._patsec[10] = (this._networkPid >> 8) + 224;
-                    this._patsec[11] = this._networkPid & 255;
+                    this._patsec[10] = 224;
+                    this._patsec[11] = 16;
 
                     // program_number
                     this._patsec[12] = this._serviceId >> 8;
