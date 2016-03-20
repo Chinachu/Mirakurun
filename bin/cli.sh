@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #   Copyright 2016 Yuki KAN
 #
