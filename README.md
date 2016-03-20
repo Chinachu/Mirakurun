@@ -12,6 +12,7 @@ An Open Source DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)*
   - Debian / CentOS / Gentoo
   - sysvinit / OpenRC / systemd
 * [Node.js](nodejs.org/) `>=4.1.1`
+* [PM2](http://pm2.keymetrics.io/) `>=1.0.2`
 
 ## Install
 
