@@ -49,7 +49,7 @@
     "js-yaml": "^3.5.2",
     "morgan": "^1.7.0",
     "swaggerize-express": "^4.0.5",
-    "node-aribts": "git+https://github.com/rndomhack/node-aribts.git#8c96ec65c9cc50324f59f456227db58a329e783b"
+    "aribts": "git+https://github.com/rndomhack/node-aribts.git#8c96ec65c9cc50324f59f456227db58a329e783b"
   },
   "devDependencies": {
     "del": "^2.2.0",
