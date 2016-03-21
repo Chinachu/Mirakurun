@@ -47,4 +47,11 @@ sudo npm install pm2 -g
 sudo npm install . -g --unsafe --production
 ```
 
+### Debug with [node-inspector](https://github.com/node-inspector/node-inspector)
+
+```
+sudo mirakurun stop
+sudo node-debug --web-host 192.168.x.x --nodejs --harmony lib/server.js
+```
+
 If you've any questions, please ask on Slack.
