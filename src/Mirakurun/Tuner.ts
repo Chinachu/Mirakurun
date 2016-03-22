@@ -21,6 +21,7 @@ import stream = require('stream');
 import _ = require('./_');
 import common = require('./common');
 import log = require('./log');
+import db = require('./db');
 import config = require('./config');
 import TunerDevice = require('./TunerDevice');
 import ChannelItem = require('./ChannelItem');
@@ -32,6 +33,8 @@ interface StreamSetting {
     channel: ChannelItem;
     serviceId?: number;
     eventId?: number;
+    noProvide?: boolean;
+    parseSDT?: boolean;
 }
 
 class Tuner {
@@ -85,6 +88,50 @@ class Tuner {
         };
 
         return this._getStream(setting, user);
+    }
+
+    getServices(channel: ChannelItem): Promise<db.Service[]> {
+
+        const setting: StreamSetting = {
+            channel: channel,
+            noProvide: true,
+            parseSDT: true
+        };
+
+        const user: common.User = {
+            id: 'Mirakurun:getServices()',
+            priority: -1,
+            disableDecoder: true
+        };
+
+        return this._getStream(setting, user)
+            .then(stream => {
+                return new Promise((resolve, reject) => {
+
+                    let services: db.Service[] = null;
+
+                    setTimeout(() => stream.emit('close'), 10000);
+
+                    stream.once('services', _services => {
+                        services = _services;
+                        stream.emit('close');
+                    });
+
+                    stream.once('close', () => {
+
+                        stream.removeAllListeners('services');
+
+                        if (services === null) {
+                            reject(new Error('stream has closed before get services'));
+                        } else {
+                            resolve(services);
+                        }
+                    });
+                });
+            })
+            .catch(error => {
+                return Promise.reject(error);
+            });
     }
 
     private _load(): this {
@@ -188,9 +235,10 @@ class Tuner {
                     }
                 } else {
                     const tsFilter = new TSFilter({
-                        allowHalfOpen: false,
                         serviceId: setting.serviceId,
-                        eventId: setting.eventId
+                        eventId: setting.eventId,
+                        noProvide: setting.noProvide,
+                        parseSDT: setting.parseSDT
                     });
 
                     device.startStream(user, tsFilter, setting.channel)
@@ -244,6 +292,10 @@ class Tuner {
 
     static getProgramStream(program: ProgramItem, user: common.User): Promise<stream.Readable> {
         return _.tuner.getProgramStream(program, user);
+    }
+
+    static getServices(channel: ChannelItem): Promise<db.Service[]> {
+        return _.tuner.getServices(channel);
     }
 }
 

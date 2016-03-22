@@ -23,6 +23,8 @@ const aribts = require('aribts');
 interface StreamOptions extends stream.DuplexOptions {
     serviceId?: number;
     eventId?: number;
+    noProvide?: boolean;
+    parseSDT?: boolean;
 }
 
 const PACKET_SIZE = 188;
@@ -43,8 +45,10 @@ const PROVIDE_PIDS = [
 class TSFilter extends stream.Duplex {
 
     // options
-    private _serviceId: number;
-    private _eventId: number;
+    private _provideServiceId: number;
+    private _provideEventId: number;
+    private _parseSDT: boolean = false;
+    private _parseEIT: boolean = false;
 
     // aribts
     private _parser: stream.Transform = new aribts.TsStream();
@@ -59,10 +63,12 @@ class TSFilter extends stream.Duplex {
     // state
     private _closed: boolean = false;
     private _ready: boolean = true;
-    private _parseEpg: boolean = false;
     private _providePids: number[] = null;// `null` to provides all
     private _parsePids: number[] = [];
+    private _tsid: number = -1;
     private _patCRC: number = -1;
+    private _serviceIds: number[] = [];
+    private _services: any[] = [];
     private _pmtPid: number = -1;
     private _pmtTimer: NodeJS.Timer;
 
@@ -73,31 +79,43 @@ class TSFilter extends stream.Duplex {
     private _readableState: any;
 
     constructor(options: StreamOptions) {
-        super();
+        super({
+            allowHalfOpen: false
+        });
 
-        this._serviceId = options.serviceId || null;
-        this._eventId = options.eventId || null;
+        this._provideServiceId = options.serviceId || null;
+        this._provideEventId = options.eventId || null;
 
-        if (this._serviceId !== null) {
+        if (this._provideServiceId !== null) {
             this._providePids = PROVIDE_PIDS.concat();
             this._ready = false;
         }
-        if (this._eventId !== null) {
+        if (this._provideEventId !== null) {
             this._ready = false;
+        }
+        if (options.noProvide === true) {
+            this._provideServiceId = null;
+            this._provideEventId = null;
+            this._providePids = [];
+            this._ready = false;
+        }
+        if (options.parseSDT) {
+            this._parseSDT = true;
         }
 
         this._parser.resume();
         this._parser.on('pat', this._onPAT.bind(this));
         this._parser.on('pmt', this._onPMT.bind(this));
+        this._parser.on('sdt', this._onSDT.bind(this));
         this._parser.on('eit', this._onEIT.bind(this));
 
         this.once('finish', this._close.bind(this));
         this.once('close', this._close.bind(this));
 
-        log.debug('TSFilter has created (serviceId=%s, eventId=%s)', this._serviceId, this._eventId);
+        log.debug('TSFilter has created (serviceId=%s, eventId=%s)', this._provideServiceId, this._provideEventId);
 
         if (this._ready === false) {
-            log.debug('TSFilter is waiting for serviceId=%s, eventId=%s', this._serviceId, this._eventId);
+            log.debug('TSFilter is waiting for serviceId=%s, eventId=%s', this._provideServiceId, this._provideEventId);
         }
     }
 
@@ -110,6 +128,11 @@ class TSFilter extends stream.Duplex {
     }
 
     _write(chunk: Buffer, encoding, callback: Function) {
+
+        if (this._closed === true) {
+            callback(new Error('TSFilter has closed already'));
+            return;
+        }
 
         // stringent safety measure
         if (this._readableState.length > this.highWaterMark) {
@@ -172,7 +195,7 @@ class TSFilter extends stream.Duplex {
         if (pid === 0 && this._patCRC !== packet.readInt32BE(packet[7] + 4)) {
             this._patCRC = packet.readInt32BE(packet[7] + 4);
             this._parser.write(packet);
-        } else if ((pid === 18 && (this._eventId !== null || this._parseEpg === true)) || this._parsePids.indexOf(pid) !== -1) {
+        } else if ((pid === 18 && (this._provideEventId !== null || this._parseEIT === true)) || this._parsePids.indexOf(pid) !== -1) {
             this._parser.write(packet);
         }
 
@@ -196,6 +219,9 @@ class TSFilter extends stream.Duplex {
 
     private _onPAT(pid, data): void {
 
+        this._tsid = data.transport_stream_id;
+        this._serviceIds = [];
+
         let i = 0, l = data.programs.length;
         for (; i < l; i++) {
             if (data.programs[i].program_number === 0) {
@@ -207,13 +233,15 @@ class TSFilter extends stream.Duplex {
                 continue;
             }
 
+            this._serviceIds.push(data.programs[i].program_number);
+
             log.debug(
                 'TSFilter detected PMT PID=%d as serviceId=%d',
                 data.programs[i].program_map_PID, data.programs[i].program_number
             );
 
             // detect PMT PID by specific service id
-            if (this._serviceId === data.programs[i].program_number) {
+            if (this._provideServiceId === data.programs[i].program_number) {
                 if (this._pmtPid !== data.programs[i].program_map_PID) {
                     this._pmtPid = data.programs[i].program_map_PID;
 
@@ -238,8 +266,8 @@ class TSFilter extends stream.Duplex {
                     this._patsec[11] = 16;
 
                     // program_number
-                    this._patsec[12] = this._serviceId >> 8;
-                    this._patsec[13] = this._serviceId & 255;
+                    this._patsec[12] = this._provideServiceId >> 8;
+                    this._patsec[13] = this._provideServiceId & 255;
                     // program_map_PID
                     this._patsec[14] = (this._pmtPid >> 8) + 224;
                     this._patsec[15] = this._pmtPid & 255
@@ -249,14 +277,20 @@ class TSFilter extends stream.Duplex {
                 }
             }
         }
+
+        if (this._parseSDT === true) {
+            if (this._parsePids.indexOf(17) === -1) {
+                this._parsePids.push(17);
+            }
+        }
     }
 
     private _onPMT(pid, data): void {
 
-        if (this._ready === false && this._serviceId !== null && this._eventId === null) {
+        if (this._ready === false && this._provideServiceId !== null && this._provideEventId === null) {
             this._ready = true;
 
-            log.debug('TSFilter is now ready for serviceId=%d', this._serviceId);
+            log.debug('TSFilter is now ready for serviceId=%d', this._provideServiceId);
         }
 
         if (this._providePids.indexOf(data.program_info[0].CA_PID) === -1) {
@@ -285,24 +319,62 @@ class TSFilter extends stream.Duplex {
         }
     }
 
+    private _onSDT(pid, data): void {
+
+        if (this._tsid !== data.transport_stream_id) {
+            return;
+        }
+
+        let i = 0, j, l = data.services.length, m, name;
+        for (; i < l; i++) {
+            if (this._serviceIds.indexOf(data.services[i].service_id) === -1) {
+                continue;
+            }
+
+            name = '';
+
+            for (j = 0, m = data.services[i].descriptors.length; j < m; j++) {
+                if (data.services[i].descriptors[j].descriptor_tag === 72) {
+                    name = new aribts.TsChar(data.services[i].descriptors[j].service_name_char).decode();
+                    break;
+                }
+            }
+
+            if (this._services.some(service => service.id === data.services[i].service_id) === false) {
+                this._services.push({
+                    id: data.services[i].service_id,
+                    name: name
+                });
+            }
+        }
+
+        //if (this._serviceIds.every(id => this._services.some(service => service.id === id)) === true) { }
+        this.emit('services', this._services);
+
+        i = this._parsePids.indexOf(pid);
+        if (i !== -1) {
+            this._parsePids.splice(i, 1);
+        }
+    }
+
     private _onEIT(pid, data): void {
 
         // detect current event
         if (
-            this._eventId !== null && data.table_id === 78 && data.section_number === 0 &&
-            (this._serviceId === null || this._serviceId === data.service_id)
+            this._provideEventId !== null && data.table_id === 78 && data.section_number === 0 &&
+            (this._provideServiceId === null || this._provideServiceId === data.service_id)
         ) {
-            if (data.events[0].event_id === this._eventId) {
+            if (data.events[0].event_id === this._provideEventId) {
                 if (this._ready === false) {
                     this._ready = true;
 
-                    log.debug('TSFilter is now ready for eventId=%d', this._eventId);
+                    log.debug('TSFilter is now ready for eventId=%d', this._provideEventId);
                 }
             } else {
                 if (this._ready === true) {
                     this._ready = false;
 
-                    log.debug('TSFilter is closing because eventId=%d has ended...', this._eventId);
+                    log.debug('TSFilter is closing because eventId=%d has ended...', this._provideEventId);
 
                     return this._close();
                 }
@@ -321,18 +393,21 @@ class TSFilter extends stream.Duplex {
         clearTimeout(this._pmtTimer);
 
         // clear buffer
-        this._readableState.buffer = [];
-        this._readableState.length = 0;
-        this._patsec.fill(0);
-        this._patsec = null;
-        this._packet.fill(0);
-        this._packet = null;
-        this._buffer.forEach(packet => {
-            packet.fill(0);
-            packet = null;
+        process.nextTick(() => {
+            this._readableState.buffer = [];
+            this._readableState.length = 0;
+            this._patsec.fill(0);
+            this._patsec = null;
+            this._packet.fill(0);
+            this._packet = null;
+            this._buffer.forEach(packet => {
+                packet.fill(0);
+                packet = null;
+            });
+            this._buffer = null;
         });
-        this._buffer = null;
 
+        // clear instance
         this._parser.removeAllListeners();
         this._parser.end();
         this._parser = null;
@@ -340,7 +415,7 @@ class TSFilter extends stream.Duplex {
 
         this.emit('close');
 
-        log.debug('TSFilter has closed (serviceId=%s, eventId=%s)', this._serviceId, this._eventId);
+        log.debug('TSFilter has closed (serviceId=%s, eventId=%s)', this._provideServiceId, this._provideEventId);
     }
 }
 

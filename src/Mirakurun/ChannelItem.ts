@@ -18,6 +18,8 @@
 
 import stream = require('stream');
 import _ = require('./_');
+import queue = require('./queue');
+import log = require('./log');
 import common = require('./common');
 import config = require('./config');
 import Service = require('./Service');
@@ -51,6 +53,14 @@ class ChannelItem {
         if (config.serviceId) {
             this.addService(config.serviceId);
         }
+
+        setTimeout(() => {
+            if (this.getServices().length === 0) {
+                this.serviceScan(true);
+            } else {
+                setTimeout(() => this.serviceScan(false), 30000);
+            }
+        }, 3000);
 
         _.channel.add(this);
     }
@@ -97,6 +107,44 @@ class ChannelItem {
 
     getStream(user: common.User): Promise<stream.Readable> {
         return Tuner.getChannelStream(this, user);
+    }
+
+    serviceScan(add: boolean): void {
+
+        log.info('ChannelItem#"%s" service scan has queued', this._name);
+
+        queue.add(() => {
+            return new Promise((resolve, reject) => {
+
+                log.info('ChannelItem#"%s" service scan has started', this._name);
+
+                Tuner.getServices(this)
+                    .then(services => {
+
+                        log.debug('ChannelItem#"%s" services: %s', this._name, JSON.stringify(services, null, '  '));
+
+                        services.forEach(service => {
+                            if (Service.exists(service.id) === true) {
+                                Service.get(service.id).name = service.name;
+                            } else if (add === true) {
+                                this.addService(service.id, service.name);
+                            }
+                        });
+
+                        log.info('ChannelItem#"%s" service scan has finished', this._name);
+
+                        resolve();
+                    })
+                    .catch(error => {
+
+                        log.error('ChannelItem#"%s" service scan has failed [%s]', this._name, error);
+
+                        setTimeout(() => this.serviceScan(add), 60000);
+
+                        reject();
+                    });
+            });
+        });
     }
 }
 
