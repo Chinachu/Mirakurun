@@ -44,7 +44,7 @@
     "lib": "lib"
   },
   "dependencies": {
-    "aribts": "git+https://github.com/rndomhack/node-aribts.git#8c96ec65c9cc50324f59f456227db58a329e783b",
+    "aribts": "git+https://github.com/rndomhack/node-aribts.git#3df30b0aed791732825dd39a310c9ab3c37dada2",
     "body-parser": "^1.15.0",
     "express": "^4.13.4",
     "js-yaml": "^3.5.2",
