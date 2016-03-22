@@ -62,7 +62,7 @@
     "typescript": "^1.8.9"
   },
   "engines": {
-    "node": ">=4.1.1"
+    "node": ">=5.9.0"
   },
   "os": [
     "linux"

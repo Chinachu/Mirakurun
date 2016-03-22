@@ -51,7 +51,7 @@ sudo npm install . -g --unsafe --production
 
 ```
 sudo mirakurun stop
-sudo node-debug --web-host 192.168.x.x --nodejs --harmony lib/server.js
+sudo node-debug --web-host 192.168.x.x lib/server.js
 ```
 
 If you've any questions, please ask on Slack.
