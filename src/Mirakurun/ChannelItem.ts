@@ -139,7 +139,7 @@ class ChannelItem {
 
                         log.error('ChannelItem#"%s" service scan has failed [%s]', this._name, error);
 
-                        setTimeout(() => this.serviceScan(add), 60000);
+                        setTimeout(() => this.serviceScan(add), add ? 180000 : 3600000);
 
                         reject();
                     });
