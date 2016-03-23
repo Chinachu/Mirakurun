@@ -1,6 +1,7 @@
 /.vscode
 /typings
 /node_modules
+/doc
 /src
 /*.log
 /.editorconfig

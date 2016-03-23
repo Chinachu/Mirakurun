@@ -33,8 +33,11 @@ gulp.task('tsc', () => {
         ])
         .pipe(sourcemaps.init())
         .pipe(typescript({
+            typescript: require('typescript'),
             target: 'ES6',
             module: 'commonjs',
+            moduleResolution: 'node',
+            removeComments: true,
             declarationFiles: false
         }))
         .js
