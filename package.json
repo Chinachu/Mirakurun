@@ -2,7 +2,7 @@
   "name": "mirakurun",
   "preferGlobal": true,
   "description": "DVR Tuner Server Service for Chinachu Air.",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "homepage": "https://github.com/kanreisa/Mirakurun",
   "keywords": [
     "mirakurun",
@@ -29,7 +29,7 @@
     "mirakurun": "bin/cli.sh"
   },
   "scripts": {
-    "start": "node --harmony lib/server.js",
+    "start": "node lib/server.js",
     "tsd": "tsd",
     "tsd-install": "tsd reinstall && tsd rebundle",
     "build": "gulp build",
@@ -40,11 +40,10 @@
     "preuninstall": "bin/preuninstall.sh"
   },
   "directories": {
-    "doc": "doc",
     "lib": "lib"
   },
   "dependencies": {
-    "aribts": "git+https://github.com/rndomhack/node-aribts.git#3df30b0aed791732825dd39a310c9ab3c37dada2",
+    "aribts": "^1.0.0",
     "body-parser": "^1.15.0",
     "express": "^4.13.4",
     "js-yaml": "^3.5.2",
