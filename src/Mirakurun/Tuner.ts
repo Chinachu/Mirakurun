@@ -195,18 +195,15 @@ class Tuner {
 
                 let device: TunerDevice = null;
 
-                // 1.
+                // 1. join to existing
                 for (i = 0; i < l; i++) {
-                    if (devices[i].isAvailable === false) {
-                        continue;
-                    }
-                    if (devices[i].channel === setting.channel) {
+                    if (devices[i].isAvailable === true && devices[i].channel === setting.channel) {
                         device = devices[i];
                         break;
                     }
                 }
 
-                // 2.
+                // 2. start as new
                 if (device === null) {
                     for (i = 0; i < l; i++) {
                         if (devices[i].isFree === true) {
@@ -216,7 +213,17 @@ class Tuner {
                     }
                 }
 
-                // 3.
+                // 3. replace existing
+                if (device === null) {
+                    for (i = 0; i < l; i++) {
+                        if (devices[i].isAvailable === true && devices[i].users.length === 0) {
+                            device = devices[i];
+                            break;
+                        }
+                    }
+                }
+
+                // 4. takeover existing
                 if (device === null) {
                     for (i = 0; i < l; i++) {
                         if (devices[i].isUsing === true && devices[i].getPriority() < user.priority) {

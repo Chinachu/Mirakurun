@@ -93,7 +93,7 @@ class TunerDevice extends events.EventEmitter {
 
     getPriority(): number {
 
-        let ret = 0;
+        let ret = -2;
 
         let i, l = this._users.length;
         for (i = 0; i < l; i++) {
@@ -169,7 +169,11 @@ class TunerDevice extends events.EventEmitter {
         }
 
         if (this._users.length === 0) {
-            this._kill().catch(log.error);
+            setTimeout(() => {
+                if (this._users.length === 0 && this._process) {
+                    this._kill().catch(log.error);
+                }
+            }, 3000);
         }
 
         log.info('TunerDevice#%d end streaming to user `%s` (priority=%d)', this._index, user.id, user.priority);
@@ -285,7 +289,7 @@ class TunerDevice extends events.EventEmitter {
         this._isAvailable = false;
 
         return new Promise<void>(resolve => {
-            this.once('release', resolve.bind(this));
+            this.once('release', resolve);
             this._process.kill('SIGTERM');
         });
     }
