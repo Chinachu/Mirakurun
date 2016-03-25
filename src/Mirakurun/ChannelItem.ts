@@ -58,7 +58,7 @@ class ChannelItem {
             if (this.getServices().length === 0) {
                 this.serviceScan(true);
             } else {
-                setTimeout(() => this.serviceScan(false), 30000);
+                setTimeout(() => this.serviceScan(false), 180000);
             }
         }, 3000);
 
