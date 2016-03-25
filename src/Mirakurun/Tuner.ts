@@ -35,6 +35,7 @@ interface StreamSetting {
     eventId?: number;
     noProvide?: boolean;
     parseSDT?: boolean;
+    parseEIT?: boolean;
 }
 
 class Tuner {
@@ -63,7 +64,8 @@ class Tuner {
     getChannelStream(channel: ChannelItem, user: common.User): Promise<stream.Readable> {
 
         const setting: StreamSetting = {
-            channel: channel
+            channel: channel,
+            parseEIT: true
         };
 
         return this._getStream(setting, user);
@@ -73,7 +75,8 @@ class Tuner {
 
         const setting: StreamSetting = {
             channel: service.channel,
-            serviceId: service.id
+            serviceId: service.id,
+            parseEIT: true
         };
 
         return this._getStream(setting, user);
@@ -84,7 +87,8 @@ class Tuner {
         const setting: StreamSetting = {
             channel: program.service.channel,
             serviceId: program.data.serviceId,
-            eventId: program.data.eventId
+            eventId: program.data.eventId,
+            parseEIT: true
         };
 
         return this._getStream(setting, user);
@@ -245,7 +249,8 @@ class Tuner {
                         serviceId: setting.serviceId,
                         eventId: setting.eventId,
                         noProvide: setting.noProvide,
-                        parseSDT: setting.parseSDT
+                        parseSDT: setting.parseSDT,
+                        parseEIT: setting.parseEIT
                     });
 
                     device.startStream(user, tsFilter, setting.channel)
