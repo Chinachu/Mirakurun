@@ -33,7 +33,7 @@ export function get(req: express.Request, res: express.Response) {
     req.once('close', () => requestAborted = true);
 
     service.getStream({
-        id: req.ip + ':' + req.connection.remotePort,
+        id: (req.ip || 'unix') + ':' + (req.connection.remotePort || Date.now()),
         priority: parseInt(req.get('X-Mirakurun-Priority') || '0', 10),
         agent: req.get('User-Agent'),
         disableDecoder: (req.query.decode === '0')
