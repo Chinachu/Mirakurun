@@ -217,13 +217,11 @@ class TSFilter extends stream.Duplex {
 
         // PAT (0) rewriting
         if (pid === 0 && this._pmtPid !== -1) {
+            packet = new Buffer(packet);
             this._patsec.copy(packet, 5, 0);
-
-            // 0xFF padding
-            //packet.fill(255, 25);
         }
 
-        this._buffer.push(new Buffer(packet));
+        this._buffer.push(packet);
     }
 
     private _onPAT(pid, data): void {
