@@ -215,9 +215,10 @@ class TSFilter extends stream.Duplex {
             return;
         }
 
+        packet = new Buffer(packet);
+
         // PAT (0) rewriting
         if (pid === 0 && this._pmtPid !== -1) {
-            packet = new Buffer(packet);
             this._patsec.copy(packet, 5, 0);
         }
 
