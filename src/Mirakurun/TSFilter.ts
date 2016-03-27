@@ -132,7 +132,6 @@ class TSFilter extends stream.Duplex {
 
         if (this._closed === true) {
             this.push(null);
-            return;
         }
     }
 
@@ -149,13 +148,23 @@ class TSFilter extends stream.Duplex {
             return this._close();
         }
 
-        let offset = 0, length = chunk.length;
+        let offset = 0;
+        const length = chunk.length;
 
         if (this._offset > 0) {
-            chunk.copy(this._packet, this._offset, 0, PACKET_SIZE - this._offset);
-            this._processPacket(this._packet);
-            offset += PACKET_SIZE - this._offset;
-            this._offset = 0;
+            if (chunk.length >= PACKET_SIZE - this._offset) {
+                chunk.copy(this._packet, this._offset, 0, PACKET_SIZE - this._offset);
+                this._processPacket(this._packet);
+                offset = PACKET_SIZE - this._offset;
+                this._offset = 0;
+            } else {
+                chunk.copy(this._packet, this._offset);
+                this._offset += chunk.length;
+
+                // chunk drained
+                callback();
+                return;
+            }
         } else {
             for (; offset < length; offset++) {
                 // sync byte (0x47) searching
@@ -193,9 +202,9 @@ class TSFilter extends stream.Duplex {
 
     private _processPacket(packet: Buffer): void {
 
-        const pid = packet.readUInt16BE(1) & 0x1fff;
+        const pid = packet.readUInt16BE(1) & 0x1FFF;
 
-        // NULL (0x1fff)
+        // NULL (0x1FFF)
         if (pid === 8191) {
             return;
         }
@@ -204,7 +213,7 @@ class TSFilter extends stream.Duplex {
         if (pid === 0 && this._patCRC !== packet.readInt32BE(packet[7] + 4)) {
             this._patCRC = packet.readInt32BE(packet[7] + 4);
             this._parser.write(packet);
-        } else if ((pid === 18 && (this._parseEIT === true || this._provideEventId !== null)) || this._parsePids.indexOf(pid) !== -1) {
+        } else if ((pid === 0x12 && (this._parseEIT === true || this._provideEventId !== null)) || this._parsePids.indexOf(pid) !== -1) {
             this._parser.write(packet);
         }
 
@@ -364,7 +373,7 @@ class TSFilter extends stream.Duplex {
             name = '';
 
             for (j = 0, m = data.services[i].descriptors.length; j < m; j++) {
-                if (data.services[i].descriptors[j].descriptor_tag === 72) {
+                if (data.services[i].descriptors[j].descriptor_tag === 0x48) {
                     name = new aribts.TsChar(data.services[i].descriptors[j].service_name_char).decode();
                     break;
                 }
@@ -395,7 +404,7 @@ class TSFilter extends stream.Duplex {
 
         // detect current event
         if (
-            this._provideEventId !== null && data.table_id === 78 && data.section_number === 0 &&
+            this._provideEventId !== null && data.table_id === 0x4E && data.section_number === 0 &&
             (this._provideServiceId === null || this._provideServiceId === data.service_id)
         ) {
             if (data.events[0].event_id === this._provideEventId) {
