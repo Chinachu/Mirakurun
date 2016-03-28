@@ -63,6 +63,7 @@ class TSFilter extends stream.Duplex {
     private _packet: Buffer = new Buffer(PACKET_SIZE);
     private _offset: number = -1;
     private _buffer: Buffer[] = [];
+    private _parses: Buffer[] = [];
     private _patsec: Buffer = new Buffer(20);
 
     // state
@@ -161,6 +162,8 @@ class TSFilter extends stream.Duplex {
                 chunk.copy(this._packet, this._offset);
                 this._offset += chunk.length;
 
+                console.log('drained...', this._offset, chunk.length);
+
                 // chunk drained
                 callback();
                 return;
@@ -197,6 +200,11 @@ class TSFilter extends stream.Duplex {
             this._buffer = [];
         }
 
+        if (this._parses.length !== 0) {
+            this._parser.write(Buffer.concat(this._parses));
+            this._parses = [];
+        }
+
         callback();
     }
 
@@ -212,9 +220,9 @@ class TSFilter extends stream.Duplex {
         // parse
         if (pid === 0 && this._patCRC !== packet.readInt32BE(packet[7] + 4)) {
             this._patCRC = packet.readInt32BE(packet[7] + 4);
-            this._parser.write(packet);
+            this._parses.push(packet);
         } else if ((pid === 0x12 && (this._parseEIT === true || this._provideEventId !== null)) || this._parsePids.indexOf(pid) !== -1) {
-            this._parser.write(packet);
+            this._parses.push(packet);
         }
 
         if (this._ready === false) {
@@ -453,6 +461,11 @@ class TSFilter extends stream.Duplex {
                 packet = null;
             });
             this._buffer = null;
+            this._parses.forEach(packet => {
+                packet.fill(0);
+                packet = null;
+            });
+            this._parses = null;
         });
 
         // clear instance
