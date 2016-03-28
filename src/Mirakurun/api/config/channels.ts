@@ -13,24 +13,27 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+/// <reference path="../../../../typings/node/node.d.ts" />
 /// <reference path="../../../../typings/express/express.d.ts" />
 'use strict';
 
+import util = require('util');
 import express = require('express');
+import api = require('../../api');
 import config = require('../../config');
 
 export function get(req: express.Request, res: express.Response) {
 
     res.status(200);
-    res.json(config.loadServer());
+    res.json(config.loadChannels());
 }
 
 export function put(req: express.Request, res: express.Response) {
 
-    const server: config.Server = req.body || {};
+    const channels: config.Channel[] = req.body || [];
 
-    config.saveServer(server);
+    config.saveChannels(channels);
 
     res.status(200);
-    res.json(server);
+    res.json(channels);
 }

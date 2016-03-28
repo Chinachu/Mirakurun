@@ -22,15 +22,15 @@ import config = require('../../config');
 export function get(req: express.Request, res: express.Response) {
 
     res.status(200);
-    res.json(config.loadServer());
+    res.json(config.loadTuners());
 }
 
 export function put(req: express.Request, res: express.Response) {
 
-    const server: config.Server = req.body || {};
+    const tuners: config.Tuner[] = req.body || [];
 
-    config.saveServer(server);
+    config.saveTuners(tuners);
 
     res.status(200);
-    res.json(server);
+    res.json(tuners);
 }
