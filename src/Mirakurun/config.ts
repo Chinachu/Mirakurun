@@ -108,7 +108,7 @@ module config {
 
         return new Promise<void>((resolve, reject) => {
 
-            fs.writeFile(path, JSON.stringify(data), err => {
+            fs.writeFile(path, yaml.safeDump(data), err => {
 
                 if (err) {
                     return reject(err);
