@@ -250,17 +250,18 @@ class TunerDevice extends events.EventEmitter {
         });
 
         // flowing start
-        this._stream.on('data', chunk => {
-
-            let i, l = this._users.length;
-            for (i = 0; i < l; i++) {
-                this._users[i]._stream.write(chunk);
-            }
-        });
+        this._stream.on('data', this._streamOnData.bind(this));
 
         log.info('TunerDevice#%d process has spawned by command `%s` (pid=%d)', this._index, cmd, this._process.pid);
 
         return Promise.resolve();
+    }
+
+    private _streamOnData(chunk: Buffer): void {
+
+        for (let i = 0, l = this._users.length; i < l; i++) {
+            this._users[i]._stream.write(chunk);
+        }
     }
 
     private _end(): this {
