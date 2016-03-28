@@ -16,13 +16,22 @@
 /// <reference path="../../../../typings/express/express.d.ts" />
 'use strict';
 
-import express = require('express');
+import {Operation} from 'express-openapi';
 import api = require('../../api');
 import Service = require('../../Service');
 
-export function get(req: express.Request, res: express.Response) {
+export var parameters = [
+    {
+        in: 'path',
+        name: 'id',
+        type: 'number',
+        required: true
+    }
+];
 
-    const service = Service.get(parseInt(req.params.id, 10));
+export var get: Operation = (req, res) => {
+
+    const service = Service.get(req.params.id);
 
     if (service === null) {
         api.responseError(res, 404);
@@ -30,4 +39,29 @@ export function get(req: express.Request, res: express.Response) {
     }
 
     res.json(service.export());
-}
+};
+
+get.apiDoc = {
+    tags: ['services'],
+    operationId: 'getService',
+    responses: {
+        200: {
+            description: 'OK',
+            schema: {
+                $ref: '#/definitions/Service'
+            }
+        },
+        404: {
+            description: 'Not Found',
+            schema: {
+                $ref: '#/definitions/Error'
+            }
+        },
+        default: {
+            description: 'Unexpected Error',
+            schema: {
+                $ref: '#/definitions/Error'
+            }
+        }
+    }
+};

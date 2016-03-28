@@ -16,13 +16,34 @@
 /// <reference path="../../../typings/express/express.d.ts" />
 'use strict';
 
-import express = require('express');
-import api = require('../api');
+import {Operation} from 'express-openapi';
 import Service = require('../Service');
 
-export function get(req: express.Request, res: express.Response) {
+export var get: Operation = (req, res) => {
 
     res.json(
         Service.all().map(service => service.export())
     );
-}
+};
+
+get.apiDoc = {
+    tags: ['services'],
+    operationId: 'getServices',
+    responses: {
+        200: {
+            description: 'OK',
+            schema: {
+                type: 'array',
+                items: {
+                    $ref: '#/definitions/Service'
+                }
+            }
+        },
+        default: {
+            description: 'Unexpected Error',
+            schema: {
+                $ref: '#/definitions/Error'
+            }
+        }
+    }
+};

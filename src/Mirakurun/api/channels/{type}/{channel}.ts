@@ -16,11 +16,27 @@
 /// <reference path="../../../../../typings/express/express.d.ts" />
 'use strict';
 
-import express = require('express');
+import {Operation} from 'express-openapi';
 import api = require('../../../api');
 import Channel = require('../../../Channel');
 
-export function get(req: express.Request, res: express.Response) {
+export var parameters = [
+    {
+        in: 'path',
+        name: 'type',
+        type: 'string',
+        enum: ['GR', 'BS', 'CS', 'SKY'],
+        required: true
+    },
+    {
+        in: 'path',
+        name: 'channel',
+        type: 'string',
+        required: true
+    }
+];
+
+export var get: Operation = (req, res) => {
 
     const channel = Channel.get(req.params.type, req.params.channel);
 
@@ -37,4 +53,29 @@ export function get(req: express.Request, res: express.Response) {
     }));
 
     res.json(body);
-}
+};
+
+get.apiDoc = {
+    tags: ['channels'],
+    operationId: 'getChannel',
+    responses: {
+        200: {
+            description: 'OK',
+            schema: {
+                $ref: '#/definitions/Channel'
+            }
+        },
+        404: {
+            description: 'Not Found',
+            schema: {
+                $ref: '#/definitions/Error'
+            }
+        },
+        default: {
+            description: 'Unexpected Error',
+            schema: {
+                $ref: '#/definitions/Error'
+            }
+        }
+    }
+};

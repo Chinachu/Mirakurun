@@ -16,21 +16,68 @@
 /// <reference path="../../../../typings/express/express.d.ts" />
 'use strict';
 
-import express = require('express');
+import {Operation} from 'express-openapi';
 import config = require('../../config');
 
-export function get(req: express.Request, res: express.Response) {
+export var get: Operation = (req, res) => {
 
     res.status(200);
     res.json(config.loadTuners());
-}
+};
 
-export function put(req: express.Request, res: express.Response) {
+get.apiDoc = {
+    tags: ['config'],
+    operationId: 'getTunersConfig',
+    responses: {
+        200: {
+            description: 'OK',
+            schema: {
+                $ref: '#/definitions/ConfigTuners'
+            }
+        },
+        default: {
+            description: 'Unexpected Error',
+            schema: {
+                $ref: '#/definitions/Error'
+            }
+        }
+    }
+};
 
-    const tuners: config.Tuner[] = req.body || [];
+export var put: Operation = (req, res) => {
+
+    const tuners: config.Tuner[] = req.body;
 
     config.saveTuners(tuners);
 
     res.status(200);
     res.json(tuners);
-}
+};
+
+put.apiDoc = {
+    tags: ['config'],
+    operationId: 'updateTunersConfig',
+    parameters: [
+        {
+            in: 'body',
+            name: 'body',
+            schema: {
+                $ref: '#/definitions/ConfigTuners'
+            }
+        }
+    ],
+    responses: {
+        200: {
+            description: 'OK',
+            schema: {
+                $ref: '#/definitions/ConfigTuners'
+            }
+        },
+        default: {
+            description: 'Unexpected Error',
+            schema: {
+                $ref: '#/definitions/Error'
+            }
+        }
+    }
+};

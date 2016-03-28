@@ -16,11 +16,10 @@
 /// <reference path="../../../typings/express/express.d.ts" />
 'use strict';
 
-import express = require('express');
-import api = require('../api');
+import {Operation} from 'express-openapi';
 import Channel = require('../Channel');
 
-export function get(req: express.Request, res: express.Response) {
+export var get: Operation = (req, res) => {
 
     res.json(
         Channel.all().map(channel => {
@@ -35,4 +34,26 @@ export function get(req: express.Request, res: express.Response) {
             return ch;
         })
     );
-}
+};
+
+get.apiDoc = {
+    tags: ['channels'],
+    operationId: 'getChannels',
+    responses: {
+        200: {
+            description: 'OK',
+            schema: {
+                type: 'array',
+                items: {
+                    $ref: '#/definitions/Channel'
+                }
+            }
+        },
+        default: {
+            description: 'Unexpected Error',
+            schema: {
+                $ref: '#/definitions/Error'
+            }
+        }
+    }
+};

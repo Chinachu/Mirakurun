@@ -26,9 +26,6 @@
     "body-parser/body-parser.d.ts": {
       "commit": "ce8ae773688d2244ba11fdf3378fcd68f773e1c4"
     },
-    "swaggerize-express/swaggerize-express.d.ts": {
-      "commit": "ce8ae773688d2244ba11fdf3378fcd68f773e1c4"
-    },
     "express-serve-static-core/express-serve-static-core.d.ts": {
       "commit": "ce8ae773688d2244ba11fdf3378fcd68f773e1c4"
     }

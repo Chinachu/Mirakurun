@@ -16,13 +16,35 @@
 /// <reference path="../../../../../typings/express/express.d.ts" />
 'use strict';
 
-import express = require('express');
+import {Operation} from 'express-openapi';
 import api = require('../../../api');
 import Service = require('../../../Service');
 
-export function get(req: express.Request, res: express.Response) {
+export var parameters = [
+    {
+        in: 'path',
+        name: 'id',
+        type: 'number',
+        required: true
+    },
+    {
+        in: 'header',
+        name: 'X-Mirakurun-Priority',
+        type: 'number',
+        minimum: 0
+    },
+    {
+        in: 'query',
+        name: 'decode',
+        type: 'number',
+        minimum: 0,
+        maximum: 1
+    }
+];
 
-    const service = Service.get(parseInt(req.params.id, 10));
+export var get: Operation = (req, res) => {
+
+    const service = Service.get(req.params.id);
 
     if (service === null) {
         api.responseError(res, 404);
@@ -34,9 +56,9 @@ export function get(req: express.Request, res: express.Response) {
 
     service.getStream({
         id: (req.ip || 'unix') + ':' + (req.connection.remotePort || Date.now()),
-        priority: parseInt(req.get('X-Mirakurun-Priority') || '0', 10),
+        priority: req.get('X-Mirakurun-Priority') || '0',
         agent: req.get('User-Agent'),
-        disableDecoder: (req.query.decode === '0')
+        disableDecoder: (req.query.decode === 0)
     })
         .then(stream => {
 
@@ -50,4 +72,24 @@ export function get(req: express.Request, res: express.Response) {
             stream.pipe(res);
         })
         .catch((err) => api.responseStreamErrorHandler(res, err));
-}
+};
+
+get.apiDoc = {
+    tags: ['services', 'stream'],
+    operationId: 'getServiceStream',
+    produces: ['video/MP2T'],
+    responses: {
+        200: {
+            description: 'OK'
+        },
+        404: {
+            description: 'Not Found'
+        },
+        503: {
+            description: 'Tuner Resource Unavailable'
+        },
+        default: {
+            description: 'Unexpected Error'
+        }
+    }
+};

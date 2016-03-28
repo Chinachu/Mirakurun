@@ -24,17 +24,25 @@ module api {
     export interface Error {
         code: number;
         reason: string;
+        errors: any[]
     }
 
     export function responseError(res: express.Response, code: number, reason?: string): express.Response {
 
-        res.writeHead(code, reason, {
-            'Content-Type': 'application/json'
-        });
+        if (reason) {
+            res.writeHead(code, reason, {
+                'Content-Type': 'application/json'
+            });
+        } else {
+            res.writeHead(code, {
+                'Content-Type': 'application/json'
+            });
+        }
 
         var error: Error = {
             code: code,
-            reason: reason || null
+            reason: reason || null,
+            errors: []
         };
 
         res.end(JSON.stringify(error));

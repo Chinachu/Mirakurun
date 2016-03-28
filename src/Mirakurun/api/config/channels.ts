@@ -17,23 +17,68 @@
 /// <reference path="../../../../typings/express/express.d.ts" />
 'use strict';
 
-import util = require('util');
-import express = require('express');
-import api = require('../../api');
+import {Operation} from 'express-openapi';
 import config = require('../../config');
 
-export function get(req: express.Request, res: express.Response) {
+export var get: Operation = (req, res) => {
 
     res.status(200);
     res.json(config.loadChannels());
-}
+};
 
-export function put(req: express.Request, res: express.Response) {
+get.apiDoc = {
+    tags: ['config'],
+    operationId: 'getChannelsConfig',
+    responses: {
+        200: {
+            description: 'OK',
+            schema: {
+                $ref: '#/definitions/ConfigChannels'
+            }
+        },
+        default: {
+            description: 'Unexpected Error',
+            schema: {
+                $ref: '#/definitions/Error'
+            }
+        }
+    }
+};
 
-    const channels: config.Channel[] = req.body || [];
+export var put: Operation = (req, res) => {
+
+    const channels: config.Channel[] = req.body;
 
     config.saveChannels(channels);
 
     res.status(200);
     res.json(channels);
-}
+};
+
+put.apiDoc = {
+    tags: ['config'],
+    operationId: 'updateChannelsConfig',
+    parameters: [
+        {
+            in: 'body',
+            name: 'body',
+            schema: {
+                $ref: '#/definitions/ConfigChannels'
+            }
+        }
+    ],
+    responses: {
+        200: {
+            description: 'OK',
+            schema: {
+                $ref: '#/definitions/ConfigChannels'
+            }
+        },
+        default: {
+            description: 'Unexpected Error',
+            schema: {
+                $ref: '#/definitions/Error'
+            }
+        }
+    }
+};

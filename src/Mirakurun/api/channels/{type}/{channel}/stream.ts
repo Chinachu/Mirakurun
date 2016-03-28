@@ -16,11 +16,40 @@
 /// <reference path="../../../../../../typings/express/express.d.ts" />
 'use strict';
 
-import express = require('express');
+import {Operation} from 'express-openapi';
 import api = require('../../../../api');
 import Channel = require('../../../../Channel');
 
-export function get(req: express.Request, res: express.Response) {
+export var parameters = [
+    {
+        in: 'path',
+        name: 'type',
+        type: 'string',
+        enum: ['GR', 'BS', 'CS', 'SKY'],
+        required: true
+    },
+    {
+        in: 'path',
+        name: 'channel',
+        type: 'string',
+        required: true
+    },
+    {
+        in: 'header',
+        name: 'X-Mirakurun-Priority',
+        type: 'number',
+        minimum: 0
+    },
+    {
+        in: 'query',
+        name: 'decode',
+        type: 'number',
+        minimum: 0,
+        maximum: 1
+    }
+];
+
+export var get: Operation = (req, res) => {
 
     const channel = Channel.get(req.params.type, req.params.channel);
 
@@ -34,9 +63,9 @@ export function get(req: express.Request, res: express.Response) {
 
     channel.getStream({
         id: (req.ip || 'unix') + ':' + (req.connection.remotePort || Date.now()),
-        priority: parseInt(req.get('X-Mirakurun-Priority') || '0', 10),
+        priority: req.get('X-Mirakurun-Priority') || 0,
         agent: req.get('User-Agent'),
-        disableDecoder: (req.query.decode === '0')
+        disableDecoder: (req.query.decode === 0)
     })
         .then(stream => {
 
@@ -50,4 +79,24 @@ export function get(req: express.Request, res: express.Response) {
             stream.pipe(res);
         })
         .catch((err) => api.responseStreamErrorHandler(res, err));
-}
+};
+
+get.apiDoc = {
+    tags: ['channels', 'stream'],
+    operationId: 'getChannelStream',
+    produces: ['video/MP2T'],
+    responses: {
+        200: {
+            description: 'OK'
+        },
+        404: {
+            description: 'Not Found'
+        },
+        503: {
+            description: 'Tuner Resource Unavailable'
+        },
+        default: {
+            description: 'Unexpected Error'
+        }
+    }
+};

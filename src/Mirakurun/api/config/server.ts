@@ -16,21 +16,68 @@
 /// <reference path="../../../../typings/express/express.d.ts" />
 'use strict';
 
-import express = require('express');
+import {Operation} from 'express-openapi';
 import config = require('../../config');
 
-export function get(req: express.Request, res: express.Response) {
+export var get: Operation = (req, res) => {
 
     res.status(200);
     res.json(config.loadServer());
-}
+};
 
-export function put(req: express.Request, res: express.Response) {
+get.apiDoc = {
+    tags: ['config'],
+    operationId: 'getServerConfig',
+    responses: {
+        200: {
+            description: 'OK',
+            schema: {
+                $ref: '#/definitions/ConfigServer'
+            }
+        },
+        default: {
+            description: 'Unexpected Error',
+            schema: {
+                $ref: '#/definitions/Error'
+            }
+        }
+    }
+};
 
-    const server: config.Server = req.body || {};
+export var put: Operation = (req, res) => {
+
+    const server: config.Server = req.body;
 
     config.saveServer(server);
 
     res.status(200);
     res.json(server);
-}
+};
+
+put.apiDoc = {
+    tags: ['config'],
+    operationId: 'updateServerConfig',
+    parameters: [
+        {
+            in: 'body',
+            name: 'body',
+            schema: {
+                $ref: '#/definitions/ConfigServer'
+            }
+        }
+    ],
+    responses: {
+        200: {
+            description: 'OK',
+            schema: {
+                $ref: '#/definitions/ConfigServer'
+            }
+        },
+        default: {
+            description: 'Unexpected Error',
+            schema: {
+                $ref: '#/definitions/Error'
+            }
+        }
+    }
+};

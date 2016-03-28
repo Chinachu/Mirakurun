@@ -19,7 +19,7 @@
 import fs = require('fs');
 import http = require('http');
 import express = require('express');
-import swaggerize = require('swaggerize-express');
+import openapi = require('express-openapi');
 import morgan = require('morgan');
 import bodyParser = require('body-parser');
 import yaml = require('js-yaml');
@@ -82,26 +82,28 @@ class Server {
                 }
             });
 
-            app.use(swaggerize({
-                api: yaml.safeLoad(fs.readFileSync('apiDefinition.yml', 'utf8')),
-                docspath: '/docs',
-                handlers: './api'
-            }));
+            openapi.initialize({
+                app: app,　　　　　　　　　　　　　　　
+                apiDoc: yaml.safeLoad(fs.readFileSync('apiDefinition.yml', 'utf8')),
+                docsPath: '/docs',
+                routes: './lib/Mirakurun/api'
+            });
 
             app.use((err, req, res: express.Response, next) => {
 
-                log.debug(err.stack);
+                log.debug('err.stack:', err.stack);
                 log.debug(JSON.stringify(err, null, '  '));
 
                 if (res.headersSent === false) {
-                    res.writeHead(err.status, err.name, {
+                    res.writeHead(err.status, {
                         'Content-Type': 'application/json'
                     });
                 }
 
                 res.end(JSON.stringify({
                     code: res.statusCode,
-                    reason: err.message
+                    reason: err.message || res.statusMessage,
+                    errors: err.errors
                 }));
 
                 next();
