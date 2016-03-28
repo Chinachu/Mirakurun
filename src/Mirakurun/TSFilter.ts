@@ -162,8 +162,6 @@ class TSFilter extends stream.Duplex {
                 chunk.copy(this._packet, this._offset);
                 this._offset += chunk.length;
 
-                console.log('drained...', this._offset, chunk.length);
-
                 // chunk drained
                 callback();
                 return;
