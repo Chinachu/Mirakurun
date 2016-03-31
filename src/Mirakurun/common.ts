@@ -13,6 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+'use strict';
 
 export interface User {
     id: string;
@@ -22,3 +23,28 @@ export interface User {
 }
 
 export type ChannelType = "GR" | "BS" | "CS" | "SKY";
+
+export function extendObject<T, U>(b: T, a: U): T {
+
+    for (let k in a) {
+        b[k] = a[k];
+    }
+
+    return b;
+};
+
+export function updateObject<T, U>(b: T, a: U): boolean {
+
+    let updated = false;
+
+    for (let k in a) {
+        if (b[k] !== a[k]) {
+            if (updated === false) {
+                updated = true;
+            }
+            b[k] = a[k];
+        }
+    }
+
+    return updated;
+};
