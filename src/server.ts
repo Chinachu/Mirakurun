@@ -16,12 +16,15 @@
 /// <reference path="../typings/node/node.d.ts" />
 'use strict';
 
+import util = require('util');
 import Server = require('./Mirakurun/Server');
 
 process.title = 'Mirakurun: Server';
 
 process.on('uncaughtException', err => {
-    console.error(err, err.stack);
+    console.error(err, err.stack.map(stack => {
+        return stack.getFunctionName() + '() at ' + stack.getFileName() + ':' + stack.getLineNumber();
+    }));
 });
 
 setEnv('SERVER_CONFIG_PATH', '/usr/local/etc/mirakurun/server.yml');

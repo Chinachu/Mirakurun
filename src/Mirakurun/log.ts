@@ -28,9 +28,10 @@ export enum LogLevel {
 
 export let logLevel: LogLevel = LogLevel.INFO;
 
+Error['prepareStackTrace'] = (error, stack) => stack;
+
 function getCaller() {
     const error = new Error();
-    Error['prepareStackTrace'] = (error, stack) => stack;
     return error.stack[3]['getFileName']().match(/[^\/]+$/)[0] + ':' + error.stack[3]['getLineNumber']();
 }
 
