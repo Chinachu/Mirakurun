@@ -91,8 +91,8 @@ class Server {
 
             app.use((err, req, res: express.Response, next) => {
 
-                log.debug('err.stack:', err.stack);
-                log.debug(JSON.stringify(err, null, '  '));
+                log.error(JSON.stringify(err, null, '  '));
+                console.error(err.stack);
 
                 if (res.headersSent === false) {
                     res.writeHead(err.status, {

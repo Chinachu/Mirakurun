@@ -28,15 +28,8 @@ export enum LogLevel {
 
 export let logLevel: LogLevel = LogLevel.INFO;
 
-Error['prepareStackTrace'] = (error, stack) => stack;
-
-function getCaller() {
-    const error = new Error();
-    return error.stack[3]['getFileName']().match(/[^\/]+$/)[0] + ':' + error.stack[3]['getLineNumber']();
-}
-
 function getLogString(lvstr: string, msgs: any[]) {
-    return new Date().toISOString() + ' ' + lvstr + ': ' + util.format.apply(null, msgs) + ' @' + getCaller();
+    return new Date().toISOString() + ' ' + lvstr + ': ' + util.format.apply(null, msgs);
 }
 
 export function debug(...msgs: any[]);

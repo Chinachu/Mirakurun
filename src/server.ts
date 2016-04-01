@@ -22,9 +22,7 @@ import Server = require('./Mirakurun/Server');
 process.title = 'Mirakurun: Server';
 
 process.on('uncaughtException', err => {
-    console.error(err, err.stack.map(stack => {
-        return stack.getFunctionName() + '() at ' + stack.getFileName() + ':' + stack.getLineNumber();
-    }));
+    console.error(err.stack);
 });
 
 setEnv('SERVER_CONFIG_PATH', '/usr/local/etc/mirakurun/server.yml');
