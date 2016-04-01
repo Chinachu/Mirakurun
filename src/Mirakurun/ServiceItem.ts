@@ -21,7 +21,6 @@ import _ = require('./_');
 import common = require('./common');
 import db = require('./db');
 import Event = require('./Event');
-import Tuner = require('./Tuner');
 import ChannelItem = require('./ChannelItem');
 
 class ServiceItem {
@@ -70,7 +69,7 @@ class ServiceItem {
     }
 
     getStream(user: common.User): Promise<stream.Readable> {
-        return Tuner.getServiceStream(this, user);
+        return _.tuner.getServiceStream(this, user);
     }
 
     private _updated(): void {

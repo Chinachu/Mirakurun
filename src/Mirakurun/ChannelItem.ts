@@ -22,9 +22,7 @@ import queue = require('./queue');
 import log = require('./log');
 import common = require('./common');
 import config = require('./config');
-import Service = require('./Service');
 import ServiceItem = require('./ServiceItem');
-import Tuner = require('./Tuner');
 
 class ChannelItem {
 
@@ -102,11 +100,11 @@ class ChannelItem {
     }
 
     getServices(): ServiceItem[] {
-        return Service.findByChannel(this);
+        return _.service.findByChannel(this);
     }
 
     getStream(user: common.User): Promise<stream.Readable> {
-        return Tuner.getChannelStream(this, user);
+        return _.tuner.getChannelStream(this, user);
     }
 
     serviceScan(add: boolean): void {
@@ -118,14 +116,14 @@ class ChannelItem {
 
                 log.info('ChannelItem#"%s" service scan has started', this._name);
 
-                Tuner.getServices(this)
+                _.tuner.getServices(this)
                     .then(services => {
 
                         log.debug('ChannelItem#"%s" services: %s', this._name, JSON.stringify(services, null, '  '));
 
                         services.forEach(service => {
-                            if (Service.exists(service.id) === true) {
-                                Service.get(service.id).name = service.name;
+                            if (_.service.exists(service.id) === true) {
+                                _.service.get(service.id).name = service.name;
                             } else if (add === true) {
                                 this.addService(service.id, service.name);
                             }
