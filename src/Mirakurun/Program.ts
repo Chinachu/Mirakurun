@@ -21,13 +21,12 @@ import fs = require('fs');
 import _ = require('./_');
 import log = require('./log');
 import db = require('./db');
-import Service = require('./Service');
 import ServiceItem = require('./ServiceItem');
 import ProgramItem = require('./ProgramItem');
 
 class Program {
 
-    private _items: ProgramItem[];
+    private _items: ProgramItem[] = [];
     private _saveTimerId: NodeJS.Timer;
 
     constructor() {
@@ -35,6 +34,12 @@ class Program {
         _.program = this;
 
         this._load();
+
+        setInterval(this._gc.bind(this), 1000 * 60 * 15);
+    }
+
+    get items(): ProgramItem[] {
+        return this._items;
     }
 
     add(item: ProgramItem): void {
@@ -64,9 +69,9 @@ class Program {
 
         if (index !== -1) {
             this._items.splice(index, 1);
-        }
 
-        this.save();
+            this.save();
+        }
     }
 
     exists(id: number): boolean {
@@ -89,15 +94,19 @@ class Program {
 
     save(): void {
         clearTimeout(this._saveTimerId);
-        this._saveTimerId = setTimeout(() => this._save(), 500);
+        this._saveTimerId = setTimeout(() => this._save(), 3000);
     }
 
     private _load(): void {
 
         log.debug('loading programs...');
 
+        const now = Date.now();
+
         db.loadPrograms().forEach(program => {
-            new ProgramItem(program);
+            if (now < (program.startAt + program.duration)) {
+                new ProgramItem(program);
+            }
         });
     }
 
@@ -108,6 +117,17 @@ class Program {
         db.savePrograms(
             this._items.map(program => program.data)
         );
+    }
+
+    private _gc(): void {
+
+        const now = Date.now();
+
+        this._items.forEach(program => {
+            if (now > (program.data.startAt + program.data.duration)) {
+                program.remove();
+            }
+        });
     }
 
     static add(item: ProgramItem): void {
@@ -128,6 +148,10 @@ class Program {
 
     static findByServiceId(id: number): ProgramItem[] {
         return _.program.findByServiceId(id);
+    }
+
+    static all(): ProgramItem[] {
+        return _.program.items;
     }
 
     static save(): void {

@@ -21,9 +21,7 @@ import _ = require('./_');
 import common = require('./common');
 import db = require('./db');
 import Event = require('./Event');
-import Tuner = require('./Tuner');
 import ChannelItem = require('./ChannelItem');
-import Service = require('./Service');
 import ServiceItem = require('./ServiceItem');
 
 class ProgramItem {
@@ -31,7 +29,9 @@ class ProgramItem {
     constructor(private _data: db.Program) {
 
         if (_.program.exists(_data.id) === true) {
-            return this;
+            let item = _.program.get(_data.id);
+            item.update(_data);
+            return item;
         }
 
         _.program.add(this);
@@ -43,7 +43,7 @@ class ProgramItem {
     }
 
     get service(): ServiceItem {
-        return Service.get(this._data.serviceId);
+        return _.service.get(this._data.serviceId);
     }
 
     get data(): db.Program {
@@ -52,21 +52,25 @@ class ProgramItem {
 
     update(data: db.Program): void {
 
-        if (data.id !== this._data.id) {
+        /* if (data.id !== this._data.id) {
             if (_.program.exists(data.id) === true) {
                 _.program.remove(this);
                 return;
             }
+        } */
+
+        if (common.updateObject(this._data, data) === true) {
+            _.program.save();
+            this._updated();
         }
-
-        this._data = data;
-
-        _.program.save();
-        this._updated();
     }
 
     getStream(user: common.User): Promise<stream.Readable> {
-        return Tuner.getProgramStream(this, user);
+        return _.tuner.getProgramStream(this, user);
+    }
+
+    remove(): void {
+        _.program.remove(this);
     }
 
     private _updated(): void {
