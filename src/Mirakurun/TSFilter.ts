@@ -215,6 +215,8 @@ class TSFilter extends stream.Duplex {
             return;
         }
 
+        packet = new Buffer(packet);
+
         // parse
         if (pid === 0 && this._patCRC !== packet.readInt32BE(packet[7] + 4)) {
             this._patCRC = packet.readInt32BE(packet[7] + 4);
@@ -229,8 +231,6 @@ class TSFilter extends stream.Duplex {
         if (this._providePids !== null && this._providePids.indexOf(pid) === -1) {
             return;
         }
-
-        packet = new Buffer(packet);
 
         // PAT (0) rewriting
         if (pid === 0 && this._pmtPid !== -1) {
@@ -431,7 +431,7 @@ class TSFilter extends stream.Duplex {
         }
 
         // write EPG stream
-        if (this._parseEIT === true) {
+        if (this._parseEIT === true && data.table_id !== 0x4E && data.table_id !== 0x4F) {
             epg.write(data);
         }
     }
