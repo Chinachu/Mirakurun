@@ -431,7 +431,7 @@ class TSFilter extends stream.Duplex {
         }
 
         // write EPG stream
-        if (this._parseEIT === true && data.table_id !== 0x4E) {
+        if (this._parseEIT === true && data.table_id !== 0x4E && data.table_id !== 0x4F) {
             epg.write(data);
         }
     }

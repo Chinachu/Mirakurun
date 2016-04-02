@@ -306,13 +306,13 @@ definitions:
     type: object
     properties:
       lv1:
-        type: number;
+        type: number
       lv2:
-        type: number;
+        type: number
       un1:
-        type: number;
+        type: number
       un2:
-        type: number;
+        type: number
 
   ProgramVideoType:
     type: string
