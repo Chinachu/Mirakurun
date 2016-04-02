@@ -47,16 +47,14 @@ class Server {
             log.logLevel = serverConfig.logLevel;
         }
 
-        const addresses: string[] = [];
+        let addresses: string[] = [];
 
         if (serverConfig.path) {
             addresses.push(serverConfig.path);
         }
 
         if (serverConfig.port) {
-            system.getPrivateIPv4Addresses().concat(['127.0.0.1']).forEach((address) => {
-                addresses.push(address);
-            });
+            addresses = [...addresses, ...system.getPrivateIPv4Addresses(), '127.0.0.1'];
         }
 
         addresses.forEach(address => {
