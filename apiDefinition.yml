@@ -167,7 +167,7 @@ definitions:
     type: object
     properties:
       code:
-        type: number
+        type: integer
       reason:
         type: string
       errors:
@@ -186,14 +186,27 @@ definitions:
         type: string
 
   ProgramId:
-    type: string
+    type: integer
+    maximum: 655356553565535
+
+  EventId:
+    type: integer
+    maximum: 65535
 
   ServiceId:
-    type: number
-    maxLength: 32
+    type: integer
+    maximum: 65535
+
+  NetworkId:
+    type: integer
+    maximum: 65535
+
+  ServiceItemId:
+    type: integer
+    maximum: 6553565535
 
   UnixtimeMS:
-    type: number
+    type: integer
 
   # channel -------------------------------------------------------------------
 
@@ -243,14 +256,16 @@ definitions:
     properties:
       id:
         $ref: '#/definitions/ProgramId'
+      networkId:
+        $ref: '#/definitions/NetworkId'
       eventId:
-        type: number
+        $ref: '#/definitions/EventId'
       service:
         $ref: '#/definitions/ServiceId'
       startAt:
         $ref: '#/definitions/UnixtimeMS'
       duration:
-        type: number
+        type: integer
       isFree:
         type: boolean
       name:
@@ -273,23 +288,23 @@ definitions:
           resolution:
             $ref: '#/definitions/ProgramVideoResolution'
           streamContent:
-            type: number
+            type: integer
           componentType:
-            type: number
+            type: integer
       audio:
         type: object
         properties:
           samplingRate:
             $ref: '#/definitions/ProgramAudioSamplingRate'
           componentType:
-            type: number
+            type: integer
       #series:
       #  type: object
       #  properties:
       #    id:
-      #      type: number
+      #      type: integer
       #    repeatCount:
-      #      type: number
+      #      type: integer
       #      minimum: 0
       #    pattern:
       #      $ref: '#/definitions/ProgramPattern'
@@ -306,13 +321,13 @@ definitions:
     type: object
     properties:
       lv1:
-        type: number
+        type: integer
       lv2:
-        type: number
+        type: integer
       un1:
-        type: number
+        type: integer
       un2:
-        type: number
+        type: integer
 
   ProgramVideoType:
     type: string
@@ -334,7 +349,7 @@ definitions:
       - 4320p
 
   ProgramAudioSamplingRate:
-    type: number
+    type: integer
     enum:
       - 16000 # 001
       - 22050 # 010
@@ -345,7 +360,7 @@ definitions:
     # ARIB STD-B10 Vol.2
 
   #ProgramPattern:
-  #  type: number
+  #  type: integer
   #  minimum: 0
   #  maximum: 7
     # ARIB STD-B10 Vol.2
@@ -359,7 +374,7 @@ definitions:
     # 0x7 未定義
 
   #ProgramEpisodeNumber:
-  #  type: number
+  #  type: integer
   #  minimum: 1
   #  maximum: 4095
 
@@ -390,11 +405,11 @@ definitions:
         type: string
         pattern: ^\/[^\/]+\/.+\.sock$
       port:
-        type: number
+        type: integer
         minimum: 1
         maximum: 65535
       logLevel:
-        type: number
+        type: integer
         minimum: -1
         maximum: 3
 
@@ -446,7 +461,7 @@ definitions:
       channel:
         type: string
       serviceId:
-        type: number
+        $ref: '#/definitions/ServiceId'
       satelite:
         type: string
       isDisabled:
@@ -480,7 +495,7 @@ definitions:
       command:
         type: string
       pid:
-        type: number
+        type: integer
       users:
         type: array
         items:
@@ -492,7 +507,7 @@ definitions:
       id:
         type: string
       priority:
-        type: number
+        type: integer
         minimum: -1
       agent:
         type: string
