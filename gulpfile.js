@@ -37,7 +37,7 @@ gulp.task('tsc', () => {
             target: 'ES6',
             module: 'commonjs',
             moduleResolution: 'node',
-            removeComments: true,
+            removeComments: false,
             declarationFiles: false
         }))
         .js
