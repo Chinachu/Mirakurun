@@ -94,7 +94,7 @@ class TSFilter extends stream.Duplex {
         this._provideEventId = options.eventId || null;
 
         if (this._provideServiceId !== null) {
-            this._providePids = PROVIDE_PIDS.concat();
+            this._providePids = [...PROVIDE_PIDS];
             this._ready = false;
         }
         if (this._provideEventId !== null) {
@@ -431,7 +431,7 @@ class TSFilter extends stream.Duplex {
         }
 
         // write EPG stream
-        if (this._parseEIT === true && data.table_id !== 0x4E && data.table_id !== 0x4F) {
+        if (this._parseEIT === true && data.table_id !== 0x4E) {
             epg.write(data);
         }
     }

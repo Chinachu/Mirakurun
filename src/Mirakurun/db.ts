@@ -34,42 +34,80 @@ module db {
     }
 
     export interface Program {
-        id: number;
-        eventId: number;
-        serviceId: number;
-        startAt: number;
-        endAt: number;
-        length: number;
-        name: string;
-        description: string;
-        genre: string;
-        attributes: string[];
-        video: ProgramVideo;
-        audio: ProgramAudio;
-        series?: ProgramSeries;
+        id?: number;
+
+        eventId?: number;
+        serviceId?: number;
+        startAt?: number;
+        duration?: number;
+        isFree?: boolean;
+
+        name?: string;
+        description?: string;
+        genres?: ProgramGenre[];
+        //attributes: string[];
+        video?: ProgramVideo;
+        audio?: ProgramAudio;
+
+        extended?: {
+            text: string;
+        }
+
+        //series?: ProgramSeries;
+
+        relatedItems?: ProgramRelatedItem[];
+    }
+
+    export interface ProgramGenre {
+        lv1: number;
+        lv2: number;
+        un1: number;
+        un2: number;
     }
 
     export interface ProgramVideo {
-        type: string;
+        type: ProgramVideoType;
         resolution: string;
+
         streamContent: number;
         componentType: number;
     }
 
+    export type ProgramVideoType = "mpeg2" | "h.264" | "h.265"
+
+    export type ProgramVideoResolution = (
+        "240p" | "480i" | "480p" | "720p" |
+        "1080i" | "1080p" | "2160p" | "4320p"
+    )
+
     export interface ProgramAudio {
-        type: string;
-        qualityIndicator: number;
-        samplingRate: number;
+        samplingRate: ProgramAudioSamplingRate;
+
         componentType: number;
     }
 
-    export interface ProgramSeries {
+    export enum ProgramAudioSamplingRate {
+        "16kHz" = 16000,
+        "22.05kHz" = 22050,
+        "24kHz" = 24000,
+        "32kHz" = 32000,
+        "44.1kHz" = 44100,
+        "48kHz" = 48000
+    }
+
+    /* export interface ProgramSeries {
         id: number;
         repeatCount: number;
         pattern: number;
         expiresAt: number;
         lastEpisode: number;
         name: string;
+    } */
+
+    export interface ProgramRelatedItem {
+        id: number;
+        serviceId: number;
+        eventId: number;
     }
 
     export function loadServices(): Service[] {
