@@ -78,13 +78,27 @@ class Program {
         return this.get(id) !== null;
     }
 
-    findByServiceId(id: number): ProgramItem[] {
+    findByServiceId(serviceId: number): ProgramItem[] {
 
         const items = [];
 
         let i, l = this._items.length;
         for (i = 0; i < l; i++) {
-            if (this._items[i].data.serviceId === id) {
+            if (this._items[i].data.serviceId === serviceId) {
+                items.push(this._items[i]);
+            }
+        }
+
+        return items;
+    }
+
+    findByServiceItemId(id: number): ProgramItem[] {
+
+        const items = [];
+
+        let i, l = this._items.length;
+        for (i = 0; i < l; i++) {
+            if (this._items[i].id === id) {
                 items.push(this._items[i]);
             }
         }
@@ -102,12 +116,25 @@ class Program {
         log.debug('loading programs...');
 
         const now = Date.now();
+        let dropped = false;
 
         db.loadPrograms().forEach(program => {
-            if (now < (program.startAt + program.duration)) {
-                new ProgramItem(program);
+
+            if (typeof program.networkId === 'undefined') {
+                dropped = true;
+                return;
             }
+            if (now > (program.startAt + program.duration)) {
+                dropped = true;
+                return;
+            }
+
+            new ProgramItem(program);
         });
+
+        if (dropped === true) {
+            this.save();
+        }
     }
 
     private _save(): void {
@@ -146,8 +173,12 @@ class Program {
         return _.program.exists(id);
     }
 
-    static findByServiceId(id: number): ProgramItem[] {
-        return _.program.findByServiceId(id);
+    static findByServiceId(serviceId: number): ProgramItem[] {
+        return _.program.findByServiceId(serviceId);
+    }
+
+    static findByServiceItemId(id: number): ProgramItem[] {
+        return _.program.findByServiceItemId(id);
     }
 
     static all(): ProgramItem[] {

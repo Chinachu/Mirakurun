@@ -28,6 +28,8 @@ export var get: Operation = (req, res) => {
 
             ch.services = channel.getServices().map(service => ({
                 id: service.id,
+                serviceId: service.serviceId,
+                networkId: service.networkId,
                 name: service.name
             }));
 

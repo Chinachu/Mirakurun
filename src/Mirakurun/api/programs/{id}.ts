@@ -24,7 +24,9 @@ export var parameters = [
     {
         in: 'path',
         name: 'id',
-        type: 'number',
+        type: 'integer',
+        minimum: 10000000000,
+        maximum: 655356553565535,
         required: true
     }
 ];

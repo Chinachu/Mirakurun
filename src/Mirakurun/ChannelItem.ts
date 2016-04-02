@@ -36,11 +36,10 @@ class ChannelItem {
         const pre = _.channel.get(config.type, config.channel);
         if (pre !== null) {
             if (config.serviceId) {
-                pre.addService(config.serviceId, config.name);
+                pre.addService(config.serviceId);
             }
 
-            _.channel.add(pre);
-            return;
+            return pre;
         }
 
         this._name = config.name;
@@ -53,7 +52,7 @@ class ChannelItem {
         }
 
         setTimeout(() => {
-            if (this.getServices().length === 0) {
+            if (!config.serviceId && this.getServices().length === 0) {
                 this.serviceScan(true);
             } else {
                 setTimeout(() => this.serviceScan(false), 180000);
@@ -88,15 +87,44 @@ class ChannelItem {
         };
     }
 
-    addService(id: number, name?: string): this {
+    addService(serviceId: number): void {
 
         if (!_.service) {
-            process.nextTick(() => this.addService(id, name));
+            process.nextTick(() => this.addService(serviceId));
             return;
         }
 
-        new ServiceItem(this, id, name || this._name);
-        return this;
+        if (_.service.findByChannel(this).some(service => service.serviceId === serviceId) === true) {
+            return;
+        }
+
+        log.info('ChannelItem#"%s" serviceId=%d check has queued', this._name, serviceId);
+
+        queue.add(() => {
+            return new Promise((resolve, reject) => {
+
+                log.info('ChannelItem#"%s" serviceId=%d check has started', this._name, serviceId);
+
+                _.tuner.getServices(this)
+                    .then(services => services.find(service => service.serviceId === serviceId))
+                    .then(service => {
+
+                        log.debug('ChannelItem#"%s" serviceId=%d: %s', this._name, serviceId, JSON.stringify(service, null, '  '));
+
+                        new ServiceItem(this, service.networkId, service.serviceId, service.name);
+
+                        resolve();
+                    })
+                    .catch(error => {
+
+                        log.info('ChannelItem#"%s" serviceId=%d check has failed [%s]', this._name, serviceId, error);
+
+                        setTimeout(() => this.addService(serviceId), 180000);
+
+                        reject();
+                    });
+            });
+        });
     }
 
     getServices(): ServiceItem[] {
@@ -122,10 +150,12 @@ class ChannelItem {
                         log.debug('ChannelItem#"%s" services: %s', this._name, JSON.stringify(services, null, '  '));
 
                         services.forEach(service => {
-                            if (_.service.exists(service.id) === true) {
-                                _.service.get(service.id).name = service.name;
+
+                            const item = _.service.get(service.networkId, service.serviceId);
+                            if (item !== null) {
+                                item.name = service.name;
                             } else if (add === true) {
-                                this.addService(service.id, service.name);
+                                new ServiceItem(this, service.networkId, service.serviceId, service.name);
                             }
                         });
 

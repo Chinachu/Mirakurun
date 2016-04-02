@@ -48,20 +48,33 @@ class Service {
         }
     }
 
-    get(id: number): ServiceItem {
+    get(id: number): ServiceItem;
+    get(networkId: number, serviceId: number): ServiceItem;
+    get(id: number, serviceId?: number) {
 
-        let i, l = this._items.length;
-        for (i = 0; i < l; i++) {
-            if (this._items[i].id === id) {
-                return this._items[i];
+        let i = 0, l = this._items.length;
+
+        if (typeof serviceId === 'undefined') {
+            for (; i < l; i++) {
+                if (this._items[i].id === id) {
+                    return this._items[i];
+                }
+            }
+        } else {
+            for (; i < l; i++) {
+                if (this._items[i].networkId === id && this._items[i].serviceId === serviceId) {
+                    return this._items[i];
+                }
             }
         }
 
         return null;
     }
 
-    exists(id: number): boolean {
-        return this.get(id) !== null;
+    exists(id: number): boolean;
+    exists(networkId: number, serviceId: number): boolean;
+    exists(id: number, serviceId?: number) {
+        return this.get(id, serviceId) !== null;
     }
 
     findByChannel(channel: ChannelItem): ServiceItem[] {
@@ -71,6 +84,20 @@ class Service {
         let i, l = this._items.length;
         for (i = 0; i < l; i++) {
             if (this._items[i].channel === channel) {
+                items.push(this._items[i]);
+            }
+        }
+
+        return items;
+    }
+
+    findByNetworkId(networkId: number): ServiceItem[] {
+
+        const items = [];
+
+        let i, l = this._items.length;
+        for (i = 0; i < l; i++) {
+            if (this._items[i].networkId === networkId) {
                 items.push(this._items[i]);
             }
         }
@@ -98,10 +125,15 @@ class Service {
                 return;
             }
 
-            new ServiceItem(channelItem, service.id, service.name);
+            if (typeof service.networkId === 'undefined' || typeof service.serviceId === 'undefined') {
+                dropped = true;
+                return;
+            }
+
+            new ServiceItem(channelItem, service.networkId, service.serviceId, service.name);
         });
 
-        if (dropped) {
+        if (dropped === true) {
             this.save();
         }
     }
@@ -119,16 +151,24 @@ class Service {
         return _.service.add(item);
     }
 
-    static get(id: number): ServiceItem {
-        return _.service.get(id);
+    static get(id: number): ServiceItem;
+    static get(networkId: number, serviceId: number): ServiceItem;
+    static get(id: number, serviceId?: number) {
+        return _.service.get(id, serviceId);
     }
 
-    static exists(id: number): boolean {
-        return _.service.exists(id);
+    static exists(id: number): boolean;
+    static exists(networkId: number, serviceId: number): boolean;
+    static exists(id: number, serviceId?: number) {
+        return _.service.exists(id, serviceId);
     }
 
     static findByChannel(channel: ChannelItem): ServiceItem[] {
         return _.service.findByChannel(channel);
+    }
+
+    static findByNetworkId(networkId: number): ServiceItem[] {
+        return _.service.findByNetworkId(networkId);
     }
 
     static all(): ServiceItem[] {

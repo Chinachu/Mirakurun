@@ -25,9 +25,13 @@ import ChannelItem = require('./ChannelItem');
 
 class ServiceItem {
 
-    constructor(private _channel: ChannelItem, private _id: number, private _name?: string) {
+    private _id: number;
 
-        if (_.service.exists(_id) === true) {
+    constructor(private _channel: ChannelItem, private _networkId: number, private _serviceId: number, private _name?: string) {
+
+        this._id = ServiceItem.createId(_networkId, _serviceId);
+
+        if (_.service.exists(this._id) === true) {
             return this;
         }
 
@@ -37,6 +41,14 @@ class ServiceItem {
 
     get id(): number {
         return this._id;
+    }
+
+    get networkId(): number {
+        return this._networkId;
+    }
+
+    get serviceId(): number {
+        return this._serviceId;
     }
 
     get name(): string {
@@ -60,6 +72,8 @@ class ServiceItem {
     export(): db.Service {
         return {
             id: this._id,
+            serviceId: this._serviceId,
+            networkId: this._networkId,
             name: this._name || '',
             channel: {
                 type: this._channel.type,
@@ -74,6 +88,10 @@ class ServiceItem {
 
     private _updated(): void {
         Event.emit('service', this.export())
+    }
+
+    static createId(networkId: number, serviceId: number): number {
+        return parseInt(networkId + (serviceId / 100000).toFixed(5).slice(2), 10);
     }
 }
 

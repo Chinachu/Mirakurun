@@ -115,7 +115,7 @@ interface VersionState {
 // forked from rndomhack/node-aribts/blob/1e7ef94bba3d6ac26aec764bf24dde2c2852bfcb/lib/epg.js
 class EPG extends stream.Writable {
 
-    private _epg: { [serviceId: string]: { [eventId: string]: EventState } } = {};
+    private _epg: { [networkId: number]: { [serviceId: number]: { [eventId: number]: EventState } } } = {};
 
     constructor() {
         super({
@@ -127,11 +127,15 @@ class EPG extends stream.Writable {
 
     _write(eit: any, encoding, callback) {
 
-        if (typeof this._epg[eit.service_id] === 'undefined') {
-            this._epg[eit.service_id] = {};
+        if (typeof this._epg[eit.original_network_id] === 'undefined') {
+            this._epg[eit.original_network_id] = {};
         }
 
-        const service = this._epg[eit.service_id];
+        if (typeof this._epg[eit.original_network_id][eit.service_id] === 'undefined') {
+            this._epg[eit.original_network_id][eit.service_id] = {};
+        }
+
+        const service = this._epg[eit.original_network_id][eit.service_id];
 
         let update: boolean,
             state: EventState;
@@ -148,10 +152,11 @@ class EPG extends stream.Writable {
                         extended: isBasicTable(eit.table_id) ? -1 : eit.version_number
                     },
                     program: new ProgramItem({
-                        id: getProgramId(eit.service_id, e.event_id),
+                        id: getProgramId(eit.original_network_id, eit.service_id, e.event_id),
 
                         eventId: e.event_id,
                         serviceId: eit.service_id,
+                        networkId: eit.original_network_id,
                         startAt: getTime(e.start_time),
                         duration: getTimeFromBCD24(e.duration),
                         isFree: e.free_CA_mode === 0
@@ -368,14 +373,16 @@ class EPG extends stream.Writable {
 
         const now = Date.now();
 
-        let sid, eid, state: EventState;
-        for (sid in this._epg) {
-            for (eid in this._epg[sid]) {
-                state = this._epg[sid][eid];
-                if (now > (state.program.data.startAt + state.program.data.duration)) {
-                    //state.program.remove();// This will called from Program
-                    delete state.program;
-                    delete this._epg[sid][eid];
+        let nid, sid, eid, state: EventState;
+        for (nid in this._epg) {
+            for (sid in this._epg[nid]) {
+                for (eid in this._epg[nid][sid]) {
+                    state = this._epg[nid][sid][eid];
+                    if (now > (state.program.data.startAt + state.program.data.duration)) {
+                        //state.program.remove();// This will called from Program
+                        delete state.program;
+                        delete this._epg[nid][sid][eid];
+                    }
                 }
             }
         }
@@ -414,8 +421,8 @@ function isOutOfDate(state: EventState, eit): boolean {
     return true;
 }
 
-function getProgramId(serviceId: number, eventId: number): number {
-    return parseInt((serviceId / 100000).toFixed(5).slice(2) + (eventId / 100000).toFixed(5).slice(2), 10);
+function getProgramId(networkId: number, serviceId: number, eventId: number): number {
+    return parseInt(networkId + (serviceId / 100000).toFixed(5).slice(2) + (eventId / 100000).toFixed(5).slice(2), 10);
 }
 
 function getTime(buffer: Buffer): number {
@@ -458,7 +465,7 @@ function getGenre(content: any): db.ProgramGenre {
 
 function getRelatedProgramItem(event: any): db.ProgramRelatedItem {
     return {
-        id: getProgramId(event.service_id, event.event_id),
+        networkId: event.original_network_id,
         serviceId: event.service_id,
         eventId: event.event_id
     };

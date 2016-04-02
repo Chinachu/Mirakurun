@@ -43,7 +43,7 @@ class ProgramItem {
     }
 
     get service(): ServiceItem {
-        return _.service.get(this._data.serviceId);
+        return _.service.get(this._data.networkId, this._data.serviceId);
     }
 
     get data(): db.Program {

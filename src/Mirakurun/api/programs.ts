@@ -24,8 +24,12 @@ export var get: Operation = (req, res) => {
     let programs;
 
     if (req.query.serviceId) {
+        // for debug
         programs = Program.findByServiceId(req.query.serviceId);
-    } else {
+    } else if (req.query.serviceItemId) {
+        // for debug
+        programs = Program.findByServiceItemId(req.query.serviceItemId);
+    } {
         programs = Program.all();
     }
 

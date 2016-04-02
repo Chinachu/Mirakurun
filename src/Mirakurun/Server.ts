@@ -93,7 +93,7 @@ class Server {
                 console.error(err.stack);
 
                 if (res.headersSent === false) {
-                    res.writeHead(err.status, {
+                    res.writeHead(err.status || 500, {
                         'Content-Type': 'application/json'
                     });
                 }

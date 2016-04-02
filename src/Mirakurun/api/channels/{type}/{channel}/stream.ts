@@ -37,13 +37,13 @@ export var parameters = [
     {
         in: 'header',
         name: 'X-Mirakurun-Priority',
-        type: 'number',
+        type: 'integer',
         minimum: 0
     },
     {
         in: 'query',
         name: 'decode',
-        type: 'number',
+        type: 'integer',
         minimum: 0,
         maximum: 1
     }

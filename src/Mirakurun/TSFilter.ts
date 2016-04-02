@@ -25,6 +25,7 @@ const aribts = require('aribts');
 const CRC32_TABLE = require('../../node_modules/aribts/lib/crc32_table');
 
 interface StreamOptions extends stream.DuplexOptions {
+    networkId?: number;
     serviceId?: number;
     eventId?: number;
     noProvide?: boolean;
@@ -54,6 +55,7 @@ class TSFilter extends stream.Duplex {
     private _provideEventId: number;
     private _parseSDT: boolean = false;
     private _parseEIT: boolean = false;
+    private _targetNetworkId: number;
 
     // aribts
     private _parser: stream.Transform = new aribts.TsStream();
@@ -90,6 +92,7 @@ class TSFilter extends stream.Duplex {
             allowHalfOpen: false
         });
 
+        this._targetNetworkId = options.networkId || null;
         this._provideServiceId = options.serviceId || null;
         this._provideEventId = options.eventId || null;
 
@@ -256,7 +259,11 @@ class TSFilter extends stream.Duplex {
             }
 
             this._serviceIds.push(id);
-            item = _.service.get(id);
+            if (this._targetNetworkId === null) {
+                item = null;
+            } else {
+                item = _.service.get(this._targetNetworkId, id);
+            }
 
             log.debug(
                 'TSFilter detected PMT PID=%d as serviceId=%d (%s)',
@@ -301,25 +308,13 @@ class TSFilter extends stream.Duplex {
             }
 
             if (this._parseEIT === true && item) {
-                if (item.channel.type === 'GR') {
-                    item.channel.getServices().forEach(item => {
-                        if (this._parseServiceIds.indexOf(item.id) === -1) {
-                            this._parseServiceIds.push(item.id);
+                _.service.findByNetworkId(this._targetNetworkId).forEach(service => {
+                    if (this._parseServiceIds.indexOf(service.serviceId) === -1) {
+                        this._parseServiceIds.push(service.serviceId);
 
-                            log.debug('TSFilter parsing serviceId=%d (%s)', item.id, item.name);
-                        }
-                    });
-                } else {
-                    _.channel.findByType(item.channel.type).forEach(ch => {
-                        ch.getServices().forEach(item => {
-                            if (this._parseServiceIds.indexOf(item.id) === -1) {
-                                this._parseServiceIds.push(item.id);
-
-                                log.debug('TSFilter parsing serviceId=%d (%s)', item.id, item.name);
-                            }
-                        });
-                    });
-                }
+                        log.debug('TSFilter parsing serviceId=%d (%s)', service.serviceId, service.name);
+                    }
+                });
             }
         }
 
@@ -387,7 +382,8 @@ class TSFilter extends stream.Duplex {
 
             if (this._services.some(service => service.id === data.services[i].service_id) === false) {
                 this._services.push({
-                    id: data.services[i].service_id,
+                    networkId: data.original_network_id,
+                    serviceId: data.services[i].service_id,
                     name: name
                 });
             }

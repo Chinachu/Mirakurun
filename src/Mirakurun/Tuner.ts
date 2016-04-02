@@ -31,6 +31,7 @@ import TSFilter = require('./TSFilter');
 
 interface StreamSetting {
     channel: ChannelItem;
+    networkId?: number;
     serviceId?: number;
     eventId?: number;
     noProvide?: boolean;
@@ -63,8 +64,16 @@ class Tuner {
 
     getChannelStream(channel: ChannelItem, user: common.User): Promise<stream.Readable> {
 
+        let networkId;
+
+        const services = channel.getServices();
+        if (services.length !== 0) {
+            networkId = services[0].networkId;
+        }
+
         const setting: StreamSetting = {
             channel: channel,
+            networkId: networkId,
             parseEIT: true
         };
 
@@ -75,7 +84,8 @@ class Tuner {
 
         const setting: StreamSetting = {
             channel: service.channel,
-            serviceId: service.id,
+            serviceId: service.serviceId,
+            networkId: service.networkId,
             parseEIT: true
         };
 
@@ -88,6 +98,7 @@ class Tuner {
             channel: program.service.channel,
             serviceId: program.data.serviceId,
             eventId: program.data.eventId,
+            networkId: program.data.networkId,
             parseEIT: true
         };
 
@@ -246,6 +257,7 @@ class Tuner {
                     }
                 } else {
                     const tsFilter = new TSFilter({
+                        networkId: setting.networkId,
                         serviceId: setting.serviceId,
                         eventId: setting.eventId,
                         noProvide: setting.noProvide,

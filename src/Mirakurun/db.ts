@@ -24,6 +24,8 @@ module db {
 
     export interface Service {
         id: number;
+        serviceId: number;
+        networkId: number;
         name: string;
         channel: Channel;
     }
@@ -35,9 +37,9 @@ module db {
 
     export interface Program {
         id?: number;
-
         eventId?: number;
         serviceId?: number;
+        networkId?: number;
         startAt?: number;
         duration?: number;
         isFree?: boolean;
@@ -105,7 +107,7 @@ module db {
     } */
 
     export interface ProgramRelatedItem {
-        id: number;
+        networkId?: number;
         serviceId: number;
         eventId: number;
     }

@@ -24,14 +24,20 @@ export var parameters = [
     {
         in: 'path',
         name: 'id',
-        type: 'number',
+        type: 'integer',
+        maximum: 6553565535,
         required: true
     }
 ];
 
 export var get: Operation = (req, res) => {
 
-    const service = Service.get(req.params.id);
+    let service = Service.get(req.params.id);
+
+    if (service === null) {
+        // deprecated
+        service = Service.all().find(item => item.serviceId === req.params.id);
+    }
 
     if (service === null) {
         api.responseError(res, 404);
