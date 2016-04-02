@@ -1,7 +1,7 @@
 swagger: '2.0'
 info:
   title: Mirakurun
-  version: '1.0.0'
+  version: '1.0'
   description: DVR Tuner Server Service for Chinachu Air.
   contact:
     name: Yuki KAN
@@ -12,346 +12,6 @@ consumes:
 produces:
   - application/json
 paths:
-
-  # channels ------------------------------------------------------------------
-
-  /channels:
-    head:
-      tags:
-          - channels
-      responses:
-        200:
-          description: OK
-        default:
-          description: Unexpected Error
-    get:
-      operationId: getChannels
-      tags:
-        - channels
-      responses:
-        200:
-          description: OK
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/Channel'
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
-  /channels/{type}:
-    parameters:
-      - in: path
-        name: type
-        type: string
-        enum:
-          - GR
-          - BS
-          - CS
-          - SKY
-        required: true
-    head:
-      tags:
-        - channels
-      responses:
-        200:
-          description: OK
-        default:
-          description: Unexpected Error
-    get:
-      operationId: getChannelsByType
-      tags:
-        - channels
-      responses:
-        200:
-          description: OK
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/Channel'
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
-  /channels/{type}/{channel}:
-    parameters:
-      - in: path
-        name: type
-        type: string
-        enum:
-          - GR
-          - BS
-          - CS
-          - SKY
-        required: true
-      - in: path
-        name: channel
-        type: string
-        required: true
-    head:
-      tags:
-        - channels
-      responses:
-        200:
-          description: OK
-        404:
-          description: Not Found
-        default:
-          description: Unexpected Error
-    get:
-      operationId: getChannel
-      tags:
-        - channels
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: '#/definitions/Channel'
-        404:
-          description: Not Found
-          schema:
-            $ref: '#/definitions/Error'
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
-  /channels/{type}/{channel}/stream:
-    parameters:
-      - in: path
-        name: type
-        type: string
-        enum:
-          - GR
-          - BS
-          - CS
-          - SKY
-        required: true
-      - in: path
-        name: channel
-        type: string
-        required: true
-      - in: header
-        name: X-Mirakurun-Priority
-        type: number
-        minimum: 0
-      - in: query
-        name: decode
-        type: number
-        minimum: 0
-        maximum: 1
-    get:
-      operationId: getChannelStream
-      tags:
-        - channels
-        - stream
-      produces:
-        - video/MP2T
-      responses:
-        200:
-          description: OK
-        404:
-          description: Not Found
-        503:
-          description: Tuner Resource Unavailable
-        default:
-          description: Unexpected Error
-
-  # services ------------------------------------------------------------------
-
-  /services:
-    head:
-      tags:
-          - services
-      responses:
-        200:
-          description: OK
-        default:
-          description: Unexpected Error
-    get:
-      operationId: getServices
-      tags:
-        - services
-      responses:
-        200:
-          description: OK
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/Service'
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
-  /services/{id}:
-    parameters:
-      - in: path
-        name: id
-        type: number
-        required: true
-    head:
-      tags:
-        - services
-      responses:
-        200:
-          description: OK
-        404:
-          description: Not Found
-        default:
-          description: Unexpected Error
-    get:
-      operationId: getService
-      tags:
-        - services
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: '#/definitions/Service'
-        404:
-          description: Not Found
-          schema:
-            $ref: '#/definitions/Error'
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
-  /services/{id}/stream:
-    parameters:
-      - in: path
-        name: id
-        type: number
-        required: true
-      - in: header
-        name: X-Mirakurun-Priority
-        type: number
-        minimum: 0
-    get:
-      operationId: getServiceStream
-      tags:
-        - services
-        - stream
-      produces:
-        - video/MP2T
-      responses:
-        200:
-          description: OK
-        404:
-          description: Not Found
-        503:
-          description: Tuner Resource Unavailable
-        default:
-          description: Unexpected Error
-
-  # programs ------------------------------------------------------------------
-
-  /programs:
-    head:
-      tags:
-          - programs
-      responses:
-        200:
-          description: OK
-          headers:
-            Last-Modified:
-              type: string
-              format: dateTime
-        default:
-          description: Unexpected Error
-    get:
-      operationId: getPrograms
-      tags:
-        - programs
-      responses:
-        200:
-          description: OK
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/Program'
-          headers:
-            Last-Modified:
-              type: string
-              format: dateTime
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
-  /programs/{id}:
-    parameters:
-      - in: path
-        name: id
-        type: string
-        required: true
-    head:
-      tags:
-        - programs
-      responses:
-        200:
-          description: OK
-          headers:
-            Last-Modified:
-              type: string
-              format: dateTime
-        404:
-          description: Not Found
-        default:
-          description: Unexpected Error
-    get:
-      operationId: getProgram
-      tags:
-        - programs
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: '#/definitions/Program'
-          headers:
-            Last-Modified:
-              type: string
-              format: dateTime
-        404:
-          description: Not Found
-          schema:
-            $ref: '#/definitions/Error'
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
-  /programs/{id}/stream:
-    parameters:
-      - in: path
-        name: id
-        type: string
-        required: true
-      - in: header
-        name: X-Mirakurun-Priority
-        type: number
-        minimum: 0
-    get:
-      operationId: getProgramStream
-      tags:
-        - programs
-        - stream
-      produces:
-        - video/MP2T
-      responses:
-        200:
-          description: OK
-        404:
-          description: Not Found
-        410:
-          description: Gone
-        503:
-          description: Tuner Resource Unavailable
-        default:
-          description: Unexpected Error
 
   # events --------------------------------------------------------------------
 
@@ -414,107 +74,6 @@ paths:
       responses:
         200:
           description: OK
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
-  # config --------------------------------------------------------------------
-
-  /config/server:
-    get:
-      operationId: getServerConfig
-      tags:
-        - config
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: '#/definitions/ConfigServer'
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-    put:
-      operationId: updateServerConfig
-      tags:
-        - config
-      parameters:
-        - in: body
-          name: body
-          schema:
-            $ref: '#/definitions/ConfigServer'
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: '#/definitions/ConfigServer'
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
-  /config/tuners:
-    get:
-      operationId: getTunersConfig
-      tags:
-        - config
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: '#/definitions/ConfigTuners'
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-    put:
-      operationId: updateTunersConfig
-      tags:
-        - config
-      parameters:
-        - in: body
-          name: body
-          schema:
-            $ref: '#/definitions/ConfigTuners'
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: '#/definitions/ConfigTuners'
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
-  /config/channels:
-    get:
-      operationId: getChannelsConfig
-      tags:
-        - config
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: '#/definitions/ConfigChannels'
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-    put:
-      operationId: updateChannelsConfig
-      tags:
-        - config
-      parameters:
-        - in: body
-          name: body
-          schema:
-            $ref: '#/definitions/ConfigChannels'
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: '#/definitions/ConfigChannels'
         default:
           description: Unexpected Error
           schema:
@@ -611,6 +170,20 @@ definitions:
         type: number
       reason:
         type: string
+      errors:
+        type: array
+        items:
+          $ref: '#/definitions/ErrorOfOpenAPI'
+
+  ErrorOfOpenAPI:
+    type: object
+    properties:
+      errorCode:
+        type: string
+      message:
+        type: string
+      location:
+        type: string
 
   ProgramId:
     type: string
@@ -672,24 +245,26 @@ definitions:
         $ref: '#/definitions/ProgramId'
       eventId:
         type: number
+      service:
+        $ref: '#/definitions/ServiceId'
       startAt:
         $ref: '#/definitions/UnixtimeMS'
-      endAt:
-        $ref: '#/definitions/UnixtimeMS'
-      length:
+      duration:
         type: number
-      service:
-        $ref: '#/definitions/Service'
+      isFree:
+        type: boolean
       name:
         type: string
       description:
         type: string
-      genre:
-        $ref: '#/definitions/ProgramGenre'
-      attributes:
+      genres:
         type: array
         items:
-          $ref: '#/definitions/ProgramAttribute'
+          $ref: '#/definitions/ProgramGenre'
+      #attributes:
+      #  type: array
+      #  items:
+      #    type: string
       video:
         type: object
         properties:
@@ -704,71 +279,47 @@ definitions:
       audio:
         type: object
         properties:
-          type:
-            $ref: '#/definitions/ProgramAudioType'
-          qualityIndicator:
-            $ref: '#/definitions/ProgramAudioQuality'
           samplingRate:
             $ref: '#/definitions/ProgramAudioSamplingRate'
           componentType:
             type: number
-      series:
-        type: object
-        properties:
-          id:
-            type: number
-          repeatCount:
-            type: number
-            minimum: 0
-          pattern:
-            $ref: '#/definitions/ProgramPattern'
-          expiresAt:
-            $ref: '#/definitions/UnixtimeMS'
-          episode:
-            $ref: '#/definitions/ProgramEpisodeNumber'
-          lastEpisode:
-            $ref: '#/definitions/ProgramEpisodeNumber'
-          name:
-            type: string
+      #series:
+      #  type: object
+      #  properties:
+      #    id:
+      #      type: number
+      #    repeatCount:
+      #      type: number
+      #      minimum: 0
+      #    pattern:
+      #      $ref: '#/definitions/ProgramPattern'
+      #    expiresAt:
+      #      $ref: '#/definitions/UnixtimeMS'
+      #    episode:
+      #      $ref: '#/definitions/ProgramEpisodeNumber'
+      #    lastEpisode:
+      #      $ref: '#/definitions/ProgramEpisodeNumber'
+      #    name:
+      #      type: string
 
   ProgramGenre:
-    type: string
-    enum:
-      - news
-      - sport
-      - information
-      - drama
-      - music
-      - variety
-      - cinema
-      - anime
-      - documentary
-      - theater
-      - education
-      - welfare
-      - extended
-      - etc
-
-  ProgramAttribute:
-    type: string
-    enum:
-      - cc
-      - new
-      - final
-      - re
-      - data
-      - free
-      - bilingual
-      - multichannel-sound
-      - live
-      - prequel
-      - sequel
+    type: object
+    properties:
+      lv1:
+        type: number;
+      lv2:
+        type: number;
+      un1:
+        type: number;
+      un2:
+        type: number;
 
   ProgramVideoType:
     type: string
     enum:
       - mpeg2
       - h.264
+      - h.265
 
   ProgramVideoResolution:
     type: string
@@ -780,19 +331,7 @@ definitions:
       - 1080i
       - 1080p
       - 2160p
-
-  ProgramAudioType:
-    type: string
-    enum:
-      - bc
-      - aac
-
-  ProgramAudioQuality:
-    type: number
-    enum:
-      - 1 # 現行の衛星標準テレビ放送のB モードに相当する音声品質
-      - 2 # モード 1 以外の音声品質でモード 3 に分類しないもの
-      - 3 # モード 1、2 に比べて限定的な音声品質
+      - 4320p
 
   ProgramAudioSamplingRate:
     type: number
@@ -805,10 +344,10 @@ definitions:
       - 48000 # 111
     # ARIB STD-B10 Vol.2
 
-  ProgramPattern:
-    type: number
-    minimum: 0
-    maximum: 7
+  #ProgramPattern:
+  #  type: number
+  #  minimum: 0
+  #  maximum: 7
     # ARIB STD-B10 Vol.2
     # 0x0 不定期（0x1 – 0x7で定義されるもの以外）
     # 0x1 帯番組（毎日、平日のみ毎日、土・日のみなど）、週に複数回の編成
@@ -819,10 +358,10 @@ definitions:
     # 0x6 定期または不定期の蓄積用の編成
     # 0x7 未定義
 
-  ProgramEpisodeNumber:
-    type: number
-    minimum: 1
-    maximum: 4095
+  #ProgramEpisodeNumber:
+  #  type: number
+  #  minimum: 1
+  #  maximum: 4095
 
   # event ---------------------------------------------------------------------
 
@@ -889,6 +428,11 @@ definitions:
         type: boolean
 
   ConfigChannels:
+    type: array
+    items:
+      $ref: '#/definitions/ConfigChannelsItem'
+
+  ConfigChannelsItem:
     type: object
     required:
       - name
