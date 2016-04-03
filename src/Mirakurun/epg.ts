@@ -447,8 +447,8 @@ function getTime(buffer: Buffer): number {
 
 function getTimeFromBCD24(buffer: Buffer): number {
 
-    let time = (buffer[0] >> 4) * 10 + (buffer[0] & 0x0F) * 3600;
-    time += (buffer[1] >> 4) * 10 + (buffer[1] & 0x0F) * 60;
+    let time = ((buffer[0] >> 4) * 10 + (buffer[0] & 0x0F)) * 3600;
+    time += ((buffer[1] >> 4) * 10 + (buffer[1] & 0x0F)) * 60;
     time += (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);
 
     return time * 1000;
