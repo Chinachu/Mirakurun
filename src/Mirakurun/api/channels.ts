@@ -13,15 +13,16 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../../../typings/express/express.d.ts" />
 'use strict';
 
 import {Operation} from 'express-openapi';
+import api = require('../api');
 import Channel = require('../Channel');
 
 export var get: Operation = (req, res) => {
 
-    res.json(
+    api.responseJSON(
+        res,
         Channel.all().map(channel => {
 
             const ch: any = channel.export();

@@ -13,10 +13,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../../../typings/express/express.d.ts" />
 'use strict';
 
 import {Operation} from 'express-openapi';
+import api = require('../api');
 import Program = require('../Program');
 
 export var get: Operation = (req, res) => {
@@ -33,7 +33,7 @@ export var get: Operation = (req, res) => {
         programs = Program.all();
     }
 
-    res.json(programs.map(program => program.data));
+    api.responseJSON(res, programs.map(program => program.data));
 };
 
 get.apiDoc = {

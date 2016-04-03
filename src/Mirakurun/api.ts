@@ -58,6 +58,16 @@ module api {
 
         return api.responseError(res, 500, err.message);
     }
+
+    export function responseJSON(res: express.Response, body: any): express.Response {
+
+        // this is lighter than res.json()
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.status(200);
+        res.end(JSON.stringify(body));
+
+        return res;
+    }
 }
 
 export = api;
