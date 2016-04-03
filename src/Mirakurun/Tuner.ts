@@ -105,6 +105,40 @@ class Tuner {
         return this._getStream(setting, user);
     }
 
+    getEPG(channel: ChannelItem, seconds: number): Promise<void> {
+
+        let networkId;
+
+        const services = channel.getServices();
+        if (services.length !== 0) {
+            networkId = services[0].networkId;
+        }
+
+        const setting: StreamSetting = {
+            channel: channel,
+            networkId: networkId,
+            noProvide: true,
+            parseEIT: true
+        };
+
+        const user: common.User = {
+            id: 'Mirakurun:getEPG()',
+            priority: -1,
+            disableDecoder: true
+        };
+
+        return this._getStream(setting, user)
+            .then(stream => {
+                return new Promise<void>((resolve) => {
+                    setTimeout(() => stream.emit('close'), seconds * 1000);
+                    stream.once('close', resolve);
+                });
+            })
+            .catch(error => {
+                return Promise.reject(error);
+            });
+    }
+
     getServices(channel: ChannelItem): Promise<db.Service[]> {
 
         const setting: StreamSetting = {
@@ -316,6 +350,10 @@ class Tuner {
 
     static getProgramStream(program: ProgramItem, user: common.User): Promise<stream.Readable> {
         return _.tuner.getProgramStream(program, user);
+    }
+
+    static getEPG(channel: ChannelItem, seconds: number): Promise<void> {
+        return _.tuner.getEPG(channel, seconds);
     }
 
     static getServices(channel: ChannelItem): Promise<db.Service[]> {

@@ -115,6 +115,8 @@ interface VersionState {
 // forked from rndomhack/node-aribts/blob/1e7ef94bba3d6ac26aec764bf24dde2c2852bfcb/lib/epg.js
 class EPG extends stream.Writable {
 
+    status: { [networkId: number]: boolean } = {};
+
     private _epg: { [networkId: number]: { [serviceId: number]: { [eventId: number]: EventState } } } = {};
 
     constructor() {
@@ -127,15 +129,17 @@ class EPG extends stream.Writable {
 
     _write(eit: any, encoding, callback) {
 
-        if (typeof this._epg[eit.original_network_id] === 'undefined') {
-            this._epg[eit.original_network_id] = {};
+        const networkId = eit.original_network_id;
+
+        if (typeof this._epg[networkId] === 'undefined') {
+            this._epg[networkId] = {};
         }
 
-        if (typeof this._epg[eit.original_network_id][eit.service_id] === 'undefined') {
-            this._epg[eit.original_network_id][eit.service_id] = {};
+        if (typeof this._epg[networkId][eit.service_id] === 'undefined') {
+            this._epg[networkId][eit.service_id] = {};
         }
 
-        const service = this._epg[eit.original_network_id][eit.service_id];
+        const service = this._epg[networkId][eit.service_id];
 
         let update: boolean,
             state: EventState;
@@ -152,11 +156,11 @@ class EPG extends stream.Writable {
                         extended: isBasicTable(eit.table_id) ? -1 : eit.version_number
                     },
                     program: new ProgramItem({
-                        id: getProgramId(eit.original_network_id, eit.service_id, e.event_id),
+                        id: getProgramId(networkId, eit.service_id, e.event_id),
 
                         eventId: e.event_id,
                         serviceId: eit.service_id,
-                        networkId: eit.original_network_id,
+                        networkId: networkId,
                         startAt: getTime(e.start_time),
                         duration: getTimeFromBCD24(e.duration),
                         isFree: e.free_CA_mode === 0

@@ -18,6 +18,7 @@
 
 import stream = require('stream');
 import _ = require('./_');
+import queue = require('./queue');
 import common = require('./common');
 import log = require('./log');
 import config = require('./config');
@@ -32,7 +33,9 @@ class Channel {
 
         _.channel = this;
 
-        this.load();
+        this._load();
+
+        setTimeout(this._epgGatherer.bind(this), 60000);
     }
 
     get items(): ChannelItem[] {
@@ -72,7 +75,7 @@ class Channel {
         return items;
     }
 
-    private load(): void {
+    private _load(): void {
 
         log.debug('loading channels...');
 
@@ -114,6 +117,47 @@ class Channel {
             }
 
             new ChannelItem(channel);
+        });
+    }
+
+    private _epgGatherer(): void {
+
+        queue.add(() => {
+
+            const networkIds = [...new Set(_.service.items.map(item => item.networkId))];
+
+            networkIds.forEach(networkId => {
+
+                const services = _.service.findByNetworkId(networkId);
+
+                if (services.length === 0) {
+                    return;
+                }
+
+                queue.add(() => {
+                    return new Promise((resolve, reject) => {
+
+                        log.info('Network#%d EPG gathering has started', networkId);
+
+                        Tuner.getEPG(services[0].channel, 60)
+                            .then(() => {
+                                log.info('Network#%d EPG gathering has finished', networkId);
+                                resolve();
+                            })
+                            .catch(error => {
+                                log.error('Network#%d EPG gathering has failed [%s]', networkId, error);
+                                reject();
+                            });
+                    });
+                });
+
+                queue.add(() => {
+                    setTimeout(this._epgGatherer.bind(this), 900000);
+                    return Promise.resolve();
+                });
+            });
+
+            return Promise.resolve();
         });
     }
 

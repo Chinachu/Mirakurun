@@ -113,7 +113,12 @@ class TSFilter extends stream.Duplex {
             this._parseSDT = true;
         }
         if (options.parseEIT === true) {
-            this._parseEIT = true;
+            if (this._targetNetworkId === null) {
+                this._parseEIT = true;
+            } else if (epg.status[this._targetNetworkId] !== true) {
+                epg.status[this._targetNetworkId] = true;
+                this._parseEIT = true;
+            }
         }
 
         this._parser.resume();
@@ -467,6 +472,11 @@ class TSFilter extends stream.Duplex {
         this._parser.end();
         this._parser = null;
         //this._tsUtil = null;
+
+        // update status
+        if (this._parseEIT === true && this._targetNetworkId !== null) {
+            epg.status[this._targetNetworkId] = false;
+        }
 
         this.emit('close');
 
