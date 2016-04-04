@@ -150,11 +150,11 @@ class Channel {
                             });
                     });
                 });
+            });
 
-                queue.add(() => {
-                    setTimeout(this._epgGatherer.bind(this), 900000);
-                    return Promise.resolve();
-                });
+            queue.add(() => {
+                setTimeout(this._epgGatherer.bind(this), 900000);
+                return Promise.resolve();
             });
 
             return Promise.resolve();
