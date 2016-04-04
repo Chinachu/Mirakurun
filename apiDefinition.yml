@@ -142,23 +142,6 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
-  # status --------------------------------------------------------------------
-
-  /status:
-    get:
-      operationId: getStatus
-      tags:
-        - status
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: '#/definitions/Status'
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
 definitions:
 
   # common --------------------------------------------------------------------
@@ -478,12 +461,18 @@ definitions:
   Status:
     type: object
     properties:
-      tuners:
-        type: array
-        items:
-          $ref: '#/definitions/StatusTuner'
+      tuner:
+        $ref: '#/definitions/StatusTuner'
 
   StatusTuner:
+    type: object
+    properties:
+      devices:
+        type: array
+        items:
+          $ref: '#/definitions/StatusTunerDevice'
+
+  StatusTunerDevice:
     type: object
     properties:
       name:
