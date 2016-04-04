@@ -1,10 +1,20 @@
 # Mirakurun
-An Open Source DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
+DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 
 [![npm version][npm-img]][npm-url]
 [![Linux Build][travis-img]][travis-url]
 [![Dependency Status][dep-img]][dep-url]
 [![devDependency Status][devdep-img]][devdep-url]
+
+## Features
+
+* RESTful API - has designed like HTTP version of Spinel
+* Unix Sockets / TCP
+* Advanced Tuner Process Management
+* Priority Management
+* Integrated TS Parser, Filter
+* Realtime EPG Parser
+* Supports most Tuner Devices (chardev, DVB / ISDB-T, ISDB-S, DVB-S2)
 
 ## Requirements
 
@@ -52,6 +62,11 @@ mirakurun log server
 ```
 mirakurun [status|start|stop|restart]
 ```
+
+## Client Implementations
+
+* [Rivarun](https://github.com/kanreisa/Rivarun)
+* [BonDriver_Mirakurun](https://github.com/h-mineta/BonDriver_Mirakurun)
 
 ## Contributing
 
