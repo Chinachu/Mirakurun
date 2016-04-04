@@ -26,7 +26,7 @@ gulp.task('clean', () => {
     del.sync(['lib']);
 });
 
-gulp.task('tsc', () => {
+gulp.task('tsc', ['clean'], () => {
     return gulp
         .src([
             'src/**/*.ts'
@@ -45,7 +45,7 @@ gulp.task('tsc', () => {
         .pipe(gulp.dest('lib'));
 });
 
-gulp.task('build', ['clean', 'tsc']);
+gulp.task('build', ['tsc']);
 
 gulp.task('watch', function () {
     gulp.watch('src/**/*.ts', ['build']);
