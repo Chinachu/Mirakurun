@@ -17,12 +17,22 @@
 
 import {Operation} from 'express-openapi';
 import api = require('../api');
-import Tuner = require('../Tuner');
+import epg = require('../epg');
 
-export var get: Operation = (req, res) => {
+export const get: Operation = (req, res) => {
+
+    const gatheringNetworks = [];
+
+    for (let nid in epg.status) {
+        if (epg.status[nid] === true) {
+            gatheringNetworks.push(parseInt(nid, 10));
+        }
+    }
 
     api.responseJSON(res, {
-        tuner: Tuner.getStatus()
+        epg: {
+            gatheringNetworks: gatheringNetworks
+        }
     });
 };
 
@@ -33,10 +43,7 @@ get.apiDoc = {
         200: {
             description: 'OK',
             schema: {
-                type: 'array',
-                items: {
-                    $ref: '#/definitions/Status'
-                }
+                $ref: '#/definitions/Status'
             }
         },
         default: {
