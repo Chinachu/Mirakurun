@@ -34,6 +34,12 @@ sudo npm install pm2 -g
 sudo npm install mirakurun -g --unsafe --production
 ```
 
+### Update
+
+```
+sudo npm install mirakurun@latest -g --unsafe --production
+```
+
 ### Uninstall
 
 ```
