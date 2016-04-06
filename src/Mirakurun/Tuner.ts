@@ -50,9 +50,20 @@ class Tuner {
         _.tuner = this;
     }
 
-    getDevices(): TunerDevice[] {
-
+    get devices(): TunerDevice[] {
         return this._devices;
+    }
+
+    get(index: number): TunerDevice {
+
+        let i = 0, l = this._devices.length;
+        for (; i < l; i++) {
+            if (this._devices[i].index === index) {
+                return this._devices[i];
+            }
+        }
+
+        return null;
     }
 
     typeExists(type: common.ChannelType): boolean {
@@ -341,8 +352,12 @@ class Tuner {
         return devices;
     }
 
-    static getDevices(): TunerDevice[] {
-        return _.tuner.getDevices();
+    static all(): TunerDevice[] {
+        return _.tuner.devices;
+    }
+
+    static get(index: number): TunerDevice {
+        return _.tuner.get(index);
     }
 
     static typeExists(type: common.ChannelType): boolean {

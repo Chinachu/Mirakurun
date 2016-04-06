@@ -125,6 +125,10 @@ class TunerDevice extends events.EventEmitter {
         };
     }
 
+    kill(): Promise<void> {
+        return this._kill();
+    }
+
     startStream(user: User, stream: stream.Writable, channel?: ChannelItem): Promise<void> {
 
         log.debug('TunerDevice#%d start stream for user `%s` (priority=%d)...', this._index, user.id, user.priority);

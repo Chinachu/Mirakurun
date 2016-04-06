@@ -16,28 +16,45 @@
 'use strict';
 
 import {Operation} from 'express-openapi';
-import api = require('../api');
-import Tuner = require('../Tuner');
+import api = require('../../api');
+import Tuner = require('../../Tuner');
+
+export const parameters = [
+    {
+        in: 'path',
+        name: 'index',
+        type: 'integer',
+        minimum: 0,
+        required: true
+    }
+];
 
 export const get: Operation = (req, res) => {
 
-    api.responseJSON(
-        res,
-        Tuner.all().map(device => device.export())
-    );
+    let tuner = Tuner.get(req.params.index);
+
+    if (tuner === null) {
+        api.responseError(res, 404);
+        return;
+    }
+
+    api.responseJSON(res, tuner.export());
 };
 
 get.apiDoc = {
     tags: ['tuners'],
-    operationId: 'getTuners',
+    operationId: 'getTuner',
     responses: {
         200: {
             description: 'OK',
             schema: {
-                type: 'array',
-                items: {
-                    $ref: '#/definitions/TunerDevice'
-                }
+                $ref: '#/definitions/TunerDevice'
+            }
+        },
+        404: {
+            description: 'Not Found',
+            schema: {
+                $ref: '#/definitions/Error'
             }
         },
         default: {
