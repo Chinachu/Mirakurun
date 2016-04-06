@@ -19,7 +19,7 @@ import {Operation} from 'express-openapi';
 import api = require('../api');
 import Program = require('../Program');
 
-export var get: Operation = (req, res) => {
+export const get: Operation = (req, res) => {
 
     let programs;
 

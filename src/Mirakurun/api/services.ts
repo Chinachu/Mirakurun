@@ -19,7 +19,7 @@ import {Operation} from 'express-openapi';
 import api = require('../api');
 import Service = require('../Service');
 
-export var get: Operation = (req, res) => {
+export const get: Operation = (req, res) => {
 
     api.responseJSON(res, Service.all().map(service => service.export()));
 };

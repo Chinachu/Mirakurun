@@ -13,13 +13,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../../../../typings/express/express.d.ts" />
 'use strict';
 
 import {Operation} from 'express-openapi';
 import config = require('../../config');
 
-export var get: Operation = (req, res) => {
+export const get: Operation = (req, res) => {
 
     res.status(200);
     res.json(config.loadServer());
@@ -44,7 +43,7 @@ get.apiDoc = {
     }
 };
 
-export var put: Operation = (req, res) => {
+export const put: Operation = (req, res) => {
 
     const server: config.Server = req.body;
 

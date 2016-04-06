@@ -13,14 +13,13 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../../../../../typings/express/express.d.ts" />
 'use strict';
 
 import {Operation} from 'express-openapi';
 import api = require('../../../api');
 import Channel = require('../../../Channel');
 
-export var parameters = [
+export const parameters = [
     {
         in: 'path',
         name: 'type',
@@ -36,7 +35,7 @@ export var parameters = [
     }
 ];
 
-export var get: Operation = (req, res) => {
+export const get: Operation = (req, res) => {
 
     const channel = Channel.get(req.params.type, req.params.channel);
 
