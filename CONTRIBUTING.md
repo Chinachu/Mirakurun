@@ -19,11 +19,6 @@ trying narrow down the issue. Please include least the following information:
 
 To get started, [sign the Contributor License Agreement](https://www.clahub.com/agreements/kanreisa/Mirakurun).
 
-### Pull Request
-
-Please PR to the [develop](https://github.com/kanreisa/Mirakurun/tree/develop) branch.
-Please don't PR to the master branch it's protected.
-
 ### Checkout
 
 ```
