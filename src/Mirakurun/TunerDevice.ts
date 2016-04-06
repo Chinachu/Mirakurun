@@ -30,6 +30,15 @@ interface User extends common.User {
     _stream?: stream.Writable;
 }
 
+interface Status {
+    index: number;
+    name: string;
+    types: common.ChannelType[];
+    command: string;
+    pid: number;
+    users: common.User[];
+}
+
 class TunerDevice extends events.EventEmitter {
 
     private _channel: ChannelItem;
@@ -103,6 +112,17 @@ class TunerDevice extends events.EventEmitter {
         }
 
         return ret;
+    }
+
+    export(): Status {
+        return {
+            index: this._index,
+            name: this._config.name,
+            types: this._config.types,
+            command: this._command,
+            pid: this.pid,
+            users: this.users
+        };
     }
 
     startStream(user: User, stream: stream.Writable, channel?: ChannelItem): Promise<void> {

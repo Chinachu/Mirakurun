@@ -39,15 +39,6 @@ interface StreamSetting {
     parseEIT?: boolean;
 }
 
-interface Status {
-    devices: DeviceStatus[];
-}
-
-interface DeviceStatus {
-    name: string;
-    types: common.ChannelType[];
-}
-
 class Tuner {
 
     private _devices: TunerDevice[] = [];
@@ -59,17 +50,9 @@ class Tuner {
         _.tuner = this;
     }
 
-    getStatus(): Status {
+    getDevices(): TunerDevice[] {
 
-        return {
-            devices: this._devices.map(device => ({
-                name: device.config.name,
-                types: device.config.types,
-                command: device.command,
-                pid: device.pid,
-                users: device.users
-            }))
-        };
+        return this._devices;
     }
 
     typeExists(type: common.ChannelType): boolean {
@@ -358,8 +341,8 @@ class Tuner {
         return devices;
     }
 
-    static getStatus(): Status {
-        return _.tuner.getStatus();
+    static getDevices(): TunerDevice[] {
+        return _.tuner.getDevices();
     }
 
     static typeExists(type: common.ChannelType): boolean {
