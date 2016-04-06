@@ -361,6 +361,39 @@ definitions:
   #  minimum: 1
   #  maximum: 4095
 
+  # tuner ---------------------------------------------------------------------
+
+  TunerDevice:
+    type: object
+    properties:
+      index:
+        type: integer
+      name:
+        type: string
+      types:
+        type: array
+        items:
+          $ref: '#/definitions/ChannelType'
+      command:
+        type: string
+      pid:
+        type: integer
+      users:
+        type: array
+        items:
+          $ref: '#/definitions/StatusTunerUser'
+
+  TunerUser:
+    type: object
+    properties:
+      id:
+        type: string
+      priority:
+        type: integer
+        minimum: -1
+      agent:
+        type: string
+
   # event ---------------------------------------------------------------------
 
   Event:
@@ -461,42 +494,10 @@ definitions:
   Status:
     type: object
     properties:
-      tuner:
-        $ref: '#/definitions/StatusTuner'
-
-  StatusTuner:
-    type: object
-    properties:
-      devices:
-        type: array
-        items:
-          $ref: '#/definitions/StatusTunerDevice'
-
-  StatusTunerDevice:
-    type: object
-    properties:
-      name:
-        type: string
-      types:
-        type: array
-        items:
-          $ref: '#/definitions/ChannelType'
-      command:
-        type: string
-      pid:
-        type: integer
-      users:
-        type: array
-        items:
-          $ref: '#/definitions/StatusTunerUser'
-
-  StatusTunerUser:
-    type: object
-    properties:
-      id:
-        type: string
-      priority:
-        type: integer
-        minimum: -1
-      agent:
-        type: string
+      epg:
+        type: object
+        properties:
+          gatheringNetworks:
+            type: array
+            items:
+              $ref: '#/definitions/NetworkId'
