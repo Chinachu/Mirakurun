@@ -163,7 +163,7 @@ class TSFilter extends stream.Duplex {
         if (this._offset > 0) {
             if (chunk.length >= PACKET_SIZE - this._offset) {
                 chunk.copy(this._packet, this._offset, 0, PACKET_SIZE - this._offset);
-                this._processPacket(this._packet);
+                this._processPacket(this._packet, true);
                 offset = PACKET_SIZE - this._offset;
                 this._offset = 0;
             } else {
@@ -193,7 +193,7 @@ class TSFilter extends stream.Duplex {
             }
 
             if (length - offset >= PACKET_SIZE) {
-                this._processPacket(chunk.slice(offset, offset + PACKET_SIZE));
+                this._processPacket(chunk.slice(offset, offset + PACKET_SIZE), false);
                 this._offset = 0;
             } else {
                 chunk.copy(this._packet, 0, offset);
@@ -214,7 +214,7 @@ class TSFilter extends stream.Duplex {
         callback();
     }
 
-    private _processPacket(packet: Buffer): void {
+    private _processPacket(packet: Buffer, mustCopy: boolean): void {
 
         const pid = packet.readUInt16BE(1) & 0x1FFF;
 
@@ -223,7 +223,9 @@ class TSFilter extends stream.Duplex {
             return;
         }
 
-        packet = new Buffer(packet);
+        if (mustCopy === true) {
+            packet = new Buffer(packet);
+        }
 
         // parse
         if (pid === 0 && this._patCRC !== packet.readInt32BE(packet[7] + 4)) {
@@ -242,6 +244,9 @@ class TSFilter extends stream.Duplex {
 
         // PAT (0) rewriting
         if (pid === 0 && this._pmtPid !== -1) {
+            if (mustCopy === false) {
+                packet = new Buffer(packet);
+            }
             this._patsec.copy(packet, 5, 0);
         }
 
