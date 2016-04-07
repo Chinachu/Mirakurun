@@ -41,17 +41,20 @@ interface Status {
 
 class TunerDevice extends events.EventEmitter {
 
-    private _channel: ChannelItem;
-    private _command: string;
-    private _process: child_process.ChildProcess;
-    private _stream: stream.Readable;
-    private _users: User[];
-    private _isAvailable: boolean;
+    private _channel: ChannelItem = null;
+    private _command: string = null;
+    private _process: child_process.ChildProcess = null;
+    private _stream: stream.Readable = null;
+
+    private _users: User[] = [];
+
+    private _isAvailable: boolean = true;
+    private _exited: boolean = false;
+    private _closing: boolean = false;
 
     constructor(private _index: number, private _config: config.Tuner) {
         super();
-
-        this._release();
+        log.debug('TunerDevice#%d initialized', this._index);
     }
 
     get index(): number {
@@ -126,7 +129,7 @@ class TunerDevice extends events.EventEmitter {
     }
 
     kill(): Promise<void> {
-        return this._kill();
+        return this._kill(true);
     }
 
     startStream(user: User, stream: stream.Writable, channel?: ChannelItem): Promise<void> {
@@ -170,7 +173,7 @@ class TunerDevice extends events.EventEmitter {
                 return Promise.reject(new Error(util.format('TunerDevice#%d has higher priority user', this._index)));
             }
 
-            return this._kill()
+            return this._kill(true)
                 .then(() => this._spawn(channel))
                 .catch(err => Promise.reject(err))
                 .then(resolve);
@@ -195,7 +198,7 @@ class TunerDevice extends events.EventEmitter {
         if (this._users.length === 0) {
             setTimeout(() => {
                 if (this._users.length === 0 && this._process) {
-                    this._kill().catch(log.error);
+                    this._kill(true).catch(log.error);
                 }
             }, 3000);
         }
@@ -230,7 +233,7 @@ class TunerDevice extends events.EventEmitter {
 
                 log.error('TunerDevice#%d cat process error `%s` (pid=%d)', this._index, err.code, cat.pid);
 
-                this._kill();
+                this._kill(false);
             });
 
             cat.once('close', (code, signal) => {
@@ -240,7 +243,9 @@ class TunerDevice extends events.EventEmitter {
                     this._index, code, signal, cat.pid
                 );
 
-                this._kill();
+                if (this._exited === false) {
+                    this._kill(false);
+                }
             });
 
             this._process.once('exit', () => cat.kill('SIGKILL'));
@@ -249,6 +254,8 @@ class TunerDevice extends events.EventEmitter {
         } else {
             this._stream = this._process.stdout;
         }
+
+        this._process.once('exit', () => this._exited = true);
 
         this._process.once('error', (err) => {
 
@@ -294,16 +301,18 @@ class TunerDevice extends events.EventEmitter {
 
         this._stream.removeAllListeners('data');
 
-        let i, l = this._users.length;
-        for (i = 0; i < l; i++) {
-            this._users[i]._stream.end();
-            this._users.splice(i, 1);
+        if (this._closing === true) {
+            let i, l = this._users.length;
+            for (i = 0; i < l; i++) {
+                this._users[i]._stream.end();
+                this._users.splice(i, 1);
+            }
         }
 
         return this;
     }
 
-    private _kill(): Promise<void> {
+    private _kill(close: boolean): Promise<void> {
 
         log.debug('TunerDevice#%d kill...', this._index);
 
@@ -312,6 +321,7 @@ class TunerDevice extends events.EventEmitter {
         }
 
         this._isAvailable = false;
+        this._closing = close;
 
         return new Promise<void>(resolve => {
             this.once('release', resolve);
@@ -319,7 +329,7 @@ class TunerDevice extends events.EventEmitter {
         });
     }
 
-    private _release(): this {
+    private _release() {
 
         if (this._process) {
             this._process.stderr.removeAllListeners();
@@ -329,18 +339,28 @@ class TunerDevice extends events.EventEmitter {
             this._stream.removeAllListeners();
         }
 
-        this._channel = null;
         this._command = null;
         this._process = null;
         this._stream = null;
-        this._users = [];
+
+        if (this._closing === true) {
+            this._channel = null;
+            this._users = [];
+        }
+
         this._isAvailable = true;
+        this._closing = false;
+        this._exited = false;
 
         this.emit('release');
 
         log.debug('TunerDevice#%d released', this._index);
 
-        return this;
+        if (this._closing === false && this._users.length !== 0) {
+            log.debug('TunerDevice#%d respawning because request has not closed', this._index);
+
+            this._spawn(this._channel);
+        }
     }
 }
 
