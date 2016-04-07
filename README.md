@@ -15,7 +15,7 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 * Unix Sockets / TCP
 * Advanced Tuner Process Management
 * Priority Management
-* Integrated TS Parser, Filter
+* Integrated MPEG-2 TS Parser, Filter
 * Realtime EPG Parser
 * Supports most Tuner Devices (chardev, DVB / ISDB-T, ISDB-S, DVB-S2)
 
@@ -24,7 +24,7 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 * Linux - x86 / x64
   - Debian / CentOS / Gentoo
   - sysvinit / OpenRC / systemd
-* [Node.js](nodejs.org/) `>=5.9.0`
+* [Node.js](http://nodejs.org/) `>=5.9.0`
 * [PM2](http://pm2.keymetrics.io/) `>=1.0.2`
 
 ## Install
