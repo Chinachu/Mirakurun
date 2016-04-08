@@ -15,7 +15,7 @@
 */
 'use strict';
 
-import {Operation} from 'express-openapi';
+import { Operation } from 'express-openapi';
 import Channel = require('../../Channel');
 
 export const parameters = [
