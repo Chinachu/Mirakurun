@@ -107,16 +107,18 @@ class Server {
                 next();
             });
 
-            if (/^\//.test(address) === true) {
-                if (fs.existsSync(address) === true) {
+            if (/^\//.test(address) === true || /^\\\\\.\\pipe\\/.test(address) === true) {
+                if (process.platform !== 'win32' && fs.existsSync(address) === true) {
                     fs.unlinkSync(address);
                 }
 
                 server.listen(address, () => {
-                    log.info('listening on http://unix:%s', address);
+                    log.info('listening on http+unix://%s', address.replace(/\//g, '%2F'));
                 });
 
-                fs.chmodSync(address, '777');
+                if (process.platform !== 'win32') {
+                    fs.chmodSync(address, '777');
+                }
             } else {
                 server.listen(serverConfig.port, address, () => {
                     log.info('listening on http://%s:%d', address, serverConfig.port);

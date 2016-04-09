@@ -16,6 +16,13 @@
 /// <reference path="../typings/node/node.d.ts" />
 'use strict';
 
+if (process.platform !== 'win32') {
+    if (process.getuid() !== 0) {
+        console.error('root please.');
+        process.exit(1);
+    }
+}
+
 import util = require('util');
 import Server = require('./Mirakurun/Server');
 
@@ -30,6 +37,8 @@ setEnv('TUNERS_CONFIG_PATH', '/usr/local/etc/mirakurun/tuners.yml');
 setEnv('CHANNELS_CONFIG_PATH', '/usr/local/etc/mirakurun/channels.yml');
 setEnv('SERVICES_DB_PATH', '/usr/local/var/db/mirakurun/services.json');
 setEnv('PROGRAMS_DB_PATH', '/usr/local/var/db/mirakurun/programs.json');
+setEnv('LOG_STDOUT', '/usr/local/var/log/mirakurun.stdout.log');
+setEnv('LOG_STDERR', '/usr/local/var/log/mirakurun.stderr.log');
 
 new Server();
 
