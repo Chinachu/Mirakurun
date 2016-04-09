@@ -24,7 +24,7 @@ To get started, [sign the Contributor License Agreement](https://www.clahub.com/
 ```
 git clone git@github.com:kanreisa/Mirakurun.git
 cd Mirakurun
-git checkout develop
+git checkout <branch>
 ```
 
 ### Build
@@ -38,15 +38,27 @@ npm run build
 ### Install
 
 ```
+# Linux / Darwin
 sudo npm install pm2 -g
 sudo npm install . -g --unsafe --production
+
+# Win32 (Windows PowerShell as Admin)
+npm install winser -g
+npm install . -g --production
 ```
 
 ### Debug with [node-inspector](https://github.com/node-inspector/node-inspector)
 
 ```
+node-inspector &
+
+# Linux / Darwin
 sudo mirakurun stop
-sudo node-debug --web-host 192.168.x.x lib/server.js
+sudo run debug
+
+# Win32 (Windows PowerShell as Admin)
+Stop-Service mirakurun
+npm run debug.win32
 ```
 
 If you've any questions, please ask on Slack.
