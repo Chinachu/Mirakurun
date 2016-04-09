@@ -16,8 +16,7 @@
 'use strict';
 
 if (process.platform !== 'win32') {
-    process.exitCode = 1;
-    return;
+    process.exit(1);
 }
 
 const fs = require('fs');
