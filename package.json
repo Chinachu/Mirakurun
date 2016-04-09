@@ -7,11 +7,13 @@
   "keywords": [
     "mirakurun",
     "chinachu",
-    "chinachu air",
     "rivarun",
+    "arib",
+    "isdb",
+    "dvb",
     "dvr",
-    "tv",
-    "linux"
+    "dtv",
+    "tv"
   ],
   "author": {
     "name": "Yuki KAN",
@@ -29,15 +31,18 @@
     "mirakurun": "bin/cli.sh"
   },
   "scripts": {
-    "start": "node lib/server.js",
+    "start": "node lib/server.js --max_old_space_size=128",
+    "debug": "node lib/server.js --max_old_space_size=128 --debug-brk",
+    "start.win32": "node.exe bin/init.win32.js",
+    "debug.win32": "node.exe bin/init.win32.js --debug-brk",
     "tsd": "tsd",
     "tsd-install": "tsd reinstall && tsd rebundle",
     "build": "gulp build",
     "watch": "gulp watch",
     "test": "gulp test",
-    "preinstall": "bin/preinstall.sh",
-    "postinstall": "bin/postinstall.sh",
-    "preuninstall": "bin/preuninstall.sh"
+    "preinstall": "node bin/preinstall.js",
+    "postinstall": "node bin/postinstall.js",
+    "preuninstall": "node bin/preuninstall.js"
   },
   "directories": {
     "lib": "lib"
@@ -64,6 +69,8 @@
     "node": ">=5.9.0"
   },
   "os": [
-    "linux"
+    "linux",
+    "darwin",
+    "win32"
   ]
 }
