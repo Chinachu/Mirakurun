@@ -297,6 +297,12 @@ class TunerDevice extends events.EventEmitter {
     }
 
     private _end(): this {
+        
+        if (this._killTimeout) {
+            clearTimeout(this._killTimeout);
+        }
+        
+        this._killTimeout = null;
 
         this._isAvailable = false;
 
@@ -347,14 +353,10 @@ class TunerDevice extends events.EventEmitter {
         if (this._stream) {
             this._stream.removeAllListeners();
         }
-        if (this._killTimeout) {
-            clearTimeout(this._killTimeout);
-        }
 
         this._command = null;
         this._process = null;
         this._stream = null;
-        this._killTimeout = null;
 
         if (this._closing === true) {
             this._channel = null;
