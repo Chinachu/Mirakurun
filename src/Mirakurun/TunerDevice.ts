@@ -45,6 +45,7 @@ class TunerDevice extends events.EventEmitter {
     private _command: string = null;
     private _process: child_process.ChildProcess = null;
     private _stream: stream.Readable = null;
+    private _killTimeout: NodeJS.Timer = null;
 
     private _users: User[] = [];
 
@@ -327,6 +328,10 @@ class TunerDevice extends events.EventEmitter {
             this.once('release', resolve);
             if (process.platform === 'win32') {
                 this._process.stdin.write('\n');
+                
+                this._killTimeout = setTimeout(() => {
+                    this._process.kill('SIGTERM');
+                }, 3000);
             } else {
                 this._process.kill('SIGTERM');
             }
@@ -342,10 +347,14 @@ class TunerDevice extends events.EventEmitter {
         if (this._stream) {
             this._stream.removeAllListeners();
         }
+        if (this._killTimeout) {
+            clearTimeout(this._killTimeout);
+        }
 
         this._command = null;
         this._process = null;
         this._stream = null;
+        this._killTimeout = null;
 
         if (this._closing === true) {
             this._channel = null;
