@@ -11,9 +11,7 @@ trying narrow down the issue. Please include least the following information:
 * Version of Mirakurun: `sudo npm list -g mirakurun`
 * Version of Chinachu: `sudo npm list -g chinachu`
 * Platform you're running on (Debian jessie, CentOS 7.1, ...)
-* Architecture you're running on (x86 or x64)
-
-**Please note: ARM architectures currently not supported.**
+* Architecture you're running on (x86 or x64 or ARMv8 or ...)
 
 ## Development
 
