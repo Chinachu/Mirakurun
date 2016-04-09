@@ -20,6 +20,7 @@ if (process.env['npm_config_global'] !== 'true') {
 }
 
 const fs = require('fs');
+const path = require('path');
 const child_process = require('child_process');
 
 // init
@@ -64,15 +65,18 @@ if (process.platform === 'linux' || process.platform === 'darwin') {
         ]
     });
 } else if (process.platform === 'win32') {
-    const base = `${ process.env.HOME }\\.Mirakurun`;
-    const data = `${ process.env.LOCALAPPDATA }\\Mirakurun`;
+    const configDir = path.join(process.env.USERPROFILE, '.Mirakurun');
+    const dataDir = path.join(process.env.LOCALAPPDATA, 'Mirakurun');
 
-    fs.existsSync(base) === false && fs.mkdirSync(base);
-    fs.existsSync(data) === false && fs.mkdirSync(data);
+    if (!fs.existsSync(configDir)) fs.mkdirSync(configDir);
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
 
-    fs.existsSync(`${ base }\\server.yml`) === false && copy('config\\server.win32.yml', `${ base }\\server.yml`);
-    fs.existsSync(`${ base }\\tuners.yml`) === false && copy('config\\tuners.win32.yml', `${ base }\\tuners.yml`);
-    fs.existsSync(`${ base }\\channels.yml`) === false && copy('config\\channels.win32.yml', `${ base }\\channels.yml`);
+    if (!fs.existsSync(path.join(configDir, 'server.yml')))
+        copyFileSync('config/server.win32.yml', path.join(configDir, 'server.yml'));
+    if (!fs.existsSync(path.join(configDir, 'tuners.yml')))
+        copyFileSync('config/tuners.win32.yml', path.join(configDir, 'tuners.yml'));
+    if (!fs.existsSync(path.join(configDir, 'channels.yml')))
+        copyFileSync('config/channels.win32.yml', path.join(configDir, 'channels.yml'));
 
     // winser
 
@@ -80,11 +84,10 @@ if (process.platform === 'linux' || process.platform === 'darwin') {
         'winser.cmd',
         [
             '-i', '-a', '--startuptype', 'delayed',
-            '--startcmd', `node.exe bin\\init.win32.js`,
+            '--startcmd', 'node.exe bin/init.win32.js',
             '--set', 'AppPriority ABOVE_NORMAL_PRIORITY_CLASS',
             '--set', 'Type SERVICE_WIN32_OWN_PROCESS',
-            '--env', `HOMEDRIVE=${ process.env.HOMEDRIVE }`,
-            '--env', `HOMEPATH=${ process.env.HOMEPATH }`,
+            '--env', `USERPROFILE=${ process.env.USERPROFILE }`,
             '--env', `LOCALAPPDATA=${ process.env.LOCALAPPDATA }`
         ],
         {
@@ -97,6 +100,6 @@ if (process.platform === 'linux' || process.platform === 'darwin') {
     );
 }
 
-function copy(src, dest) {
-    fs.createReadStream(src).pipe(fs.createWriteStream(dest));
+function copyFileSync(src, dest) {
+    fs.writeFileSync(dest, fs.readFileSync(src));
 }
