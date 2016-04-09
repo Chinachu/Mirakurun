@@ -19,34 +19,65 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 * Realtime EPG Parser
 * Supports most Tuner Devices (chardev, DVB / ISDB-T, ISDB-S, DVB-S2)
 
-## Requirements
+## Requirements / Supported Platforms
 
-* Linux - x86 / x64
-  - Debian / CentOS / Gentoo
-  - sysvinit / OpenRC / systemd
 * [Node.js](http://nodejs.org/) `>=5.9.0`
+
+**Bold** is the recommended.
+see: [doc/Platforms.md](doc/Platforms.md)
+
+### **Linux**
+
 * [PM2](http://pm2.keymetrics.io/) `>=1.0.2`
+* x86 / **x64** / ARMv7 / **ARMv8**
+* **Debian** / Ubuntu / CentOS / Gentoo
+* SystemV / OpenRC / **SystemD**
+
+### Darwin (Experimental)
+
+* [PM2](http://pm2.keymetrics.io/) `>=1.0.2`
+* OS X v10.11 El Capitan
+
+### Win32 (Experimental)
+
+* [winser](https://github.com/jfromaniello/winser) `>=1.0.2`
+* Windows 10 TH2
 
 ## Install
 
 ```
+# Linux / Darwin
 sudo npm install pm2 -g
 sudo npm install mirakurun -g --unsafe --production
+
+# Win32 (Windows PowerShell as Admin)
+npm install winser -g
+npm install mirakurun -g --production
 ```
 
 ### Update
 
 ```
+# Linux / Darwin
 sudo npm install mirakurun@latest -g --unsafe --production
+
+# Win32 (Windows PowerShell as Admin)
+npm install mirakurun@latest -g --production
 ```
 
 ### Uninstall
 
 ```
+# Linux / Darwin
 sudo npm uninstall mirakurun -g --unsafe
+
+# Win32 (Windows PowerShell as Admin)
+npm uninstall mirakurun -g
 ```
 
 ## CLI
+
+**Only Linux / Darwin Platform**
 
 ### Administration
 
