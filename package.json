@@ -19,6 +19,9 @@
     "name": "Yuki KAN",
     "url": "https://github.com/kanreisa"
   },
+  "contributors": [
+    "rndomhack"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/kanreisa/Mirakurun.git"
