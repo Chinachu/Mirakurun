@@ -45,7 +45,13 @@ if (process.platform === 'linux' || process.platform === 'darwin') {
     });
 } else if (process.platform === 'win32') {
     try {
-        child_process.execSync('winser -r -x -s');
+        child_process.execSync('winser -r -x', {
+            stdio: [
+                null,
+                process.stdout,
+                null
+            ]
+        });
     } catch (e) {
     }
 }
