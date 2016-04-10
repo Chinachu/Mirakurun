@@ -324,8 +324,17 @@ class TunerDevice extends events.EventEmitter {
         this._closing = close;
 
         return new Promise<void>(resolve => {
+
             this.once('release', resolve);
-            this._process.kill('SIGTERM');
+
+            if (process.platform === 'win32') {
+                const timer = setTimeout(() => this._process.kill(), 3000);
+                this._process.once('exit', () => clearTimeout(timer));
+
+                this._process.stdin.write('\n');
+            } else {
+                this._process.kill('SIGTERM');
+            }
         });
     }
 
