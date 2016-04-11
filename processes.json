@@ -10,7 +10,9 @@
       "exec_mode": "fork",
       "autorestart": true,
       "env": {
-        "NODE_ENV": "production"
+        "NODE_ENV": "production",
+        "LOG_STDOUT": "/usr/local/var/log/mirakurun.stdout.log",
+        "LOG_STDERR": "/usr/local/var/log/mirakurun.stderr.log"
       }
     }
   ]

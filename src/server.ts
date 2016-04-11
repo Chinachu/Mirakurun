@@ -37,8 +37,6 @@ setEnv('TUNERS_CONFIG_PATH', '/usr/local/etc/mirakurun/tuners.yml');
 setEnv('CHANNELS_CONFIG_PATH', '/usr/local/etc/mirakurun/channels.yml');
 setEnv('SERVICES_DB_PATH', '/usr/local/var/db/mirakurun/services.json');
 setEnv('PROGRAMS_DB_PATH', '/usr/local/var/db/mirakurun/programs.json');
-setEnv('LOG_STDOUT', '/usr/local/var/log/mirakurun.stdout.log');
-setEnv('LOG_STDERR', '/usr/local/var/log/mirakurun.stderr.log');
 
 if (process.platform === 'linux') {
     child_process.execSync(`renice -n -10 -p ${ process.pid }`);

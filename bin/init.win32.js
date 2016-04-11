@@ -31,35 +31,16 @@ for (const key in proc.env) {
     setEnv(key, proc.env[key]);
 }
 
-const args = [
-    path.resolve(__dirname, '..', proc.script.replace(/\//g, '\\')),
-    proc.node_args,
-    ...process.argv.slice(2)
-];
-
 console.log('configDir:', configDir);
 console.log('dataDir:', dataDir);
-
-const stdoutLogPath = path.join(dataDir, 'stdout');
-const stderrLogPath = path.join(dataDir, 'stderr');
-
-const stdout = fs.createWriteStream(stdoutLogPath);
-const stderr = fs.createWriteStream(stderrLogPath);
 
 setEnv('SERVER_CONFIG_PATH', path.join(configDir, 'server.yml'));
 setEnv('TUNERS_CONFIG_PATH', path.join(configDir, 'tuners.yml'));
 setEnv('CHANNELS_CONFIG_PATH', path.join(configDir, 'channels.yml'));
 setEnv('SERVICES_DB_PATH', path.join(dataDir, 'services.json'));
 setEnv('PROGRAMS_DB_PATH', path.join(dataDir, 'programs.json'));
-setEnv('LOG_STDOUT', stdoutLogPath);
-setEnv('LOG_STDERR', stderrLogPath);
 
-const node = spawn('node.exe', args);
-
-node.stdout.pipe(stdout);
-node.stdout.pipe(process.stdout);
-node.stderr.pipe(stderr);
-node.stderr.pipe(process.stderr);
+require('../' + proc.script);
 
 function setEnv(name, value) {
     process.env[name] = process.env[name] || value;

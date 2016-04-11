@@ -75,17 +75,24 @@ if (process.platform === 'linux' || process.platform === 'darwin') {
         fs.mkdirSync(dataDir);
     }
 
-    if (fs.existsSync(path.join(configDir, 'server.yml')) === false) {
-        copyFileSync('config\\server.win32.yml', path.join(configDir, 'server.yml'));
+    const serverConfigPath = path.join(configDir, 'server.yml');
+    const tunersConfigPath = path.join(configDir, 'tuners.yml');
+    const channelsConfigPath = path.join(configDir, 'channels.yml');
+
+    if (fs.existsSync(serverConfigPath) === false) {
+        copyFileSync('config\\server.win32.yml', serverConfigPath);
     }
-    if (fs.existsSync(path.join(configDir, 'tuners.yml')) === false) {
-        copyFileSync('config\\tuners.win32.yml', path.join(configDir, 'tuners.yml'));
+    if (fs.existsSync(tunersConfigPath) === false) {
+        copyFileSync('config\\tuners.win32.yml', tunersConfigPath);
     }
-    if (fs.existsSync(path.join(configDir, 'channels.yml')) === false) {
-        copyFileSync('config\\channels.win32.yml', path.join(configDir, 'channels.yml'));
+    if (fs.existsSync(channelsConfigPath) === false) {
+        copyFileSync('config\\channels.win32.yml', channelsConfigPath);
     }
 
     // winser
+
+    const stdoutLogPath = path.join(dataDir, 'stdout');
+    const stderrLogPath = path.join(dataDir, 'stderr');
 
     child_process.execFileSync(
         'winser.cmd',
@@ -94,6 +101,10 @@ if (process.platform === 'linux' || process.platform === 'darwin') {
             '--startcmd', `node.exe bin\\init.win32.js`,
             '--set', 'AppPriority ABOVE_NORMAL_PRIORITY_CLASS',
             '--set', 'Type SERVICE_WIN32_OWN_PROCESS',
+            '--set', `AppStdout ${ stdoutLogPath }`,
+            '--set', `AppStderr ${ stderrLogPath }`,
+            '--env', `LOG_STDOUT=${ stdoutLogPath }`,
+            '--env', `LOG_STDERR=${ stderrLogPath }`,
             '--env', `USERPROFILE=${ process.env.USERPROFILE }`,
             '--env', `LOCALAPPDATA=${ process.env.LOCALAPPDATA }`
         ],
