@@ -187,7 +187,7 @@ class TSFilter extends stream.Duplex {
         for (; offset < length; offset += PACKET_SIZE) {
             // sync byte (0x47) verifying
             if (chunk[offset] !== 71) {
-                offset -= PACKET_SIZE + 1;
+                offset -= PACKET_SIZE - 1;
                 continue;
             }
 
