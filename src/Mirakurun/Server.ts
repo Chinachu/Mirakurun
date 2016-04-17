@@ -107,7 +107,7 @@ class Server {
                 next();
             });
 
-            if (/^\//.test(address) === true || /^\\\\\.\\pipe\\/.test(address) === true) {
+            if (regexp.unixDomainSocket.test(address) === true || regexp.windowsNamedPipe.test(address) === true) {
                 if (process.platform !== 'win32' && fs.existsSync(address) === true) {
                     fs.unlinkSync(address);
                 }
