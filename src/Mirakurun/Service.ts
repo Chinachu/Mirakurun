@@ -16,14 +16,14 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import stream = require('stream');
-import _ = require('./_');
-import log = require('./log');
-import db = require('./db');
-import ChannelItem = require('./ChannelItem');
-import ServiceItem = require('./ServiceItem');
+import * as stream from 'stream';
+import * as log from './log';
+import _ from './_';
+import db from './db';
+import ChannelItem from './ChannelItem';
+import ServiceItem from './ServiceItem';
 
-class Service {
+export default class Service {
 
     private _items: ServiceItem[] = [];
     private _saveTimerId: NodeJS.Timer;
@@ -179,5 +179,3 @@ class Service {
         return _.service.save();
     }
 }
-
-export = Service;

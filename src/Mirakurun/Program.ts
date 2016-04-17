@@ -16,15 +16,15 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import stream = require('stream');
-import fs = require('fs');
-import _ = require('./_');
-import log = require('./log');
-import db = require('./db');
-import ServiceItem = require('./ServiceItem');
-import ProgramItem = require('./ProgramItem');
+import * as stream from 'stream';
+import * as fs from 'fs';
+import * as log from './log';
+import _ from './_';
+import db from './db';
+import ServiceItem from './ServiceItem';
+import ProgramItem from './ProgramItem';
 
-class Program {
+export default class Program {
 
     private _items: ProgramItem[] = [];
     private _saveTimerId: NodeJS.Timer;
@@ -189,5 +189,3 @@ class Program {
         return _.program.save();
     }
 }
-
-export = Program;

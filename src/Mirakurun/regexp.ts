@@ -21,4 +21,4 @@ const regexp = {
     unixDomainSocket: /^\/.+/
 };
 
-export = regexp;
+export default regexp;

@@ -16,16 +16,16 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import stream = require('stream');
-import _ = require('./_');
-import queue = require('./queue');
-import common = require('./common');
-import log = require('./log');
-import config = require('./config');
-import ChannelItem = require('./ChannelItem');
-import Tuner = require('./Tuner');
+import * as stream from 'stream';
+import * as common from './common';
+import * as log from './log';
+import * as config from './config';
+import _ from './_';
+import queue from './queue';
+import ChannelItem from './ChannelItem';
+import Tuner from './Tuner';
 
-class Channel {
+export default class Channel {
 
     private _items: ChannelItem[] = [];
 
@@ -177,5 +177,3 @@ class Channel {
         return _.channel.items;
     }
 }
-
-export = Channel;

@@ -16,22 +16,22 @@
 /// <reference path="../../typings/tsd.d.ts" />
 'use strict';
 
-import fs = require('fs');
-import http = require('http');
-import express = require('express');
-import openapi = require('express-openapi');
-import morgan = require('morgan');
-import bodyParser = require('body-parser');
-import yaml = require('js-yaml');
-import log = require('./log');
-import regexp = require('./regexp');
-import config = require('./config');
-import system = require('./system');
-import Event = require('./Event');
-import Tuner = require('./Tuner');
-import Channel = require('./Channel');
-import Service = require('./Service');
-import Program = require('./Program');
+import * as fs from 'fs';
+import * as http from 'http';
+import * as express from 'express';
+import * as openapi from 'express-openapi';
+import * as morgan from 'morgan';
+import * as bodyParser from 'body-parser';
+import * as yaml from 'js-yaml';
+import * as log from './log';
+import * as config from './config';
+import regexp from './regexp';
+import system from './system';
+import Event from './Event';
+import Tuner from './Tuner';
+import Channel from './Channel';
+import Service from './Service';
+import Program from './Program';
 
 const pkg = require('../../package.json');
 
@@ -136,4 +136,4 @@ class Server {
     }
 }
 
-export = Server;
+export default Server;

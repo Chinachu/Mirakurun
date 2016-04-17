@@ -15,9 +15,9 @@
 */
 'use strict';
 
-import {Operation} from 'express-openapi';
-import api = require('../../api');
-import Tuner = require('../../Tuner');
+import { Operation } from 'express-openapi';
+import * as api from '../../api';
+import Tuner from '../../Tuner';
 
 export const parameters = [
     {

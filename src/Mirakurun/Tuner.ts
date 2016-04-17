@@ -16,18 +16,18 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import child_process = require('child_process');
-import stream = require('stream');
-import _ = require('./_');
-import common = require('./common');
-import log = require('./log');
-import db = require('./db');
-import config = require('./config');
-import TunerDevice = require('./TunerDevice');
-import ChannelItem = require('./ChannelItem');
-import ServiceItem = require('./ServiceItem');
-import ProgramItem = require('./ProgramItem');
-import TSFilter = require('./TSFilter');
+import * as child_process from 'child_process';
+import * as stream from 'stream';
+import * as common from './common';
+import * as log from './log';
+import * as config from './config';
+import _ from './_';
+import db from './db';
+import TunerDevice from './TunerDevice';
+import ChannelItem from './ChannelItem';
+import ServiceItem from './ServiceItem';
+import ProgramItem from './ProgramItem';
+import TSFilter from './TSFilter';
 
 interface StreamSetting {
     channel: ChannelItem;
@@ -39,7 +39,7 @@ interface StreamSetting {
     parseEIT?: boolean;
 }
 
-class Tuner {
+export default class Tuner {
 
     private _devices: TunerDevice[] = [];
 
@@ -384,5 +384,3 @@ class Tuner {
         return _.tuner.getServices(channel);
     }
 }
-
-export = Tuner;

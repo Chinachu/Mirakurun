@@ -23,8 +23,8 @@ if (process.platform !== 'win32') {
     }
 }
 
-import child_process = require('child_process');
-import Server = require('./Mirakurun/Server');
+import { execSync } from 'child_process';
+import Server from './Mirakurun/Server';
 
 process.title = 'Mirakurun: Server';
 
@@ -39,8 +39,8 @@ setEnv('SERVICES_DB_PATH', '/usr/local/var/db/mirakurun/services.json');
 setEnv('PROGRAMS_DB_PATH', '/usr/local/var/db/mirakurun/programs.json');
 
 if (process.platform === 'linux') {
-    child_process.execSync(`renice -n -10 -p ${ process.pid }`);
-    child_process.execSync(`ionice -c 1 -n 7 -p ${ process.pid }`);
+    execSync(`renice -n -10 -p ${ process.pid }`);
+    execSync(`ionice -c 1 -n 7 -p ${ process.pid }`);
 }
 
 new Server();

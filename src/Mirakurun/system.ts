@@ -16,8 +16,8 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import os = require('os');
-import regexp = require('./regexp');
+import * as os from 'os';
+import regexp from './regexp';
 
 module system {
 
@@ -42,4 +42,4 @@ module system {
     }
 }
 
-export = system;
+export default system;

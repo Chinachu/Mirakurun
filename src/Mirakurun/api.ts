@@ -17,57 +17,52 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import express = require('express');
+import * as express from 'express';
 
-module api {
-
-    export interface Error {
-        code: number;
-        reason: string;
-        errors: any[]
-    }
-
-    export function responseError(res: express.Response, code: number, reason?: string): express.Response {
-
-        if (reason) {
-            res.writeHead(code, reason, {
-                'Content-Type': 'application/json'
-            });
-        } else {
-            res.writeHead(code, {
-                'Content-Type': 'application/json'
-            });
-        }
-
-        var error: Error = {
-            code: code,
-            reason: reason || null,
-            errors: []
-        };
-
-        res.end(JSON.stringify(error));
-
-        return res;
-    }
-
-    export function responseStreamErrorHandler(res: express.Response, err: NodeJS.ErrnoException): express.Response {
-
-        if (err.message === 'no available tuners') {
-            return api.responseError(res, 503, 'Tuner Resource Unavailable');
-        }
-
-        return api.responseError(res, 500, err.message);
-    }
-
-    export function responseJSON(res: express.Response, body: any): express.Response {
-
-        // this is lighter than res.json()
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.status(200);
-        res.end(JSON.stringify(body));
-
-        return res;
-    }
+export interface Error {
+    code: number;
+    reason: string;
+    errors: any[]
 }
 
-export = api;
+export function responseError(res: express.Response, code: number, reason?: string): express.Response {
+
+    if (reason) {
+        res.writeHead(code, reason, {
+            'Content-Type': 'application/json'
+        });
+    } else {
+        res.writeHead(code, {
+            'Content-Type': 'application/json'
+        });
+    }
+
+    var error: Error = {
+        code: code,
+        reason: reason || null,
+        errors: []
+    };
+
+    res.end(JSON.stringify(error));
+
+    return res;
+}
+
+export function responseStreamErrorHandler(res: express.Response, err: NodeJS.ErrnoException): express.Response {
+
+    if (err.message === 'no available tuners') {
+        return responseError(res, 503, 'Tuner Resource Unavailable');
+    }
+
+    return responseError(res, 500, err.message);
+}
+
+export function responseJSON(res: express.Response, body: any): express.Response {
+
+    // this is lighter than res.json()
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.status(200);
+    res.end(JSON.stringify(body));
+
+    return res;
+}

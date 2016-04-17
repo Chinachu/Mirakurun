@@ -17,4 +17,4 @@
 
 const Queue = require('promise-queue');
 
-export = new Queue(1, Infinity);
+export default new Queue(1, Infinity);

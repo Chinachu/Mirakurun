@@ -16,8 +16,8 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import events = require('events');
-import _ = require('./_');
+import { EventEmitter } from 'events';
+import _ from './_';
 
 interface EventMessage {
     resource: string;
@@ -25,7 +25,7 @@ interface EventMessage {
     time: number;
 }
 
-class Event extends events.EventEmitter {
+export default class Event extends EventEmitter {
 
     private _log: EventMessage[] = [];
 
@@ -72,5 +72,3 @@ class Event extends events.EventEmitter {
         return _.event.emit('event', message);
     }
 }
-
-export = Event;

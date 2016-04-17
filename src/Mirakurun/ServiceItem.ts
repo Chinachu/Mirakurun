@@ -16,14 +16,14 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import stream = require('stream');
-import _ = require('./_');
-import common = require('./common');
-import db = require('./db');
-import Event = require('./Event');
-import ChannelItem = require('./ChannelItem');
+import * as stream from 'stream';
+import * as common from './common';
+import _ from './_';
+import db from './db';
+import Event from './Event';
+import ChannelItem from './ChannelItem';
 
-class ServiceItem {
+export default class ServiceItem {
 
     private _id: number;
 
@@ -94,5 +94,3 @@ class ServiceItem {
         return parseInt(networkId + (serviceId / 100000).toFixed(5).slice(2), 10);
     }
 }
-
-export = ServiceItem;

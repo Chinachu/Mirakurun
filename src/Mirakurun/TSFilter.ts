@@ -16,11 +16,11 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import stream = require('stream');
-import _ = require('./_');
-import log = require('./log');
-import epg = require('./epg');
-import ServiceItem = require('./ServiceItem');
+import * as stream from 'stream';
+import * as log from './log';
+import epg from './epg';
+import _ from './_';
+import ServiceItem from './ServiceItem';
 const aribts = require('aribts');
 const CRC32_TABLE = require('../../node_modules/aribts/lib/crc32_table');
 
@@ -48,7 +48,7 @@ const PROVIDE_PIDS = [
     0x0028// SDTT
 ];
 
-class TSFilter extends stream.Duplex {
+export default class TSFilter extends stream.Duplex {
 
     // options
     private _provideServiceId: number;
@@ -495,5 +495,3 @@ function calcCRC32(buf: Buffer): number {
     }
     return crc;
 }
-
-export = TSFilter;
