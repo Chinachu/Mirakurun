@@ -35,7 +35,7 @@ class Channel {
 
         this._load();
 
-        setTimeout(this._epgGatherer.bind(this), 60000);
+        setTimeout(this._epgGatherer.bind(this), 6000);
     }
 
     get items(): ChannelItem[] {
@@ -139,7 +139,7 @@ class Channel {
 
                         log.info('Network#%d EPG gathering has started', networkId);
 
-                        Tuner.getEPG(services[0].channel, 60)
+                        Tuner.getEPG(services[0].channel, 600)
                             .then(() => {
                                 log.info('Network#%d EPG gathering has finished', networkId);
                                 resolve();
