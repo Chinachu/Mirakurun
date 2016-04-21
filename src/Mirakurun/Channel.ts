@@ -35,7 +35,7 @@ class Channel {
 
         this._load();
 
-        setTimeout(this._epgGatherer.bind(this), 6000);
+        setTimeout(this._epgGatherer.bind(this), 60000);
     }
 
     get items(): ChannelItem[] {

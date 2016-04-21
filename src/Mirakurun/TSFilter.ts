@@ -462,94 +462,7 @@ class TSFilter extends stream.Duplex {
             epg.write(data);
 
             if (!this._epgReady) {
-                const networkId = data.original_network_id;
-                const serviceId = data.service_id;
-
-                if (typeof this._epgState[networkId] === 'undefined') {
-                    this._epgState[networkId] = {};
-                }
-
-                if (typeof this._epgState[networkId][serviceId] === 'undefined') {
-                    this._epgState[networkId][serviceId] = {
-                        basic: {
-                            flags: [],
-                            lastFlagsId: -1,
-                        },
-                        extended: {
-                            flags: [],
-                            lastFlagsId: -1,
-                        }
-                    };
-
-                    for (let i = 0; i < 0x08; i++) {
-                        [this._epgState[networkId][serviceId].basic, this._epgState[networkId][serviceId].extended].forEach(target => {
-                            target.flags.push({
-                                flag: new Buffer(32).fill(0x00),
-                                ignore: new Buffer(32).fill(0xFF),
-                                version_number: -1
-                            });
-                        });
-                    }
-                }
-
-                const flagsId = data.table_id & 0x07;
-                const lastFlagsId = data.last_table_id & 0x07;
-                const segmentNumber = data.section_number >> 3;
-                const lastSegmentNumber = data.last_section_number >> 3;
-                const sectionNumber = data.section_number & 0x07;
-                const segmentLastSectionNumber = data.segment_last_section_number & 0x07;
-                const targetFlags = (data.table_id & 0x0F) < 0x08 ? this._epgState[networkId][serviceId].basic : this._epgState[networkId][serviceId].extended;
-
-                if ((targetFlags.lastFlagsId !== lastFlagsId) ||
-                    (targetFlags.flags[flagsId].version_number !== -1 && targetFlags.flags[flagsId].version_number !== data.version_number)) {
-                    // reset fields
-                    for (let i = 0; i < 0x08; i++) {
-                        targetFlags.flags[i].flag.fill(0x00);
-                        targetFlags.flags[i].ignore.fill(i <= lastFlagsId ? 0x00 : 0xFF);
-                    }
-                }
-
-                // update ignore field (past segment)
-                if (flagsId === 0 && this._streamTime !== null) {
-                    let segment = (this._streamTime + 9 * 60 * 60 * 1000) / (3 * 60 * 60 * 1000) & 0x07;
-
-                    for (let i = 0; i < segment; i++) {
-                        targetFlags.flags[flagsId].ignore[i] = 0xFF;
-                    }
-                }
-
-                // update ignore field (segment)
-                for (let i = lastSegmentNumber + 1; i < 0x20 ; i++) {
-                    targetFlags.flags[flagsId].ignore[i] = 0xFF;
-                }
-
-                // update ignore field (section)
-                for (let i = segmentLastSectionNumber + 1; i < 8; i++) {
-                    targetFlags.flags[flagsId].ignore[segmentNumber] |= 1 << i;
-                }
-
-                // update flag field
-                targetFlags.flags[flagsId].flag[segmentNumber] |= 1 << sectionNumber;
-
-                // update last_table_id & version_number
-                targetFlags.lastFlagsId = lastFlagsId;
-                targetFlags.flags[flagsId].version_number = data.version_number;
-
-                this._epgReady = Object.keys(this._epgState).every(nid => {
-                    return Object.keys(this._epgState[nid]).every(sid => {
-                        return [this._epgState[nid][sid].basic, this._epgState[nid][sid].extended].every(target => {
-                            return target.flags.every(table => {
-                                return table.flag.every((segment, i) => {
-                                    return (segment | table.ignore[i]) === 0xFF;
-                                });
-                            });
-                        });
-                    });
-                });
-
-                if (this._epgReady) {
-                    this.emit("epgReady");
-                }
+                this._updateEpgState(data);
             }
         }
     }
@@ -557,6 +470,97 @@ class TSFilter extends stream.Duplex {
     private _onTOT(pid, data): void {
 
         this._streamTime = getTime(data.JST_time);
+    }
+
+    private _updateEpgState(data): void {
+        const networkId = data.original_network_id;
+        const serviceId = data.service_id;
+
+        if (typeof this._epgState[networkId] === 'undefined') {
+            this._epgState[networkId] = {};
+        }
+
+        if (typeof this._epgState[networkId][serviceId] === 'undefined') {
+            this._epgState[networkId][serviceId] = {
+                basic: {
+                    flags: [],
+                    lastFlagsId: -1,
+                },
+                extended: {
+                    flags: [],
+                    lastFlagsId: -1,
+                }
+            };
+
+            for (let i = 0; i < 0x08; i++) {
+                [this._epgState[networkId][serviceId].basic, this._epgState[networkId][serviceId].extended].forEach(target => {
+                    target.flags.push({
+                        flag: new Buffer(32).fill(0x00),
+                        ignore: new Buffer(32).fill(0xFF),
+                        version_number: -1
+                    });
+                });
+            }
+        }
+
+        const flagsId = data.table_id & 0x07;
+        const lastFlagsId = data.last_table_id & 0x07;
+        const segmentNumber = data.section_number >> 3;
+        const lastSegmentNumber = data.last_section_number >> 3;
+        const sectionNumber = data.section_number & 0x07;
+        const segmentLastSectionNumber = data.segment_last_section_number & 0x07;
+        const targetFlags = (data.table_id & 0x0F) < 0x08 ? this._epgState[networkId][serviceId].basic : this._epgState[networkId][serviceId].extended;
+
+        if ((targetFlags.lastFlagsId !== lastFlagsId) ||
+            (targetFlags.flags[flagsId].version_number !== -1 && targetFlags.flags[flagsId].version_number !== data.version_number)) {
+            // reset fields
+            for (let i = 0; i < 0x08; i++) {
+                targetFlags.flags[i].flag.fill(0x00);
+                targetFlags.flags[i].ignore.fill(i <= lastFlagsId ? 0x00 : 0xFF);
+            }
+        }
+
+        // update ignore field (past segment)
+        if (flagsId === 0 && this._streamTime !== null) {
+            let segment = (this._streamTime + 9 * 60 * 60 * 1000) / (3 * 60 * 60 * 1000) & 0x07;
+
+            for (let i = 0; i < segment; i++) {
+                targetFlags.flags[flagsId].ignore[i] = 0xFF;
+            }
+        }
+
+        // update ignore field (segment)
+        for (let i = lastSegmentNumber + 1; i < 0x20 ; i++) {
+            targetFlags.flags[flagsId].ignore[i] = 0xFF;
+        }
+
+        // update ignore field (section)
+        for (let i = segmentLastSectionNumber + 1; i < 8; i++) {
+            targetFlags.flags[flagsId].ignore[segmentNumber] |= 1 << i;
+        }
+
+        // update flag field
+        targetFlags.flags[flagsId].flag[segmentNumber] |= 1 << sectionNumber;
+
+        // update last_table_id & version_number
+        targetFlags.lastFlagsId = lastFlagsId;
+        targetFlags.flags[flagsId].version_number = data.version_number;
+
+        this._epgReady = Object.keys(this._epgState).every(nid => {
+            return Object.keys(this._epgState[nid]).every(sid => {
+                return [this._epgState[nid][sid].basic, this._epgState[nid][sid].extended].every(target => {
+                    return target.flags.every(table => {
+                        return table.flag.every((segment, i) => {
+                            return (segment | table.ignore[i]) === 0xFF;
+                        });
+                    });
+                });
+            });
+        });
+
+        if (this._epgReady) {
+            this.emit("epgReady");
+        }
     }
 
     private _close(): void {
