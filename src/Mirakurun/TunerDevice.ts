@@ -295,21 +295,18 @@ export default class TunerDevice extends events.EventEmitter {
         }
     }
 
-    private _end(): this {
+    private _end(): void {
 
         this._isAvailable = false;
 
         this._stream.removeAllListeners('data');
 
         if (this._closing === true) {
-            let i, l = this._users.length;
-            for (i = 0; i < l; i++) {
+            for (let i = 0, l = this._users.length; i < l; i++) {
                 this._users[i]._stream.end();
                 this._users.splice(i, 1);
             }
         }
-
-        return this;
     }
 
     private _kill(close: boolean): Promise<void> {
@@ -338,7 +335,7 @@ export default class TunerDevice extends events.EventEmitter {
         });
     }
 
-    private _release() {
+    private _release(): void {
 
         if (this._process) {
             this._process.stderr.removeAllListeners();
