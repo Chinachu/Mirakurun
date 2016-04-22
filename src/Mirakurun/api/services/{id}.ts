@@ -38,7 +38,7 @@ export const get: Operation = (req, res) => {
         service = Service.all().find(item => item.serviceId === req.params.id);
     }
 
-    if (service === null) {
+    if (service === null || service === undefined) {
         api.responseError(res, 404);
         return;
     }
