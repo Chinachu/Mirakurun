@@ -147,6 +147,7 @@ export default class Tuner {
             .then(stream => {
                 return new Promise<void>((resolve) => {
                     setTimeout(() => stream.emit('close'), seconds * 1000);
+                    stream.once('epgReady', () => stream.emit('close'));
                     stream.once('close', resolve);
                 });
             })

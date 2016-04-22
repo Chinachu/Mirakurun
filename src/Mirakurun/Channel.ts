@@ -139,7 +139,7 @@ export default class Channel {
 
                         log.info('Network#%d EPG gathering has started', networkId);
 
-                        Tuner.getEPG(services[0].channel, 60)
+                        Tuner.getEPG(services[0].channel, 600)
                             .then(() => {
                                 log.info('Network#%d EPG gathering has finished', networkId);
                                 resolve();
