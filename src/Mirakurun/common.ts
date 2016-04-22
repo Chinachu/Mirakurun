@@ -31,7 +31,7 @@ export function extendObject<T, U>(b: T, a: U): T {
     }
 
     return b;
-};
+}
 
 export function updateObject<T, U>(b: T, a: U): boolean {
 
@@ -47,4 +47,4 @@ export function updateObject<T, U>(b: T, a: U): boolean {
     }
 
     return updated;
-};
+}

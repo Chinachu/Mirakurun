@@ -16,11 +16,11 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import stream = require('stream');
-import _ = require('./_');
-import log = require('./log');
-import epg = require('./epg');
-import ServiceItem = require('./ServiceItem');
+import * as stream from 'stream';
+import * as log from './log';
+import epg from './epg';
+import _ from './_';
+import ServiceItem from './ServiceItem';
 const aribts = require('aribts');
 const CRC32_TABLE = require('../../node_modules/aribts/lib/crc32_table');
 
@@ -48,7 +48,7 @@ const PROVIDE_PIDS = [
     0x0028// SDTT
 ];
 
-class TSFilter extends stream.Duplex {
+export default class TSFilter extends stream.Duplex {
 
     // options
     private _provideServiceId: number;
@@ -74,7 +74,7 @@ class TSFilter extends stream.Duplex {
     private _providePids: number[] = null;// `null` to provides all
     private _parsePids: number[] = [];
     private _tsid: number = -1;
-    private _patCRC: number = -1;
+    private _patCRC: Buffer = new Buffer(0);
     private _serviceIds: number[] = [];
     private _services: any[] = [];
     private _parseServiceIds: number[] = [];
@@ -188,7 +188,6 @@ class TSFilter extends stream.Duplex {
             // sync byte (0x47) verifying
             if (chunk[offset] !== 71) {
                 offset -= PACKET_SIZE - 1;
-                this._offset = -1;
                 continue;
             }
 
@@ -228,8 +227,8 @@ class TSFilter extends stream.Duplex {
         }
 
         // parse
-        if (pid === 0 && this._patCRC !== packet.readInt32BE(packet[7] + 4)) {
-            this._patCRC = packet.readInt32BE(packet[7] + 4);
+        if (pid === 0 && this._patCRC.compare(packet.slice(packet[7] + 4, packet[7] + 8))) {
+            this._patCRC = packet.slice(packet[7] + 4, packet[7] + 8);
             this._parses.push(packet);
         } else if ((pid === 0x12 && (this._parseEIT === true || this._provideEventId !== null)) || this._parsePids.indexOf(pid) !== -1) {
             this._parses.push(packet);
@@ -496,5 +495,3 @@ function calcCRC32(buf: Buffer): number {
     }
     return crc;
 }
-
-export = TSFilter;

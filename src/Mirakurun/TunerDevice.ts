@@ -16,15 +16,15 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import events = require('events');
-import child_process = require('child_process');
-import stream = require('stream');
-import fs = require('fs');
-import util = require('util');
-import common = require('./common');
-import log = require('./log');
-import config = require('./config');
-import ChannelItem = require('./ChannelItem');
+import * as events from 'events';
+import * as child_process from 'child_process';
+import * as stream from 'stream';
+import * as fs from 'fs';
+import * as util from 'util';
+import * as common from './common';
+import * as log from './log';
+import * as config from './config';
+import ChannelItem from './ChannelItem';
 
 interface User extends common.User {
     _stream?: stream.Writable;
@@ -39,7 +39,7 @@ interface Status {
     users: common.User[];
 }
 
-class TunerDevice extends events.EventEmitter {
+export default class TunerDevice extends events.EventEmitter {
 
     private _channel: ChannelItem = null;
     private _command: string = null;
@@ -324,8 +324,17 @@ class TunerDevice extends events.EventEmitter {
         this._closing = close;
 
         return new Promise<void>(resolve => {
+
             this.once('release', resolve);
-            this._process.kill('SIGTERM');
+
+            if (process.platform === 'win32') {
+                const timer = setTimeout(() => this._process.kill(), 3000);
+                this._process.once('exit', () => clearTimeout(timer));
+
+                this._process.stdin.write('\n');
+            } else {
+                this._process.kill('SIGTERM');
+            }
         });
     }
 
@@ -363,5 +372,3 @@ class TunerDevice extends events.EventEmitter {
         }
     }
 }
-
-export = TunerDevice;

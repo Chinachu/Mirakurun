@@ -16,9 +16,9 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import stream = require('stream');
-import db = require('./db');
-import ProgramItem = require('./ProgramItem');
+import * as stream from 'stream';
+import db from './db';
+import ProgramItem from './ProgramItem';
 const aribts = require('aribts');
 const TsChar = aribts.TsChar;
 const TsDate = aribts.TsDate;
@@ -475,6 +475,4 @@ function getRelatedProgramItem(event: any): db.ProgramRelatedItem {
     };
 }
 
-const epg = new EPG();
-
-export = epg;
+export default new EPG();

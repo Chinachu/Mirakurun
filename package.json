@@ -1,22 +1,27 @@
 {
   "name": "mirakurun",
   "preferGlobal": true,
-  "description": "DVR Tuner Server Service for Chinachu Air.",
+  "description": "DTV Tuner Server Service for Chinachu Air.",
   "version": "1.2.1",
   "homepage": "https://github.com/kanreisa/Mirakurun",
   "keywords": [
     "mirakurun",
     "chinachu",
-    "chinachu air",
     "rivarun",
+    "arib",
+    "isdb",
+    "dvb",
     "dvr",
-    "tv",
-    "linux"
+    "dtv",
+    "tv"
   ],
   "author": {
     "name": "Yuki KAN",
     "url": "https://github.com/kanreisa"
   },
+  "contributors": [
+    "rndomhack"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/kanreisa/Mirakurun.git"
@@ -29,15 +34,18 @@
     "mirakurun": "bin/cli.sh"
   },
   "scripts": {
-    "start": "node lib/server.js",
+    "start": "node --max_old_space_size=128 lib/server.js",
+    "debug": "node --debug-brk --max_old_space_size=128 lib/server.js",
+    "start.win32": "node.exe --max_old_space_size=128 bin/init.win32.js",
+    "debug.win32": "node.exe --debug-brk --max_old_space_size=128 bin/init.win32.js",
     "tsd": "tsd",
     "tsd-install": "tsd reinstall && tsd rebundle",
     "build": "gulp build",
     "watch": "gulp watch",
     "test": "gulp test",
-    "preinstall": "bin/preinstall.sh",
-    "postinstall": "bin/postinstall.sh",
-    "preuninstall": "bin/preuninstall.sh"
+    "preinstall": "node bin/preinstall.js",
+    "postinstall": "node bin/postinstall.js",
+    "preuninstall": "node bin/preuninstall.js"
   },
   "directories": {
     "lib": "lib"
@@ -64,6 +72,8 @@
     "node": ">=5.9.0"
   },
   "os": [
-    "linux"
+    "linux",
+    "darwin",
+    "win32"
   ]
 }

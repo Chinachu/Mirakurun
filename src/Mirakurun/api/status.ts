@@ -15,9 +15,9 @@
 */
 'use strict';
 
-import {Operation} from 'express-openapi';
-import api = require('../api');
-import epg = require('../epg');
+import { Operation } from 'express-openapi';
+import * as api from '../api';
+import epg from '../epg';
 
 export const get: Operation = (req, res) => {
 

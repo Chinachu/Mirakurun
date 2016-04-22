@@ -15,9 +15,9 @@
 */
 'use strict';
 
-import {Operation} from 'express-openapi';
-import api = require('../../api');
-import Service = require('../../Service');
+import { Operation } from 'express-openapi';
+import * as api from '../../api';
+import Service from '../../Service';
 
 export const parameters = [
     {
@@ -38,7 +38,7 @@ export const get: Operation = (req, res) => {
         service = Service.all().find(item => item.serviceId === req.params.id);
     }
 
-    if (service === null) {
+    if (service === null || service === undefined) {
         api.responseError(res, 404);
         return;
     }

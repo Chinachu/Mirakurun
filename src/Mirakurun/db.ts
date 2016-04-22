@@ -16,9 +16,9 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import fs = require('fs');
-import common = require('./common');
-import log = require('./log');
+import * as fs from 'fs';
+import * as common from './common';
+import * as log from './log';
 
 module db {
 
@@ -159,4 +159,4 @@ module db {
     }
 }
 
-export = db;
+export default db;
