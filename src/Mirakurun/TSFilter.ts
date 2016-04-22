@@ -16,11 +16,11 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import stream = require('stream');
-import _ = require('./_');
-import log = require('./log');
-import epg = require('./epg');
-import ServiceItem = require('./ServiceItem');
+import * as stream from 'stream';
+import * as log from './log';
+import epg from './epg';
+import _ from './_';
+import ServiceItem from './ServiceItem';
 const aribts = require('aribts');
 const CRC32_TABLE = require('../../node_modules/aribts/lib/crc32_table');
 
@@ -48,7 +48,24 @@ const PROVIDE_PIDS = [
     0x0028// SDTT
 ];
 
-class TSFilter extends stream.Duplex {
+interface BasicExtState {
+    basic: {
+        flags: FlagState[];
+        lastFlagsId: number;
+    }
+    extended: {
+        flags: FlagState[];
+        lastFlagsId: number;
+    }
+}
+
+interface FlagState {
+    flag: Buffer;
+    ignore: Buffer;
+    version_number: number;
+}
+
+export default class TSFilter extends stream.Duplex {
 
     // options
     private _provideServiceId: number;
@@ -74,12 +91,15 @@ class TSFilter extends stream.Duplex {
     private _providePids: number[] = null;// `null` to provides all
     private _parsePids: number[] = [];
     private _tsid: number = -1;
-    private _patCRC: number = -1;
+    private _patCRC: Buffer = new Buffer(0);
     private _serviceIds: number[] = [];
     private _services: any[] = [];
     private _parseServiceIds: number[] = [];
     private _pmtPid: number = -1;
     private _pmtTimer: NodeJS.Timer;
+    private _streamTime: number = null;
+    private _epgReady: boolean = false;
+    private _epgState: { [networkId: number]: { [serviceId: number]: BasicExtState } } = {};
 
     // stream options
     private highWaterMark: number = 1024 * 1024 * 16;
@@ -126,6 +146,7 @@ class TSFilter extends stream.Duplex {
         this._parser.on('pmt', this._onPMT.bind(this));
         this._parser.on('sdt', this._onSDT.bind(this));
         this._parser.on('eit', this._onEIT.bind(this));
+        this._parser.on('tot', this._onTOT.bind(this));
 
         this.once('finish', this._close.bind(this));
         this.once('close', this._close.bind(this));
@@ -188,7 +209,6 @@ class TSFilter extends stream.Duplex {
             // sync byte (0x47) verifying
             if (chunk[offset] !== 71) {
                 offset -= PACKET_SIZE - 1;
-                this._offset = -1;
                 continue;
             }
 
@@ -228,10 +248,10 @@ class TSFilter extends stream.Duplex {
         }
 
         // parse
-        if (pid === 0 && this._patCRC !== packet.readInt32BE(packet[7] + 4)) {
-            this._patCRC = packet.readInt32BE(packet[7] + 4);
+        if (pid === 0 && this._patCRC.compare(packet.slice(packet[7] + 4, packet[7] + 8))) {
+            this._patCRC = packet.slice(packet[7] + 4, packet[7] + 8);
             this._parses.push(packet);
-        } else if ((pid === 0x12 && (this._parseEIT === true || this._provideEventId !== null)) || this._parsePids.indexOf(pid) !== -1) {
+        } else if ((pid === 0x12 && (this._parseEIT === true || this._provideEventId !== null)) || pid === 0x14 || this._parsePids.indexOf(pid) !== -1) {
             this._parses.push(packet);
         }
 
@@ -410,12 +430,13 @@ class TSFilter extends stream.Duplex {
 
     private _onEIT(pid, data): void {
 
-        if (data.events.length === 0 || this._parseServiceIds.indexOf(data.service_id) === -1) {
+        if (this._parseServiceIds.indexOf(data.service_id) === -1) {
             return;
         }
 
         // detect current event
         if (
+            data.events.length !== 0 &&
             this._provideEventId !== null && data.table_id === 0x4E && data.section_number === 0 &&
             (this._provideServiceId === null || this._provideServiceId === data.service_id)
         ) {
@@ -436,9 +457,109 @@ class TSFilter extends stream.Duplex {
             }
         }
 
-        // write EPG stream
+        // write EPG stream and store result
         if (this._parseEIT === true && data.table_id !== 0x4E && data.table_id !== 0x4F) {
             epg.write(data);
+
+            if (!this._epgReady) {
+                this._updateEpgState(data);
+            }
+        }
+    }
+
+    private _onTOT(pid, data): void {
+
+        this._streamTime = getTime(data.JST_time);
+    }
+
+    private _updateEpgState(data): void {
+        const networkId = data.original_network_id;
+        const serviceId = data.service_id;
+
+        if (typeof this._epgState[networkId] === 'undefined') {
+            this._epgState[networkId] = {};
+        }
+
+        if (typeof this._epgState[networkId][serviceId] === 'undefined') {
+            this._epgState[networkId][serviceId] = {
+                basic: {
+                    flags: [],
+                    lastFlagsId: -1,
+                },
+                extended: {
+                    flags: [],
+                    lastFlagsId: -1,
+                }
+            };
+
+            for (let i = 0; i < 0x08; i++) {
+                [this._epgState[networkId][serviceId].basic, this._epgState[networkId][serviceId].extended].forEach(target => {
+                    target.flags.push({
+                        flag: new Buffer(32).fill(0x00),
+                        ignore: new Buffer(32).fill(0xFF),
+                        version_number: -1
+                    });
+                });
+            }
+        }
+
+        const flagsId = data.table_id & 0x07;
+        const lastFlagsId = data.last_table_id & 0x07;
+        const segmentNumber = data.section_number >> 3;
+        const lastSegmentNumber = data.last_section_number >> 3;
+        const sectionNumber = data.section_number & 0x07;
+        const segmentLastSectionNumber = data.segment_last_section_number & 0x07;
+        const targetFlags = (data.table_id & 0x0F) < 0x08 ? this._epgState[networkId][serviceId].basic : this._epgState[networkId][serviceId].extended;
+
+        if ((targetFlags.lastFlagsId !== lastFlagsId) ||
+            (targetFlags.flags[flagsId].version_number !== -1 && targetFlags.flags[flagsId].version_number !== data.version_number)) {
+            // reset fields
+            for (let i = 0; i < 0x08; i++) {
+                targetFlags.flags[i].flag.fill(0x00);
+                targetFlags.flags[i].ignore.fill(i <= lastFlagsId ? 0x00 : 0xFF);
+            }
+        }
+
+        // update ignore field (past segment)
+        if (flagsId === 0 && this._streamTime !== null) {
+            let segment = (this._streamTime + 9 * 60 * 60 * 1000) / (3 * 60 * 60 * 1000) & 0x07;
+
+            for (let i = 0; i < segment; i++) {
+                targetFlags.flags[flagsId].ignore[i] = 0xFF;
+            }
+        }
+
+        // update ignore field (segment)
+        for (let i = lastSegmentNumber + 1; i < 0x20 ; i++) {
+            targetFlags.flags[flagsId].ignore[i] = 0xFF;
+        }
+
+        // update ignore field (section)
+        for (let i = segmentLastSectionNumber + 1; i < 8; i++) {
+            targetFlags.flags[flagsId].ignore[segmentNumber] |= 1 << i;
+        }
+
+        // update flag field
+        targetFlags.flags[flagsId].flag[segmentNumber] |= 1 << sectionNumber;
+
+        // update last_table_id & version_number
+        targetFlags.lastFlagsId = lastFlagsId;
+        targetFlags.flags[flagsId].version_number = data.version_number;
+
+        this._epgReady = Object.keys(this._epgState).every(nid => {
+            return Object.keys(this._epgState[nid]).every(sid => {
+                return [this._epgState[nid][sid].basic, this._epgState[nid][sid].extended].every(target => {
+                    return target.flags.every(table => {
+                        return table.flag.every((segment, i) => {
+                            return (segment | table.ignore[i]) === 0xFF;
+                        });
+                    });
+                });
+            });
+        });
+
+        if (this._epgReady) {
+            this.emit("epgReady");
         }
     }
 
@@ -497,4 +618,22 @@ function calcCRC32(buf: Buffer): number {
     return crc;
 }
 
-export = TSFilter;
+function getTime(buffer: Buffer): number {
+
+    let mjd = (buffer[0] << 8) | buffer[1];
+
+    let y = (((mjd - 15078.2) / 365.25) | 0);
+    let m = (((mjd - 14956.1 - ((y * 365.25) | 0)) / 30.6001) | 0);
+    let d = mjd - 14956 - ((y * 365.25) | 0) - ((m * 30.6001) | 0);
+
+    let k = (m === 14 || m === 15) ? 1 : 0;
+
+    y = y + k + 1900;
+    m = m - 1 - k * 12;
+
+    let h = (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);
+    let i = (buffer[3] >> 4) * 10 + (buffer[3] & 0x0F);
+    let s = (buffer[4] >> 4) * 10 + (buffer[4] & 0x0F);
+
+    return new Date(y, m - 1, d, h, i, s).getTime();
+}

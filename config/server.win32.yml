@@ -1,0 +1,5 @@
+path: \\.\pipe\mirakurun
+
+port: ~
+
+logLevel: 2

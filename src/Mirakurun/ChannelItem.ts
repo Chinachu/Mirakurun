@@ -16,15 +16,15 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import stream = require('stream');
-import _ = require('./_');
-import queue = require('./queue');
-import log = require('./log');
-import common = require('./common');
-import config = require('./config');
-import ServiceItem = require('./ServiceItem');
+import * as stream from 'stream';
+import _ from './_';
+import queue from './queue';
+import * as log from './log';
+import * as common from './common';
+import * as config from './config';
+import ServiceItem from './ServiceItem';
 
-class ChannelItem {
+export default class ChannelItem {
 
     private _name: string;
     private _type: common.ChannelType;
@@ -175,5 +175,3 @@ class ChannelItem {
         });
     }
 }
-
-export = ChannelItem;

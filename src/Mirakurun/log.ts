@@ -16,7 +16,7 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import util = require('util');
+import * as util from 'util';
 
 export enum LogLevel {
     'FATAL' = -1,

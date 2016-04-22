@@ -16,8 +16,8 @@
 'use strict';
 
 import { Operation } from 'express-openapi';
-import api = require('../../../api');
-import Program = require('../../../Program');
+import * as api from '../../../api';
+import Program from '../../../Program';
 
 export const parameters = [
     {

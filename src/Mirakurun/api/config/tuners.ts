@@ -16,7 +16,7 @@
 'use strict';
 
 import { Operation } from 'express-openapi';
-import config = require('../../config');
+import * as config from '../../config';
 
 export const get: Operation = (req, res) => {
 

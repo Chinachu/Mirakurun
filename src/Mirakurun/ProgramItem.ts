@@ -16,15 +16,15 @@
 /// <reference path="../../typings/node/node.d.ts" />
 'use strict';
 
-import stream = require('stream');
-import _ = require('./_');
-import common = require('./common');
-import db = require('./db');
-import Event = require('./Event');
-import ChannelItem = require('./ChannelItem');
-import ServiceItem = require('./ServiceItem');
+import * as stream from 'stream';
+import * as common from './common';
+import _ from './_';
+import db from './db';
+import Event from './Event';
+import ChannelItem from './ChannelItem';
+import ServiceItem from './ServiceItem';
 
-class ProgramItem {
+export default class ProgramItem {
 
     constructor(private _data: db.Program) {
 
@@ -77,5 +77,3 @@ class ProgramItem {
         Event.emit('program', this._data)
     }
 }
-
-export = ProgramItem;

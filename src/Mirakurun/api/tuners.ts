@@ -16,8 +16,8 @@
 'use strict';
 
 import { Operation } from 'express-openapi';
-import api = require('../api');
-import Tuner = require('../Tuner');
+import * as api from '../api';
+import Tuner from '../Tuner';
 
 export const get: Operation = (req, res) => {
 

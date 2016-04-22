@@ -16,8 +16,8 @@
 'use strict';
 
 import { Operation } from 'express-openapi';
-import api = require('../api');
-import Service = require('../Service');
+import * as api from '../api';
+import Service from '../Service';
 
 export const get: Operation = (req, res) => {
 
