@@ -49,7 +49,20 @@ if (process.platform === 'linux' || process.platform === 'darwin') {
         ]
     });
 
-    child_process.execSync('pm2 startup', {
+    const platform = '';
+
+    if (fs.existsSync('/usr/bin/systemctl') === true) {
+        platform = 'systemd';
+    } if (fs.existsSync('/etc/redhat-release') === true) {
+        platform = 'centos';
+    } else if (fs.existsSync('/etc/issue') === true) {
+        const issue = fs.readFileSync('/etc/issue', { encoding: 'utf-8' });
+        if (/Ubuntu/.test(issue) === true) {
+            platform = 'ubuntu';
+        }
+    }
+
+    child_process.execSync(`pm2 startup ${platform}`, {
         stdio: [
             null,
             process.stdout,
