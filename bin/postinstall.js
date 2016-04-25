@@ -49,7 +49,7 @@ if (process.platform === 'linux' || process.platform === 'darwin') {
         ]
     });
 
-    const platform = '';
+    let platform = '';
 
     if (fs.existsSync('/usr/bin/systemctl') === true) {
         platform = 'systemd';
