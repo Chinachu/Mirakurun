@@ -3,7 +3,7 @@
     {
       "name": "mirakurun-server",
       "script": "lib/server.js",
-      "node_args" : "--max_old_space_size=128",
+      "node_args" : "--max_old_space_size=256",
       "error_file": "/usr/local/var/log/mirakurun.stderr.log",
       "out_file": "/usr/local/var/log/mirakurun.stdout.log",
       "pid_file": "/usr/local/var/run/mirakurun.pid",
