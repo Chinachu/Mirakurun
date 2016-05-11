@@ -102,7 +102,7 @@ export default class TSFilter extends stream.Duplex {
     private _epgState: { [networkId: number]: { [serviceId: number]: BasicExtState } } = {};
 
     // stream options
-    private highWaterMark: number = 1024 * 1024 * 16;
+    private highWaterMark: number = _.config.server.highWaterMark || 1024 * 1024 * 24;
 
     // ReadableState in node/lib/_stream_readable.js
     private _readableState: any;

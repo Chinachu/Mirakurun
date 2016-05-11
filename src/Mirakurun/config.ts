@@ -30,6 +30,8 @@ export interface Server {
     port?: number;
 
     logLevel?: log.LogLevel;
+
+    highWaterMark?: number;
 }
 
 export interface Tuner {
