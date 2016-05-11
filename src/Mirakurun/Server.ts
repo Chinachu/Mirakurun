@@ -24,14 +24,9 @@ import * as morgan from 'morgan';
 import * as bodyParser from 'body-parser';
 import * as yaml from 'js-yaml';
 import * as log from './log';
-import * as config from './config';
 import regexp from './regexp';
 import system from './system';
-import Event from './Event';
-import Tuner from './Tuner';
-import Channel from './Channel';
-import Service from './Service';
-import Program from './Program';
+import _ from './_';
 
 const pkg = require('../../package.json');
 
@@ -41,7 +36,7 @@ class Server {
 
     constructor() {
 
-        const serverConfig = config.loadServer();
+        const serverConfig = _.config.server;
 
         if (typeof serverConfig.logLevel === 'number') {
             log.logLevel = serverConfig.logLevel;
@@ -127,12 +122,6 @@ class Server {
 
             this._servers.push(server);
         });
-
-        new Event();
-        new Tuner();
-        new Channel();
-        new Service();
-        new Program();
     }
 }
 

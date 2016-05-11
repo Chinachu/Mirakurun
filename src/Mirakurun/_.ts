@@ -15,6 +15,7 @@
 */
 'use strict';
 
+import * as config from './config';
 import Event from './Event';
 import Tuner from './Tuner';
 import Channel from './Channel';
@@ -22,6 +23,11 @@ import Service from './Service';
 import Program from './Program';
 
 interface _ {
+    config: {
+        server?: config.Server;
+        channels?: config.Channel[];
+        tuners?: config.Tuner[];
+    },
     event?: Event;
     tuner?: Tuner;
     channel?: Channel;
@@ -29,6 +35,8 @@ interface _ {
     program?: Program;
 }
 
-const _: _ = {};
+const _: _ = {
+    config: {}
+};
 
 export default _;

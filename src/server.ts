@@ -24,7 +24,14 @@ if (process.platform !== 'win32') {
 }
 
 import { execSync } from 'child_process';
+import _ from './Mirakurun/_';
+import Event from './Mirakurun/Event';
+import Tuner from './Mirakurun/Tuner';
+import Channel from './Mirakurun/Channel';
+import Service from './Mirakurun/Service';
+import Program from './Mirakurun/Program';
 import Server from './Mirakurun/Server';
+import * as config from './Mirakurun/config';
 
 process.title = 'Mirakurun: Server';
 
@@ -43,6 +50,15 @@ if (process.platform === 'linux') {
     execSync(`ionice -c 1 -n 7 -p ${ process.pid }`);
 }
 
+_.config.server = config.loadServer();
+_.config.channels = config.loadChannels();
+_.config.tuners = config.loadTuners();
+
+new Event();
+new Tuner();
+new Channel();
+new Service();
+new Program();
 new Server();
 
 function setEnv(name: string, value: string) {

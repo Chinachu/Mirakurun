@@ -19,7 +19,6 @@
 import * as stream from 'stream';
 import * as common from './common';
 import * as log from './log';
-import * as config from './config';
 import _ from './_';
 import queue from './queue';
 import ChannelItem from './ChannelItem';
@@ -79,7 +78,7 @@ export default class Channel {
 
         log.debug('loading channels...');
 
-        const channels = config.loadChannels();
+        const channels = _.config.channels;
 
         channels.forEach((channel, i) => {
 

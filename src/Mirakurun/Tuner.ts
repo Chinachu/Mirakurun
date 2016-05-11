@@ -20,7 +20,6 @@ import * as child_process from 'child_process';
 import * as stream from 'stream';
 import * as common from './common';
 import * as log from './log';
-import * as config from './config';
 import _ from './_';
 import db from './db';
 import TunerDevice from './TunerDevice';
@@ -204,7 +203,7 @@ export default class Tuner {
 
         log.debug('loading tuners...');
 
-        const tuners = config.loadTuners();
+        const tuners = _.config.tuners;
 
         tuners.forEach((tuner, i) => {
 
