@@ -123,7 +123,7 @@ export default class Tuner {
     getEPG(channel: ChannelItem, time?: number): Promise<void> {
 
         if (!time) {
-            time = _.config.server.epgRetrievalTime || 1000 * 60 * 5;
+            time = _.config.server.epgRetrievalTime || 1000 * 60 * 10;
         }
 
         let networkId;
