@@ -120,7 +120,11 @@ export default class Tuner {
         return this._getStream(setting, user);
     }
 
-    getEPG(channel: ChannelItem, seconds: number): Promise<void> {
+    getEPG(channel: ChannelItem, time?: number): Promise<void> {
+
+        if (!time) {
+            time = _.config.server.epgRetrievalTime || 1000 * 60 * 5;
+        }
 
         let networkId;
 
@@ -145,7 +149,7 @@ export default class Tuner {
         return this._getStream(setting, user)
             .then(stream => {
                 return new Promise<void>((resolve) => {
-                    setTimeout(() => stream.emit('close'), seconds * 1000);
+                    setTimeout(() => stream.emit('close'), time);
                     stream.once('epgReady', () => stream.emit('close'));
                     stream.once('close', resolve);
                 });
@@ -376,8 +380,8 @@ export default class Tuner {
         return _.tuner.getProgramStream(program, user);
     }
 
-    static getEPG(channel: ChannelItem, seconds: number): Promise<void> {
-        return _.tuner.getEPG(channel, seconds);
+    static getEPG(channel: ChannelItem, time?: number): Promise<void> {
+        return _.tuner.getEPG(channel, time);
     }
 
     static getServices(channel: ChannelItem): Promise<db.Service[]> {

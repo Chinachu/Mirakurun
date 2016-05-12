@@ -32,6 +32,9 @@ export interface Server {
     logLevel?: log.LogLevel;
 
     highWaterMark?: number;
+
+    epgGatheringInterval?: number;
+    epgRetrievalTime?: number;
 }
 
 export interface Tuner {

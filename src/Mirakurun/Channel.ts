@@ -27,6 +27,7 @@ import Tuner from './Tuner';
 export default class Channel {
 
     private _items: ChannelItem[] = [];
+    private _epgGatheringInterval = _.config.server.epgGatheringInterval || 1000 * 60 * 15;
 
     constructor() {
 
@@ -34,7 +35,7 @@ export default class Channel {
 
         this._load();
 
-        setTimeout(this._epgGatherer.bind(this), 60000);
+        setTimeout(this._epgGatherer.bind(this), 1000 * 60);
     }
 
     get items(): ChannelItem[] {
@@ -133,12 +134,14 @@ export default class Channel {
                     return;
                 }
 
+                log.info('Network#%d EPG gathering has queued', networkId);
+
                 queue.add(() => {
                     return new Promise((resolve, reject) => {
 
                         log.info('Network#%d EPG gathering has started', networkId);
 
-                        Tuner.getEPG(services[0].channel, 600)
+                        Tuner.getEPG(services[0].channel)
                             .then(() => {
                                 log.info('Network#%d EPG gathering has finished', networkId);
                                 resolve();
@@ -152,7 +155,7 @@ export default class Channel {
             });
 
             queue.add(() => {
-                setTimeout(this._epgGatherer.bind(this), 900000);
+                setTimeout(this._epgGatherer.bind(this), this._epgGatheringInterval);
                 return Promise.resolve();
             });
 
