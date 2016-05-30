@@ -105,16 +105,15 @@ export default class TunerDevice extends events.EventEmitter {
 
     getPriority(): number {
 
-        let ret = -2;
+        let priority = -2;
 
-        let i, l = this._users.length;
-        for (i = 0; i < l; i++) {
-            if (this._users[i].priority > ret) {
-                ret = this._users[i].priority;
+        for (let user of this._users) {
+            if (user.priority > priority) {
+                priority = user.priority;
             }
         }
 
-        return ret;
+        return priority;
     }
 
     export(): Status {
