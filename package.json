@@ -43,6 +43,7 @@
     "build": "gulp build",
     "watch": "gulp watch",
     "test": "gulp test",
+    "prepublish": "gulp build",
     "preinstall": "node bin/preinstall.js",
     "postinstall": "node bin/postinstall.js",
     "preuninstall": "node bin/preuninstall.js"
