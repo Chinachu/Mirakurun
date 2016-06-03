@@ -29,7 +29,7 @@ git checkout <branch>
 
 ```
 npm install
-npm run tsd-install
+npm run typings-install
 npm run build
 ```
 
