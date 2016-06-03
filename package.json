@@ -2,7 +2,7 @@
   "name": "mirakurun",
   "preferGlobal": true,
   "description": "DTV Tuner Server Service for Chinachu Air.",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "homepage": "https://github.com/kanreisa/Mirakurun",
   "keywords": [
     "mirakurun",
@@ -43,6 +43,7 @@
     "build": "gulp build",
     "watch": "gulp watch",
     "test": "gulp test",
+    "prepublish": "gulp build",
     "preinstall": "node bin/preinstall.js",
     "postinstall": "node bin/postinstall.js",
     "preuninstall": "node bin/preuninstall.js"

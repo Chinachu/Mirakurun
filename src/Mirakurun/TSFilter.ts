@@ -363,8 +363,10 @@ export default class TSFilter extends stream.Duplex {
             log.debug('TSFilter is now ready for serviceId=%d', this._provideServiceId);
         }
 
-        if (this._providePids.indexOf(data.program_info[0].CA_PID) === -1) {
-            this._providePids.push(data.program_info[0].CA_PID);
+        if (data.program_info[0]) {
+            if (this._providePids.indexOf(data.program_info[0].CA_PID) === -1) {
+                this._providePids.push(data.program_info[0].CA_PID);
+            }
         }
 
         if (this._providePids.indexOf(data.PCR_PID) === -1) {
