@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../../typings/node/node.d.ts" />
+/// <reference path="../../typings/index.d.ts" />
 'use strict';
 
 import { EventEmitter } from 'events';

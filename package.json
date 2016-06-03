@@ -38,8 +38,8 @@
     "debug": "node --debug-brk --max_old_space_size=256 lib/server.js",
     "start.win32": "node.exe --max_old_space_size=256 bin/init.win32.js",
     "debug.win32": "node.exe --debug-brk --max_old_space_size=256 bin/init.win32.js",
-    "tsd": "tsd",
-    "tsd-install": "tsd reinstall && tsd rebundle",
+    "typings": "typings",
+    "typings-install": "typings install",
     "build": "gulp build",
     "watch": "gulp watch",
     "test": "gulp test",
@@ -66,7 +66,8 @@
     "gulp-sourcemaps": "^1.6.0",
     "gulp-typescript": "^2.12.1",
     "tsd": "^0.6.5",
-    "typescript": "^1.8.9"
+    "typescript": "^1.8.9",
+    "typings": "^1.0.4"
   },
   "engines": {
     "node": ">=5.9.0"

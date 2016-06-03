@@ -13,8 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/// <reference path="../../typings/node/node.d.ts" />
-/// <reference path="../../typings/js-yaml/js-yaml.d.ts" />
+/// <reference path="../../typings/index.d.ts" />
 'use strict';
 
 import * as fs from 'fs';
