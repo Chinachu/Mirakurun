@@ -1,5 +1,12 @@
+# logLevel: <number>
+logLevel: 2
+
+# path: <string>
 path: /var/run/mirakurun.sock
 
-port: ~
-
-logLevel: 2
+# port: <number>
+# You can change this if port conflicted.
+# Don't expose this port on the internet, not even with NAPT.
+# Use this in LAN or VPN.
+# `~` to disable TCP port listening.
+port: 40772
