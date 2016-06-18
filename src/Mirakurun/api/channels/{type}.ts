@@ -13,17 +13,17 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-'use strict';
+"use strict";
 
-import { Operation } from 'express-openapi';
-import Channel from '../../Channel';
+import { Operation } from "express-openapi";
+import Channel from "../../Channel";
 
 export const parameters = [
     {
-        in: 'path',
-        name: 'type',
-        type: 'string',
-        enum: ['GR', 'BS', 'CS', 'SKY'],
+        in: "path",
+        name: "type",
+        type: "string",
+        enum: ["GR", "BS", "CS", "SKY"],
         required: true
     }
 ];
@@ -48,22 +48,22 @@ export const get: Operation = (req, res) => {
 };
 
 get.apiDoc = {
-    tags: ['channels'],
-    operationId: 'getChannelsByType',
+    tags: ["channels"],
+    operationId: "getChannelsByType",
     responses: {
         200: {
-            description: 'OK',
+            description: "OK",
             schema: {
-                type: 'array',
+                type: "array",
                 items: {
-                    $ref: '#/definitions/Channel'
+                    $ref: "#/definitions/Channel"
                 }
             }
         },
         default: {
-            description: 'Unexpected Error',
+            description: "Unexpected Error",
             schema: {
-                $ref: '#/definitions/Error'
+                $ref: "#/definitions/Error"
             }
         }
     }

@@ -13,22 +13,22 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-'use strict';
+"use strict";
 
-if (process.env['npm_config_global'] !== 'true') {
-    console.log('Note: add `-g` to install Mirakurun as Server!');
+if (process.env["npm_config_global"] !== "true") {
+    console.log("Note: add `-g` to install Mirakurun as Server!");
     process.exit(0);
 }
 
-const child_process = require('child_process');
+const child_process = require("child_process");
 
-if (process.platform === 'linux' || process.platform === 'darwin') {
+if (process.platform === "linux" || process.platform === "darwin") {
     if (process.getuid() !== 0) {
-        console.log('Note: `sudo npm install mirakurun -g --unsafe --production` to install Mirakurun as Server.');
+        console.log("Note: `sudo npm install mirakurun -g --unsafe --production` to install Mirakurun as Server.");
         process.exit(0);
     }
 
-    child_process.execSync('pm2 stop processes.json -s', {
+    child_process.execSync("pm2 stop processes.json -s", {
         stdio: [
             null,
             process.stdout,
@@ -36,16 +36,16 @@ if (process.platform === 'linux' || process.platform === 'darwin') {
         ]
     });
 
-    child_process.execSync('pm2 delete processes.json -s', {
+    child_process.execSync("pm2 delete processes.json -s", {
         stdio: [
             null,
             process.stdout,
             process.stderr
         ]
     });
-} else if (process.platform === 'win32') {
+} else if (process.platform === "win32") {
     try {
-        child_process.execSync('winser -r -x', {
+        child_process.execSync("winser -r -x", {
             stdio: [
                 null,
                 process.stdout,

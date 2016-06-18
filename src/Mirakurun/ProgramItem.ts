@@ -14,15 +14,15 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as stream from 'stream';
-import * as common from './common';
-import _ from './_';
-import db from './db';
-import Event from './Event';
-import ChannelItem from './ChannelItem';
-import ServiceItem from './ServiceItem';
+import * as stream from "stream";
+import * as common from "./common";
+import _ from "./_";
+import db from "./db";
+import Event from "./Event";
+import ChannelItem from "./ChannelItem";
+import ServiceItem from "./ServiceItem";
 
 export default class ProgramItem {
 
@@ -74,6 +74,6 @@ export default class ProgramItem {
     }
 
     private _updated(): void {
-        Event.emit('program', this._data)
+        Event.emit("program", this._data)
     }
 }

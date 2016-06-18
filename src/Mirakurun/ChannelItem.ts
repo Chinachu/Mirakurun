@@ -14,15 +14,15 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as stream from 'stream';
-import _ from './_';
-import queue from './queue';
-import * as log from './log';
-import * as common from './common';
-import * as config from './config';
-import ServiceItem from './ServiceItem';
+import * as stream from "stream";
+import _ from "./_";
+import queue from "./queue";
+import * as log from "./log";
+import * as common from "./common";
+import * as config from "./config";
+import ServiceItem from "./ServiceItem";
 
 export default class ChannelItem {
 
@@ -98,18 +98,18 @@ export default class ChannelItem {
             return;
         }
 
-        log.info('ChannelItem#"%s" serviceId=%d check has queued', this._name, serviceId);
+        log.info("ChannelItem#'%s' serviceId=%d check has queued", this._name, serviceId);
 
         queue.add(() => {
             return new Promise((resolve, reject) => {
 
-                log.info('ChannelItem#"%s" serviceId=%d check has started', this._name, serviceId);
+                log.info("ChannelItem#'%s' serviceId=%d check has started", this._name, serviceId);
 
                 _.tuner.getServices(this)
                     .then(services => services.find(service => service.serviceId === serviceId))
                     .then(service => {
 
-                        log.debug('ChannelItem#"%s" serviceId=%d: %s', this._name, serviceId, JSON.stringify(service, null, '  '));
+                        log.debug("ChannelItem#'%s' serviceId=%d: %s", this._name, serviceId, JSON.stringify(service, null, "  "));
 
                         new ServiceItem(this, service.networkId, service.serviceId, service.name);
 
@@ -117,7 +117,7 @@ export default class ChannelItem {
                     })
                     .catch(error => {
 
-                        log.info('ChannelItem#"%s" serviceId=%d check has failed [%s]', this._name, serviceId, error);
+                        log.info("ChannelItem#'%s' serviceId=%d check has failed [%s]", this._name, serviceId, error);
 
                         setTimeout(() => this.addService(serviceId), 180000);
 
@@ -137,17 +137,17 @@ export default class ChannelItem {
 
     serviceScan(add: boolean): void {
 
-        log.info('ChannelItem#"%s" service scan has queued', this._name);
+        log.info("ChannelItem#'%s' service scan has queued", this._name);
 
         queue.add(() => {
             return new Promise((resolve, reject) => {
 
-                log.info('ChannelItem#"%s" service scan has started', this._name);
+                log.info("ChannelItem#'%s' service scan has started", this._name);
 
                 _.tuner.getServices(this)
                     .then(services => {
 
-                        log.debug('ChannelItem#"%s" services: %s', this._name, JSON.stringify(services, null, '  '));
+                        log.debug("ChannelItem#'%s' services: %s", this._name, JSON.stringify(services, null, "  "));
 
                         services.forEach(service => {
 
@@ -159,13 +159,13 @@ export default class ChannelItem {
                             }
                         });
 
-                        log.info('ChannelItem#"%s" service scan has finished', this._name);
+                        log.info("ChannelItem#'%s' service scan has finished", this._name);
 
                         resolve();
                     })
                     .catch(error => {
 
-                        log.error('ChannelItem#"%s" service scan has failed [%s]', this._name, error);
+                        log.error("ChannelItem#'%s' service scan has failed [%s]", this._name, error);
 
                         setTimeout(() => this.serviceScan(add), add ? 180000 : 3600000);
 

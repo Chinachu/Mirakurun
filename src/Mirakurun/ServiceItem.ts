@@ -14,14 +14,14 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as stream from 'stream';
-import * as common from './common';
-import _ from './_';
-import db from './db';
-import Event from './Event';
-import ChannelItem from './ChannelItem';
+import * as stream from "stream";
+import * as common from "./common";
+import _ from "./_";
+import db from "./db";
+import Event from "./Event";
+import ChannelItem from "./ChannelItem";
 
 export default class ServiceItem {
 
@@ -52,7 +52,7 @@ export default class ServiceItem {
     }
 
     get name(): string {
-        return this._name || '';
+        return this._name || "";
     }
 
     get channel(): ChannelItem {
@@ -74,7 +74,7 @@ export default class ServiceItem {
             id: this._id,
             serviceId: this._serviceId,
             networkId: this._networkId,
-            name: this._name || '',
+            name: this._name || "",
             channel: {
                 type: this._channel.type,
                 channel: this._channel.channel
@@ -87,7 +87,7 @@ export default class ServiceItem {
     }
 
     private _updated(): void {
-        Event.emit('service', this.export())
+        Event.emit("service", this.export())
     }
 
     static createId(networkId: number, serviceId: number): number {

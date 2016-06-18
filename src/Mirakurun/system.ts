@@ -14,11 +14,11 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as os from 'os';
-import * as ip from 'ip';
-import regexp from './regexp';
+import * as os from "os";
+import * as ip from "ip";
+import regexp from "./regexp";
 
 module system {
 
@@ -31,7 +31,7 @@ module system {
             interfaces[k]
                 .filter(a => {
                     return (
-                        a.family === 'IPv4' &&
+                        a.family === "IPv4" &&
                         a.internal === false &&
                         ip.isPrivate(a.address) === true
                     );

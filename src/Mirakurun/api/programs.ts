@@ -13,11 +13,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-'use strict';
+"use strict";
 
-import { Operation } from 'express-openapi';
-import * as api from '../api';
-import Program from '../Program';
+import { Operation } from "express-openapi";
+import * as api from "../api";
+import Program from "../Program";
 
 export const get: Operation = (req, res) => {
 
@@ -37,30 +37,30 @@ export const get: Operation = (req, res) => {
 };
 
 get.apiDoc = {
-    tags: ['programs'],
-    operationId: 'getPrograms',
+    tags: ["programs"],
+    operationId: "getPrograms",
     parameters: [
         {
-            in: 'query',
-            name: 'serviceId',
-            type: 'number',
+            in: "query",
+            name: "serviceId",
+            type: "number",
             required: false
         }
     ],
     responses: {
         200: {
-            description: 'OK',
+            description: "OK",
             schema: {
-                type: 'array',
+                type: "array",
                 items: {
-                    $ref: '#/definitions/Program'
+                    $ref: "#/definitions/Program"
                 }
             }
         },
         default: {
-            description: 'Unexpected Error',
+            description: "Unexpected Error",
             schema: {
-                $ref: '#/definitions/Error'
+                $ref: "#/definitions/Error"
             }
         }
     }

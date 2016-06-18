@@ -14,15 +14,15 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as stream from 'stream';
-import * as fs from 'fs';
-import * as log from './log';
-import _ from './_';
-import db from './db';
-import ServiceItem from './ServiceItem';
-import ProgramItem from './ProgramItem';
+import * as stream from "stream";
+import * as fs from "fs";
+import * as log from "./log";
+import _ from "./_";
+import db from "./db";
+import ServiceItem from "./ServiceItem";
+import ProgramItem from "./ProgramItem";
 
 export default class Program {
 
@@ -113,14 +113,14 @@ export default class Program {
 
     private _load(): void {
 
-        log.debug('loading programs...');
+        log.debug("loading programs...");
 
         const now = Date.now();
         let dropped = false;
 
         db.loadPrograms().forEach(program => {
 
-            if (typeof program.networkId === 'undefined') {
+            if (typeof program.networkId === "undefined") {
                 dropped = true;
                 return;
             }
@@ -139,7 +139,7 @@ export default class Program {
 
     private _save(): void {
 
-        log.debug('saving programs...');
+        log.debug("saving programs...");
 
         db.savePrograms(
             this._items.map(program => program.data)

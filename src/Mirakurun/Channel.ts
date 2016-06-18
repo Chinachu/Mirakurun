@@ -14,15 +14,15 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as stream from 'stream';
-import * as common from './common';
-import * as log from './log';
-import _ from './_';
-import queue from './queue';
-import ChannelItem from './ChannelItem';
-import Tuner from './Tuner';
+import * as stream from "stream";
+import * as common from "./common";
+import * as log from "./log";
+import _ from "./_";
+import queue from "./queue";
+import ChannelItem from "./ChannelItem";
+import Tuner from "./Tuner";
 
 export default class Channel {
 
@@ -77,34 +77,34 @@ export default class Channel {
 
     private _load(): void {
 
-        log.debug('loading channels...');
+        log.debug("loading channels...");
 
         const channels = _.config.channels;
 
         channels.forEach((channel, i) => {
 
-            if (typeof channel.name !== 'string') {
-                log.error('invalid type of property `name` in channel#%d configuration', i);
+            if (typeof channel.name !== "string") {
+                log.error("invalid type of property `name` in channel#%d configuration", i);
                 return;
             }
 
-            if (channel.type !== 'GR' && channel.type !== 'BS' && channel.type !== 'CS' && channel.type !== 'SKY') {
-                log.error('invalid type of property `type` in channel#%d (%s) configuration', i, channel.name);
+            if (channel.type !== "GR" && channel.type !== "BS" && channel.type !== "CS" && channel.type !== "SKY") {
+                log.error("invalid type of property `type` in channel#%d (%s) configuration", i, channel.name);
                 return;
             }
 
-            if (typeof channel.channel !== 'string') {
-                log.error('invalid type of property `channel` in channel#%d (%s) configuration', i, channel.name);
+            if (typeof channel.channel !== "string") {
+                log.error("invalid type of property `channel` in channel#%d (%s) configuration", i, channel.name);
                 return;
             }
 
-            if (channel.satelite && typeof channel.satelite !== 'string') {
-                log.error('invalid type of property `satelite` in channel#%d (%s) configuration', i, channel.name);
+            if (channel.satelite && typeof channel.satelite !== "string") {
+                log.error("invalid type of property `satelite` in channel#%d (%s) configuration", i, channel.name);
                 return;
             }
 
-            if (channel.serviceId && typeof channel.serviceId !== 'number') {
-                log.error('invalid type of property `serviceId` in channel#%d (%s) configuration', i, channel.name);
+            if (channel.serviceId && typeof channel.serviceId !== "number") {
+                log.error("invalid type of property `serviceId` in channel#%d (%s) configuration", i, channel.name);
                 return;
             }
 
@@ -134,20 +134,20 @@ export default class Channel {
                     return;
                 }
 
-                log.info('Network#%d EPG gathering has queued', networkId);
+                log.info("Network#%d EPG gathering has queued", networkId);
 
                 queue.add(() => {
                     return new Promise((resolve, reject) => {
 
-                        log.info('Network#%d EPG gathering has started', networkId);
+                        log.info("Network#%d EPG gathering has started", networkId);
 
                         Tuner.getEPG(services[0].channel)
                             .then(() => {
-                                log.info('Network#%d EPG gathering has finished', networkId);
+                                log.info("Network#%d EPG gathering has finished", networkId);
                                 resolve();
                             })
                             .catch(error => {
-                                log.error('Network#%d EPG gathering has failed [%s]', networkId, error);
+                                log.error("Network#%d EPG gathering has failed [%s]", networkId, error);
                                 reject();
                             });
                     });

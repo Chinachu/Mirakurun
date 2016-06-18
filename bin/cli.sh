@@ -14,7 +14,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-if [ `whoami` != 'root' ]; then
+if [ `whoami` != "root" ]; then
   echo "Error: root please."
   exit 1
 fi

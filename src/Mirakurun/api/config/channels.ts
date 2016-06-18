@@ -13,10 +13,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-'use strict';
+"use strict";
 
-import { Operation } from 'express-openapi';
-import * as config from '../../config';
+import { Operation } from "express-openapi";
+import * as config from "../../config";
 
 export const get: Operation = (req, res) => {
 
@@ -25,19 +25,19 @@ export const get: Operation = (req, res) => {
 };
 
 get.apiDoc = {
-    tags: ['config'],
-    operationId: 'getChannelsConfig',
+    tags: ["config"],
+    operationId: "getChannelsConfig",
     responses: {
         200: {
-            description: 'OK',
+            description: "OK",
             schema: {
-                $ref: '#/definitions/ConfigChannels'
+                $ref: "#/definitions/ConfigChannels"
             }
         },
         default: {
-            description: 'Unexpected Error',
+            description: "Unexpected Error",
             schema: {
-                $ref: '#/definitions/Error'
+                $ref: "#/definitions/Error"
             }
         }
     }
@@ -54,28 +54,28 @@ export const put: Operation = (req, res) => {
 };
 
 put.apiDoc = {
-    tags: ['config'],
-    operationId: 'updateChannelsConfig',
+    tags: ["config"],
+    operationId: "updateChannelsConfig",
     parameters: [
         {
-            in: 'body',
-            name: 'body',
+            in: "body",
+            name: "body",
             schema: {
-                $ref: '#/definitions/ConfigChannels'
+                $ref: "#/definitions/ConfigChannels"
             }
         }
     ],
     responses: {
         200: {
-            description: 'OK',
+            description: "OK",
             schema: {
-                $ref: '#/definitions/ConfigChannels'
+                $ref: "#/definitions/ConfigChannels"
             }
         },
         default: {
-            description: 'Unexpected Error',
+            description: "Unexpected Error",
             schema: {
-                $ref: '#/definitions/Error'
+                $ref: "#/definitions/Error"
             }
         }
     }

@@ -14,12 +14,12 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as fs from 'fs';
-import * as yaml from 'js-yaml';
-import * as common from './common';
-import * as log from './log';
+import * as fs from "fs";
+import * as yaml from "js-yaml";
+import * as common from "./common";
+import * as log from "./log";
 
 export interface Server {
     // as Local Server
@@ -99,14 +99,14 @@ export function saveChannels(data: Channel[]): Promise<void> {
 
 function load(path) {
 
-    log.debug('load config `%s`', path);
+    log.debug("load config `%s`", path);
 
-    return yaml.safeLoad(fs.readFileSync(path, 'utf8'));
+    return yaml.safeLoad(fs.readFileSync(path, "utf8"));
 }
 
 function save(path, data): Promise<void> {
 
-    log.debug('save config `%s`', path);
+    log.debug("save config `%s`", path);
 
     return new Promise<void>((resolve, reject) => {
 

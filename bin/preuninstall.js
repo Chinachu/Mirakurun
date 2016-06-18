@@ -13,20 +13,20 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-'use strict';
+"use strict";
 
-if (process.env['npm_config_global'] !== 'true') {
+if (process.env["npm_config_global"] !== "true") {
     process.exit(0);
 }
 
-const execSync = require('child_process').execSync;
+const execSync = require("child_process").execSync;
 
-if (process.platform === 'linux' || process.platform === 'darwin') {
+if (process.platform === "linux" || process.platform === "darwin") {
     if (process.getuid() !== 0) {
         process.exit(0);
     }
 
-    execSync('pm2 stop processes.json', {
+    execSync("pm2 stop processes.json", {
         stdio: [
             null,
             process.stdout,
@@ -34,15 +34,15 @@ if (process.platform === 'linux' || process.platform === 'darwin') {
         ]
     });
 
-    execSync('pm2 delete processes.json', {
+    execSync("pm2 delete processes.json", {
         stdio: [
             null,
             process.stdout,
             process.stderr
         ]
     });
-} else if (process.platform === 'win32') {
-    execSync('winser -r -x -s', {
+} else if (process.platform === "win32") {
+    execSync("winser -r -x -s", {
         stdio: [
             null,
             process.stdout,

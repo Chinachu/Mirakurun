@@ -14,17 +14,17 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as events from 'events';
-import * as child_process from 'child_process';
-import * as stream from 'stream';
-import * as fs from 'fs';
-import * as util from 'util';
-import * as common from './common';
-import * as log from './log';
-import * as config from './config';
-import ChannelItem from './ChannelItem';
+import * as events from "events";
+import * as child_process from "child_process";
+import * as stream from "stream";
+import * as fs from "fs";
+import * as util from "util";
+import * as common from "./common";
+import * as log from "./log";
+import * as config from "./config";
+import ChannelItem from "./ChannelItem";
 
 interface User extends common.User {
     _stream?: stream.Writable;
@@ -54,7 +54,7 @@ export default class TunerDevice extends events.EventEmitter {
 
     constructor(private _index: number, private _config: config.Tuner) {
         super();
-        log.debug('TunerDevice#%d initialized', this._index);
+        log.debug("TunerDevice#%d initialized", this._index);
     }
 
     get index(): number {
@@ -133,27 +133,27 @@ export default class TunerDevice extends events.EventEmitter {
 
     startStream(user: User, stream: stream.Writable, channel?: ChannelItem): Promise<void> {
 
-        log.debug('TunerDevice#%d start stream for user `%s` (priority=%d)...', this._index, user.id, user.priority);
+        log.debug("TunerDevice#%d start stream for user `%s` (priority=%d)...", this._index, user.id, user.priority);
 
         if (this._isAvailable === false) {
-            return Promise.reject(new Error(util.format('TunerDevice#%d is not available', this._index)));
+            return Promise.reject(new Error(util.format("TunerDevice#%d is not available", this._index)));
         }
 
         const resolve = () => {
 
-            log.info('TunerDevice#%d streaming to user `%s` (priority=%d)', this._index, user.id, user.priority);
+            log.info("TunerDevice#%d streaming to user `%s` (priority=%d)", this._index, user.id, user.priority);
 
             user._stream = stream;
             this._users.push(user);
 
-            stream.once('close', () => this.endStream(user));
+            stream.once("close", () => this.endStream(user));
 
             return Promise.resolve();
         };
 
         if (!channel) {
             if (!this._stream) {
-                return Promise.reject(new Error(util.format('TunerDevice#%d has not stream', this._index)));
+                return Promise.reject(new Error(util.format("TunerDevice#%d has not stream", this._index)));
             } else {
                 return resolve();
             }
@@ -161,7 +161,7 @@ export default class TunerDevice extends events.EventEmitter {
 
         if (this._config.types.indexOf(channel.type) === -1) {
             return Promise.reject(
-                new Error(util.format('TunerDevice#%d is not supported for channel type `%s`', this._index, channel.type))
+                new Error(util.format("TunerDevice#%d is not supported for channel type `%s`", this._index, channel.type))
             );
         }
 
@@ -169,7 +169,7 @@ export default class TunerDevice extends events.EventEmitter {
             if (channel.channel === this._channel.channel) {
                 return resolve();
             } else if (user.priority <= this.getPriority()) {
-                return Promise.reject(new Error(util.format('TunerDevice#%d has higher priority user', this._index)));
+                return Promise.reject(new Error(util.format("TunerDevice#%d has higher priority user", this._index)));
             }
 
             return this._kill(true)
@@ -183,7 +183,7 @@ export default class TunerDevice extends events.EventEmitter {
 
     endStream(user: User): void {
 
-        log.debug('TunerDevice#%d end stream for user `%s` (priority=%d)...', this._index, user.id, user.priority);
+        log.debug("TunerDevice#%d end stream for user `%s` (priority=%d)...", this._index, user.id, user.priority);
 
         let i, l = this._users.length;
         for (i = 0; i < l; i++) {
@@ -202,43 +202,43 @@ export default class TunerDevice extends events.EventEmitter {
             }, 3000);
         }
 
-        log.info('TunerDevice#%d end streaming to user `%s` (priority=%d)', this._index, user.id, user.priority);
+        log.info("TunerDevice#%d end streaming to user `%s` (priority=%d)", this._index, user.id, user.priority);
     }
 
     private _spawn(ch): Promise<void> {
 
-        log.debug('TunerDevice#%d spawn...', this._index);
+        log.debug("TunerDevice#%d spawn...", this._index);
 
         if (this._process) {
-            return Promise.reject(new Error(util.format('TunerDevice#%d has process', this._index)));
+            return Promise.reject(new Error(util.format("TunerDevice#%d has process", this._index)));
         }
 
         let cmd = this._config.command;
 
-        cmd = cmd.replace('<channel>', ch.channel);
+        cmd = cmd.replace("<channel>", ch.channel);
 
         if (ch.satelite) {
-            cmd = cmd.replace('<satelite>', ch.satelite);
+            cmd = cmd.replace("<satelite>", ch.satelite);
         }
 
-        this._process = child_process.spawn(cmd.split(' ')[0], cmd.split(' ').slice(1));
+        this._process = child_process.spawn(cmd.split(" ")[0], cmd.split(" ").slice(1));
         this._command = cmd;
         this._channel = ch;
 
         if (this._config.dvbDevicePath) {
-            const cat = child_process.spawn('cat', [this._config.dvbDevicePath]);
+            const cat = child_process.spawn("cat", [this._config.dvbDevicePath]);
 
-            cat.once('error', (err) => {
+            cat.once("error", (err) => {
 
-                log.error('TunerDevice#%d cat process error `%s` (pid=%d)', this._index, err.code, cat.pid);
+                log.error("TunerDevice#%d cat process error `%s` (pid=%d)", this._index, err.code, cat.pid);
 
                 this._kill(false);
             });
 
-            cat.once('close', (code, signal) => {
+            cat.once("close", (code, signal) => {
 
                 log.debug(
-                    'TunerDevice#%d cat process has closed with code=%d by signal `%s` (pid=%d)',
+                    "TunerDevice#%d cat process has closed with code=%d by signal `%s` (pid=%d)",
                     this._index, code, signal, cat.pid
                 );
 
@@ -247,27 +247,27 @@ export default class TunerDevice extends events.EventEmitter {
                 }
             });
 
-            this._process.once('exit', () => cat.kill('SIGKILL'));
+            this._process.once("exit", () => cat.kill("SIGKILL"));
 
             this._stream = cat.stdout;
         } else {
             this._stream = this._process.stdout;
         }
 
-        this._process.once('exit', () => this._exited = true);
+        this._process.once("exit", () => this._exited = true);
 
-        this._process.once('error', (err) => {
+        this._process.once("error", (err) => {
 
-            log.fatal('TunerDevice#%d process error `%s` (pid=%d)', this._index, err.code, this._process.pid);
+            log.fatal("TunerDevice#%d process error `%s` (pid=%d)", this._index, err.code, this._process.pid);
 
             this._end();
             setTimeout(this._release.bind(this), this._config.dvbDevicePath ? 1000 : 100);
         });
 
-        this._process.once('close', (code, signal) => {
+        this._process.once("close", (code, signal) => {
 
             log.info(
-                'TunerDevice#%d process has closed with exit code=%d by signal `%s` (pid=%d)',
+                "TunerDevice#%d process has closed with exit code=%d by signal `%s` (pid=%d)",
                 this._index, code, signal, this._process.pid
             );
 
@@ -275,14 +275,14 @@ export default class TunerDevice extends events.EventEmitter {
             setTimeout(this._release.bind(this), this._config.dvbDevicePath ? 1000 : 100);
         });
 
-        this._process.stderr.on('data', data => {
-            log.info('TunerDevice#%d > %s', this._index, data.toString().trim());
+        this._process.stderr.on("data", data => {
+            log.info("TunerDevice#%d > %s", this._index, data.toString().trim());
         });
 
         // flowing start
-        this._stream.on('data', this._streamOnData.bind(this));
+        this._stream.on("data", this._streamOnData.bind(this));
 
-        log.info('TunerDevice#%d process has spawned by command `%s` (pid=%d)', this._index, cmd, this._process.pid);
+        log.info("TunerDevice#%d process has spawned by command `%s` (pid=%d)", this._index, cmd, this._process.pid);
 
         return Promise.resolve();
     }
@@ -298,7 +298,7 @@ export default class TunerDevice extends events.EventEmitter {
 
         this._isAvailable = false;
 
-        this._stream.removeAllListeners('data');
+        this._stream.removeAllListeners("data");
 
         if (this._closing === true) {
             for (let i = 0, l = this._users.length; i < l; i++) {
@@ -310,10 +310,10 @@ export default class TunerDevice extends events.EventEmitter {
 
     private _kill(close: boolean): Promise<void> {
 
-        log.debug('TunerDevice#%d kill...', this._index);
+        log.debug("TunerDevice#%d kill...", this._index);
 
         if (!this._process || !this._process.pid) {
-            return Promise.reject(new Error(util.format('TunerDevice#%d has not process', this._index)));
+            return Promise.reject(new Error(util.format("TunerDevice#%d has not process", this._index)));
         }
 
         this._isAvailable = false;
@@ -321,15 +321,15 @@ export default class TunerDevice extends events.EventEmitter {
 
         return new Promise<void>(resolve => {
 
-            this.once('release', resolve);
+            this.once("release", resolve);
 
-            if (process.platform === 'win32') {
+            if (process.platform === "win32") {
                 const timer = setTimeout(() => this._process.kill(), 3000);
-                this._process.once('exit', () => clearTimeout(timer));
+                this._process.once("exit", () => clearTimeout(timer));
 
-                this._process.stdin.write('\n');
+                this._process.stdin.write("\n");
             } else {
-                this._process.kill('SIGTERM');
+                this._process.kill("SIGTERM");
             }
         });
     }
@@ -357,12 +357,12 @@ export default class TunerDevice extends events.EventEmitter {
         this._closing = false;
         this._exited = false;
 
-        this.emit('release');
+        this.emit("release");
 
-        log.debug('TunerDevice#%d released', this._index);
+        log.debug("TunerDevice#%d released", this._index);
 
         if (this._closing === false && this._users.length !== 0) {
-            log.debug('TunerDevice#%d respawning because request has not closed', this._index);
+            log.debug("TunerDevice#%d respawning because request has not closed", this._index);
 
             this._spawn(this._channel);
         }

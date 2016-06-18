@@ -13,34 +13,34 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-'use strict';
+"use strict";
 
-if (process.platform !== 'win32') {
+if (process.platform !== "win32") {
     process.exit(1);
 }
 
-const fs = require('fs');
-const path = require('path');
-const spawn = require('child_process').spawn;
+const fs = require("fs");
+const path = require("path");
+const spawn = require("child_process").spawn;
 
-const proc = require('../processes.json').apps[0];
-const configDir = path.join(process.env.USERPROFILE, '.Mirakurun');
-const dataDir = path.join(process.env.LOCALAPPDATA, 'Mirakurun');
+const proc = require("../processes.json").apps[0];
+const configDir = path.join(process.env.USERPROFILE, ".Mirakurun");
+const dataDir = path.join(process.env.LOCALAPPDATA, "Mirakurun");
 
 for (const key in proc.env) {
     setEnv(key, proc.env[key]);
 }
 
-console.log('configDir:', configDir);
-console.log('dataDir:', dataDir);
+console.log("configDir:", configDir);
+console.log("dataDir:", dataDir);
 
-setEnv('SERVER_CONFIG_PATH', path.join(configDir, 'server.yml'));
-setEnv('TUNERS_CONFIG_PATH', path.join(configDir, 'tuners.yml'));
-setEnv('CHANNELS_CONFIG_PATH', path.join(configDir, 'channels.yml'));
-setEnv('SERVICES_DB_PATH', path.join(dataDir, 'services.json'));
-setEnv('PROGRAMS_DB_PATH', path.join(dataDir, 'programs.json'));
+setEnv("SERVER_CONFIG_PATH", path.join(configDir, "server.yml"));
+setEnv("TUNERS_CONFIG_PATH", path.join(configDir, "tuners.yml"));
+setEnv("CHANNELS_CONFIG_PATH", path.join(configDir, "channels.yml"));
+setEnv("SERVICES_DB_PATH", path.join(dataDir, "services.json"));
+setEnv("PROGRAMS_DB_PATH", path.join(dataDir, "programs.json"));
 
-require('../' + proc.script);
+require("../" + proc.script);
 
 function setEnv(name, value) {
     process.env[name] = process.env[name] || value;

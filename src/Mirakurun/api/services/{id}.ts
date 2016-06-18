@@ -13,17 +13,17 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-'use strict';
+"use strict";
 
-import { Operation } from 'express-openapi';
-import * as api from '../../api';
-import Service from '../../Service';
+import { Operation } from "express-openapi";
+import * as api from "../../api";
+import Service from "../../Service";
 
 export const parameters = [
     {
-        in: 'path',
-        name: 'id',
-        type: 'integer',
+        in: "path",
+        name: "id",
+        type: "integer",
         maximum: 6553565535,
         required: true
     }
@@ -47,25 +47,25 @@ export const get: Operation = (req, res) => {
 };
 
 get.apiDoc = {
-    tags: ['services'],
-    operationId: 'getService',
+    tags: ["services"],
+    operationId: "getService",
     responses: {
         200: {
-            description: 'OK',
+            description: "OK",
             schema: {
-                $ref: '#/definitions/Service'
+                $ref: "#/definitions/Service"
             }
         },
         404: {
-            description: 'Not Found',
+            description: "Not Found",
             schema: {
-                $ref: '#/definitions/Error'
+                $ref: "#/definitions/Error"
             }
         },
         default: {
-            description: 'Unexpected Error',
+            description: "Unexpected Error",
             schema: {
-                $ref: '#/definitions/Error'
+                $ref: "#/definitions/Error"
             }
         }
     }

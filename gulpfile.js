@@ -13,42 +13,42 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-'use strict';
+"use strict";
 
-var fs = require('fs');
-var gulp = require('gulp');
-var typescript = require('gulp-typescript');
-var sourcemaps = require('gulp-sourcemaps');
-var rename = require('gulp-rename');
-var del = require('del');
+var fs = require("fs");
+var gulp = require("gulp");
+var typescript = require("gulp-typescript");
+var sourcemaps = require("gulp-sourcemaps");
+var rename = require("gulp-rename");
+var del = require("del");
 
-gulp.task('clean', () => {
-    del.sync(['lib']);
+gulp.task("clean", () => {
+    del.sync(["lib"]);
 });
 
-gulp.task('tsc', ['clean'], () => {
+gulp.task("tsc", ["clean"], () => {
     return gulp
         .src([
-            'src/**/*.ts'
+            "src/**/*.ts"
         ])
         .pipe(sourcemaps.init())
         .pipe(typescript({
-            typescript: require('typescript'),
-            target: 'ES6',
-            module: 'commonjs',
-            moduleResolution: 'node',
+            typescript: require("typescript"),
+            target: "ES6",
+            module: "commonjs",
+            moduleResolution: "node",
             removeComments: false,
             declarationFiles: false
         }))
         .js
-        .pipe(sourcemaps.write('./'))
-        .pipe(gulp.dest('lib'));
+        .pipe(sourcemaps.write("./"))
+        .pipe(gulp.dest("lib"));
 });
 
-gulp.task('build', ['tsc']);
+gulp.task("build", ["tsc"]);
 
-gulp.task('watch', function () {
-    gulp.watch('src/**/*.ts', ['build']);
+gulp.task("watch", function () {
+    gulp.watch("src/**/*.ts", ["build"]);
 });
 
-gulp.task('default', ['build']);
+gulp.task("default", ["build"]);

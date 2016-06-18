@@ -13,25 +13,25 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-'use strict';
+"use strict";
 
-import { Operation } from 'express-openapi';
-import * as api from '../../../../api';
-import Channel from '../../../../Channel';
-import Service from '../../../../Service';
+import { Operation } from "express-openapi";
+import * as api from "../../../../api";
+import Channel from "../../../../Channel";
+import Service from "../../../../Service";
 
 export const parameters = [
     {
-        in: 'path',
-        name: 'type',
-        type: 'string',
-        enum: ['GR', 'BS', 'CS', 'SKY'],
+        in: "path",
+        name: "type",
+        type: "string",
+        enum: ["GR", "BS", "CS", "SKY"],
         required: true
     },
     {
-        in: 'path',
-        name: 'channel',
-        type: 'string',
+        in: "path",
+        name: "channel",
+        type: "string",
         required: true
     }
 ];
@@ -51,22 +51,22 @@ export const get: Operation = (req, res) => {
 };
 
 get.apiDoc = {
-    tags: ['channels', 'services'],
-    operationId: 'getServicesByChannel',
+    tags: ["channels", "services"],
+    operationId: "getServicesByChannel",
     responses: {
         200: {
-            description: 'OK',
+            description: "OK",
             schema: {
-                type: 'array',
+                type: "array",
                 items: {
-                    $ref: '#/definitions/Service'
+                    $ref: "#/definitions/Service"
                 }
             }
         },
         default: {
-            description: 'Unexpected Error',
+            description: "Unexpected Error",
             schema: {
-                $ref: '#/definitions/Error'
+                $ref: "#/definitions/Error"
             }
         }
     }

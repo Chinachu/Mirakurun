@@ -14,55 +14,55 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as stream from 'stream';
-import db from './db';
-import ProgramItem from './ProgramItem';
-const aribts = require('aribts');
+import * as stream from "stream";
+import db from "./db";
+import ProgramItem from "./ProgramItem";
+const aribts = require("aribts");
 const TsChar = aribts.TsChar;
 const TsDate = aribts.TsDate;
 
 const STREAM_CONTENT = {
-    1: 'mpeg2',
-    5: 'h.264',
-    9: 'h.265'
+    1: "mpeg2",
+    5: "h.264",
+    9: "h.265"
 };
 
 const COMPONENT_TYPE = {
-    0x01: '480i',
-    0x02: '480i',
-    0x03: '480i',
-    0x04: '480i',
-    0x83: '4320p',
-    0x91: '2160p',
-    0x92: '2160p',
-    0x93: '2160p',
-    0x94: '2160p',
-    0xA1: '480p',
-    0xA2: '480p',
-    0xA3: '480p',
-    0xA4: '480p',
-    0xB1: '1080i',
-    0xB2: '1080i',
-    0xB3: '1080i',
-    0xB4: '1080i',
-    0xC1: '720p',
-    0xC2: '720p',
-    0xC3: '720p',
-    0xC4: '720p',
-    0xD1: '240p',
-    0xD2: '240p',
-    0xD3: '240p',
-    0xD4: '240p',
-    0xE1: '1080p',
-    0xE2: '1080p',
-    0xE3: '1080p',
-    0xE4: '1080p',
-    0xF1: '180p',
-    0xF2: '180p',
-    0xF3: '180p',
-    0xF4: '180p'
+    0x01: "480i",
+    0x02: "480i",
+    0x03: "480i",
+    0x04: "480i",
+    0x83: "4320p",
+    0x91: "2160p",
+    0x92: "2160p",
+    0x93: "2160p",
+    0x94: "2160p",
+    0xA1: "480p",
+    0xA2: "480p",
+    0xA3: "480p",
+    0xA4: "480p",
+    0xB1: "1080i",
+    0xB2: "1080i",
+    0xB3: "1080i",
+    0xB4: "1080i",
+    0xC1: "720p",
+    0xC2: "720p",
+    0xC3: "720p",
+    0xC4: "720p",
+    0xD1: "240p",
+    0xD2: "240p",
+    0xD3: "240p",
+    0xD4: "240p",
+    0xE1: "1080p",
+    0xE2: "1080p",
+    0xE3: "1080p",
+    0xE4: "1080p",
+    0xF1: "180p",
+    0xF2: "180p",
+    0xF3: "180p",
+    0xF4: "180p"
 };
 
 const SAMPLING_RATE = {
@@ -131,11 +131,11 @@ class EPG extends stream.Writable {
 
         const networkId = eit.original_network_id;
 
-        if (typeof this._epg[networkId] === 'undefined') {
+        if (typeof this._epg[networkId] === "undefined") {
             this._epg[networkId] = {};
         }
 
-        if (typeof this._epg[networkId][eit.service_id] === 'undefined') {
+        if (typeof this._epg[networkId][eit.service_id] === "undefined") {
             this._epg[networkId][eit.service_id] = {};
         }
 
@@ -147,7 +147,7 @@ class EPG extends stream.Writable {
             e = eit.events[i];
             update = false;
 
-            if (typeof service[e.event_id] === 'undefined') {
+            if (typeof service[e.event_id] === "undefined") {
                 update = true;
 
                 state = {
@@ -347,7 +347,7 @@ class EPG extends stream.Writable {
 
                         state.group._raw = d._raw;
 
-                        if (typeof d.other_network_events === 'undefined') {
+                        if (typeof d.other_network_events === "undefined") {
                             state.program.update({
                                 relatedItems: d.events.map(getRelatedProgramItem)
                             });

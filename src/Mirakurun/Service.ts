@@ -14,14 +14,14 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as stream from 'stream';
-import * as log from './log';
-import _ from './_';
-import db from './db';
-import ChannelItem from './ChannelItem';
-import ServiceItem from './ServiceItem';
+import * as stream from "stream";
+import * as log from "./log";
+import _ from "./_";
+import db from "./db";
+import ChannelItem from "./ChannelItem";
+import ServiceItem from "./ServiceItem";
 
 export default class Service {
 
@@ -54,7 +54,7 @@ export default class Service {
 
         let i = 0, l = this._items.length;
 
-        if (typeof serviceId === 'undefined') {
+        if (typeof serviceId === "undefined") {
             for (; i < l; i++) {
                 if (this._items[i].id === id) {
                     return this._items[i];
@@ -112,7 +112,7 @@ export default class Service {
 
     private _load(): void {
 
-        log.debug('loading services...');
+        log.debug("loading services...");
 
         let dropped = false;
 
@@ -125,7 +125,7 @@ export default class Service {
                 return;
             }
 
-            if (typeof service.networkId === 'undefined' || typeof service.serviceId === 'undefined') {
+            if (typeof service.networkId === "undefined" || typeof service.serviceId === "undefined") {
                 dropped = true;
                 return;
             }
@@ -140,7 +140,7 @@ export default class Service {
 
     private _save(): void {
 
-        log.debug('saving services...');
+        log.debug("saving services...");
 
         db.saveServices(
             this._items.map(service => service.export())

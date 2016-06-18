@@ -14,38 +14,38 @@
    limitations under the License.
 */
 /// <reference path="../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-if (process.platform !== 'win32') {
+if (process.platform !== "win32") {
     if (process.getuid() !== 0) {
-        console.error('root please.');
+        console.error("root please.");
         process.exit(1);
     }
 }
 
-import { execSync } from 'child_process';
-import _ from './Mirakurun/_';
-import Event from './Mirakurun/Event';
-import Tuner from './Mirakurun/Tuner';
-import Channel from './Mirakurun/Channel';
-import Service from './Mirakurun/Service';
-import Program from './Mirakurun/Program';
-import Server from './Mirakurun/Server';
-import * as config from './Mirakurun/config';
+import { execSync } from "child_process";
+import _ from "./Mirakurun/_";
+import Event from "./Mirakurun/Event";
+import Tuner from "./Mirakurun/Tuner";
+import Channel from "./Mirakurun/Channel";
+import Service from "./Mirakurun/Service";
+import Program from "./Mirakurun/Program";
+import Server from "./Mirakurun/Server";
+import * as config from "./Mirakurun/config";
 
-process.title = 'Mirakurun: Server';
+process.title = "Mirakurun: Server";
 
-process.on('uncaughtException', err => {
+process.on("uncaughtException", err => {
     console.error(err.stack);
 });
 
-setEnv('SERVER_CONFIG_PATH', '/usr/local/etc/mirakurun/server.yml');
-setEnv('TUNERS_CONFIG_PATH', '/usr/local/etc/mirakurun/tuners.yml');
-setEnv('CHANNELS_CONFIG_PATH', '/usr/local/etc/mirakurun/channels.yml');
-setEnv('SERVICES_DB_PATH', '/usr/local/var/db/mirakurun/services.json');
-setEnv('PROGRAMS_DB_PATH', '/usr/local/var/db/mirakurun/programs.json');
+setEnv("SERVER_CONFIG_PATH", "/usr/local/etc/mirakurun/server.yml");
+setEnv("TUNERS_CONFIG_PATH", "/usr/local/etc/mirakurun/tuners.yml");
+setEnv("CHANNELS_CONFIG_PATH", "/usr/local/etc/mirakurun/channels.yml");
+setEnv("SERVICES_DB_PATH", "/usr/local/var/db/mirakurun/services.json");
+setEnv("PROGRAMS_DB_PATH", "/usr/local/var/db/mirakurun/programs.json");
 
-if (process.platform === 'linux') {
+if (process.platform === "linux") {
     execSync(`renice -n -10 -p ${ process.pid }`);
     execSync(`ionice -c 1 -n 7 -p ${ process.pid }`);
 }

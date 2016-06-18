@@ -14,9 +14,9 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as express from 'express';
+import * as express from "express";
 
 export interface Error {
     code: number;
@@ -28,11 +28,11 @@ export function responseError(res: express.Response, code: number, reason?: stri
 
     if (reason) {
         res.writeHead(code, reason, {
-            'Content-Type': 'application/json'
+            "Content-Type": "application/json"
         });
     } else {
         res.writeHead(code, {
-            'Content-Type': 'application/json'
+            "Content-Type": "application/json"
         });
     }
 
@@ -49,8 +49,8 @@ export function responseError(res: express.Response, code: number, reason?: stri
 
 export function responseStreamErrorHandler(res: express.Response, err: NodeJS.ErrnoException): express.Response {
 
-    if (err.message === 'no available tuners') {
-        return responseError(res, 503, 'Tuner Resource Unavailable');
+    if (err.message === "no available tuners") {
+        return responseError(res, 503, "Tuner Resource Unavailable");
     }
 
     return responseError(res, 500, err.message);
@@ -59,7 +59,7 @@ export function responseStreamErrorHandler(res: express.Response, err: NodeJS.Er
 export function responseJSON(res: express.Response, body: any): express.Response {
 
     // this is lighter than res.json()
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.status(200);
     res.end(JSON.stringify(body));
 

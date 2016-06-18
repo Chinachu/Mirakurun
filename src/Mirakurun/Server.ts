@@ -14,22 +14,22 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as fs from 'fs';
-import * as http from 'http';
-import * as ip from 'ip';
-import * as express from 'express';
-import * as openapi from 'express-openapi';
-import * as morgan from 'morgan';
-import * as bodyParser from 'body-parser';
-import * as yaml from 'js-yaml';
-import * as log from './log';
-import regexp from './regexp';
-import system from './system';
-import _ from './_';
+import * as fs from "fs";
+import * as http from "http";
+import * as ip from "ip";
+import * as express from "express";
+import * as openapi from "express-openapi";
+import * as morgan from "morgan";
+import * as bodyParser from "body-parser";
+import * as yaml from "js-yaml";
+import * as log from "./log";
+import regexp from "./regexp";
+import system from "./system";
+import _ from "./_";
 
-const pkg = require('../../package.json');
+const pkg = require("../../package.json");
 
 class Server {
 
@@ -39,7 +39,7 @@ class Server {
 
         const serverConfig = _.config.server;
 
-        if (typeof serverConfig.logLevel === 'number') {
+        if (typeof serverConfig.logLevel === "number") {
             log.logLevel = serverConfig.logLevel;
         }
 
@@ -50,7 +50,7 @@ class Server {
         }
 
         if (serverConfig.port) {
-            addresses = [...addresses, ...system.getPrivateIPv4Addresses(), '127.0.0.1'];
+            addresses = [...addresses, ...system.getPrivateIPv4Addresses(), "127.0.0.1"];
         }
 
         addresses.forEach(address => {
@@ -60,16 +60,16 @@ class Server {
 
             server.timeout = 1000 * 60 * 3;// 3 minutes
 
-            app.disable('x-powered-by');
+            app.disable("x-powered-by");
 
-            app.use(morgan(':remote-addr :remote-user :method :url HTTP/:http-version :status :res[content-length] - :response-time ms :user-agent'));
+            app.use(morgan(":remote-addr :remote-user :method :url HTTP/:http-version :status :res[content-length] - :response-time ms :user-agent"));
             app.use(bodyParser.urlencoded({ extended: false }));
             app.use(bodyParser.json());
 
             app.use((req: express.Request, res: express.Response, next) => {
 
                 if (ip.isPrivate(req.ip) === true || !req.ip) {
-                    res.setHeader('Server', 'Mirakurun/' + pkg.version);
+                    res.setHeader("Server", "Mirakurun/" + pkg.version);
                     next();
                 } else {
                     res.status(403).end();
@@ -78,19 +78,19 @@ class Server {
 
             openapi.initialize({
                 app: app,　　　　　　　　　　　　　　　
-                apiDoc: yaml.safeLoad(fs.readFileSync('apiDefinition.yml', 'utf8')),
-                docsPath: '/docs',
-                routes: './lib/Mirakurun/api'
+                apiDoc: yaml.safeLoad(fs.readFileSync("apiDefinition.yml", "utf8")),
+                docsPath: "/docs",
+                routes: "./lib/Mirakurun/api"
             });
 
             app.use((err, req, res: express.Response, next) => {
 
-                log.error(JSON.stringify(err, null, '  '));
+                log.error(JSON.stringify(err, null, "  "));
                 console.error(err.stack);
 
                 if (res.headersSent === false) {
                     res.writeHead(err.status || 500, {
-                        'Content-Type': 'application/json'
+                        "Content-Type": "application/json"
                     });
                 }
 
@@ -104,20 +104,20 @@ class Server {
             });
 
             if (regexp.unixDomainSocket.test(address) === true || regexp.windowsNamedPipe.test(address) === true) {
-                if (process.platform !== 'win32' && fs.existsSync(address) === true) {
+                if (process.platform !== "win32" && fs.existsSync(address) === true) {
                     fs.unlinkSync(address);
                 }
 
                 server.listen(address, () => {
-                    log.info('listening on http+unix://%s', address.replace(/\//g, '%2F'));
+                    log.info("listening on http+unix://%s", address.replace(/\//g, "%2F"));
                 });
 
-                if (process.platform !== 'win32') {
-                    fs.chmodSync(address, '777');
+                if (process.platform !== "win32") {
+                    fs.chmodSync(address, "777");
                 }
             } else {
                 server.listen(serverConfig.port, address, () => {
-                    log.info('listening on http://%s:%d', address, serverConfig.port);
+                    log.info("listening on http://%s:%d", address, serverConfig.port);
                 });
             }
 

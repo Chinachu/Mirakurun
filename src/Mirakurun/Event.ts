@@ -14,10 +14,10 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import { EventEmitter } from 'events';
-import _ from './_';
+import { EventEmitter } from "events";
+import _ from "./_";
 
 interface EventMessage {
     resource: string;
@@ -34,7 +34,7 @@ export default class Event extends EventEmitter {
 
         _.event = this;
 
-        this.on('event', message => {
+        this.on("event", message => {
 
             this._log.unshift(message);
 
@@ -50,15 +50,15 @@ export default class Event extends EventEmitter {
     }
 
     static on(listener: (message: EventMessage) => void): void {
-        _.event.on('event', listener);
+        _.event.on("event", listener);
     }
 
     static once(listener: (message: EventMessage) => void): void {
-        _.event.once('event', listener);
+        _.event.once("event", listener);
     }
 
     static removeListener(listener: Function): void {
-        _.event.removeListener('event', listener);
+        _.event.removeListener("event", listener);
     }
 
     static emit(resource: string, data: any): boolean {
@@ -69,6 +69,6 @@ export default class Event extends EventEmitter {
             time: Date.now()
         };
 
-        return _.event.emit('event', message);
+        return _.event.emit("event", message);
     }
 }

@@ -13,11 +13,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-'use strict';
+"use strict";
 
-import { Operation } from 'express-openapi';
-import * as api from '../api';
-import Tuner from '../Tuner';
+import { Operation } from "express-openapi";
+import * as api from "../api";
+import Tuner from "../Tuner";
 
 export const get: Operation = (req, res) => {
 
@@ -28,22 +28,22 @@ export const get: Operation = (req, res) => {
 };
 
 get.apiDoc = {
-    tags: ['tuners'],
-    operationId: 'getTuners',
+    tags: ["tuners"],
+    operationId: "getTuners",
     responses: {
         200: {
-            description: 'OK',
+            description: "OK",
             schema: {
-                type: 'array',
+                type: "array",
                 items: {
-                    $ref: '#/definitions/TunerDevice'
+                    $ref: "#/definitions/TunerDevice"
                 }
             }
         },
         default: {
-            description: 'Unexpected Error',
+            description: "Unexpected Error",
             schema: {
-                $ref: '#/definitions/Error'
+                $ref: "#/definitions/Error"
             }
         }
     }

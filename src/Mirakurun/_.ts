@@ -13,14 +13,14 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-'use strict';
+"use strict";
 
-import * as config from './config';
-import Event from './Event';
-import Tuner from './Tuner';
-import Channel from './Channel';
-import Service from './Service';
-import Program from './Program';
+import * as config from "./config";
+import Event from "./Event";
+import Tuner from "./Tuner";
+import Channel from "./Channel";
+import Service from "./Service";
+import Program from "./Program";
 
 interface _ {
     config: {

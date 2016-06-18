@@ -13,30 +13,30 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-'use strict';
+"use strict";
 
-import { Operation } from 'express-openapi';
-import * as api from '../../../api';
-import Service from '../../../Service';
+import { Operation } from "express-openapi";
+import * as api from "../../../api";
+import Service from "../../../Service";
 
 export const parameters = [
     {
-        in: 'path',
-        name: 'id',
-        type: 'integer',
+        in: "path",
+        name: "id",
+        type: "integer",
         maximum: 6553565535,
         required: true
     },
     {
-        in: 'header',
-        name: 'X-Mirakurun-Priority',
-        type: 'integer',
+        in: "header",
+        name: "X-Mirakurun-Priority",
+        type: "integer",
         minimum: 0
     },
     {
-        in: 'query',
-        name: 'decode',
-        type: 'integer',
+        in: "query",
+        name: "decode",
+        type: "integer",
         minimum: 0,
         maximum: 1
     }
@@ -57,21 +57,21 @@ export const get: Operation = (req, res) => {
     }
 
     let requestAborted = false;
-    req.once('close', () => requestAborted = true);
+    req.once("close", () => requestAborted = true);
 
     service.getStream({
-        id: (req.ip || 'unix') + ':' + (req.connection.remotePort || Date.now()),
-        priority: req.get('X-Mirakurun-Priority') || 0,
-        agent: req.get('User-Agent'),
+        id: (req.ip || "unix") + ":" + (req.connection.remotePort || Date.now()),
+        priority: req.get("X-Mirakurun-Priority") || 0,
+        agent: req.get("User-Agent"),
         disableDecoder: (req.query.decode === 0)
     })
         .then(stream => {
 
             if (requestAborted === true) {
-                return stream.emit('close');
+                return stream.emit("close");
             }
 
-            req.once('close', () => stream.emit('close'));
+            req.once("close", () => stream.emit("close"));
 
             res.status(200);
             stream.pipe(res);
@@ -80,21 +80,21 @@ export const get: Operation = (req, res) => {
 };
 
 get.apiDoc = {
-    tags: ['services', 'stream'],
-    operationId: 'getServiceStream',
-    produces: ['video/MP2T'],
+    tags: ["services", "stream"],
+    operationId: "getServiceStream",
+    produces: ["video/MP2T"],
     responses: {
         200: {
-            description: 'OK'
+            description: "OK"
         },
         404: {
-            description: 'Not Found'
+            description: "Not Found"
         },
         503: {
-            description: 'Tuner Resource Unavailable'
+            description: "Tuner Resource Unavailable"
         },
         default: {
-            description: 'Unexpected Error'
+            description: "Unexpected Error"
         }
     }
 };

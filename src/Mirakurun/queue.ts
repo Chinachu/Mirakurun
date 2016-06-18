@@ -13,8 +13,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-'use strict';
+"use strict";
 
-const Queue = require('promise-queue');
+const Queue = require("promise-queue");
 
 export default new Queue(1, Infinity);

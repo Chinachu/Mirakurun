@@ -14,55 +14,55 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as util from 'util';
+import * as util from "util";
 
 export enum LogLevel {
-    'FATAL' = -1,
-    'ERROR' = 0,
-    'WARN' = 1,
-    'INFO' = 2,
-    'DEBUG' = 3
+    "FATAL" = -1,
+    "ERROR" = 0,
+    "WARN" = 1,
+    "INFO" = 2,
+    "DEBUG" = 3
 }
 
 export let logLevel: LogLevel = LogLevel.INFO;
 
 function getLogString(lvstr: string, msgs: any[]) {
-    return new Date().toISOString() + ' ' + lvstr + ': ' + util.format.apply(null, msgs);
+    return new Date().toISOString() + " " + lvstr + ": " + util.format.apply(null, msgs);
 }
 
 export function debug(...msgs: any[]);
 export function debug(): void {
     if (logLevel >= LogLevel.DEBUG) {
-        console.log(getLogString.call(this, 'debug', arguments));
+        console.log(getLogString.call(this, "debug", arguments));
     }
 }
 
 export function info(...msgs: any[]);
 export function info(): void {
     if (logLevel >= LogLevel.INFO) {
-        console.info(getLogString.call(this, 'info', arguments));
+        console.info(getLogString.call(this, "info", arguments));
     }
 }
 
 export function warn(...msgs: any[]);
 export function warn(): void {
     if (logLevel >= LogLevel.WARN) {
-        console.warn(getLogString.call(this, 'warn', arguments));
+        console.warn(getLogString.call(this, "warn", arguments));
     }
 }
 
 export function error(...msgs: any[]);
 export function error(): void {
     if (logLevel >= LogLevel.ERROR) {
-        console.error(getLogString.call(this, 'error', arguments));
+        console.error(getLogString.call(this, "error", arguments));
     }
 }
 
 export function fatal(...msgs: any[]);
 export function fatal(): void {
     if (logLevel >= LogLevel.FATAL) {
-        console.error(getLogString.call(this, 'fatal', arguments));
+        console.error(getLogString.call(this, "fatal", arguments));
     }
 }

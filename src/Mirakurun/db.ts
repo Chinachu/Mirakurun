@@ -14,11 +14,11 @@
    limitations under the License.
 */
 /// <reference path="../../typings/index.d.ts" />
-'use strict';
+"use strict";
 
-import * as fs from 'fs';
-import * as common from './common';
-import * as log from './log';
+import * as fs from "fs";
+import * as common from "./common";
+import * as log from "./log";
 
 module db {
 
@@ -130,7 +130,7 @@ module db {
 
     function load(path) {
 
-        log.debug('load db `%s`', path);
+        log.debug("load db `%s`", path);
 
         if (fs.existsSync(path) === true) {
             return require(path);
@@ -141,7 +141,7 @@ module db {
 
     function save(path: string, data: any[]): Promise<void> {
 
-        log.debug('save db `%s`', path);
+        log.debug("save db `%s`", path);
 
         return new Promise<void>((resolve, reject) => {
 
