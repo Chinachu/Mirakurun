@@ -18,6 +18,7 @@
 
 import * as fs from 'fs';
 import * as http from 'http';
+import * as ip from 'ip';
 import * as express from 'express';
 import * as openapi from 'express-openapi';
 import * as morgan from 'morgan';
@@ -67,7 +68,7 @@ class Server {
 
             app.use((req: express.Request, res: express.Response, next) => {
 
-                if (regexp.privateIPv4Address.test(req.ip) === true || !req.ip) {
+                if (ip.isPrivate(req.ip) === true || !req.ip) {
                     res.setHeader('Server', 'Mirakurun/' + pkg.version);
                     next();
                 } else {

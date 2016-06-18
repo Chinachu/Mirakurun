@@ -17,6 +17,7 @@
 'use strict';
 
 import * as os from 'os';
+import * as ip from 'ip';
 import regexp from './regexp';
 
 module system {
@@ -32,7 +33,7 @@ module system {
                     return (
                         a.family === 'IPv4' &&
                         a.internal === false &&
-                        regexp.privateIPv4Address.test(a.address) === true
+                        ip.isPrivate(a.address) === true
                     );
                 })
                 .forEach(a => addresses.push(a.address))
