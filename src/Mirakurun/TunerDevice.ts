@@ -205,7 +205,7 @@ export default class TunerDevice extends events.EventEmitter {
         log.info("TunerDevice#%d end streaming to user `%s` (priority=%d)", this._index, user.id, user.priority);
     }
 
-    private _spawn(ch): Promise<void> {
+    private _spawn(ch: ChannelItem): Promise<void> {
 
         log.debug("TunerDevice#%d spawn...", this._index);
 
