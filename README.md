@@ -21,7 +21,7 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 
 ## Requirements / Supported Platforms
 
-* [Node.js](http://nodejs.org/) `>=5.9.0`
+* [Node.js](http://nodejs.org/) `>=6.2.0`
 
 **Bold** is the recommended.
 see: [doc/Platforms.md](doc/Platforms.md)

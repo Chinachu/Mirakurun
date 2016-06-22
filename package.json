@@ -72,7 +72,7 @@
     "typings": "^1.3.0"
   },
   "engines": {
-    "node": ">=6.0.0"
+    "node": ">=6.2.0"
   },
   "os": [
     "linux",
