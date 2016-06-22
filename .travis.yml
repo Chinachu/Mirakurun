@@ -1,10 +1,10 @@
 language: node_js
 node_js:
-  - "4"
+  - "6"
 sudo: required
 before_install:
   - npm install
-  - npm run tsd-install
+  - npm run typings-install
   - npm run build
 install:
   - sudo npm install . -g --unsafe --production
