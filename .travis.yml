@@ -7,10 +7,10 @@ before_install:
   - npm run typings-install
   - npm run build
 install:
-  - sudo npm install . -g --unsafe --production
+  - sudo $(which npm) install . -g --unsafe --production
 script:
   - npm test
 after_script:
-  - sudo npm uninstall . -g --unsafe
+  - sudo $(which npm) uninstall . -g --unsafe
 notifications:
   email: false
