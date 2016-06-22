@@ -301,10 +301,10 @@ export default class TunerDevice extends events.EventEmitter {
         this._stream.removeAllListeners("data");
 
         if (this._closing === true) {
-            for (let i = 0, l = this._users.length; i < l; i++) {
-                this._users[i]._stream.end();
-                this._users.splice(i, 1);
+            for (const user of this._users) {
+                user._stream.end();
             }
+            this._users.length = 0;
         }
     }
 
