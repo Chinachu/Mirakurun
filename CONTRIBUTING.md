@@ -52,7 +52,7 @@ node-inspector &
 
 # Linux / Darwin
 sudo mirakurun stop
-sudo run debug
+sudo npm run debug
 
 # Win32 (Windows PowerShell as Admin)
 Stop-Service mirakurun
