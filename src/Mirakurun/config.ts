@@ -32,6 +32,7 @@ export interface Server {
 
     highWaterMark?: number;
 
+    programGCInterval?: number;
     epgGatheringInterval?: number;
     epgRetrievalTime?: number;
 }

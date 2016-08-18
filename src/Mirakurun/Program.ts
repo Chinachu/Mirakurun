@@ -21,6 +21,7 @@ import * as fs from "fs";
 import * as log from "./log";
 import _ from "./_";
 import db from "./db";
+import queue from "./queue";
 import ServiceItem from "./ServiceItem";
 import ProgramItem from "./ProgramItem";
 
@@ -28,6 +29,7 @@ export default class Program {
 
     private _items: ProgramItem[] = [];
     private _saveTimerId: NodeJS.Timer;
+    private _programGCInterval = _.config.server.programGCInterval || 1000 * 60 * 15;
 
     constructor() {
 
@@ -35,7 +37,7 @@ export default class Program {
 
         this._load();
 
-        setInterval(this._gc.bind(this), 1000 * 60 * 15);
+        setTimeout(this._gc.bind(this), this._programGCInterval);
     }
 
     get items(): ProgramItem[] {
@@ -148,12 +150,25 @@ export default class Program {
 
     private _gc(): void {
 
-        const now = Date.now();
+        log.info("Program GC has queued");
 
-        this._items.forEach(program => {
-            if (now > (program.data.startAt + program.data.duration)) {
-                program.remove();
-            }
+        queue.add(() => {
+
+            const now = Date.now();
+            let count = 0;
+
+            this._items.forEach(program => {
+                if (now > (program.data.startAt + program.data.duration)) {
+                    ++count;
+                    program.remove();
+                }
+            });
+
+            setTimeout(this._gc.bind(this), this._programGCInterval);
+
+            log.info("Program GC has finished and removed %d programs", count);
+
+            return Promise.resolve();
         });
     }
 
