@@ -17,7 +17,9 @@
 "use strict";
 
 import * as stream from "stream";
+import * as log from "./log";
 import db from "./db";
+import queue from "./queue";
 import ProgramItem from "./ProgramItem";
 const aribts = require("aribts");
 const TsChar = aribts.TsChar;
@@ -118,13 +120,14 @@ class EPG extends stream.Writable {
     status: { [networkId: number]: boolean } = {};
 
     private _epg: { [networkId: number]: { [serviceId: number]: { [eventId: number]: EventState } } } = {};
+    private _epgGCInterval = 1000 * 60 * 15;
 
     constructor() {
         super({
             objectMode: true
         });
 
-        setInterval(this._gc.bind(this), 1000 * 60 * 15);
+        setTimeout(this._gc.bind(this), this._epgGCInterval);
     }
 
     _write(eit: any, encoding, callback) {
@@ -375,21 +378,33 @@ class EPG extends stream.Writable {
 
     private _gc(): void {
 
-        const now = Date.now();
+        log.info("EPG GC has queued");
 
-        let nid, sid, eid, state: EventState;
-        for (nid in this._epg) {
-            for (sid in this._epg[nid]) {
-                for (eid in this._epg[nid][sid]) {
-                    state = this._epg[nid][sid][eid];
-                    if (now > (state.program.data.startAt + state.program.data.duration)) {
-                        //state.program.remove();// This will called from Program
-                        delete state.program;
-                        delete this._epg[nid][sid][eid];
+        queue.add(() => {
+
+            const now = Date.now();
+            let count = 0;
+
+            let nid, sid, eid, state: EventState;
+            for (nid in this._epg) {
+                for (sid in this._epg[nid]) {
+                    for (eid in this._epg[nid][sid]) {
+                        state = this._epg[nid][sid][eid];
+                        if (now > (state.program.data.startAt + state.program.data.duration)) {
+                            ++count;
+                            delete state.program;
+                            delete this._epg[nid][sid][eid];
+                        }
                     }
                 }
             }
-        }
+
+            setTimeout(this._gc.bind(this), this._epgGCInterval);
+
+            log.info("EPG GC has finished and removed %d events", count);
+
+            return Promise.resolve();
+        });
     }
 }
 
