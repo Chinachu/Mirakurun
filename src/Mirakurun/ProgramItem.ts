@@ -18,6 +18,7 @@
 
 import * as stream from "stream";
 import * as common from "./common";
+import * as log from "./log";
 import _ from "./_";
 import db from "./db";
 import Event from "./Event";
@@ -34,8 +35,34 @@ export default class ProgramItem {
             return item;
         }
 
+        const removedIds = [];
+
+        _.program.findByQuery({
+            data: {
+                networkId: _data.networkId,
+                serviceId: _data.serviceId,
+                startAt: {
+                    $gte: _data.startAt,
+                    $lt: _data.startAt + _data.duration
+                }
+            }
+        }).forEach(item => {
+
+            item.remove();
+
+            log.debug(
+                "ProgramItem#%d (networkId=%d, eventId=%d) has removed for redefine to ProgramItem#%d (eventId=%d)",
+                item.data.id, item.data.networkId, item.data.eventId,
+                _data.id, _data.eventId
+            );
+
+            removedIds.push(item.data.id);
+        });
+
         _.program.add(this);
         this._updated();
+
+        removedIds.forEach(id => Event.emit("program-redefine", { from: id, to: _data.id }));
     }
 
     get id(): number {
@@ -51,13 +78,6 @@ export default class ProgramItem {
     }
 
     update(data: db.Program): void {
-
-        /* if (data.id !== this._data.id) {
-            if (_.program.exists(data.id) === true) {
-                _.program.remove(this);
-                return;
-            }
-        } */
 
         if (common.updateObject(this._data, data) === true) {
             _.program.save();
