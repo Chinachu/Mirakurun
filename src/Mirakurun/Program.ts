@@ -24,6 +24,7 @@ import db from "./db";
 import queue from "./queue";
 import ServiceItem from "./ServiceItem";
 import ProgramItem from "./ProgramItem";
+const sift = require("sift");
 
 export default class Program {
 
@@ -80,6 +81,10 @@ export default class Program {
         return this.get(id) !== null;
     }
 
+    findByQuery(query: Object): ProgramItem[] {
+        return sift(query, this._items);
+    }
+
     findByServiceId(serviceId: number): ProgramItem[] {
 
         const items = [];
@@ -87,20 +92,6 @@ export default class Program {
         let i, l = this._items.length;
         for (i = 0; i < l; i++) {
             if (this._items[i].data.serviceId === serviceId) {
-                items.push(this._items[i]);
-            }
-        }
-
-        return items;
-    }
-
-    findByServiceItemId(id: number): ProgramItem[] {
-
-        const items = [];
-
-        let i, l = this._items.length;
-        for (i = 0; i < l; i++) {
-            if (this._items[i].id === id) {
                 items.push(this._items[i]);
             }
         }
@@ -188,12 +179,12 @@ export default class Program {
         return _.program.exists(id);
     }
 
-    static findByServiceId(serviceId: number): ProgramItem[] {
-        return _.program.findByServiceId(serviceId);
+    static findByQuery(query: Object): ProgramItem[] {
+        return _.program.findByQuery(query);
     }
 
-    static findByServiceItemId(id: number): ProgramItem[] {
-        return _.program.findByServiceItemId(id);
+    static findByServiceId(serviceId: number): ProgramItem[] {
+        return _.program.findByServiceId(serviceId);
     }
 
     static all(): ProgramItem[] {

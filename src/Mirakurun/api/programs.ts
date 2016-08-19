@@ -23,13 +23,11 @@ export const get: Operation = (req, res) => {
 
     let programs;
 
-    if (req.query.serviceId) {
-        // for debug
-        programs = Program.findByServiceId(req.query.serviceId);
-    } else if (req.query.serviceItemId) {
-        // for debug
-        programs = Program.findByServiceItemId(req.query.serviceItemId);
-    } {
+    if (Object.keys(req.query).length !== 0) {
+        programs = Program.findByQuery({
+            data: req.query
+        });
+    } else {
         programs = Program.all();
     }
 
@@ -42,7 +40,19 @@ get.apiDoc = {
     parameters: [
         {
             in: "query",
+            name: "networkId",
+            type: "number",
+            required: false
+        },
+        {
+            in: "query",
             name: "serviceId",
+            type: "number",
+            required: false
+        },
+        {
+            in: "query",
+            name: "eventId",
             type: "number",
             required: false
         }
