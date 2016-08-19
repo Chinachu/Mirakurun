@@ -1,7 +1,7 @@
 swagger: '2.0'
 info:
   title: Mirakurun
-  version: '1.2'
+  version: '1.4'
   description: DVR Tuner Server Service for Chinachu Air.
   contact:
     name: Yuki KAN
