@@ -154,6 +154,7 @@ export default class ChannelItem {
                             const item = _.service.get(service.networkId, service.serviceId);
                             if (item !== null) {
                                 item.name = service.name;
+                                item.logoId = service.logoId;
                             } else if (add === true) {
                                 new ServiceItem(this, service.networkId, service.serviceId, service.name, service.logoId);
                             }
