@@ -53,7 +53,7 @@
     "lib": "lib"
   },
   "dependencies": {
-    "aribts": "^1.2.0",
+    "aribts": "miyukki/node-aribts.git#feature/cdt",
     "body-parser": "^1.15.0",
     "express": "^4.14.0",
     "express-openapi": "^0.22.1",
