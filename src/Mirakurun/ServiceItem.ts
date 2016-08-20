@@ -26,9 +26,8 @@ import ChannelItem from "./ChannelItem";
 export default class ServiceItem {
 
     private _id: number;
-    private _logo: NodeBuffer;
 
-    constructor(private _channel: ChannelItem, private _networkId: number, private _serviceId: number, private _name?: string) {
+    constructor(private _channel: ChannelItem, private _networkId: number, private _serviceId: number, private _name?: string, private _logoId?: number, private _logoBase64?: string) {
 
         this._id = ServiceItem.createId(_networkId, _serviceId);
 
@@ -56,8 +55,12 @@ export default class ServiceItem {
         return this._name || "";
     }
 
+    get logoId(): number {
+        return this._logoId;
+    }
+
     get logo(): NodeBuffer {
-        return this._logo;
+        return new Buffer(this._logoBase64, 'base64');
     }
 
     get channel(): ChannelItem {
@@ -74,10 +77,20 @@ export default class ServiceItem {
         }
     }
 
+    set logoId(logoId: number) {
+
+        if (this._logoId !== logoId) {
+            this._logoId = logoId;
+
+            _.service.save();
+            this._updated();
+        }
+    }
+
     set logo(logo: NodeBuffer) {
 
-        if (this._logo !== logo) {
-            this._logo = logo;
+        if (this._logoBase64 !== logo.toString()) {
+            this._logoBase64 = logo.toString();
 
             _.service.save();
             this._updated();
@@ -90,7 +103,8 @@ export default class ServiceItem {
             serviceId: this._serviceId,
             networkId: this._networkId,
             name: this._name || "",
-            logo: this._logo,
+            logoId: this._logoId,
+            logoBase64: this._logoBase64,
             channel: {
                 type: this._channel.type,
                 channel: this._channel.channel

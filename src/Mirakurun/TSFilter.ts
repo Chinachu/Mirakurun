@@ -398,7 +398,7 @@ export default class TSFilter extends stream.Duplex {
             return;
         }
 
-        let i = 0, j, l = data.services.length, m, name;
+        let i = 0, j, l = data.services.length, m, name, logoId;
         for (; i < l; i++) {
             if (this._serviceIds.indexOf(data.services[i].service_id) === -1) {
                 continue;
@@ -409,7 +409,10 @@ export default class TSFilter extends stream.Duplex {
             for (j = 0, m = data.services[i].descriptors.length; j < m; j++) {
                 if (data.services[i].descriptors[j].descriptor_tag === 0x48) {
                     name = new aribts.TsChar(data.services[i].descriptors[j].service_name_char).decode();
-                    break;
+                }
+
+                if (data.services[i].descriptors[j].descriptor_tag === 0xCF) {
+                    logoId = data.services[i].descriptors[j].logo_id;
                 }
             }
 
@@ -417,7 +420,8 @@ export default class TSFilter extends stream.Duplex {
                 this._services.push({
                     networkId: data.original_network_id,
                     serviceId: data.services[i].service_id,
-                    name: name
+                    name: name,
+                    logoId: logoId
                 });
             }
         }
@@ -477,6 +481,10 @@ export default class TSFilter extends stream.Duplex {
 
     private _onCDT(pid, data): void {
 
+        let pngBytes = aribts.TsLogo(data.data_module.data_byte).concatPalette();
+        _.service.findByNetworkIdWithLogoId(data.original_network_id, data.data_module.logo_id).forEach(service => {
+            service.logo = pngBytes;
+        });
     }
 
     private _updateEpgState(data): void {

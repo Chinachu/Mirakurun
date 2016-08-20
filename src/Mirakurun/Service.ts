@@ -105,6 +105,20 @@ export default class Service {
         return items;
     }
 
+    findByNetworkIdWithLogoId(networkId: number, logoId: number): ServiceItem[] {
+
+        const items = [];
+
+        let i, l = this._items.length;
+        for (i = 0; i < l; i++) {
+            if (this._items[i].networkId === networkId && this._items[i].logoId === logoId) {
+                items.push(this._items[i]);
+            }
+        }
+
+        return items;
+    }
+
     save(): void {
         clearTimeout(this._saveTimerId);
         this._saveTimerId = setTimeout(() => this._save(), 500);
@@ -130,7 +144,7 @@ export default class Service {
                 return;
             }
 
-            new ServiceItem(channelItem, service.networkId, service.serviceId, service.name);
+            new ServiceItem(channelItem, service.networkId, service.serviceId, service.name, service.logoId, service.logoBase64);
         });
 
         if (dropped === true) {
@@ -169,6 +183,10 @@ export default class Service {
 
     static findByNetworkId(networkId: number): ServiceItem[] {
         return _.service.findByNetworkId(networkId);
+    }
+
+    static findByNetworkIdWithLogoId(networkId: number, logoId: number): ServiceItem[] {
+        return _.service.findByNetworkIdWithLogoId(networkId, logoId);
     }
 
     static all(): ServiceItem[] {
