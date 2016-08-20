@@ -27,6 +27,7 @@ module db {
         serviceId: number;
         networkId: number;
         name: string;
+        logo?: NodeBuffer;
         channel: Channel;
     }
 

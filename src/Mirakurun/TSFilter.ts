@@ -147,6 +147,7 @@ export default class TSFilter extends stream.Duplex {
         this._parser.on("sdt", this._onSDT.bind(this));
         this._parser.on("eit", this._onEIT.bind(this));
         this._parser.on("tot", this._onTOT.bind(this));
+        this._parser.on("cdt", this._onCDT.bind(this));
 
         this.once("finish", this._close.bind(this));
         this.once("close", this._close.bind(this));
@@ -472,6 +473,10 @@ export default class TSFilter extends stream.Duplex {
     private _onTOT(pid, data): void {
 
         this._streamTime = getTime(data.JST_time);
+    }
+
+    private _onCDT(pid, data): void {
+
     }
 
     private _updateEpgState(data): void {
