@@ -16,7 +16,9 @@
 "use strict";
 
 import { Operation } from "express-openapi";
+import * as api from "../../api";
 import Channel from "../../Channel";
+const sift = require("sift");
 
 export const parameters = [
     {
@@ -30,26 +32,40 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
 
-    res.json(
-        Channel.findByType(req.params.type).map(channel => {
+    const channels = Channel.findByType(req.params.type).map(channel => {
 
-            const ch: any = channel.export();
+        const ch: any = channel.export();
 
-            ch.services = channel.getServices().map(service => ({
-                id: service.id,
-                serviceId: service.serviceId,
-                networkId: service.networkId,
-                name: service.name
-            }));
+        ch.services = channel.getServices().map(service => ({
+            id: service.id,
+            serviceId: service.serviceId,
+            networkId: service.networkId,
+            name: service.name
+        }));
 
-            return ch;
-        })
-    );
+        return ch;
+    });
+
+    api.responseJSON(res, sift(req.query, channels));
 };
 
 get.apiDoc = {
     tags: ["channels"],
     operationId: "getChannelsByType",
+    parameters: [
+        {
+            in: "query",
+            name: "channel",
+            type: "string",
+            required: false
+        },
+        {
+            in: "query",
+            name: "name",
+            type: "string",
+            required: false
+        }
+    ],
     responses: {
         200: {
             description: "OK",
