@@ -155,6 +155,7 @@ export default class ChannelItem {
                             if (item !== null) {
                                 item.name = service.name;
                                 item.logoId = service.logoId;
+                                log.debug("Service Item Update: name=%s logoId=%s", service.name, service.logoId);
                             } else if (add === true) {
                                 new ServiceItem(this, service.networkId, service.serviceId, service.name, service.logoId);
                             }
