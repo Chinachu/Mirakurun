@@ -122,7 +122,7 @@ export default class Program {
                 return;
             }
 
-            new ProgramItem(program);
+            new ProgramItem(program, true);
         });
 
         if (dropped === true) {
