@@ -51,7 +51,7 @@ get.apiDoc = {
             in: "query",
             name: "resource",
             type: "string",
-            enum: ["program", "service"],
+            enum: ["program", "service", "tuner"],
             required: false
         },
         {

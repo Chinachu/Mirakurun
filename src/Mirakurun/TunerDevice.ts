@@ -24,6 +24,7 @@ import * as util from "util";
 import * as common from "./common";
 import * as log from "./log";
 import * as config from "./config";
+import Event from "./Event";
 import ChannelItem from "./ChannelItem";
 
 interface User extends common.User {
@@ -54,6 +55,7 @@ export default class TunerDevice extends events.EventEmitter {
 
     constructor(private _index: number, private _config: config.Tuner) {
         super();
+        Event.emit("tuner", "create", this.export());
         log.debug("TunerDevice#%d initialized", this._index);
     }
 
@@ -148,6 +150,8 @@ export default class TunerDevice extends events.EventEmitter {
 
             stream.once("close", () => this.endStream(user));
 
+            this._updated();
+
             return Promise.resolve();
         };
 
@@ -203,6 +207,8 @@ export default class TunerDevice extends events.EventEmitter {
         }
 
         log.info("TunerDevice#%d end streaming to user `%s` (priority=%d)", this._index, user.id, user.priority);
+
+        this._updated();
     }
 
     private _spawn(ch: ChannelItem): Promise<void> {
@@ -282,6 +288,7 @@ export default class TunerDevice extends events.EventEmitter {
         // flowing start
         this._stream.on("data", this._streamOnData.bind(this));
 
+        this._updated();
         log.info("TunerDevice#%d process has spawned by command `%s` (pid=%d)", this._index, cmd, this._process.pid);
 
         return Promise.resolve();
@@ -306,6 +313,8 @@ export default class TunerDevice extends events.EventEmitter {
             }
             this._users.length = 0;
         }
+
+        this._updated();
     }
 
     private _kill(close: boolean): Promise<void> {
@@ -318,6 +327,8 @@ export default class TunerDevice extends events.EventEmitter {
 
         this._isAvailable = false;
         this._closing = close;
+
+        this._updated();
 
         return new Promise<void>(resolve => {
 
@@ -361,10 +372,16 @@ export default class TunerDevice extends events.EventEmitter {
 
         log.debug("TunerDevice#%d released", this._index);
 
+        this._updated();
+
         if (this._closing === false && this._users.length !== 0) {
             log.debug("TunerDevice#%d respawning because request has not closed", this._index);
 
             this._spawn(this._channel);
         }
+    }
+
+    private _updated(): void {
+        Event.emit("tuner", "update", this.export());
     }
 }
