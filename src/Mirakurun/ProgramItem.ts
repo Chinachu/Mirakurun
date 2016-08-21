@@ -62,9 +62,12 @@ export default class ProgramItem {
         }
 
         _.program.add(this);
-        this._updated();
 
-        removedIds.forEach(id => Event.emit("program-redefine", { from: id, to: _data.id }));
+        if (firstAdd === false) {
+            this._updated();
+
+            removedIds.forEach(id => Event.emit("program-redefine", { from: id, to: _data.id }));
+        }
     }
 
     get id(): number {
