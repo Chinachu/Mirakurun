@@ -64,9 +64,8 @@ export default class ProgramItem {
         _.program.add(this);
 
         if (firstAdd === false) {
-            this._updated();
-
-            removedIds.forEach(id => Event.emit("program-redefine", { from: id, to: _data.id }));
+            Event.emit("program", "create", this._data);
+            removedIds.forEach(id => Event.emit("program", "redefine", { from: id, to: _data.id }));
         }
     }
 
@@ -86,7 +85,7 @@ export default class ProgramItem {
 
         if (common.updateObject(this._data, data) === true) {
             _.program.save();
-            this._updated();
+            Event.emit("program", "update", this._data);
         }
     }
 
@@ -96,9 +95,5 @@ export default class ProgramItem {
 
     remove(): void {
         _.program.remove(this);
-    }
-
-    private _updated(): void {
-        Event.emit("program", this._data)
     }
 }

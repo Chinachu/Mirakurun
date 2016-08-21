@@ -36,7 +36,7 @@ export default class ServiceItem {
         }
 
         _.service.add(this);
-        this._updated();
+        Event.emit("service", "create", this.export());
     }
 
     get id(): number {
@@ -87,7 +87,7 @@ export default class ServiceItem {
     }
 
     private _updated(): void {
-        Event.emit("service", this.export())
+        Event.emit("service", "update", this.export());
     }
 
     static createId(networkId: number, serviceId: number): number {
