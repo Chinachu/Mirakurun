@@ -25,10 +25,8 @@ export const get: Operation = (req, res) => {
     res.status(200);
     res.write("[\n");
 
-    req.once("close", () => {
-        Event.removeListener(_listener);
-        res.end("\n]\n");
-    });
+    req.setTimeout(1000 * 60 * 60, () => { });
+    req.once("close", () => Event.removeListener(_listener));
 
     Event.on(_listener);
 
