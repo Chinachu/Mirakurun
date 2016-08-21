@@ -481,7 +481,7 @@ export default class TSFilter extends stream.Duplex {
 
     private _onCDT(pid, data): void {
 
-        if (data.data_module.logo_type == 0x05) {
+        if (data.data_module.logo_type === 0x05) {
             return;
         }
 
