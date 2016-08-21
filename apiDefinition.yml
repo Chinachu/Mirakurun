@@ -349,6 +349,12 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/StatusTunerUser'
+      isAvailable:
+        type: boolean
+      isFree:
+        type: boolean
+      isUsing:
+        type: boolean
 
   TunerUser:
     type: object
@@ -368,6 +374,8 @@ definitions:
     properties:
       resource:
         $ref: '#/definitions/EventResource'
+      type:
+        $ref: '#/definitions/EventType'
       data:
         type: object
       time:
@@ -378,6 +386,14 @@ definitions:
     enum:
       - program
       - service
+      - tuner
+
+  EventType:
+    type: string
+    enum:
+      - create
+      - update
+      - redefine
 
   # config --------------------------------------------------------------------
 
