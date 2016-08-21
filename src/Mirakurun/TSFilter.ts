@@ -481,8 +481,10 @@ export default class TSFilter extends stream.Duplex {
 
     private _onCDT(pid, data): void {
 
+        log.debug("Receive CDT: networkId=%d logoId=%d", data.original_network_id, data.data_module.logo_id);
         let pngBytes = aribts.TsLogo(data.data_module.data_byte).concatPalette();
         _.service.findByNetworkIdWithLogoId(data.original_network_id, data.data_module.logo_id).forEach(service => {
+            logo.debug("Update logo data serviceId=%d", service.serviceId);
             service.logo = pngBytes;
         });
     }
