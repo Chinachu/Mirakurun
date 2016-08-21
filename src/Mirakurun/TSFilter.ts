@@ -45,7 +45,8 @@ const PROVIDE_PIDS = [
     0x0014,// TDT
     0x0023,// SDTT
     0x0024,// BIT
-    0x0028// SDTT
+    0x0028,// SDTT
+    0x0029// CDT
 ];
 
 interface BasicExtState {
@@ -480,6 +481,10 @@ export default class TSFilter extends stream.Duplex {
     }
 
     private _onCDT(pid, data): void {
+
+        if (data.data_module.logo_type == 0x05) {
+            return;
+        }
 
         log.debug("Receive CDT: networkId=%d logoId=%d", data.original_network_id, data.data_module.logo_id);
         let pngBytes = aribts.TsLogo(data.data_module.data_byte).concatPalette();
