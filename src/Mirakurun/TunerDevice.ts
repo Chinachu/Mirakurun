@@ -38,6 +38,9 @@ interface Status {
     command: string;
     pid: number;
     users: common.User[];
+    isAvailable: boolean;
+    isFree: boolean;
+    isUsing: boolean;
 }
 
 export default class TunerDevice extends events.EventEmitter {
@@ -125,7 +128,10 @@ export default class TunerDevice extends events.EventEmitter {
             types: this._config.types,
             command: this._command,
             pid: this.pid,
-            users: this.users
+            users: this.users,
+            isAvailable: this.isAvailable,
+            isFree: this.isFree,
+            isUsing: this.isUsing
         };
     }
 
