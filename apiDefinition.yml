@@ -13,39 +13,6 @@ produces:
   - application/json
 paths:
 
-  # events --------------------------------------------------------------------
-
-  /events:
-    get:
-      operationId: getEvents
-      tags:
-        - events
-      responses:
-        200:
-          description: OK
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/Event'
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
-  /events/stream:
-    get:
-      operationId: getEventsStream
-      tags:
-        - events
-        - stream
-      responses:
-        200:
-          description: OK
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
   # log -----------------------------------------------------------------------
 
   /log:

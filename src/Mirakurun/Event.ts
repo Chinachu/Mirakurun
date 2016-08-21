@@ -19,7 +19,7 @@
 import { EventEmitter } from "events";
 import _ from "./_";
 
-interface EventMessage {
+export interface EventMessage {
     resource: string;
     data: any;
     time: number;
@@ -47,6 +47,10 @@ export default class Event extends EventEmitter {
 
     get log(): EventMessage[] {
         return this._log;
+    }
+
+    static get log(): EventMessage[] {
+        return _.event.log;
     }
 
     static on(listener: (message: EventMessage) => void): void {
