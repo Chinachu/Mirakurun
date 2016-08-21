@@ -89,8 +89,8 @@ export default class ServiceItem {
 
     set logo(logo: NodeBuffer) {
 
-        if (this._logoBase64 !== logo.toString()) {
-            this._logoBase64 = logo.toString();
+        if (this._logoBase64 !== logo.toString('base64')) {
+            this._logoBase64 = logo.toString('base64');
 
             _.service.save();
             this._updated();
