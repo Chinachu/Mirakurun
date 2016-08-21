@@ -33,6 +33,14 @@ export const get: Operation = (req, res) => {
     Event.on(_listener);
 
     function _listener(message: EventMessage) {
+
+        if (req.query.resource && req.query.resource !== message.resource) {
+            return;
+        }
+        if (req.query.type && req.query.type !== message.type) {
+            return;
+        }
+
         res.write(JSON.stringify(message) + "\n,\n");
     }
 };
@@ -40,6 +48,22 @@ export const get: Operation = (req, res) => {
 get.apiDoc = {
     tags: ["events", "stream"],
     operationId: "getEventsStream",
+    parameters: [
+        {
+            in: "query",
+            name: "resource",
+            type: "string",
+            enum: ["program", "service"],
+            required: false
+        },
+        {
+            in: "query",
+            name: "type",
+            type: "string",
+            enum: ["create", "update", "redefine"],
+            required: false
+        }
+    ],
     responses: {
         200: {
             description: "OK",
