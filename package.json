@@ -61,7 +61,8 @@
     "js-yaml": "^3.5.2",
     "morgan": "^1.7.0",
     "promise-queue": "^2.2.3",
-    "sift": "^3.2.4"
+    "sift": "^3.2.4",
+    "tail": "^1.1.1"
   },
   "devDependencies": {
     "del": "^2.2.0",

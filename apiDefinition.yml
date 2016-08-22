@@ -13,39 +13,6 @@ produces:
   - application/json
 paths:
 
-  # log -----------------------------------------------------------------------
-
-  /log:
-    get:
-      operationId: getLog
-      tags:
-        - log
-      produces:
-        - text/plain
-      responses:
-        200:
-          description: OK
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
-  /log/stream:
-    get:
-      operationId: getLogStream
-      tags:
-        - log
-        - stream
-      produces:
-        - text/plain
-      responses:
-        200:
-          description: OK
-        default:
-          description: Unexpected Error
-          schema:
-            $ref: '#/definitions/Error'
-
   # version -------------------------------------------------------------------
 
   /version:
