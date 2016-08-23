@@ -28,7 +28,7 @@ module db {
         networkId: number;
         name: string;
         logoId: number;
-        logoBase64?: string;
+        logoData?: string;//base64
         channel: Channel;
     }
 

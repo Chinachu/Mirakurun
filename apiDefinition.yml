@@ -160,9 +160,17 @@ definitions:
     type: object
     properties:
       id:
+        $ref: '#/definitions/ServiceItemId'
+      serviceId:
         $ref: '#/definitions/ServiceId'
+      networkId:
+        $ref: '#/definitions/NetworkId'
       name:
         type: string
+      logoId:
+        type: number
+      hasLogoData:
+        type: boolean
       channel:
         $ref: '#/definitions/Channel'
 

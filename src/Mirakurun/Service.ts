@@ -144,7 +144,7 @@ export default class Service {
                 return;
             }
 
-            new ServiceItem(channelItem, service.networkId, service.serviceId, service.name, service.logoId, service.logoBase64);
+            new ServiceItem(channelItem, service.networkId, service.serviceId, service.name, service.logoId, service.logoData);
         });
 
         if (dropped === true) {
@@ -157,7 +157,7 @@ export default class Service {
         log.debug("saving services...");
 
         db.saveServices(
-            this._items.map(service => service.export())
+            this._items.map(service => service.export(true))
         );
     }
 

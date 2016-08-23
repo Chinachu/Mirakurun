@@ -22,7 +22,13 @@ const sift = require("sift");
 
 export const get: Operation = (req, res) => {
 
-    const services = Service.all().map(service => service.export());
+    const services = Service.all().map(service => {
+
+        const ret: any = service.export();
+        ret.hasLogoData = service.hasLogoData;
+
+        return ret;
+    });
 
     api.responseJSON(res, sift(req.query, services));
 };
