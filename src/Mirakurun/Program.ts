@@ -56,8 +56,7 @@ export default class Program {
 
     get(id: number): ProgramItem {
 
-        let i, l = this._items.length;
-        for (i = 0; i < l; i++) {
+        for (let i = 0, l = this._items.length; i < l; i++) {
             if (this._items[i].id === id) {
                 return this._items[i];
             }
@@ -89,8 +88,7 @@ export default class Program {
 
         const items = [];
 
-        let i, l = this._items.length;
-        for (i = 0; i < l; i++) {
+        for (let i = 0, l = this._items.length; i < l; i++) {
             if (this._items[i].data.serviceId === serviceId) {
                 items.push(this._items[i]);
             }

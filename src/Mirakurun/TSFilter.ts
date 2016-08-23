@@ -240,8 +240,8 @@ export default class TSFilter extends stream.Duplex {
 
         const pid = packet.readUInt16BE(1) & 0x1FFF;
 
-        // NULL (0x1FFF)
-        if (pid === 8191) {
+        // NULL
+        if (pid === 0x1FFF) {
             return;
         }
 
@@ -285,9 +285,9 @@ export default class TSFilter extends stream.Duplex {
         this._serviceIds = [];
         this._parseServiceIds = [];
 
-        let i = 0, l = data.programs.length, id: number, item: ServiceItem;
-        for (; i < l; i++) {
-            id = data.programs[i].program_number;
+        for (let i = 0, l = data.programs.length; i < l; i++) {
+            let item: ServiceItem;
+            const id = data.programs[i].program_number as number;
 
             if (id === 0) {
                 log.debug("TSFilter detected NIT PID=%d", data.programs[i].network_PID);
@@ -379,17 +379,16 @@ export default class TSFilter extends stream.Duplex {
             this._providePids.push(data.PCR_PID);
         }
 
-        let i = 0, l = data.streams.length;
-        for (; i < l; i++) {
+        for (let i = 0, l = data.streams.length; i < l; i++) {
             if (this._providePids.indexOf(data.streams[i].elementary_PID) === -1) {
                 this._providePids.push(data.streams[i].elementary_PID);
             }
         }
 
         // sleep
-        i = this._parsePids.indexOf(pid);
-        if (i !== -1) {
-            this._parsePids.splice(i, 1);
+        const index = this._parsePids.indexOf(pid);
+        if (index !== -1) {
+            this._parsePids.splice(index, 1);
 
             this._pmtTimer = setTimeout(() => {
                 this._parsePids.push(pid);
@@ -403,8 +402,7 @@ export default class TSFilter extends stream.Duplex {
             return;
         }
 
-        let i = 0, j, l = data.services.length, m;
-        for (; i < l; i++) {
+        for (let i = 0, l = data.services.length; i < l; i++) {
             if (this._serviceIds.indexOf(data.services[i].service_id) === -1) {
                 continue;
             }
@@ -412,7 +410,7 @@ export default class TSFilter extends stream.Duplex {
             let name = "";
             let logoId = -1;
 
-            for (j = 0, m = data.services[i].descriptors.length; j < m; j++) {
+            for (let j = 0, m = data.services[i].descriptors.length; j < m; j++) {
                 if (data.services[i].descriptors[j].descriptor_tag === 0x48) {
                     name = new aribts.TsChar(data.services[i].descriptors[j].service_name_char).decode();
                 }
@@ -439,9 +437,9 @@ export default class TSFilter extends stream.Duplex {
         //if (this._serviceIds.every(id => this._services.some(service => service.id === id)) === true) { }
         this.emit("services", this._services);
 
-        i = this._parsePids.indexOf(pid);
-        if (i !== -1) {
-            this._parsePids.splice(i, 1);
+        const index = this._parsePids.indexOf(pid);
+        if (index !== -1) {
+            this._parsePids.splice(index, 1);
         }
     }
 
@@ -647,16 +645,18 @@ export default class TSFilter extends stream.Duplex {
 }
 
 function calcCRC32(buf: Buffer): number {
-    let i = 0, l = buf.length, crc = -1;
-    for (; i < l; i++) {
+
+    let crc = -1;
+    for (let i = 0, l = buf.length; i < l; i++) {
         crc = (crc << 8) ^ CRC32_TABLE[((crc >>> 24) ^ buf[i])];
     }
+
     return crc;
 }
 
 function getTime(buffer: Buffer): number {
 
-    let mjd = (buffer[0] << 8) | buffer[1];
+    const mjd = (buffer[0] << 8) | buffer[1];
 
     let y = (((mjd - 15078.2) / 365.25) | 0);
     let m = (((mjd - 14956.1 - ((y * 365.25) | 0)) / 30.6001) | 0);

@@ -112,7 +112,7 @@ export default class TunerDevice extends events.EventEmitter {
 
         let priority = -2;
 
-        for (let user of this._users) {
+        for (const user of this._users) {
             if (user.priority > priority) {
                 priority = user.priority;
             }
@@ -195,8 +195,7 @@ export default class TunerDevice extends events.EventEmitter {
 
         log.debug("TunerDevice#%d end stream for user `%s` (priority=%d)...", this._index, user.id, user.priority);
 
-        let i, l = this._users.length;
-        for (i = 0; i < l; i++) {
+        for (let i = 0, l = this._users.length; i < l; i++) {
             if (this._users[i].id === user.id && this._users[i].priority === user.priority) {
                 this._users[i]._stream.end();
                 this._users.splice(i, 1);

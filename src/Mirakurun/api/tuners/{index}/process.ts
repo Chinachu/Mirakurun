@@ -73,7 +73,7 @@ get.apiDoc = {
 
 export const del: Operation = (req, res) => {
 
-    let tuner = Tuner.get(req.params.index);
+    const tuner = Tuner.get(req.params.index);
 
     if (tuner === null || Number.isInteger(tuner.pid) === false) {
         api.responseError(res, 404);

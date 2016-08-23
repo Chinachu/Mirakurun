@@ -52,16 +52,14 @@ export default class Service {
     get(networkId: number, serviceId: number): ServiceItem;
     get(id: number, serviceId?: number) {
 
-        let i = 0, l = this._items.length;
-
         if (typeof serviceId === "undefined") {
-            for (; i < l; i++) {
+            for (let i = 0, l = this._items.length; i < l; i++) {
                 if (this._items[i].id === id) {
                     return this._items[i];
                 }
             }
         } else {
-            for (; i < l; i++) {
+            for (let i = 0, l = this._items.length; i < l; i++) {
                 if (this._items[i].networkId === id && this._items[i].serviceId === serviceId) {
                     return this._items[i];
                 }
@@ -81,8 +79,7 @@ export default class Service {
 
         const items = [];
 
-        let i, l = this._items.length;
-        for (i = 0; i < l; i++) {
+        for (let i = 0, l = this._items.length; i < l; i++) {
             if (this._items[i].channel === channel) {
                 items.push(this._items[i]);
             }
@@ -95,8 +92,7 @@ export default class Service {
 
         const items = [];
 
-        let i, l = this._items.length;
-        for (i = 0; i < l; i++) {
+        for (let i = 0, l = this._items.length; i < l; i++) {
             if (this._items[i].networkId === networkId) {
                 items.push(this._items[i]);
             }
@@ -109,8 +105,7 @@ export default class Service {
 
         const items = [];
 
-        let i, l = this._items.length;
-        for (i = 0; i < l; i++) {
+        for (let i = 0, l = this._items.length; i < l; i++) {
             if (this._items[i].networkId === networkId && this._items[i].logoId === logoId) {
                 items.push(this._items[i]);
             }

@@ -55,8 +55,7 @@ export default class Tuner {
 
     get(index: number): TunerDevice {
 
-        let i = 0, l = this._devices.length;
-        for (; i < l; i++) {
+        for (let i = 0, l = this._devices.length; i < l; i++) {
             if (this._devices[i].index === index) {
                 return this._devices[i];
             }
@@ -67,8 +66,7 @@ export default class Tuner {
 
     typeExists(type: common.ChannelType): boolean {
 
-        let i, l = this._devices.length;
-        for (i = 0; i < l; i++) {
+        for (let i = 0, l = this._devices.length; i < l; i++) {
             if (this._devices[i].config.types.indexOf(type) !== -1) {
                 return true;
             }
@@ -258,14 +256,14 @@ export default class Tuner {
             const devices = this._getDevicesByType(setting.channel.type);
 
             let tryCount = 20;
-            let i, l = devices.length;
+            const length = devices.length;
 
             function find() {
 
                 let device: TunerDevice = null;
 
                 // 1. join to existing
-                for (i = 0; i < l; i++) {
+                for (let i = 0; i < length; i++) {
                     if (devices[i].isAvailable === true && devices[i].channel === setting.channel) {
                         device = devices[i];
                         break;
@@ -274,7 +272,7 @@ export default class Tuner {
 
                 // 2. start as new
                 if (device === null) {
-                    for (i = 0; i < l; i++) {
+                    for (let i = 0; i < length; i++) {
                         if (devices[i].isFree === true) {
                             device = devices[i];
                             break;
@@ -284,7 +282,7 @@ export default class Tuner {
 
                 // 3. replace existing
                 if (device === null) {
-                    for (i = 0; i < l; i++) {
+                    for (let i = 0; i < length; i++) {
                         if (devices[i].isAvailable === true && devices[i].users.length === 0) {
                             device = devices[i];
                             break;
@@ -294,7 +292,7 @@ export default class Tuner {
 
                 // 4. takeover existing
                 if (device === null) {
-                    for (i = 0; i < l; i++) {
+                    for (let i = 0; i < length; i++) {
                         if (devices[i].isUsing === true && devices[i].getPriority() < user.priority) {
                             device = devices[i];
                             break;
@@ -346,8 +344,7 @@ export default class Tuner {
 
         const devices = [];
 
-        let i, l = this._devices.length;
-        for (i = 0; i < l; i++) {
+        for (let i = 0, l = this._devices.length; i < l; i++) {
             if (this._devices[i].config.types.indexOf(type) !== -1) {
                 devices.push(this._devices[i]);
             }

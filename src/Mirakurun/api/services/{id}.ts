@@ -31,7 +31,7 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
 
-    let service = Service.get(req.params.id);
+    const service = Service.get(req.params.id);
 
     if (service === null || service === undefined) {
         api.responseError(res, 404);

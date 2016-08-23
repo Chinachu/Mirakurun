@@ -36,7 +36,7 @@ export function responseError(res: express.Response, code: number, reason?: stri
         });
     }
 
-    var error: Error = {
+    const error: Error = {
         code: code,
         reason: reason || null,
         errors: []

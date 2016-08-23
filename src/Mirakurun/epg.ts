@@ -144,11 +144,10 @@ class EPG extends stream.Writable {
 
         const service = this._epg[networkId][eit.service_id];
 
-        let update: boolean,
-            state: EventState;
         for (let i = 0, l = eit.events.length, e; i < l; i++) {
             e = eit.events[i];
-            update = false;
+            let update = false;
+            let state: EventState;
 
             if (typeof service[e.event_id] === "undefined") {
                 update = true;
@@ -385,11 +384,10 @@ class EPG extends stream.Writable {
             const now = Date.now();
             let count = 0;
 
-            let nid, sid, eid, state: EventState;
-            for (nid in this._epg) {
-                for (sid in this._epg[nid]) {
-                    for (eid in this._epg[nid][sid]) {
-                        state = this._epg[nid][sid][eid];
+            for (const nid in this._epg) {
+                for (const sid in this._epg[nid]) {
+                    for (const eid in this._epg[nid][sid]) {
+                        const state = this._epg[nid][sid][eid];
                         if (now > (state.program.data.startAt + state.program.data.duration)) {
                             ++count;
                             delete state.program;
@@ -446,7 +444,7 @@ function getProgramId(networkId: number, serviceId: number, eventId: number): nu
 
 function getTime(buffer: Buffer): number {
 
-    let mjd = (buffer[0] << 8) | buffer[1];
+    const mjd = (buffer[0] << 8) | buffer[1];
 
     let y = (((mjd - 15078.2) / 365.25) | 0);
     let m = (((mjd - 14956.1 - ((y * 365.25) | 0)) / 30.6001) | 0);

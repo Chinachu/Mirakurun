@@ -30,7 +30,7 @@ export default class ProgramItem {
     constructor(private _data: db.Program, firstAdd = false) {
 
         if (_.program.exists(_data.id) === true) {
-            let item = _.program.get(_data.id);
+            const item = _.program.get(_data.id);
             item.update(_data);
             return item;
         }

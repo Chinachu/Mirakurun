@@ -51,8 +51,7 @@ export default class Channel {
 
     get(type: common.ChannelType, channel: string): ChannelItem {
 
-        let i, l = this._items.length;
-        for (i = 0; i < l; i++) {
+        for (let i = 0, l = this._items.length; i < l; i++) {
             if (this._items[i].channel === channel && this._items[i].type === type) {
                 return this._items[i];
             }
@@ -65,8 +64,7 @@ export default class Channel {
 
         const items = [];
 
-        let i, l = this._items.length;
-        for (i = 0; i < l; i++) {
+        for (let i = 0, l = this._items.length; i < l; i++) {
             if (this._items[i].type === type) {
                 items.push(this._items[i]);
             }
