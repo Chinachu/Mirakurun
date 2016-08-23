@@ -27,7 +27,7 @@ import ServiceItem from "./ServiceItem";
 
 export default class ProgramItem {
 
-    constructor(private _data: db.Program) {
+    constructor(private _data: db.Program, firstAdd = false) {
 
         if (_.program.exists(_data.id) === true) {
             let item = _.program.get(_data.id);
@@ -37,32 +37,36 @@ export default class ProgramItem {
 
         const removedIds = [];
 
-        _.program.findByQuery({
-            data: {
-                networkId: _data.networkId,
-                serviceId: _data.serviceId,
-                startAt: {
-                    $gte: _data.startAt,
-                    $lt: _data.startAt + _data.duration
+        if (firstAdd === false) {
+            _.program.findByQuery({
+                data: {
+                    networkId: _data.networkId,
+                    serviceId: _data.serviceId,
+                    startAt: {
+                        $gte: _data.startAt,
+                        $lt: _data.startAt + _data.duration
+                    }
                 }
-            }
-        }).forEach(item => {
+            }).forEach(item => {
 
-            item.remove();
+                item.remove();
 
-            log.debug(
-                "ProgramItem#%d (networkId=%d, eventId=%d) has removed for redefine to ProgramItem#%d (eventId=%d)",
-                item.data.id, item.data.networkId, item.data.eventId,
-                _data.id, _data.eventId
-            );
+                log.debug(
+                    "ProgramItem#%d (networkId=%d, eventId=%d) has removed for redefine to ProgramItem#%d (eventId=%d)",
+                    item.data.id, item.data.networkId, item.data.eventId,
+                    _data.id, _data.eventId
+                );
 
-            removedIds.push(item.data.id);
-        });
+                removedIds.push(item.data.id);
+            });
+        }
 
         _.program.add(this);
-        this._updated();
 
-        removedIds.forEach(id => Event.emit("program-redefine", { from: id, to: _data.id }));
+        if (firstAdd === false) {
+            Event.emit("program", "create", this._data);
+            removedIds.forEach(id => Event.emit("program", "redefine", { from: id, to: _data.id }));
+        }
     }
 
     get id(): number {
@@ -81,7 +85,7 @@ export default class ProgramItem {
 
         if (common.updateObject(this._data, data) === true) {
             _.program.save();
-            this._updated();
+            Event.emit("program", "update", this._data);
         }
     }
 
@@ -91,9 +95,5 @@ export default class ProgramItem {
 
     remove(): void {
         _.program.remove(this);
-    }
-
-    private _updated(): void {
-        Event.emit("program", this._data)
     }
 }

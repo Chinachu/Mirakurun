@@ -18,15 +18,38 @@
 import { Operation } from "express-openapi";
 import * as api from "../api";
 import Service from "../Service";
+const sift = require("sift");
 
 export const get: Operation = (req, res) => {
 
-    api.responseJSON(res, Service.all().map(service => service.export()));
+    const services = Service.all().map(service => service.export());
+
+    api.responseJSON(res, sift(req.query, services));
 };
 
 get.apiDoc = {
     tags: ["services"],
     operationId: "getServices",
+    parameters: [
+        {
+            in: "query",
+            name: "serviceId",
+            type: "integer",
+            required: false
+        },
+        {
+            in: "query",
+            name: "networkId",
+            type: "integer",
+            required: false
+        },
+        {
+            in: "query",
+            name: "name",
+            type: "string",
+            required: false
+        }
+    ],
     responses: {
         200: {
             description: "OK",

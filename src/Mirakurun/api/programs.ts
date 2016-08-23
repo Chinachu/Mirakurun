@@ -18,10 +18,11 @@
 import { Operation } from "express-openapi";
 import * as api from "../api";
 import Program from "../Program";
+import ProgramItem from "../ProgramItem";
 
 export const get: Operation = (req, res) => {
 
-    let programs;
+    let programs: ProgramItem[];
 
     if (Object.keys(req.query).length !== 0) {
         programs = Program.findByQuery({
@@ -41,19 +42,19 @@ get.apiDoc = {
         {
             in: "query",
             name: "networkId",
-            type: "number",
+            type: "integer",
             required: false
         },
         {
             in: "query",
             name: "serviceId",
-            type: "number",
+            type: "integer",
             required: false
         },
         {
             in: "query",
             name: "eventId",
-            type: "number",
+            type: "integer",
             required: false
         }
     ],

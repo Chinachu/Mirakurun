@@ -19,11 +19,15 @@
 import { EventEmitter } from "events";
 import _ from "./_";
 
-interface EventMessage {
-    resource: string;
+export interface EventMessage {
+    resource: EventResource;
+    type: EventType;
     data: any;
     time: number;
 }
+
+export type EventResource = "program" | "service" | "tuner";
+export type EventType = "create" | "update" | "redefine";
 
 export default class Event extends EventEmitter {
 
@@ -49,6 +53,10 @@ export default class Event extends EventEmitter {
         return this._log;
     }
 
+    static get log(): EventMessage[] {
+        return _.event.log;
+    }
+
     static on(listener: (message: EventMessage) => void): void {
         _.event.on("event", listener);
     }
@@ -61,10 +69,11 @@ export default class Event extends EventEmitter {
         _.event.removeListener("event", listener);
     }
 
-    static emit(resource: string, data: any): boolean {
+    static emit(resource: EventResource, type: EventType, data: any): boolean {
 
         const message: EventMessage = {
             resource: resource,
+            type: type,
             data: data,
             time: Date.now()
         };

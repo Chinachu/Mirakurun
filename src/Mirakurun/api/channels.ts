@@ -18,30 +18,51 @@
 import { Operation } from "express-openapi";
 import * as api from "../api";
 import Channel from "../Channel";
+const sift = require("sift");
 
 export const get: Operation = (req, res) => {
 
-    api.responseJSON(
-        res,
-        Channel.all().map(channel => {
+    const channels = Channel.all().map(channel => {
 
-            const ch: any = channel.export();
+        const ch: any = channel.export();
 
-            ch.services = channel.getServices().map(service => ({
-                id: service.id,
-                serviceId: service.serviceId,
-                networkId: service.networkId,
-                name: service.name
-            }));
+        ch.services = channel.getServices().map(service => ({
+            id: service.id,
+            serviceId: service.serviceId,
+            networkId: service.networkId,
+            name: service.name
+        }));
 
-            return ch;
-        })
-    );
+        return ch;
+    });
+
+    api.responseJSON(res, sift(req.query, channels));
 };
 
 get.apiDoc = {
     tags: ["channels"],
     operationId: "getChannels",
+    parameters: [
+        {
+            in: "query",
+            name: "type",
+            type: "string",
+            enum: ["GR", "BS", "CS", "SKY"],
+            required: false
+        },
+        {
+            in: "query",
+            name: "channel",
+            type: "string",
+            required: false
+        },
+        {
+            in: "query",
+            name: "name",
+            type: "string",
+            required: false
+        }
+    ],
     responses: {
         200: {
             description: "OK",

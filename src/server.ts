@@ -32,6 +32,7 @@ import Service from "./Mirakurun/Service";
 import Program from "./Mirakurun/Program";
 import Server from "./Mirakurun/Server";
 import * as config from "./Mirakurun/config";
+import * as log from "./Mirakurun/log";
 
 process.title = "Mirakurun: Server";
 
@@ -53,6 +54,10 @@ if (process.platform === "linux") {
 _.config.server = config.loadServer();
 _.config.channels = config.loadChannels();
 _.config.tuners = config.loadTuners();
+
+if (typeof _.config.server.logLevel === "number") {
+    log.logLevel = _.config.server.logLevel;
+}
 
 new Event();
 new Tuner();

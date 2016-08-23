@@ -2,7 +2,7 @@
   "name": "mirakurun",
   "preferGlobal": true,
   "description": "DTV Tuner Server Service for Chinachu Air.",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "homepage": "https://github.com/kanreisa/Mirakurun",
   "keywords": [
     "mirakurun",
@@ -54,22 +54,23 @@
   },
   "dependencies": {
     "aribts": "rndomhack/node-aribts.git#8b96efe5a2702028a68e632947f3900bd468f391",
-    "body-parser": "^1.15.0",
+    "body-parser": "^1.15.2",
     "express": "^4.14.0",
-    "express-openapi": "^0.22.1",
+    "express-openapi": "^0.25.1",
     "ip": "^1.1.3",
     "js-yaml": "^3.5.2",
     "morgan": "^1.7.0",
     "promise-queue": "^2.2.3",
-    "sift": "^3.2.4"
+    "sift": "^3.2.4",
+    "tail": "^1.1.1"
   },
   "devDependencies": {
     "del": "^2.2.0",
-    "gulp": "^3.9.0",
+    "gulp": "^3.9.1",
     "gulp-rename": "^1.2.2",
     "gulp-sourcemaps": "^1.6.0",
-    "gulp-typescript": "^2.12.1",
-    "typescript": "^1.8.9",
+    "gulp-typescript": "^2.13.6",
+    "typescript": "^1.8.10",
     "typings": "^1.3.2"
   },
   "engines": {

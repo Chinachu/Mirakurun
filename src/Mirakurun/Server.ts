@@ -39,10 +39,6 @@ class Server {
 
         const serverConfig = _.config.server;
 
-        if (typeof serverConfig.logLevel === "number") {
-            log.logLevel = serverConfig.logLevel;
-        }
-
         let addresses: string[] = [];
 
         if (serverConfig.path) {
@@ -53,55 +49,56 @@ class Server {
             addresses = [...addresses, ...system.getPrivateIPv4Addresses(), "127.0.0.1"];
         }
 
+        const app = express();
+
+        app.disable("x-powered-by");
+
+        app.use(morgan(":remote-addr :remote-user :method :url HTTP/:http-version :status :res[content-length] - :response-time ms :user-agent"));
+        app.use(bodyParser.urlencoded({ extended: false }));
+        app.use(bodyParser.json());
+
+        app.use((req: express.Request, res: express.Response, next) => {
+
+            if (ip.isPrivate(req.ip) === true || !req.ip) {
+                res.setHeader("Server", "Mirakurun/" + pkg.version);
+                next();
+            } else {
+                res.status(403).end();
+            }
+        });
+
+        openapi.initialize({
+            app: app,　　　　　　　　　　　　　　　
+            apiDoc: yaml.safeLoad(fs.readFileSync("apiDefinition.yml", "utf8")),
+            docsPath: "/docs",
+            routes: "./lib/Mirakurun/api"
+        });
+
+        app.use((err, req, res: express.Response, next) => {
+
+            log.error(JSON.stringify(err, null, "  "));
+            console.error(err.stack);
+
+            if (res.headersSent === false) {
+                res.writeHead(err.status || 500, {
+                    "Content-Type": "application/json"
+                });
+            }
+
+            res.end(JSON.stringify({
+                code: res.statusCode,
+                reason: err.message || res.statusMessage,
+                errors: err.errors
+            }));
+
+            next();
+        });
+
         addresses.forEach(address => {
 
-            const app = express();
             const server = http.createServer(app);
 
             server.timeout = 1000 * 60 * 3;// 3 minutes
-
-            app.disable("x-powered-by");
-
-            app.use(morgan(":remote-addr :remote-user :method :url HTTP/:http-version :status :res[content-length] - :response-time ms :user-agent"));
-            app.use(bodyParser.urlencoded({ extended: false }));
-            app.use(bodyParser.json());
-
-            app.use((req: express.Request, res: express.Response, next) => {
-
-                if (ip.isPrivate(req.ip) === true || !req.ip) {
-                    res.setHeader("Server", "Mirakurun/" + pkg.version);
-                    next();
-                } else {
-                    res.status(403).end();
-                }
-            });
-
-            openapi.initialize({
-                app: app,　　　　　　　　　　　　　　　
-                apiDoc: yaml.safeLoad(fs.readFileSync("apiDefinition.yml", "utf8")),
-                docsPath: "/docs",
-                routes: "./lib/Mirakurun/api"
-            });
-
-            app.use((err, req, res: express.Response, next) => {
-
-                log.error(JSON.stringify(err, null, "  "));
-                console.error(err.stack);
-
-                if (res.headersSent === false) {
-                    res.writeHead(err.status || 500, {
-                        "Content-Type": "application/json"
-                    });
-                }
-
-                res.end(JSON.stringify({
-                    code: res.statusCode,
-                    reason: err.message || res.statusMessage,
-                    errors: err.errors
-                }));
-
-                next();
-            });
 
             if (regexp.unixDomainSocket.test(address) === true || regexp.windowsNamedPipe.test(address) === true) {
                 if (process.platform !== "win32" && fs.existsSync(address) === true) {
