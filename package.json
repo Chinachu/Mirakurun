@@ -53,7 +53,7 @@
     "lib": "lib"
   },
   "dependencies": {
-    "aribts": "^1.2.0",
+    "aribts": "rndomhack/node-aribts.git#8b96efe5a2702028a68e632947f3900bd468f391",
     "body-parser": "^1.15.2",
     "express": "^4.14.0",
     "express-openapi": "^0.25.1",

@@ -27,7 +27,7 @@ export default class ServiceItem {
 
     private _id: number;
 
-    constructor(private _channel: ChannelItem, private _networkId: number, private _serviceId: number, private _name?: string) {
+    constructor(private _channel: ChannelItem, private _networkId: number, private _serviceId: number, private _name?: string, private _logoId?: number, private _logoData?: string) {
 
         this._id = ServiceItem.createId(_networkId, _serviceId);
 
@@ -55,6 +55,18 @@ export default class ServiceItem {
         return this._name || "";
     }
 
+    get logoId(): number {
+        return this._logoId;
+    }
+
+    get logoData(): NodeBuffer {
+        return new Buffer(this._logoData, 'base64');
+    }
+
+    get hasLogoData(): boolean {
+        return !!this._logoData;
+    }
+
     get channel(): ChannelItem {
         return this._channel;
     }
@@ -69,17 +81,45 @@ export default class ServiceItem {
         }
     }
 
-    export(): db.Service {
-        return {
+    set logoId(logoId: number) {
+
+        if (this._logoId !== logoId) {
+            this._logoId = logoId;
+
+            _.service.save();
+            this._updated();
+        }
+    }
+
+    set logoData(logo: NodeBuffer) {
+
+        if (this._logoData !== logo.toString('base64')) {
+            this._logoData = logo.toString('base64');
+
+            _.service.save();
+            this._updated();
+        }
+    }
+
+    export(full = false): db.Service {
+
+        const ret: db.Service = {
             id: this._id,
             serviceId: this._serviceId,
             networkId: this._networkId,
             name: this._name || "",
+            logoId: this._logoId,
             channel: {
                 type: this._channel.type,
                 channel: this._channel.channel
             }
         };
+
+        if (full === true) {
+            ret.logoData = this._logoData;
+        }
+
+        return ret;
     }
 
     getStream(user: common.User): Promise<stream.Readable> {

@@ -45,7 +45,8 @@ const PROVIDE_PIDS = [
     0x0014,// TDT
     0x0023,// SDTT
     0x0024,// BIT
-    0x0028// SDTT
+    0x0028,// SDTT
+    0x0029// CDT
 ];
 
 interface BasicExtState {
@@ -147,6 +148,7 @@ export default class TSFilter extends stream.Duplex {
         this._parser.on("sdt", this._onSDT.bind(this));
         this._parser.on("eit", this._onEIT.bind(this));
         this._parser.on("tot", this._onTOT.bind(this));
+        this._parser.on("cdt", this._onCDT.bind(this));
 
         this.once("finish", this._close.bind(this));
         this.once("close", this._close.bind(this));
@@ -251,7 +253,11 @@ export default class TSFilter extends stream.Duplex {
         if (pid === 0 && this._patCRC.compare(packet.slice(packet[7] + 4, packet[7] + 8))) {
             this._patCRC = packet.slice(packet[7] + 4, packet[7] + 8);
             this._parses.push(packet);
-        } else if ((pid === 0x12 && (this._parseEIT === true || this._provideEventId !== null)) || pid === 0x14 || this._parsePids.indexOf(pid) !== -1) {
+        } else if (
+            ((pid === 0x12 || pid === 0x29) && (this._parseEIT === true || this._provideEventId !== null)) ||
+            pid === 0x14 ||
+            this._parsePids.indexOf(pid) !== -1
+        ) {
             this._parses.push(packet);
         }
 
@@ -397,17 +403,25 @@ export default class TSFilter extends stream.Duplex {
             return;
         }
 
-        let i = 0, j, l = data.services.length, m, name;
+        let i = 0, j, l = data.services.length, m;
         for (; i < l; i++) {
             if (this._serviceIds.indexOf(data.services[i].service_id) === -1) {
                 continue;
             }
 
-            name = "";
+            let name = "";
+            let logoId = -1;
 
             for (j = 0, m = data.services[i].descriptors.length; j < m; j++) {
                 if (data.services[i].descriptors[j].descriptor_tag === 0x48) {
                     name = new aribts.TsChar(data.services[i].descriptors[j].service_name_char).decode();
+                }
+
+                if (data.services[i].descriptors[j].descriptor_tag === 0xCF) {
+                    logoId = data.services[i].descriptors[j].logo_id;
+                }
+
+                if (name !== "" && logoId !== -1) {
                     break;
                 }
             }
@@ -416,7 +430,8 @@ export default class TSFilter extends stream.Duplex {
                 this._services.push({
                     networkId: data.original_network_id,
                     serviceId: data.services[i].service_id,
-                    name: name
+                    name: name,
+                    logoId: logoId
                 });
             }
         }
@@ -472,6 +487,25 @@ export default class TSFilter extends stream.Duplex {
     private _onTOT(pid, data): void {
 
         this._streamTime = getTime(data.JST_time);
+    }
+
+    private _onCDT(pid, data): void {
+
+        const dataModule = new aribts.TsLogo(data.data_module_byte);
+        const logoInfo = dataModule.decode();
+        if (logoInfo.logo_type !== 0x05) {
+            return;
+        }
+
+        log.debug("TSFilter detected CDT networkId=%d, logoId=%d", data.original_network_id, logoInfo.logo_id);
+
+        const logoData = dataModule.decodePng();
+
+        _.service.findByNetworkIdWithLogoId(data.original_network_id, logoInfo.logo_id).forEach(service => {
+            service.logoData = logoData;
+
+            log.debug("TSFilter updated serviceId=%d logo data", service.serviceId);
+        });
     }
 
     private _updateEpgState(data): void {

@@ -59,7 +59,7 @@ export const get: Operation = (req, res) => {
         return;
     }
 
-    res.json(service.export());
+    res.redirect(307, `/api/services/${service.id}`);
 };
 
 get.apiDoc = {

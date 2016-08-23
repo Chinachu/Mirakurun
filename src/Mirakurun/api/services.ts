@@ -22,7 +22,13 @@ const sift = require("sift");
 
 export const get: Operation = (req, res) => {
 
-    const services = Service.all().map(service => service.export());
+    const services = Service.all().map(service => {
+
+        const ret: any = service.export();
+        ret.hasLogoData = service.hasLogoData;
+
+        return ret;
+    });
 
     api.responseJSON(res, sift(req.query, services));
 };
@@ -46,6 +52,19 @@ get.apiDoc = {
         {
             in: "query",
             name: "name",
+            type: "string",
+            required: false
+        },
+        {
+            in: "query",
+            name: "channel.type",
+            type: "string",
+            enum: ["GR", "BS", "CS", "SKY"],
+            required: false
+        },
+        {
+            in: "query",
+            name: "channel.channel",
             type: "string",
             required: false
         }

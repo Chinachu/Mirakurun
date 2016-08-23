@@ -45,9 +45,7 @@ export const get: Operation = (req, res) => {
         return;
     }
 
-    res.json(
-        Service.findByChannel(channel).map(service => service.export())
-    );
+    res.redirect(307, `/api/services?channel.type=${channel.type}&channel.channel=${channel.channel}`);
 };
 
 get.apiDoc = {
