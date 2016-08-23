@@ -59,7 +59,7 @@ export default class ServiceItem {
         return this._logoId;
     }
 
-    get logo(): NodeBuffer {
+    get logoData(): NodeBuffer {
         return new Buffer(this._logoBase64, 'base64');
     }
 
@@ -87,7 +87,7 @@ export default class ServiceItem {
         }
     }
 
-    set logo(logo: NodeBuffer) {
+    set logoData(logo: NodeBuffer) {
 
         if (this._logoBase64 !== logo.toString('base64')) {
             this._logoBase64 = logo.toString('base64');
