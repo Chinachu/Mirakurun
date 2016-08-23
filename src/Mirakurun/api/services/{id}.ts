@@ -33,11 +33,6 @@ export const get: Operation = (req, res) => {
 
     let service = Service.get(req.params.id);
 
-    if (service === null) {
-        // deprecated
-        service = Service.all().find(item => item.serviceId === req.params.id);
-    }
-
     if (service === null || service === undefined) {
         api.responseError(res, 404);
         return;
