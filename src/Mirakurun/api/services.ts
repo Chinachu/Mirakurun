@@ -54,6 +54,19 @@ get.apiDoc = {
             name: "name",
             type: "string",
             required: false
+        },
+        {
+            in: "query",
+            name: "channel.type",
+            type: "string",
+            enum: ["GR", "BS", "CS", "SKY"],
+            required: false
+        },
+        {
+            in: "query",
+            name: "channel.channel",
+            type: "string",
+            required: false
         }
     ],
     responses: {
