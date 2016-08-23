@@ -72,7 +72,27 @@ export const get: Operation = (req, res) => {
         return;
     }
 
-    res.redirect(307, `/api/services/${service.id}/stream?decode=${req.query.decode}`);
+    let requestAborted = false;
+    req.once("close", () => requestAborted = true);
+
+    service.getStream({
+        id: (req.ip || "unix") + ":" + (req.connection.remotePort || Date.now()),
+        priority: req.get("X-Mirakurun-Priority") || 0,
+        agent: req.get("User-Agent"),
+        disableDecoder: (req.query.decode === 0)
+    })
+        .then(stream => {
+
+            if (requestAborted === true) {
+                return stream.emit("close");
+            }
+
+            req.once("close", () => stream.emit("close"));
+
+            res.status(200);
+            stream.pipe(res);
+        })
+        .catch((err) => api.responseStreamErrorHandler(res, err));
 };
 
 get.apiDoc = {
