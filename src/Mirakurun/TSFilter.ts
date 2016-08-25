@@ -408,11 +408,13 @@ export default class TSFilter extends stream.Duplex {
             }
 
             let name = "";
+            let type = -1;
             let logoId = -1;
 
             for (let j = 0, m = data.services[i].descriptors.length; j < m; j++) {
                 if (data.services[i].descriptors[j].descriptor_tag === 0x48) {
                     name = new aribts.TsChar(data.services[i].descriptors[j].service_name_char).decode();
+                    type = data.services[i].descriptors[j].service_type;
                 }
 
                 if (data.services[i].descriptors[j].descriptor_tag === 0xCF) {
@@ -429,6 +431,7 @@ export default class TSFilter extends stream.Duplex {
                     networkId: data.original_network_id,
                     serviceId: data.services[i].service_id,
                     name: name,
+                    type: type,
                     logoId: logoId
                 });
             }

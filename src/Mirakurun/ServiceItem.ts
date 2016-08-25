@@ -27,7 +27,15 @@ export default class ServiceItem {
 
     private _id: number;
 
-    constructor(private _channel: ChannelItem, private _networkId: number, private _serviceId: number, private _name?: string, private _logoId?: number, private _logoData?: string) {
+    constructor(
+        private _channel: ChannelItem,
+        private _networkId: number,
+        private _serviceId: number,
+        private _name?: string,
+        private _type?: number,
+        private _logoId?: number,
+        private _logoData?: string
+    ) {
 
         this._id = ServiceItem.createId(_networkId, _serviceId);
 
@@ -55,6 +63,10 @@ export default class ServiceItem {
         return this._name || "";
     }
 
+    get type(): number {
+        return this._type;
+    }
+
     get logoId(): number {
         return this._logoId;
     }
@@ -75,6 +87,16 @@ export default class ServiceItem {
 
         if (this._name !== name) {
             this._name = name;
+
+            _.service.save();
+            this._updated();
+        }
+    }
+
+    set type(type: number) {
+
+        if (this._type !== type) {
+            this._type = type;
 
             _.service.save();
             this._updated();
@@ -108,6 +130,7 @@ export default class ServiceItem {
             serviceId: this._serviceId,
             networkId: this._networkId,
             name: this._name || "",
+            type: this._type,
             logoId: this._logoId,
             channel: {
                 type: this._channel.type,

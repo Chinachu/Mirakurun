@@ -139,7 +139,15 @@ export default class Service {
                 return;
             }
 
-            new ServiceItem(channelItem, service.networkId, service.serviceId, service.name, service.logoId, service.logoData);
+            new ServiceItem(
+                channelItem,
+                service.networkId,
+                service.serviceId,
+                service.name,
+                service.type,
+                service.logoId,
+                service.logoData
+            );
         });
 
         if (dropped === true) {

@@ -57,6 +57,12 @@ get.apiDoc = {
         },
         {
             in: "query",
+            name: "type",
+            type: "integer",
+            required: false
+        },
+        {
+            in: "query",
             name: "channel.type",
             type: "string",
             enum: ["GR", "BS", "CS", "SKY"],
