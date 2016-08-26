@@ -158,6 +158,11 @@ definitions:
 
   Service:
     type: object
+    required:
+      - id
+      - serviceId
+      - networkId
+      - name
     properties:
       id:
         $ref: '#/definitions/ServiceItemId'
@@ -178,15 +183,23 @@ definitions:
 
   Program:
     type: object
+    required:
+      - id
+      - eventId
+      - serviceId
+      - networkId
+      - startAt
+      - duration
+      - isFree
     properties:
       id:
         $ref: '#/definitions/ProgramId'
-      networkId:
-        $ref: '#/definitions/NetworkId'
       eventId:
         $ref: '#/definitions/EventId'
-      service:
+      serviceId:
         $ref: '#/definitions/ServiceId'
+      networkId:
+        $ref: '#/definitions/NetworkId'
       startAt:
         $ref: '#/definitions/UnixtimeMS'
       duration:
@@ -307,6 +320,16 @@ definitions:
 
   TunerDevice:
     type: object
+    required:
+      - index
+      - name
+      - types
+      - command
+      - pid
+      - users
+      - isAvailable
+      - isFree
+      - isUsing
     properties:
       index:
         type: integer
@@ -323,7 +346,7 @@ definitions:
       users:
         type: array
         items:
-          $ref: '#/definitions/StatusTunerUser'
+          $ref: '#/definitions/TunerUser'
       isAvailable:
         type: boolean
       isFree:
@@ -333,6 +356,9 @@ definitions:
 
   TunerUser:
     type: object
+    required:
+      - id
+      - priority
     properties:
       id:
         type: string
@@ -346,6 +372,11 @@ definitions:
 
   Event:
     type: object
+    required:
+      - resource
+      - type
+      - data
+      - time
     properties:
       resource:
         $ref: '#/definitions/EventResource'
@@ -377,7 +408,6 @@ definitions:
     properties:
       path:
         type: string
-        pattern: ^\/[^\/]+\/.+\.sock$
       port:
         type: integer
         minimum: 1
@@ -451,6 +481,8 @@ definitions:
 
   Status:
     type: object
+    required:
+      - epg
     properties:
       epg:
         type: object
