@@ -69,7 +69,7 @@ class Server {
 
         openapi.initialize({
             app: app,　　　　　　　　　　　　　　　
-            apiDoc: yaml.safeLoad(fs.readFileSync("apiDefinition.yml", "utf8")),
+            apiDoc: yaml.safeLoad(fs.readFileSync("api.yml", "utf8")),
             docsPath: "/docs",
             routes: "./lib/Mirakurun/api"
         });
