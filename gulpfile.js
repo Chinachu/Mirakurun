@@ -15,12 +15,12 @@
 */
 "use strict";
 
-var fs = require("fs");
-var gulp = require("gulp");
-var typescript = require("gulp-typescript");
-var sourcemaps = require("gulp-sourcemaps");
-var rename = require("gulp-rename");
-var del = require("del");
+const fs = require("fs");
+const gulp = require("gulp");
+const typescript = require("gulp-typescript");
+const sourcemaps = require("gulp-sourcemaps");
+const rename = require("gulp-rename");
+const del = require("del");
 
 gulp.task("clean", () => {
     del.sync(["lib"]);
@@ -47,7 +47,7 @@ gulp.task("tsc", ["clean"], () => {
 
 gulp.task("build", ["tsc"]);
 
-gulp.task("watch", function () {
+gulp.task("watch", () => {
     gulp.watch("src/**/*.ts", ["build"]);
 });
 
