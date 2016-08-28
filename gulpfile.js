@@ -18,9 +18,9 @@
 
 const fs = require("fs");
 const gulp = require("gulp");
+const mocha = require('gulp-mocha');
 const typescript = require("gulp-typescript");
 const sourcemaps = require("gulp-sourcemaps");
-const rename = require("gulp-rename");
 const del = require("del");
 
 gulp.task("clean", () => {
@@ -48,8 +48,23 @@ gulp.task("tsc", ["clean"], () => {
 
 gulp.task("build", ["tsc"]);
 
+gulp.task("test", test)
+
 gulp.task("watch", () => {
     gulp.watch("src/**/*.ts", ["build"]);
+    gulp.watch("test/**/*.js", ["test"]);
 });
 
-gulp.task("default", ["build"]);
+gulp.task("default", ["build"], test);
+
+function test() {
+    return gulp
+        .src(["test/**/*.js"])
+        .pipe(
+            mocha({
+                reporter: "spec",
+                timeout: 3000,
+                slow: 10
+            })
+        );
+}
