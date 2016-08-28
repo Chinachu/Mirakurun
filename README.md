@@ -5,13 +5,14 @@
 DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 
 [![npm version][npm-img]][npm-url]
+[![npm downloads][downloads-image]][downloads-url]
 [![Linux Build][travis-img]][travis-url]
 [![Dependency Status][dep-img]][dep-url]
 [![devDependency Status][devdep-img]][devdep-url]
 
 ## Features
 
-* RESTful API - has designed like HTTP version of Spinel
+* RESTful API (Open API) - has designed like HTTP version of Spinel
 * Unix Sockets / TCP
 * Advanced Tuner Process Management
 * Priority Management
@@ -125,6 +126,8 @@ mirakurun [status|start|stop|restart]
 
 [npm-img]: https://img.shields.io/npm/v/mirakurun.svg
 [npm-url]: https://npmjs.org/package/mirakurun
+[downloads-image]: https://img.shields.io/npm/dm/mirakurun.svg?style=flat
+[downloads-url]: https://npmjs.org/package/mirakurun
 [travis-img]: https://img.shields.io/travis/kanreisa/Mirakurun.svg
 [travis-url]: https://travis-ci.org/kanreisa/Mirakurun
 [dep-img]: https://david-dm.org/kanreisa/Mirakurun.svg
