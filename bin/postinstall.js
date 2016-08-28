@@ -119,7 +119,8 @@ if (process.platform === "linux" || process.platform === "darwin") {
             "--env", `LOG_STDOUT=${ stdoutLogPath }`,
             "--env", `LOG_STDERR=${ stderrLogPath }`,
             "--env", `USERPROFILE=${ process.env.USERPROFILE }`,
-            "--env", `LOCALAPPDATA=${ process.env.LOCALAPPDATA }`
+            "--env", `LOCALAPPDATA=${ process.env.LOCALAPPDATA }`,
+            "--env", "USING_WINSER=1"
         ],
         {
             stdio: [
