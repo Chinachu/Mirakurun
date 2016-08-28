@@ -128,8 +128,8 @@ mirakurun [status|start|stop|restart]
 [npm-url]: https://npmjs.org/package/mirakurun
 [downloads-image]: https://img.shields.io/npm/dm/mirakurun.svg?style=flat
 [downloads-url]: https://npmjs.org/package/mirakurun
-[travis-img]: https://img.shields.io/travis/kanreisa/Mirakurun.svg
-[travis-url]: https://travis-ci.org/kanreisa/Mirakurun
+[travis-img]: https://img.shields.io/travis/Chinachu/Mirakurun.svg
+[travis-url]: https://travis-ci.org/Chinachu/Mirakurun
 [dep-img]: https://david-dm.org/kanreisa/Mirakurun.svg
 [dep-url]: https://david-dm.org/kanreisa/Mirakurun
 [devdep-img]: https://david-dm.org/kanreisa/Mirakurun/dev-status.svg
