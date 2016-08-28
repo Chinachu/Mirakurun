@@ -1,16 +1,11 @@
 language: node_js
 node_js:
   - "6"
-sudo: required
-before_install:
+install:
   - npm install
   - npm run typings-install
   - npm run build
-install:
-  - sudo $(which npm) install . -g --unsafe --production
 script:
   - npm test
-after_script:
-  - sudo $(which npm) uninstall . -g --unsafe
 notifications:
   email: false
