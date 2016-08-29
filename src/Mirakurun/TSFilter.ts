@@ -490,21 +490,23 @@ export default class TSFilter extends stream.Duplex {
 
     private _onCDT(pid, data): void {
 
-        const dataModule = new aribts.TsLogo(data.data_module_byte);
-        const logoInfo = dataModule.decode();
-        if (logoInfo.logo_type !== 0x05) {
-            return;
+        if (data.data_type === 0x01) {
+            // Logo
+            const dataModule = new aribts.tsDataModule.TsDataModuleCdtLogo(data.data_module_byte).decode();
+            if (dataModule.logo_type !== 0x05) {
+                return;
+            }
+
+            log.debug("TSFilter detected CDT networkId=%d, logoId=%d", data.original_network_id, dataModule.logo_id);
+
+            const logoData = new aribts.TsLogo(dataModule.data_byte).decode();
+
+            _.service.findByNetworkIdWithLogoId(data.original_network_id, dataModule.logo_id).forEach(service => {
+                service.logoData = logoData;
+
+                log.debug("TSFilter updated serviceId=%d logo data", service.serviceId);
+            });
         }
-
-        log.debug("TSFilter detected CDT networkId=%d, logoId=%d", data.original_network_id, logoInfo.logo_id);
-
-        const logoData = dataModule.decodePng();
-
-        _.service.findByNetworkIdWithLogoId(data.original_network_id, logoInfo.logo_id).forEach(service => {
-            service.logoData = logoData;
-
-            log.debug("TSFilter updated serviceId=%d logo data", service.serviceId);
-        });
     }
 
     private _updateEpgState(data): void {
