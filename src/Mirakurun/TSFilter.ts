@@ -36,28 +36,28 @@ interface StreamOptions extends stream.DuplexOptions {
 const PACKET_SIZE = 188;
 
 const PROVIDE_PIDS = [
-    0x0000,// PAT
-    0x0001,// CAT
-    0x0010,// NIT
-    0x0011,// SDT
-    0x0012,// EIT
-    0x0013,// RST
-    0x0014,// TDT
-    0x0023,// SDTT
-    0x0024,// BIT
-    0x0028,// SDTT
-    0x0029// CDT
+    0x0000, // PAT
+    0x0001, // CAT
+    0x0010, // NIT
+    0x0011, // SDT
+    0x0012, // EIT
+    0x0013, // RST
+    0x0014, // TDT
+    0x0023, // SDTT
+    0x0024, // BIT
+    0x0028, // SDTT
+    0x0029 // CDT
 ];
 
 interface BasicExtState {
     basic: {
         flags: FlagState[];
         lastFlagsId: number;
-    }
+    };
     extended: {
         flags: FlagState[];
         lastFlagsId: number;
-    }
+    };
 }
 
 interface FlagState {
@@ -77,7 +77,6 @@ export default class TSFilter extends stream.Duplex {
 
     // aribts
     private _parser: stream.Transform = new aribts.TsStream();
-    //private _tsUtil = new aribts.TsUtil();
 
     // buffer
     private _packet: Buffer = new Buffer(PACKET_SIZE);
@@ -89,7 +88,7 @@ export default class TSFilter extends stream.Duplex {
     // state
     private _closed: boolean = false;
     private _ready: boolean = true;
-    private _providePids: number[] = null;// `null` to provides all
+    private _providePids: number[] = null; // `null` to provides all
     private _parsePids: number[] = [];
     private _tsid: number = -1;
     private _patCRC: Buffer = new Buffer(0);
@@ -322,7 +321,7 @@ export default class TSFilter extends stream.Duplex {
                     data._raw.copy(this._patsec, 0, 0, 8);
 
                     // section_length
-                    this._patsec[2] = 17;// 0x11
+                    this._patsec[2] = 17; // 0x11
 
                     // network_number = 0
                     this._patsec[8] = 0;
@@ -336,7 +335,7 @@ export default class TSFilter extends stream.Duplex {
                     this._patsec[13] = id & 255;
                     // program_map_PID
                     this._patsec[14] = (this._pmtPid >> 8) + 224;
-                    this._patsec[15] = this._pmtPid & 255
+                    this._patsec[15] = this._pmtPid & 255;
 
                     // calculate CRC32
                     this._patsec.writeInt32BE(calcCRC32(this._patsec.slice(0, 16)), 16);
@@ -437,7 +436,6 @@ export default class TSFilter extends stream.Duplex {
             }
         }
 
-        //if (this._serviceIds.every(id => this._services.some(service => service.id === id)) === true) { }
         this.emit("services", this._services);
 
         const index = this._parsePids.indexOf(pid);
@@ -634,7 +632,6 @@ export default class TSFilter extends stream.Duplex {
         this._parser.removeAllListeners();
         this._parser.end();
         this._parser = null;
-        //this._tsUtil = null;
 
         // update status
         if (this._parseEIT === true && this._targetNetworkId !== null) {

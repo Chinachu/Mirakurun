@@ -83,30 +83,30 @@ interface EventState {
     program: ProgramItem;
 
     short: {
-        version: number;//basic
+        version: number; // basic
         event_name_char: Buffer;
         text_char: Buffer;
-    }
+    };
     extended: {
-        version: number;//extended
-    }
+        version: number; // extended
+    };
     component: {
-        version: number;//basic
+        version: number; // basic
         stream_content: number;
         component_type: number;
-    }
+    };
     content: {
-        version: number;//basic
+        version: number; // basic
         _raw: Buffer;
-    }
+    };
     audio: {
-        version: number;//basic
+        version: number; // basic
         _raw: Buffer;
-    }
+    };
     group: {
-        version: number;//basic
+        version: number; // basic
         _raw: Buffer;
-    }
+    };
 }
 
 interface VersionState {
@@ -146,12 +146,9 @@ class EPG extends stream.Writable {
 
         for (let i = 0, l = eit.events.length, e; i < l; i++) {
             e = eit.events[i];
-            let update = false;
             let state: EventState;
 
             if (typeof service[e.event_id] === "undefined") {
-                update = true;
-
                 state = {
                     version: {
                         basic: isBasicTable(eit.table_id) ? eit.version_number : -1,
@@ -200,8 +197,6 @@ class EPG extends stream.Writable {
                 state = service[e.event_id];
 
                 if (isOutOfDate(state, eit) === true) {
-                    update = true;
-
                     if (isBasicTable(eit.table_id) === true) {
                         state.version.basic = eit.version_number;
                     } else {
@@ -235,7 +230,6 @@ class EPG extends stream.Writable {
                         ) {
                             break;
                         }
-                        update = true;
 
                         state.short.event_name_char = d.event_name_char;
                         state.short.text_char = d.text_char;
@@ -266,7 +260,6 @@ class EPG extends stream.Writable {
                         ) {
                             break;
                         }
-                        update = true;
 
                         state.component.stream_content = d.stream_content;
                         state.component.component_type = d.component_type;
@@ -296,7 +289,6 @@ class EPG extends stream.Writable {
                         ) {
                             break;
                         }
-                        update = true;
 
                         state.content._raw = d._raw;
 
@@ -319,7 +311,6 @@ class EPG extends stream.Writable {
                         ) {
                             break;
                         }
-                        update = true;
 
                         state.audio._raw = d._raw;
 
@@ -345,7 +336,6 @@ class EPG extends stream.Writable {
                         ) {
                             break;
                         }
-                        update = true;
 
                         state.group._raw = d._raw;
 
@@ -365,11 +355,6 @@ class EPG extends stream.Writable {
                         break;
                 }// <- switch
             }// <- for
-
-            if (update === true) {
-                // debugging code here
-                //console.log(state.program.id, state.program.data.startAt, state.program.data.name);
-            }
         }// <- for
 
         callback();

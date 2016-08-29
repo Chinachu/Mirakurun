@@ -20,7 +20,7 @@ import * as os from "os";
 import * as ip from "ip";
 import regexp from "./regexp";
 
-module system {
+namespace system {
 
     export function getPrivateIPv4Addresses(): string[] {
 
@@ -36,7 +36,7 @@ module system {
                         ip.isPrivate(a.address) === true
                     );
                 })
-                .forEach(a => addresses.push(a.address))
+                .forEach(a => addresses.push(a.address));
         });
 
         return addresses;

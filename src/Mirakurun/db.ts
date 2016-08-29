@@ -20,7 +20,7 @@ import * as fs from "fs";
 import * as common from "./common";
 import * as log from "./log";
 
-module db {
+namespace db {
 
     export interface Service {
         id: number;
@@ -29,7 +29,7 @@ module db {
         name: string;
         type: number;
         logoId: number;
-        logoData?: string;//base64
+        logoData?: string; // base64
         channel: Channel;
     }
 
@@ -50,15 +50,14 @@ module db {
         name?: string;
         description?: string;
         genres?: ProgramGenre[];
-        //attributes: string[];
         video?: ProgramVideo;
         audio?: ProgramAudio;
 
         extended?: {
             text: string;
-        }
+        };
 
-        //series?: ProgramSeries;
+        // series?: ProgramSeries;
 
         relatedItems?: ProgramRelatedItem[];
     }

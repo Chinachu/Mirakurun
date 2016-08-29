@@ -106,7 +106,7 @@ export default class Channel {
                 return;
             }
 
-            if(channel.isDisabled === true) {
+            if (channel.isDisabled === true) {
                 return;
             }
 

@@ -21,7 +21,7 @@ import * as express from "express";
 export interface Error {
     code: number;
     reason: string;
-    errors: any[]
+    errors: any[];
 }
 
 export function responseError(res: express.Response, code: number, reason?: string): express.Response {

@@ -72,7 +72,7 @@ export default class ServiceItem {
     }
 
     get logoData(): NodeBuffer {
-        return new Buffer(this._logoData, 'base64');
+        return new Buffer(this._logoData, "base64");
     }
 
     get hasLogoData(): boolean {
@@ -115,8 +115,8 @@ export default class ServiceItem {
 
     set logoData(logo: NodeBuffer) {
 
-        if (this._logoData !== logo.toString('base64')) {
-            this._logoData = logo.toString('base64');
+        if (this._logoData !== logo.toString("base64")) {
+            this._logoData = logo.toString("base64");
 
             _.service.save();
             this._updated();
