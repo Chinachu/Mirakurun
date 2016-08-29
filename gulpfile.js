@@ -19,11 +19,25 @@
 const fs = require("fs");
 const gulp = require("gulp");
 const mocha = require('gulp-mocha');
+const tslint = require("gulp-tslint");
 const typescript = require("gulp-typescript");
 const sourcemaps = require("gulp-sourcemaps");
 const del = require("del");
 
-gulp.task("clean", () => {
+gulp.task("tslint", () => {
+    return gulp
+        .src([
+            "src/**/*.ts"
+        ])
+        .pipe(tslint({
+            formatter: "verbose"
+        }))
+        .pipe(tslint.report({
+            summarizeFailureOutput: true
+        }));
+});
+
+gulp.task("clean", ["tslint"], () => {
     del.sync(["lib"]);
 });
 
