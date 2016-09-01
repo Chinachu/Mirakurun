@@ -1,7 +1,7 @@
 swagger: '2.0'
 info:
   title: Mirakurun
-  version: '1.4'
+  version: '1.6'
   description: DVR Tuner Server Service for Chinachu Air.
   contact:
     name: Yuki KAN
@@ -418,9 +418,27 @@ definitions:
 
   Status:
     type: object
-    required:
-      - epg
     properties:
+      process:
+        type: object
+        properties:
+          arch:
+            type: string
+          platform:
+            type: string
+          versions:
+            type: object
+          pid:
+            type: integer
+          memoryUsage:
+            type: object
+            properties:
+              rss:
+                type: integer
+              heapTotal:
+                type: integer
+              heapUsed:
+                type: integer
       epg:
         type: object
         properties:
@@ -428,3 +446,46 @@ definitions:
             type: array
             items:
               $ref: '#/definitions/NetworkId'
+          storedEvents:
+            type: integer
+      errorCount:
+        type: object
+        properties:
+          uncaughtException:
+            type: integer
+          bufferOverflow:
+            type: integer
+          tunerDeviceRespawn:
+            type: integer
+      timerAccuracy:
+        type: object
+        properties:
+          last:
+            type: number
+          m1:
+            type: object
+            properties:
+              avg:
+                type: number
+              min:
+                type: number
+              max:
+                type: number
+          m5:
+            type: object
+            properties:
+              avg:
+                type: number
+              min:
+                type: number
+              max:
+                type: number
+          m15:
+            type: object
+            properties:
+              avg:
+                type: number
+              min:
+                type: number
+              max:
+                type: number
