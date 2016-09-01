@@ -76,7 +76,7 @@ function finalize(status) {
 
     munin.create([
         () => {
-            const g = new munin.Graph('Mirakurun Memory Usage','Bytes','mirakurun');
+            const g = new munin.Graph('Mirakurun Memory Usage','Bytes','mirakurun').setScale(true);
             g.args = {
                 "--base": "1024",
                 "-l": "0"
@@ -87,7 +87,7 @@ function finalize(status) {
             return g;
         },
         () => {
-            const g = new munin.Graph('Mirakurun Programs DB','Events','mirakurun');
+            const g = new munin.Graph('Mirakurun Programs DB','Events','mirakurun').setScale(true);
             g.add(new munin.Model.Default('stored events').setDraw("AREA").setValue(status.epg.storedEvents));
             return g;
         },
