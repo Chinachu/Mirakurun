@@ -37,36 +37,32 @@ const status: Status = {
     },
     timerAccuracy: {
         last: 0,
-        m1: [],
-        m5: [],
-        m15: []
+        m1: Array.apply(null, new Array(60)).map(Number.prototype.valueOf, 0),
+        m5: Array.apply(null, new Array(60 * 5)).map(Number.prototype.valueOf, 0),
+        m15: Array.apply(null, new Array(60 * 15)).map(Number.prototype.valueOf, 0)
     }
 };
 
 const tl = status.timerAccuracy;
-let last = Date.now();
+let last: number[];
 
 function tick() {
     // main loop
-    tl.last = Date.now() - last - 1000;
+    const diff = process.hrtime(last); // nanoseconds
+    tl.last = diff[0] * 1e9 + diff[1] - 1000000000;
 
     tl.m1.push(tl.last);
     tl.m5.push(tl.last);
     tl.m15.push(tl.last);
 
-    if (tl.m1.length > 60) {
-        tl.m1.shift();
-    }
-    if (tl.m5.length > 60 * 5) {
-        tl.m5.shift();
-    }
-    if (tl.m15.length > 60 * 15) {
-        tl.m15.shift();
-    }
+    tl.m1.shift();
+    tl.m5.shift();
+    tl.m15.shift();
 
-    last = Date.now();
+    last = process.hrtime();
     setTimeout(tick, 1000);
 }
-setTimeout(tick, 1000);
+setTimeout(() => last = process.hrtime(), 1000 * 9);
+setTimeout(tick, 1000 * 10);
 
 export default status;
