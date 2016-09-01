@@ -112,8 +112,8 @@ mirakurun [status|start|stop|restart]
 ### Installation
 
 ```
-cd /etc/munin/plugins/
-ln -s /usr/local/lib/node_modules/mirakurun/bin/munin-plugins/mirakurun_status.js mirakurun_status
+ln -s /usr/local/lib/node_modules/mirakurun/bin/munin-plugins/mirakurun_status.js /usr/share/munin/plugins/mirakurun_status
+ln -s /usr/share/munin/plugins/mirakurun_status /etc/munin/plugins/mirakurun_status
 # check
 munin-run mirakurun_status
 # apply
