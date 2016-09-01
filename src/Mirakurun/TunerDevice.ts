@@ -24,6 +24,7 @@ import * as util from "util";
 import * as common from "./common";
 import * as log from "./log";
 import * as config from "./config";
+import status from "./status";
 import Event from "./Event";
 import ChannelItem from "./ChannelItem";
 
@@ -381,6 +382,7 @@ export default class TunerDevice extends events.EventEmitter {
 
         if (this._closing === false && this._users.length !== 0) {
             log.debug("TunerDevice#%d respawning because request has not closed", this._index);
+            ++status.errorCount.tunerDeviceRespawn;
 
             this._spawn(this._channel);
         }

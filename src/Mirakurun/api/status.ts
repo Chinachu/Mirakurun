@@ -17,23 +17,43 @@
 
 import { Operation } from "express-openapi";
 import * as api from "../api";
-import epg from "../epg";
+import { Status } from "../../../api.d.ts";
+import status from "../status";
 
 export const get: Operation = (req, res) => {
 
-    const gatheringNetworks = [];
+    const ret: Status = {
+        epg: {
+            gatheringNetworks: []
+        },
+        errorCount: status.errorCount,
+        timerAccuracy: {
+            last: status.timerAccuracy.last,
+            m1: {
+                avg: status.timerAccuracy.m1.reduce((a, b) => a + b) / status.timerAccuracy.m1.length,
+                min: Math.min.apply(null, status.timerAccuracy.m1),
+                max: Math.max.apply(null, status.timerAccuracy.m1)
+            },
+            m5: {
+                avg: status.timerAccuracy.m5.reduce((a, b) => a + b) / status.timerAccuracy.m5.length,
+                min: Math.min.apply(null, status.timerAccuracy.m5),
+                max: Math.max.apply(null, status.timerAccuracy.m5)
+            },
+            m15: {
+                avg: status.timerAccuracy.m15.reduce((a, b) => a + b) / status.timerAccuracy.m15.length,
+                min: Math.min.apply(null, status.timerAccuracy.m15),
+                max: Math.max.apply(null, status.timerAccuracy.m15)
+            }
+        }
+    };
 
-    for (let nid in epg.status) {
-        if (epg.status[nid] === true) {
-            gatheringNetworks.push(parseInt(nid, 10));
+    for (let nid in status.epg) {
+        if (status.epg[nid] === true) {
+            ret.epg.gatheringNetworks.push(parseInt(nid, 10));
         }
     }
 
-    api.responseJSON(res, {
-        epg: {
-            gatheringNetworks: gatheringNetworks
-        }
-    });
+    api.responseJSON(res, ret);
 };
 
 get.apiDoc = {

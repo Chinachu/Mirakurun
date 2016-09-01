@@ -117,8 +117,6 @@ interface VersionState {
 // forked from rndomhack/node-aribts/blob/1e7ef94bba3d6ac26aec764bf24dde2c2852bfcb/lib/epg.js
 class EPG extends stream.Writable {
 
-    status: { [networkId: number]: boolean } = {};
-
     private _epg: { [networkId: number]: { [serviceId: number]: { [eventId: number]: EventState } } } = {};
     private _epgGCInterval = 1000 * 60 * 15;
 

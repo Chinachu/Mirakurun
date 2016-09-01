@@ -187,5 +187,27 @@ export interface Version {
 export interface Status {
     epg: {
         gatheringNetworks: NetworkId[];
-    }
+    };
+    errorCount: {
+        bufferOverflow: number;
+        tunerDeviceRespawn: number;
+    };
+    timerAccuracy: {
+        last: number;
+        m1: {
+            avg: number;
+            min: number;
+            max: number;
+        };
+        m5: {
+            avg: number;
+            min: number;
+            max: number;
+        };
+        m15: {
+            avg: number;
+            min: number;
+            max: number;
+        };
+    };
 }

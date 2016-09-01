@@ -19,6 +19,7 @@
 import * as stream from "stream";
 import * as log from "./log";
 import epg from "./epg";
+import status from "./status";
 import _ from "./_";
 import ServiceItem from "./ServiceItem";
 const aribts = require("aribts");
@@ -135,8 +136,8 @@ export default class TSFilter extends stream.Duplex {
         if (options.parseEIT === true) {
             if (this._targetNetworkId === null) {
                 this._parseEIT = true;
-            } else if (epg.status[this._targetNetworkId] !== true) {
-                epg.status[this._targetNetworkId] = true;
+            } else if (status.epg[this._targetNetworkId] !== true) {
+                status.epg[this._targetNetworkId] = true;
                 this._parseEIT = true;
             }
         }
@@ -176,6 +177,7 @@ export default class TSFilter extends stream.Duplex {
         // stringent safety measure
         if (this._readableState.length > this.highWaterMark) {
             log.error("TSFilter is closing because overflowing the buffer...");
+            ++status.errorCount.bufferOverflow;
             return this._close();
         }
 
@@ -637,7 +639,7 @@ export default class TSFilter extends stream.Duplex {
 
         // update status
         if (this._parseEIT === true && this._targetNetworkId !== null) {
-            epg.status[this._targetNetworkId] = false;
+            status.epg[this._targetNetworkId] = false;
         }
 
         this.emit("close");
