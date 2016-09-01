@@ -185,10 +185,19 @@ export interface Version {
 }
 
 export interface Status {
+    process: {
+        arch: string;
+        platform: string;
+        versions: any;
+        pid: number;
+        memoryUsage: NodeJS.MemoryUsage;
+    };
     epg: {
         gatheringNetworks: NetworkId[];
+        storedEvents: number;
     };
     errorCount: {
+        uncaughtException: number;
         bufferOverflow: number;
         tunerDeviceRespawn: number;
     };

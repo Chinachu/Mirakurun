@@ -19,30 +19,40 @@ import { Operation } from "express-openapi";
 import * as api from "../api";
 import { Status } from "../../../api.d.ts";
 import status from "../status";
+import Program from "../Program";
 
 export const get: Operation = (req, res) => {
 
     const ret: Status = {
+        process: {
+            arch: process.arch,
+            platform: process.platform,
+            versions: process.versions,
+            pid: process.pid,
+            memoryUsage: process.memoryUsage()
+        },
         epg: {
-            gatheringNetworks: []
+            gatheringNetworks: [],
+            storedEvents: Program.all().length
         },
         errorCount: status.errorCount,
         timerAccuracy: {
-            last: status.timerAccuracy.last,
+            // ns → μs
+            last: status.timerAccuracy.last / 1000,
             m1: {
-                avg: status.timerAccuracy.m1.reduce((a, b) => a + b) / status.timerAccuracy.m1.length,
-                min: Math.min.apply(null, status.timerAccuracy.m1),
-                max: Math.max.apply(null, status.timerAccuracy.m1)
+                avg: (status.timerAccuracy.m1.reduce((a, b) => a + b) / status.timerAccuracy.m1.length) / 1000,
+                min: Math.min.apply(null, status.timerAccuracy.m1) / 1000,
+                max: Math.max.apply(null, status.timerAccuracy.m1) / 1000
             },
             m5: {
-                avg: status.timerAccuracy.m5.reduce((a, b) => a + b) / status.timerAccuracy.m5.length,
-                min: Math.min.apply(null, status.timerAccuracy.m5),
-                max: Math.max.apply(null, status.timerAccuracy.m5)
+                avg: (status.timerAccuracy.m5.reduce((a, b) => a + b) / status.timerAccuracy.m5.length) / 1000,
+                min: Math.min.apply(null, status.timerAccuracy.m5) / 1000,
+                max: Math.max.apply(null, status.timerAccuracy.m5) / 1000
             },
             m15: {
-                avg: status.timerAccuracy.m15.reduce((a, b) => a + b) / status.timerAccuracy.m15.length,
-                min: Math.min.apply(null, status.timerAccuracy.m15),
-                max: Math.max.apply(null, status.timerAccuracy.m15)
+                avg: (status.timerAccuracy.m15.reduce((a, b) => a + b) / status.timerAccuracy.m15.length) / 1000,
+                min: Math.min.apply(null, status.timerAccuracy.m15) / 1000,
+                max: Math.max.apply(null, status.timerAccuracy.m15) / 1000
             }
         }
     };
@@ -53,7 +63,9 @@ export const get: Operation = (req, res) => {
         }
     }
 
-    api.responseJSON(res, ret);
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.status(200);
+    res.end(JSON.stringify(ret, null, 2));
 };
 
 get.apiDoc = {

@@ -25,6 +25,7 @@ if (process.platform !== "win32") {
 
 import { execSync } from "child_process";
 import _ from "./Mirakurun/_";
+import status from "./Mirakurun/status";
 import Event from "./Mirakurun/Event";
 import Tuner from "./Mirakurun/Tuner";
 import Channel from "./Mirakurun/Channel";
@@ -37,6 +38,7 @@ import * as log from "./Mirakurun/log";
 process.title = "Mirakurun: Server";
 
 process.on("uncaughtException", err => {
+    ++status.errorCount.uncaughtException;
     console.error(err.stack);
 });
 

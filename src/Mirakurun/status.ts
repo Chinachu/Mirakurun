@@ -18,6 +18,7 @@
 interface Status {
     epg: { [networkId: number]: boolean };
     errorCount: {
+        uncaughtException: number;
         bufferOverflow: number;
         tunerDeviceRespawn: number;
     };
@@ -32,6 +33,7 @@ interface Status {
 const status: Status = {
     epg: {},
     errorCount: {
+        uncaughtException: 0,
         bufferOverflow: 0,
         tunerDeviceRespawn: 0
     },
