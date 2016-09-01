@@ -104,6 +104,31 @@ mirakurun log server
 mirakurun [status|start|stop|restart]
 ```
 
+## Munin Plugin
+
+**Required**
+* [Munin](http://munin-monitoring.org/) `>=1.4.0`
+
+### Installation
+
+```
+cd /etc/munin/plugins/
+ln -s /usr/local/lib/node_modules/mirakurun/bin/munin-plugins/mirakurun_status.js mirakurun_status
+# check
+munin-run mirakurun_status
+# apply
+service munin-node restart
+```
+
+#### Workaround: `/usr/bin/env: node: No such file or directory`
+
+create `/etc/munin/plugin-conf.d/mirakurun.conf` like below:
+
+```
+[mirakurun_*]
+command /usr/local/bin/node %c
+```
+
 ## Client Implementations
 
 * [Rivarun](https://github.com/kanreisa/Rivarun)
