@@ -61,6 +61,7 @@
     "js-yaml": "^3.5.2",
     "latest-version": "^2.0.0",
     "morgan": "^1.7.0",
+    "munin-plugin": "0.0.9",
     "promise-queue": "^2.2.3",
     "sift": "^3.2.4",
     "tail": "^1.1.1"
