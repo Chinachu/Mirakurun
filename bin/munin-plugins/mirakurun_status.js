@@ -76,26 +76,30 @@ function finalize(status) {
 
     munin.create([
         () => {
-            const g = new munin.Graph('Mirakurun Memory Usage','bytes','mirakurun');
+            const g = new munin.Graph('Mirakurun Memory Usage','Bytes','mirakurun');
+            g.args = {
+                "--base": "1024",
+                "-l": "0"
+            };
             g.add(new munin.Model.Default('rss').setDraw("AREA").setValue(status.process.memoryUsage.rss));
             g.add(new munin.Model.Default('heapTotal').setValue(status.process.memoryUsage.heapTotal));
             g.add(new munin.Model.Default('heapUsed').setValue(status.process.memoryUsage.heapUsed));
             return g;
         },
         () => {
-            const g = new munin.Graph('Mirakurun Programs DB','events','mirakurun');
+            const g = new munin.Graph('Mirakurun Programs DB','Events','mirakurun');
             g.add(new munin.Model.Default('stored events').setDraw("AREA").setValue(status.epg.storedEvents));
             return g;
         },
         () => {
-            const g = new munin.Graph('Mirakurun Error','count','mirakurun');
+            const g = new munin.Graph('Mirakurun Error','Count','mirakurun');
             g.add(new munin.Model.Default('uncaught exception').setValue(status.errorCount.uncaughtException));
             g.add(new munin.Model.Default('buffer overflow').setValue(status.errorCount.bufferOverflow));
             g.add(new munin.Model.Default('tuner device respawn').setValue(status.errorCount.tunerDeviceRespawn));
             return g;
         },
         () => {
-            const g = new munin.Graph('Mirakurun Timer Accuracy','μs','mirakurun');
+            const g = new munin.Graph('Mirakurun Timer Accuracy','Microseconds','mirakurun');
             g.add(new munin.Model.Default('raw value').setValue(status.timerAccuracy.last));
             g.add(new munin.Model.Default('avg m1').setDraw("AREA").setValue(status.timerAccuracy.m1.avg));
             return g;
