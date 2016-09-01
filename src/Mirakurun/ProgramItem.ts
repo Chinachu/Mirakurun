@@ -38,16 +38,12 @@ export default class ProgramItem {
         const removedIds = [];
 
         if (firstAdd === false) {
-            _.program.findByQuery({
-                data: {
-                    networkId: _data.networkId,
-                    serviceId: _data.serviceId,
-                    startAt: {
-                        $gte: _data.startAt,
-                        $lt: _data.startAt + _data.duration
-                    }
-                }
-            }).forEach(item => {
+            _.program.findConflicts(
+                _data.networkId,
+                _data.serviceId,
+                _data.startAt,
+                _data.startAt + _data.duration
+            ).forEach(item => {
 
                 item.remove();
 

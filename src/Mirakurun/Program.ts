@@ -97,6 +97,25 @@ export default class Program {
         return items;
     }
 
+    findConflicts(networkId: number, serviceId: number, start: number, end: number) {
+
+        const items = [];
+
+        for (let i = 0, l = this._items.length; i < l; i++) {
+            const item = this._items[i];
+            if (
+                item.data.networkId === networkId &&
+                item.data.serviceId === serviceId &&
+                item.data.startAt >= start &&
+                item.data.startAt < end
+            ) {
+                items.push(item);
+            }
+        }
+
+        return items;
+    }
+
     save(): void {
         clearTimeout(this._saveTimerId);
         this._saveTimerId = setTimeout(() => this._save(), 3000);
