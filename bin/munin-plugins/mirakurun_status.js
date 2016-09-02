@@ -95,7 +95,7 @@ function finalize(status) {
         },
         () => {
             const g = new munin.Graph('Mirakurun Stream','Count','mirakurun');
-            g.add(new munin.Model.Default("TunerDevice").setDraw("STACK").setValue(status.streamCount.tunerDevice));
+            g.add(new munin.Model.Default("TunerDevice").setDraw("AREA").setValue(status.streamCount.tunerDevice));
             g.add(new munin.Model.Default("TSFilter").setDraw("STACK").setValue(status.streamCount.tsFilter));
             g.add(new munin.Model.Default("decoder").setDraw("STACK").setValue(status.streamCount.decoder));
             return g;
@@ -104,7 +104,7 @@ function finalize(status) {
             const g = new munin.Graph('Mirakurun Error','Count','mirakurun');
 
             const uncaughtException = new munin.Model.Default('uncaught exception')
-            uncaughtException.setDraw("STACK");
+            uncaughtException.setDraw("AREA");
             uncaughtException.setType("DERIVE");
             uncaughtException.setMin("0");
             uncaughtException.setValue(status.errorCount.uncaughtException);
