@@ -41,14 +41,6 @@ if (process.platform === "linux" || process.platform === "darwin") {
 
     // pm2
 
-    child_process.execSync("pm2 start processes.json", {
-        stdio: [
-            null,
-            process.stdout,
-            process.stderr
-        ]
-    });
-
     let platform = "";
 
     if (fs.existsSync("/usr/bin/systemctl") === true) {
@@ -63,6 +55,14 @@ if (process.platform === "linux" || process.platform === "darwin") {
     }
 
     child_process.execSync(`pm2 startup ${platform}`, {
+        stdio: [
+            null,
+            process.stdout,
+            process.stderr
+        ]
+    });
+
+    child_process.execSync("pm2 start processes.json", {
         stdio: [
             null,
             process.stdout,
