@@ -196,6 +196,11 @@ export interface Status {
         gatheringNetworks: NetworkId[];
         storedEvents: number;
     };
+    streamCount: {
+        tunerDevice: number;
+        tsFilter: number;
+        decoder: number;
+    };
     errorCount: {
         uncaughtException: number;
         bufferOverflow: number;

@@ -94,6 +94,13 @@ function finalize(status) {
             return g;
         },
         () => {
+            const g = new munin.Graph('Mirakurun Stream','Count','mirakurun');
+            g.add(new munin.Model.Default("TunerDevice").setDraw("STACK").setValue(status.streamCount.tunerDevice));
+            g.add(new munin.Model.Default("TSFilter").setDraw("STACK").setValue(status.streamCount.tsFilter));
+            g.add(new munin.Model.Default("decoder").setDraw("STACK").setValue(status.streamCount.decoder));
+            return g;
+        },
+        () => {
             const g = new munin.Graph('Mirakurun Error','Count','mirakurun');
 
             const uncaughtException = new munin.Model.Default('uncaught exception')

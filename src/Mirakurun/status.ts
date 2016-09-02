@@ -17,6 +17,10 @@
 
 interface Status {
     epg: { [networkId: number]: boolean };
+    streamCount: {
+        tsFilter: number;
+        decoder: number;
+    };
     errorCount: {
         uncaughtException: number;
         bufferOverflow: number;
@@ -32,6 +36,10 @@ interface Status {
 
 const status: Status = {
     epg: {},
+    streamCount: {
+        tsFilter: 0,
+        decoder: 0
+    },
     errorCount: {
         uncaughtException: 0,
         bufferOverflow: 0,

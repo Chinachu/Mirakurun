@@ -21,6 +21,7 @@ import * as stream from "stream";
 import * as common from "./common";
 import * as log from "./log";
 import _ from "./_";
+import status from "./status";
 import db from "./db";
 import TunerDevice from "./TunerDevice";
 import ChannelItem from "./ChannelItem";
@@ -323,8 +324,12 @@ export default class Tuner {
                                 resolve(tsFilter);
                             } else {
                                 const decoder = child_process.spawn(device.decoder);
+                                ++status.streamCount.decoder;
                                 decoder.stderr.pipe(process.stderr);
-                                decoder.stdout.once("close", () => tsFilter.emit("close"));
+                                decoder.stdout.once("close", () => {
+                                    tsFilter.emit("close");
+                                    --status.streamCount.decoder;
+                                });
                                 tsFilter.once("close", () => decoder.kill("SIGKILL"));
                                 tsFilter.pipe(decoder.stdin);
                                 resolve(decoder.stdout);

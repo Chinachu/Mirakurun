@@ -448,6 +448,15 @@ definitions:
               $ref: '#/definitions/NetworkId'
           storedEvents:
             type: integer
+      streamCount:
+        type: object
+        properties:
+          tunerDevice:
+            type: number
+          tsFilter:
+            type: number
+          decoder:
+            type: number
       errorCount:
         type: object
         properties:

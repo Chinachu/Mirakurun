@@ -20,6 +20,7 @@ import * as api from "../api";
 import { Status } from "../../../api.d.ts";
 import status from "../status";
 import Program from "../Program";
+import Tuner from "../Tuner";
 
 export const get: Operation = (req, res) => {
 
@@ -34,6 +35,11 @@ export const get: Operation = (req, res) => {
         epg: {
             gatheringNetworks: [],
             storedEvents: Program.all().length
+        },
+        streamCount: {
+            tunerDevice: Tuner.all().filter(td => td.isUsing === true).length,
+            tsFilter: status.streamCount.tsFilter,
+            decoder: status.streamCount.decoder
         },
         errorCount: status.errorCount,
         timerAccuracy: {

@@ -158,6 +158,8 @@ export default class TSFilter extends stream.Duplex {
         if (this._ready === false) {
             log.debug("TSFilter is waiting for serviceId=%s, eventId=%s", this._provideServiceId, this._provideEventId);
         }
+
+        ++status.streamCount.tsFilter;
     }
 
     _read(size: number) {
@@ -645,6 +647,8 @@ export default class TSFilter extends stream.Duplex {
         this.emit("close");
 
         log.debug("TSFilter has closed (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
+
+        --status.streamCount.tsFilter;
     }
 }
 
