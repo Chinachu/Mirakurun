@@ -95,9 +95,9 @@ function finalize(status) {
         },
         () => {
             const g = new munin.Graph('Mirakurun Stream','Count','mirakurun');
-            g.add(new munin.Model.Default("TunerDevice").setDraw("AREA").setValue(status.streamCount.tunerDevice));
+            g.add(new munin.Model.Default("decoder").setDraw("AREA").setValue(status.streamCount.decoder));
             g.add(new munin.Model.Default("TSFilter").setDraw("STACK").setValue(status.streamCount.tsFilter));
-            g.add(new munin.Model.Default("decoder").setDraw("STACK").setValue(status.streamCount.decoder));
+            g.add(new munin.Model.Default("TunerDevice").setDraw("STACK").setValue(status.streamCount.tunerDevice));
             return g;
         },
         () => {
