@@ -54,7 +54,7 @@ namespace db {
         audio?: ProgramAudio;
 
         extended?: {
-            text: string;
+            [description: string]: string;
         };
 
         // series?: ProgramSeries;

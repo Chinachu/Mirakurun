@@ -89,6 +89,13 @@ interface EventState {
     };
     extended: {
         version: number; // extended
+        _descs: {
+            item_description_length: number;
+            item_description_char: Buffer;
+            item_length: number;
+            item_char: Buffer;
+        }[][];
+        _done: boolean;
     };
     component: {
         version: number; // basic
@@ -169,7 +176,9 @@ class EPG extends stream.Writable {
                         text_char: null
                     },
                     extended: {
-                        version: -1
+                        version: -1,
+                        _descs: null,
+                        _done: true
                     },
                     component: {
                         version: -1,
@@ -241,7 +250,54 @@ class EPG extends stream.Writable {
 
                     // extended_event
                     case 0x4E:
-                        //
+                        if (state.extended.version !== eit.version_number) {
+                            state.extended.version = eit.version_number;
+                            state.extended._descs = new Array(d.last_descriptor_number + 1);
+                            state.extended._done = false;
+                        } else if (state.extended._done === true) {
+                            break;
+                        }
+
+                        if (state.extended._descs[d.descriptor_number] === undefined) {
+                            state.extended._descs[d.descriptor_number] = d.items;
+
+                            let comp = true;
+                            for (let i = 0, l = state.extended._descs.length; i < l; i++) {
+                                if (state.extended._descs[i] === undefined) {
+                                    comp = false;
+                                    break;
+                                }
+                            }
+                            if (comp === false) {
+                                break;
+                            }
+
+                            const extended: any = {};
+
+                            let current = "";
+                            for (let i = 0, l = state.extended._descs.length; i < l; i++) {
+                                for (let j = 0, m = state.extended._descs[i].length; j < m; j++) {
+                                    const desc = state.extended._descs[i][j].item_description_length === 0
+                                                ? current
+                                                : new TsChar(state.extended._descs[i][j].item_description_char).decode();
+                                    current = desc;
+
+                                    const char = new TsChar(state.extended._descs[i][j].item_char).decode();
+                                    if (extended[desc] === undefined) {
+                                        extended[desc] = char;
+                                    } else {
+                                        extended[desc] += char;
+                                    }
+                                }
+                                state.extended._descs[i] = null; // clean up
+                            }
+
+                            state.program.update({
+                                extended: extended
+                            });
+
+                            state.extended._done = true; // done
+                        }
 
                         break;
 

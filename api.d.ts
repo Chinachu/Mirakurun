@@ -80,6 +80,11 @@ export interface Program {
         samplingRate: ProgramAudioSamplingRate;
         componentType: number;
     }
+
+    extended?: {
+        [description: string]: string;
+    };
+
     relatedItems?: ProgramRelatedItem[];
 }
 
