@@ -185,7 +185,7 @@ export default class TSFilter extends stream.Duplex {
             if (this._overflowTimer === null) {
                 this._overflowTimer = setTimeout(() => {
                     log.error("TSFilter will closing because reached time limit of overflowing the buffer...");
-                    return this._close();
+                    this._close();
                 }, this._overflowTimeLimit);
             }
 
