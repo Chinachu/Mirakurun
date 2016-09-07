@@ -30,7 +30,10 @@ export interface Server {
 
     logLevel?: log.LogLevel;
 
+    /** Byte */
     highWaterMark?: number;
+    /** Milliseconds */
+    overflowTimeLimit?: number;
 
     programGCInterval?: number;
     epgGatheringInterval?: number;

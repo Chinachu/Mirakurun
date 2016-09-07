@@ -101,9 +101,11 @@ export default class TSFilter extends stream.Duplex {
     private _streamTime: number = null;
     private _epgReady: boolean = false;
     private _epgState: { [networkId: number]: { [serviceId: number]: BasicExtState } } = {};
+    private _overflowTimer: NodeJS.Timer = null;
 
     // stream options
     private highWaterMark: number = _.config.server.highWaterMark || 1024 * 1024 * 24;
+    private _overflowTimeLimit: number = _.config.server.overflowTimeLimit || 1000 * 30;
 
     // ReadableState in node/lib/_stream_readable.js
     private _readableState: any;
@@ -178,9 +180,21 @@ export default class TSFilter extends stream.Duplex {
 
         // stringent safety measure
         if (this._readableState.length > this.highWaterMark) {
-            log.error("TSFilter is closing because overflowing the buffer...");
+            log.error("TSFilter is overflowing the buffer...");
+
+            if (this._overflowTimer === null) {
+                this._overflowTimer = setTimeout(() => {
+                    log.error("TSFilter will closing because reached time limit of overflowing the buffer...");
+                    return this._close();
+                }, this._overflowTimeLimit);
+            }
+
             ++status.errorCount.bufferOverflow;
-            return this._close();
+            return;
+        }
+        if (this._overflowTimer !== null) {
+            clearTimeout(this._overflowTimer);
+            this._overflowTimer = null;
         }
 
         let offset = 0;
