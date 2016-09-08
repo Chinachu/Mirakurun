@@ -67,9 +67,12 @@ class Server {
             }
         });
 
+        const api = yaml.safeLoad(fs.readFileSync("api.yml", "utf8"));
+        api.info.version = pkg.version;
+
         openapi.initialize({
             app: app,　　　　　　　　　　　　　　　
-            apiDoc: yaml.safeLoad(fs.readFileSync("api.yml", "utf8")),
+            apiDoc: api,
             docsPath: "/docs",
             routes: "./lib/Mirakurun/api"
         });
