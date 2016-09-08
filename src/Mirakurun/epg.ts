@@ -489,7 +489,7 @@ function getTime(buffer: Buffer): number {
     let m = (((mjd - 14956.1 - ((y * 365.25) | 0)) / 30.6001) | 0);
     let d = mjd - 14956 - ((y * 365.25) | 0) - ((m * 30.6001) | 0);
 
-    let k = (m === 14 || m === 15) ? 1 : 0;
+    const k = (m === 14 || m === 15) ? 1 : 0;
 
     y = y + k + 1900;
     m = m - 1 - k * 12;
