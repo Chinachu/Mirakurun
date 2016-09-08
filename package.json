@@ -3,7 +3,7 @@
   "preferGlobal": true,
   "description": "DTV Tuner Server Service for Chinachu Air.",
   "version": "1.7.1",
-  "homepage": "https://github.com/kanreisa/Mirakurun",
+  "homepage": "https://github.com/Chinachu/Mirakurun",
   "keywords": [
     "mirakurun",
     "chinachu",
@@ -24,10 +24,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/kanreisa/Mirakurun.git"
+    "url": "https://github.com/Chinachu/Mirakurun.git"
   },
   "bugs": {
-    "url": "https://github.com/kanreisa/Mirakurun/issues"
+    "url": "https://github.com/Chinachu/Mirakurun/issues"
   },
   "license": "Apache-2.0",
   "bin": {
@@ -35,9 +35,9 @@
   },
   "scripts": {
     "start": "node --max_old_space_size=256 lib/server.js",
-    "debug": "node --debug-brk --max_old_space_size=256 lib/server.js",
+    "debug": "node --max_old_space_size=256 lib/server.js --debug-brk",
     "start.win32": "node.exe --max_old_space_size=256 bin/init.win32.js",
-    "debug.win32": "node.exe --debug-brk --max_old_space_size=256 bin/init.win32.js",
+    "debug.win32": "node.exe --max_old_space_size=256 bin/init.win32.js --debug-brk",
     "typings": "typings",
     "typings-install": "typings install",
     "build": "gulp build",
@@ -50,6 +50,7 @@
     "preuninstall": "node bin/preuninstall.js"
   },
   "directories": {
+    "doc": "doc",
     "lib": "lib"
   },
   "dependencies": {
