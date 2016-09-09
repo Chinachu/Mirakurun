@@ -238,7 +238,6 @@ definitions:
       - 32000 # 101
       - 44100 # 110
       - 48000 # 111
-    # ARIB STD-B10 Vol.2
 
   #ProgramPattern:
   #  type: integer
