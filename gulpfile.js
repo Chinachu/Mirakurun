@@ -60,7 +60,22 @@ gulp.task("tsc", ["clean"], () => {
         .pipe(gulp.dest("lib"));
 });
 
-gulp.task("build", ["tsc"]);
+gulp.task("build", ["tsc"], () => {
+    return gulp
+        .src([
+            "src/client.ts"
+        ])
+        .pipe(typescript({
+            typescript: require("typescript"),
+            target: "ES6",
+            module: "commonjs",
+            moduleResolution: "node",
+            removeComments: false,
+            declarationFiles: true
+        }))
+        .dts
+        .pipe(gulp.dest("lib"));
+});
 
 gulp.task("test", test)
 

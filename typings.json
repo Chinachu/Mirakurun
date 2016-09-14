@@ -7,7 +7,7 @@
     "js-yaml": "registry:dt/js-yaml#3.5.2+20160316171810",
     "mime": "registry:dt/mime#0.0.0+20160316155526",
     "morgan": "registry:dt/morgan#1.7.0+20160524142355",
-    "node": "registry:dt/node#6.0.0+20160613154055",
+    "node": "registry:dt/node#6.0.0+20160909174046",
     "serve-static": "registry:dt/serve-static#0.0.0+20160606155157"
   }
 }

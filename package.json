@@ -33,6 +33,7 @@
   "bin": {
     "mirakurun": "bin/cli.sh"
   },
+  "main": "lib/client.js",
   "scripts": {
     "start": "node --max_old_space_size=256 lib/server.js",
     "debug": "node --max_old_space_size=256 lib/server.js --debug-brk",
