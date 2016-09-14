@@ -23,7 +23,7 @@ import status from "./status";
 import _ from "./_";
 import ServiceItem from "./ServiceItem";
 const aribts = require("aribts");
-const CRC32_TABLE = require("../../node_modules/aribts/lib/crc32_table");
+const calcCRC32: (buf: Buffer) => number = aribts.TsCrc32.calc;
 
 interface StreamOptions extends stream.DuplexOptions {
     networkId?: number;
@@ -665,16 +665,6 @@ export default class TSFilter extends stream.Duplex {
 
         --status.streamCount.tsFilter;
     }
-}
-
-function calcCRC32(buf: Buffer): number {
-
-    let crc = -1;
-    for (let i = 0, l = buf.length; i < l; i++) {
-        crc = (crc << 8) ^ CRC32_TABLE[((crc >>> 24) ^ buf[i])];
-    }
-
-    return crc;
 }
 
 function getTime(buffer: Buffer): number {
