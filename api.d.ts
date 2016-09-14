@@ -132,6 +132,10 @@ export interface TunerUser {
     agent?: string;
 }
 
+export interface TunerProcess {
+    pid: number;
+}
+
 export interface Event {
     resource: EventResource;
     type: EventType;

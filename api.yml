@@ -320,6 +320,14 @@ definitions:
       agent:
         type: string
 
+  TunerProcess:
+    type: object
+    required:
+      - pid
+    properties:
+      pid:
+        type: integer
+
   # event ---------------------------------------------------------------------
 
   Event:

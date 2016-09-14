@@ -48,12 +48,7 @@ get.apiDoc = {
         200: {
             description: "OK",
             schema: {
-                type: "object",
-                properties: {
-                    pid: {
-                        type: "integer"
-                    }
-                }
+                $ref: "#/definitions/TunerProcess"
             }
         },
         404: {
