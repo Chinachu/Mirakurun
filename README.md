@@ -29,14 +29,14 @@ see: [doc/Platforms.md](doc/Platforms.md)
 
 ### **Linux**
 
-* [PM2](http://pm2.keymetrics.io/) `>=1.0.2`
+* [PM2](http://pm2.keymetrics.io/) `>=2.0.12`
 * x86 / **x64** / ARMv7 / **ARMv8**
 * **Debian** / Ubuntu / CentOS / Gentoo
 * SystemV / OpenRC / **SystemD**
 
 ### Darwin (Experimental)
 
-* [PM2](http://pm2.keymetrics.io/) `>=1.0.2`
+* [PM2](http://pm2.keymetrics.io/) `>=2.0.12`
 * OS X v10.11 El Capitan
 
 ### Win32 (Experimental)
