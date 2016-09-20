@@ -47,6 +47,8 @@ if (process.platform === "linux" || process.platform === "darwin") {
         platform = "systemd";
     } if (fs.existsSync("/etc/redhat-release") === true) {
         platform = "centos";
+    } else if (fs.existsSync("/etc/gentoo-release") === true) {
+        platform = "gentoo";
     } else if (fs.existsSync("/etc/issue") === true) {
         const issue = fs.readFileSync("/etc/issue", { encoding: "utf-8" });
         if (/Ubuntu/.test(issue) === true) {
