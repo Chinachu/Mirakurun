@@ -36,9 +36,9 @@
   "main": "lib/client.js",
   "scripts": {
     "start": "node --max_old_space_size=256 lib/server.js",
-    "debug": "node --max_old_space_size=256 lib/server.js --debug-brk",
+    "debug": "node --max_old_space_size=256 --debug-brk lib/server.js",
     "start.win32": "node.exe --max_old_space_size=256 bin/init.win32.js",
-    "debug.win32": "node.exe --max_old_space_size=256 bin/init.win32.js --debug-brk",
+    "debug.win32": "node.exe --max_old_space_size=256 --debug-brk bin/init.win32.js",
     "typings": "typings",
     "typings-install": "typings install",
     "build": "gulp build",
