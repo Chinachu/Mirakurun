@@ -1,4 +1,4 @@
-[![Mirakurun](https://yabumi.cc/153eab7d76cd45beb272b916.svg)](https://github.com/kanreisa/Mirakurun)
+[![Mirakurun](https://yabumi.cc/153eab7d76cd45beb272b916.svg)](https://github.com/Chinachu/Mirakurun)
 
 # Mirakurun
 
@@ -131,7 +131,7 @@ command /usr/local/bin/node %c
 
 ## Client Implementations
 
-* [Rivarun](https://github.com/kanreisa/Rivarun)
+* [Rivarun](https://github.com/Chinachu/Rivarun)
 * [BonDriver_Mirakurun](https://github.com/h-mineta/BonDriver_Mirakurun)
 
 ## Contributing
@@ -155,7 +155,7 @@ command /usr/local/bin/node %c
 [downloads-url]: https://npmjs.org/package/mirakurun
 [travis-img]: https://img.shields.io/travis/Chinachu/Mirakurun.svg
 [travis-url]: https://travis-ci.org/Chinachu/Mirakurun
-[dep-img]: https://david-dm.org/kanreisa/Mirakurun.svg
-[dep-url]: https://david-dm.org/kanreisa/Mirakurun
-[devdep-img]: https://david-dm.org/kanreisa/Mirakurun/dev-status.svg
-[devdep-url]: https://david-dm.org/kanreisa/Mirakurun#info=devDependencies
+[dep-img]: https://david-dm.org/Chinachu/Mirakurun.svg
+[dep-url]: https://david-dm.org/Chinachu/Mirakurun
+[devdep-img]: https://david-dm.org/Chinachu/Mirakurun/dev-status.svg
+[devdep-url]: https://david-dm.org/Chinachu/Mirakurun#info=devDependencies
