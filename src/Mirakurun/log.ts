@@ -28,8 +28,27 @@ export enum LogLevel {
 
 export let logLevel: LogLevel = LogLevel.INFO;
 
+let offsetStr: string;
+let offsetMS = 0;
+if (/ GMT\+\d{4} /.test(new Date().toString()) === true) {
+    const date = new Date();
+    offsetStr = date.toString().match(/ GMT(\+\d{4}) /)[1];
+    offsetStr = offsetStr.slice(0, 3) + ":" + offsetStr.slice(3, 5);
+    offsetMS = date.getTimezoneOffset() * 60 * 1000;
+}
+
 function getLogString(lvstr: string, msgs: any[]) {
-    return new Date().toISOString() + " " + lvstr + ": " + util.format.apply(null, msgs);
+
+    let isoStr: string;
+
+    if (offsetStr) {
+        isoStr = new Date(Date.now() - offsetMS).toISOString();
+        isoStr = isoStr.slice(0, -1) + offsetStr;
+    } else {
+        isoStr = new Date().toISOString();
+    }
+
+    return isoStr + " " + lvstr + ": " + util.format.apply(null, msgs);
 }
 
 export function debug(...msgs: any[]);
