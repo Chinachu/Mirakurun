@@ -14,5 +14,5 @@
    limitations under the License.
 */
 
-import Client from "./lib/client.d.ts";
+import Client from "./lib/client";
 export default Client;
