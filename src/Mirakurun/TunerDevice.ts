@@ -28,6 +28,9 @@ import status from "./status";
 import Event from "./Event";
 import ChannelItem from "./ChannelItem";
 
+const Queue = require("promise-queue");
+const pt2Queue = new Queue(1, Infinity);
+
 interface User extends common.User {
     _stream?: stream.Writable;
 }
@@ -346,7 +349,18 @@ export default class TunerDevice extends events.EventEmitter {
 
                 this._process.stdin.write("\n");
             } else {
-                this._process.kill("SIGTERM");
+                if (this._config.isPT2 === true) {
+                    // PT2 support
+                    pt2Queue.add(() => {
+                        return new Promise(resolve => {
+                            setTimeout(() => this._process.kill("SIGTERM"), 100);
+                            setTimeout(resolve, 500);
+                        });
+                    });
+                } else {
+                    // regular way
+                    this._process.kill("SIGTERM");
+                }
             }
         });
     }
