@@ -349,23 +349,30 @@ export default class TunerDevice extends events.EventEmitter {
 
                 this._process.stdin.write("\n");
             } else {
-                if (this._config.isPT2 === true) {
-                    // PT2 support
-                    pt2Queue.add(() => {
-                        return new Promise(resolve => {
-                            setTimeout(() => this._process.kill("SIGTERM"), 100);
-                            setTimeout(resolve, 500);
-                        });
-                    });
-                } else {
-                    // regular way
-                    this._process.kill("SIGTERM");
-                }
+                this._process.kill("SIGTERM");
             }
         });
     }
 
     private _release(): void {
+
+        if (process.platform !== "win32" && this._config.isPT2 === true && !this._config.dvbDevicePath) {
+            // PT2 support
+            pt2Queue.add(() => {
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        this._released();
+                        resolve();
+                    }, 500);
+                });
+            });
+        } else {
+            // regular way
+            this._released();
+        }
+    }
+
+    private _released(): void {
 
         if (this._process) {
             this._process.stderr.removeAllListeners();
