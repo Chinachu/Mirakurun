@@ -222,6 +222,24 @@ export default class TunerDevice extends events.EventEmitter {
 
     private _spawn(ch: ChannelItem): Promise<void> {
 
+        if (process.platform !== "win32" && this._config.isPT2 === true && !this._config.dvbDevicePath) {
+            // PT2 support
+            return new Promise<void>(resolve => {
+                pt2Queue.add(() => {
+                    return new Promise(_resolve => {
+                        resolve();
+                        setTimeout(_resolve, 500);
+                    });
+                }).then(() => this.__spawn(ch));
+            });
+        } else {
+            // regular way
+            return this.__spawn(ch);
+        }
+    }
+
+    private __spawn(ch: ChannelItem): Promise<void> {
+
         log.debug("TunerDevice#%d spawn...", this._index);
 
         if (this._process) {
@@ -348,31 +366,22 @@ export default class TunerDevice extends events.EventEmitter {
                 this._process.once("exit", () => clearTimeout(timer));
 
                 this._process.stdin.write("\n");
+            } else if (this._config.isPT2 === true && !this._config.dvbDevicePath) {
+                // PT2 support
+                pt2Queue.add(() => {
+                    return new Promise(resolve => {
+                        this._process.kill("SIGTERM");
+                        setTimeout(resolve, 500);
+                    });
+                });
             } else {
+                // regular way
                 this._process.kill("SIGTERM");
             }
         });
     }
 
     private _release(): void {
-
-        if (process.platform !== "win32" && this._config.isPT2 === true && !this._config.dvbDevicePath) {
-            // PT2 support
-            pt2Queue.add(() => {
-                return new Promise(resolve => {
-                    setTimeout(() => {
-                        this._released();
-                        resolve();
-                    }, 500);
-                });
-            });
-        } else {
-            // regular way
-            this._released();
-        }
-    }
-
-    private _released(): void {
 
         if (this._process) {
             this._process.stderr.removeAllListeners();
