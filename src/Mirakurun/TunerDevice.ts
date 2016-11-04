@@ -230,8 +230,8 @@ export default class TunerDevice extends events.EventEmitter {
                         resolve();
                         setTimeout(_resolve, 500);
                     });
-                }).then(() => this.__spawn(ch));
-            });
+                });
+            }).then(() => this.__spawn(ch));
         } else {
             // regular way
             return this.__spawn(ch);
