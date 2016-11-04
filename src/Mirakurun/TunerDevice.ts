@@ -228,7 +228,7 @@ export default class TunerDevice extends events.EventEmitter {
                 pt2Queue.add(() => {
                     return new Promise(_resolve => {
                         resolve();
-                        setTimeout(_resolve, 500);
+                        setTimeout(_resolve, 4000);
                     });
                 });
             }).then(() => this.__spawn(ch));
