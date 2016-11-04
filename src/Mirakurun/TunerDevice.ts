@@ -59,6 +59,7 @@ export default class TunerDevice extends events.EventEmitter {
     private _isAvailable: boolean = true;
     private _exited: boolean = false;
     private _closing: boolean = false;
+    private _pt2Resolver: (value?: {} | PromiseLike<{}>) => void = () => {};
 
     constructor(private _index: number, private _config: config.Tuner) {
         super();
@@ -228,6 +229,7 @@ export default class TunerDevice extends events.EventEmitter {
                 pt2Queue.add(() => {
                     return new Promise(_resolve => {
                         resolve();
+                        this._pt2Resolver = _resolve;
                         setTimeout(_resolve, 4000);
                     });
                 });
@@ -309,6 +311,9 @@ export default class TunerDevice extends events.EventEmitter {
         });
 
         this._process.stderr.on("data", data => {
+            if (data.toString().match("Recording...")) {
+                this._pt2Resolver();
+            }
             log.info("TunerDevice#%d > %s", this._index, data.toString().trim());
         });
 
