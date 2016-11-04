@@ -421,4 +421,4 @@ export default class TunerDevice extends events.EventEmitter {
     private _updated(): void {
         Event.emit("tuner", "update", this.export());
     }
-}
+}
