@@ -59,7 +59,7 @@ export default class TunerDevice extends events.EventEmitter {
     private _isAvailable: boolean = true;
     private _exited: boolean = false;
     private _closing: boolean = false;
-    private _pt2Resolver: (value?: {} | PromiseLike<{}>) => void = () => {};
+    private _pt2Resolver: () => void = () => {};
 
     constructor(private _index: number, private _config: config.Tuner) {
         super();
