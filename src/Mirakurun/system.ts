@@ -56,7 +56,7 @@ namespace system {
                         ip.isPrivate(a.address) === true
                     );
                 })
-                .forEach(a => addresses.push(a.address));
+                .forEach(a => addresses.push(a.address + "%" + k));
         });
 
         return addresses;

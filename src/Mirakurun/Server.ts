@@ -129,12 +129,14 @@ class Server {
                 }
             } else {
                 server.listen(serverConfig.port, address, () => {
-
-                    if (address.indexOf(":") !== -1) {
-                        address = `[${ address }]`;
+                    if (address.indexOf("%") !== -1) {
+                        const pair = address.split("%");
+                        const addr = pair[0];
+                        const iface = pair[1];
+                        log.info("listening on http://[%s]:%d (%s)", addr, serverConfig.port, iface);
+                    } else {
+                        log.info("listening on http://%s:%d", address, serverConfig.port);
                     }
-
-                    log.info("listening on http://%s:%d", address, serverConfig.port);
                 });
             }
 
