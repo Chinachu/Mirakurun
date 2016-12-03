@@ -194,6 +194,7 @@ export interface Version {
 }
 
 export interface Status {
+    version: string;
     process: {
         arch: string;
         platform: string;
