@@ -41,6 +41,26 @@ namespace system {
 
         return addresses;
     }
+
+    export function getPrivateIPv6Addresses(): string[] {
+
+        const addresses = [];
+
+        const interfaces = os.networkInterfaces();
+        Object.keys(interfaces).forEach(k => {
+            interfaces[k]
+                .filter(a => {
+                    return (
+                        a.family === "IPv6" &&
+                        a.internal === false &&
+                        ip.isPrivate(a.address) === true
+                    );
+                })
+                .forEach(a => addresses.push(a.address));
+        });
+
+        return addresses;
+    }
 }
 
 export default system;

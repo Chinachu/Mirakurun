@@ -46,7 +46,19 @@ class Server {
         }
 
         if (serverConfig.port) {
-            addresses = [...addresses, ...system.getPrivateIPv4Addresses(), "127.0.0.1"];
+            addresses = [
+                ...addresses,
+                ...system.getPrivateIPv4Addresses(),
+                "127.0.0.1"
+            ];
+
+            if (serverConfig.disableIPv6 !== true) {
+                addresses = [
+                    ...addresses,
+                    ...system.getPrivateIPv6Addresses(),
+                    "::1"
+                ];
+            }
         }
 
         const app = express();
@@ -117,6 +129,11 @@ class Server {
                 }
             } else {
                 server.listen(serverConfig.port, address, () => {
+
+                    if (address.indexOf(":") !== -1) {
+                        address = `[${ address }]`;
+                    }
+
                     log.info("listening on http://%s:%d", address, serverConfig.port);
                 });
             }
