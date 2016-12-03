@@ -45,11 +45,9 @@ npm install winser -g
 npm install . -g --production
 ```
 
-### Debug with [node-inspector](https://github.com/node-inspector/node-inspector)
+### Debug
 
 ```
-node-inspector &
-
 # Linux / Darwin
 sudo mirakurun stop
 sudo npm run debug

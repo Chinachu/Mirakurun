@@ -19,10 +19,11 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 * Integrated MPEG-2 TS Parser, Filter
 * Realtime EPG Parser
 * Supports most Tuner Devices (chardev, DVB / ISDB-T, ISDB-S, DVB-S2)
+* IPv6 Support
 
 ## Requirements / Supported Platforms
 
-* [Node.js](http://nodejs.org/) `>=6.2.0`
+* [Node.js](http://nodejs.org/) `>=6.5.0`
 
 **Bold** is the recommended.
 see: [doc/Platforms.md](doc/Platforms.md)
@@ -42,7 +43,7 @@ see: [doc/Platforms.md](doc/Platforms.md)
 ### Win32 (Experimental)
 
 * [winser](https://github.com/jfromaniello/winser) `>=1.0.2`
-* Windows 10 TH2
+* Windows 10 RS1
 
 ## Install
 
