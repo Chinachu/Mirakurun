@@ -21,7 +21,7 @@ import * as fs from "fs";
 import * as http from "http";
 import * as querystring from "querystring";
 import * as yaml from "js-yaml";
-import * as apid from "../api.d.ts";
+import * as apid from "../api";
 const pkg = require("../package.json");
 const spec = yaml.safeLoad(fs.readFileSync(__dirname + "/../api.yml", "utf8"));
 
@@ -215,7 +215,7 @@ export default class Client {
 
                     const chunks: Buffer[] = [];
 
-                    res.on("data", chunk => chunks.push(chunk));
+                    res.on("data", chunk => chunks.push(<Buffer>chunk));
                     res.on("end", () => {
 
                         const buffer = Buffer.concat(chunks);

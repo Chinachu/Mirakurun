@@ -32,7 +32,7 @@ const Queue = require("promise-queue");
 const pt2Queue = new Queue(1, Infinity);
 
 interface User extends common.User {
-    _stream?: stream.Writable;
+    _stream?: stream.Duplex;
 }
 
 interface Status {
@@ -143,7 +143,7 @@ export default class TunerDevice extends events.EventEmitter {
         return this._kill(true);
     }
 
-    startStream(user: User, stream: stream.Writable, channel?: ChannelItem): Promise<void> {
+    startStream(user: User, stream: stream.Duplex, channel?: ChannelItem): Promise<void> {
 
         log.debug("TunerDevice#%d start stream for user `%s` (priority=%d)...", this._index, user.id, user.priority);
 
@@ -263,7 +263,7 @@ export default class TunerDevice extends events.EventEmitter {
 
             cat.once("error", (err) => {
 
-                log.error("TunerDevice#%d cat process error `%s` (pid=%d)", this._index, err.code, cat.pid);
+                log.error("TunerDevice#%d cat process error `%s` (pid=%d)", this._index, err.name, cat.pid);
 
                 this._kill(false);
             });
@@ -291,7 +291,7 @@ export default class TunerDevice extends events.EventEmitter {
 
         this._process.once("error", (err) => {
 
-            log.fatal("TunerDevice#%d process error `%s` (pid=%d)", this._index, err.code, this._process.pid);
+            log.fatal("TunerDevice#%d process error `%s` (pid=%d)", this._index, err.name, this._process.pid);
 
             this._end();
             setTimeout(this._release.bind(this), this._config.dvbDevicePath ? 1000 : 100);

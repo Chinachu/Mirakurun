@@ -86,7 +86,7 @@ class Server {
             app: app,　　　　　　　　　　　　　　　
             apiDoc: api,
             docsPath: "/docs",
-            routes: "./lib/Mirakurun/api"
+            paths: "./lib/Mirakurun/api"
         });
 
         app.use((err, req, res: express.Response, next) => {
