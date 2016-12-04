@@ -236,7 +236,7 @@ export default class TunerDevice extends events.EventEmitter {
             }).then(() => {
                 this.__spawn(ch);
                 this._process.stderr.on("data", data => {
-                    if (data.toString().match("Recording...")) {
+                    if (data.toString().match(/Recording\.\.\./)) {
                         pt2Resolver();
                     }
                 });
