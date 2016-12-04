@@ -22,9 +22,12 @@ import status from "../status";
 import Program from "../Program";
 import Tuner from "../Tuner";
 
+const pkg = require("../../../package.json");
+
 export const get: Operation = (req, res) => {
 
     const ret: Status = {
+        version: pkg.version,
         process: {
             arch: process.arch,
             platform: process.platform,

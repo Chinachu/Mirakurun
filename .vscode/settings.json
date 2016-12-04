@@ -6,5 +6,6 @@
     "editor.autoClosingBrackets": true,
     "files.trimTrailingWhitespace": true,
     "git.enabled": true,
-    "git.autofetch": false
+    "git.autofetch": false,
+    "typescript.tsdk": "./node_modules/typescript/lib"
 }

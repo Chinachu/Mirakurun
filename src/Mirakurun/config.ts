@@ -28,6 +28,9 @@ export interface Server {
     // as Remote Server
     port?: number;
 
+    /** `true` to disable IPv6 listening */
+    disableIPv6?: boolean;
+
     logLevel?: log.LogLevel;
 
     /** Byte */

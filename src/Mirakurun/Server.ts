@@ -46,7 +46,19 @@ class Server {
         }
 
         if (serverConfig.port) {
-            addresses = [...addresses, ...system.getPrivateIPv4Addresses(), "127.0.0.1"];
+            addresses = [
+                ...addresses,
+                ...system.getPrivateIPv4Addresses(),
+                "127.0.0.1"
+            ];
+
+            if (serverConfig.disableIPv6 !== true) {
+                addresses = [
+                    ...addresses,
+                    ...system.getPrivateIPv6Addresses(),
+                    "::1"
+                ];
+            }
         }
 
         const app = express();
@@ -74,7 +86,7 @@ class Server {
             app: app,　　　　　　　　　　　　　　　
             apiDoc: api,
             docsPath: "/docs",
-            routes: "./lib/Mirakurun/api"
+            paths: "./lib/Mirakurun/api"
         });
 
         app.use((err, req, res: express.Response, next) => {
@@ -117,7 +129,14 @@ class Server {
                 }
             } else {
                 server.listen(serverConfig.port, address, () => {
-                    log.info("listening on http://%s:%d", address, serverConfig.port);
+                    if (address.indexOf("%") !== -1) {
+                        const pair = address.split("%");
+                        const addr = pair[0];
+                        const iface = pair[1];
+                        log.info("listening on http://[%s]:%d (%s)", addr, serverConfig.port, iface);
+                    } else {
+                        log.info("listening on http://%s:%d", address, serverConfig.port);
+                    }
                 });
             }
 
