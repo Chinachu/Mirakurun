@@ -224,13 +224,23 @@ export default class TunerDevice extends events.EventEmitter {
 
         if (process.platform !== "win32" && this._config.isPT2 === true && !this._config.dvbDevicePath) {
             // PT2 support
+            let pt2Resolver = () => {};
             return new Promise<void>(resolve => {
                 pt2Queue.add(() => {
                     return new Promise(_resolve => {
                         resolve();
-                        setTimeout(_resolve, 500);
+                        pt2Resolver = _resolve;
+                        setTimeout(_resolve, 4000);
                     });
-                }).then(() => this.__spawn(ch));
+                });
+            }).then(() => {
+                let ret = this.__spawn(ch);
+                this._process.stderr.on("data", data => {
+                    if (data.toString().match(/Recording\.\.\./)) {
+                        pt2Resolver();
+                    }
+                });
+                return ret;
             });
         } else {
             // regular way
