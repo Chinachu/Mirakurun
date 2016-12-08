@@ -129,7 +129,7 @@ class Server {
                 }
             } else {
                 server.listen(serverConfig.port, address, () => {
-                    if (address.indexOf("%") !== -1) {
+                    if (address.indexOf(":") !== -1) {
                         const pair = address.split("%");
                         const addr = pair[0];
                         const iface = pair[1];
