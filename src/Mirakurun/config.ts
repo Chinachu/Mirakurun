@@ -58,9 +58,6 @@ export interface Tuner {
     // decoder
     decoder?: string;
 
-    // special flags
-    isPT2?: boolean;
-
     isDisabled?: boolean;
 }
 

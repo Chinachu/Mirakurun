@@ -29,7 +29,6 @@ import Event from "./Event";
 import ChannelItem from "./ChannelItem";
 
 const Queue = require("promise-queue");
-const pt2Queue = new Queue(1, Infinity);
 
 interface User extends common.User {
     _stream?: stream.Duplex;
@@ -222,47 +221,6 @@ export default class TunerDevice extends events.EventEmitter {
 
     private _spawn(ch: ChannelItem): Promise<void> {
 
-        // PT2 support
-        if (process.platform !== "win32" && this._config.isPT2 === true && !this._config.dvbDevicePath) {
-
-            const timeout = () => new Promise(resolve => {
-                setTimeout(() => {
-                    log.debug("TunerDevice#%d ended observing PT2 process", this._index);
-                    resolve();
-                }, 4000);
-            });
-
-            const observing = () => new Promise(resolve => {
-
-                log.info("TunerDevice#%d observing spawned PT2 process...", this._index);
-
-                const handler = (data) => {
-                    if (/Recording\.\.\./.test(data.toString()) === true) {
-                        log.info("TunerDevice#%d PT2 is OK", this._index);
-
-                        this._process.stderr.removeListener("data", handler);
-                        resolve();
-                    }
-                };
-
-                this._process.stderr.on("data", handler);
-            });
-
-            return new Promise<void>(resolve => {
-                pt2Queue.add(() => {
-                    return this.__spawn(ch)
-                        .then(() => resolve())
-                        .then(() => Promise.race([timeout(), observing()]));
-                });
-            });
-        }
-
-        // regular way
-        return this.__spawn(ch);
-    }
-
-    private __spawn(ch: ChannelItem): Promise<void> {
-
         log.debug("TunerDevice#%d spawn...", this._index);
 
         if (this._process) {
@@ -389,14 +347,6 @@ export default class TunerDevice extends events.EventEmitter {
                 this._process.once("exit", () => clearTimeout(timer));
 
                 this._process.stdin.write("\n");
-            } else if (this._config.isPT2 === true && !this._config.dvbDevicePath) {
-                // PT2 support
-                pt2Queue.add(() => {
-                    return new Promise(resolve => {
-                        this._process.kill("SIGTERM");
-                        setTimeout(resolve, 500);
-                    });
-                });
             } else {
                 // regular way
                 this._process.kill("SIGTERM");

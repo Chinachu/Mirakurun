@@ -171,8 +171,6 @@ export interface ConfigTunersItem {
     /** for dvb */
     dvbDevicePath?: string;
     decoder?: string;
-    /** special flag */
-    isPT2?: boolean;
     isDisabled?: boolean;
 }
 
