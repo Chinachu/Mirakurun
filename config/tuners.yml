@@ -28,40 +28,6 @@
   decoder: arib-b25-stream-test
   isDisabled: true
 
-- name: PT2-S1
-  types:
-    - BS
-    - CS
-  isPT2: true
-  command: recpt1 --device /dev/pt1video0 --lnb 15 <channel> - -
-  decoder: arib-b25-stream-test
-  isDisabled: true
-
-- name: PT2-S2
-  types:
-    - BS
-    - CS
-  isPT2: true
-  command: recpt1 --device /dev/pt1video1 --lnb 15 <channel> - -
-  decoder: arib-b25-stream-test
-  isDisabled: true
-
-- name: PT2-T1
-  types:
-    - GR
-  isPT2: true
-  command: recpt1 --device /dev/pt1video2 <channel> - -
-  decoder: arib-b25-stream-test
-  isDisabled: true
-
-- name: PT2-T2
-  types:
-    - GR
-  isPT2: true
-  command: recpt1 --device /dev/pt1video3 <channel> - -
-  decoder: arib-b25-stream-test
-  isDisabled: true
-
 - name: TBS6922
   types:
     - SKY
