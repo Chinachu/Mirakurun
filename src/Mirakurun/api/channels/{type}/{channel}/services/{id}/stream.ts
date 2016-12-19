@@ -89,6 +89,7 @@ export const get: Operation = (req, res) => {
 
             req.once("close", () => stream.emit("close"));
 
+            res.setHeader("Content-Type", "video/MP2T");
             res.status(200);
             stream.pipe(res);
         })
