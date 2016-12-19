@@ -1,7 +1,7 @@
 {
     "editor.tabSize": 4,
     "editor.insertSpaces": true,
-    "editor.renderWhitespace": true,
+    "editor.renderWhitespace": "all",
     "editor.formatOnType": false,
     "editor.autoClosingBrackets": true,
     "files.trimTrailingWhitespace": true,
