@@ -319,7 +319,7 @@ export default class TunerDevice extends events.EventEmitter {
             for (const user of this._users) {
                 user._stream.end();
             }
-            this._users.length = 0;
+            this._users = [];
         }
 
         this._updated();
