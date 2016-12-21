@@ -490,7 +490,7 @@ export default class TSFilter extends stream.Duplex {
         // write EPG stream and store result
         if (
             this._parseEIT === true &&
-            this._parseServiceIds.indexOf(data.service_id) === -1 &&
+            this._parseServiceIds.indexOf(data.service_id) !== -1 &&
             data.table_id !== 0x4E && data.table_id !== 0x4F
         ) {
             epg.write(data);
