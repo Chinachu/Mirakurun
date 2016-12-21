@@ -637,15 +637,7 @@ export default class TSFilter extends stream.Duplex {
             this._patsec = null;
             this._packet.fill(0);
             this._packet = null;
-            this._buffer.forEach(packet => {
-                packet.fill(0);
-                packet = null;
-            });
             this._buffer = null;
-            this._parses.forEach(packet => {
-                packet.fill(0);
-                packet = null;
-            });
             this._parses = null;
         });
 
