@@ -101,7 +101,7 @@ export default class ChannelItem {
         log.info("ChannelItem#'%s' serviceId=%d check has queued", this._name, serviceId);
 
         queue.add(() => {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
 
                 log.info("ChannelItem#'%s' serviceId=%d check has started", this._name, serviceId);
 
@@ -121,7 +121,7 @@ export default class ChannelItem {
 
                         setTimeout(() => this.addService(serviceId), 180000);
 
-                        reject();
+                        resolve();
                     });
             });
         });
@@ -140,7 +140,7 @@ export default class ChannelItem {
         log.info("ChannelItem#'%s' service scan has queued", this._name);
 
         queue.add(() => {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
 
                 log.info("ChannelItem#'%s' service scan has started", this._name);
 
@@ -178,7 +178,7 @@ export default class ChannelItem {
 
                         setTimeout(() => this.serviceScan(add), add ? 180000 : 3600000);
 
-                        reject();
+                        resolve();
                     });
             });
         });

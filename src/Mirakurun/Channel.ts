@@ -135,7 +135,7 @@ export default class Channel {
                 log.info("Network#%d EPG gathering has queued", networkId);
 
                 queue.add(() => {
-                    return new Promise((resolve, reject) => {
+                    return new Promise((resolve) => {
 
                         log.info("Network#%d EPG gathering has started", networkId);
 
@@ -146,7 +146,7 @@ export default class Channel {
                             })
                             .catch(error => {
                                 log.error("Network#%d EPG gathering has failed [%s]", networkId, error);
-                                reject();
+                                resolve();
                             });
                     });
                 });
