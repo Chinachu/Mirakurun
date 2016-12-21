@@ -304,7 +304,7 @@ export default class TunerDevice extends events.EventEmitter {
 
     private _streamOnData(chunk: Buffer): void {
 
-        for (let i = 0, l = this._users.length; i < l; i++) {
+        for (let i = 0; i < this._users.length; i++) {
             this._users[i]._stream.write(chunk);
         }
     }
