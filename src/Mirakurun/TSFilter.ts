@@ -464,15 +464,11 @@ export default class TSFilter extends stream.Duplex {
 
     private _onEIT(pid, data): void {
 
-        if (this._parseServiceIds.indexOf(data.service_id) === -1) {
-            return;
-        }
-
         // detect current event
         if (
             data.events.length !== 0 &&
             this._provideEventId !== null && data.table_id === 0x4E && data.section_number === 0 &&
-            (this._provideServiceId === null || this._provideServiceId === data.service_id)
+            this._provideServiceId === data.service_id
         ) {
             if (data.events[0].event_id === this._provideEventId) {
                 if (this._ready === false) {
@@ -492,7 +488,11 @@ export default class TSFilter extends stream.Duplex {
         }
 
         // write EPG stream and store result
-        if (this._parseEIT === true && data.table_id !== 0x4E && data.table_id !== 0x4F) {
+        if (
+            this._parseEIT === true &&
+            this._parseServiceIds.indexOf(data.service_id) === -1 &&
+            data.table_id !== 0x4E && data.table_id !== 0x4F
+        ) {
             epg.write(data);
 
             if (!this._epgReady) {
