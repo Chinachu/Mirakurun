@@ -54,7 +54,7 @@ export const get: Operation = (req, res) => {
 
     let requestAborted = false;
     req.once("close", () => requestAborted = true);
-    req.setTimeout(1000 * 60 * 10, () => { });// 10 minites
+    req.setTimeout(1000 * 60 * 10, () => { }); // 10 minites
 
     program.getStream({
         id: (req.ip || "unix") + ":" + (req.connection.remotePort || Date.now()),
