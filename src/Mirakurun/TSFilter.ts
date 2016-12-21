@@ -80,11 +80,11 @@ export default class TSFilter extends stream.Duplex {
     private _parser: stream.Transform = new aribts.TsStream();
 
     // buffer
-    private _packet: Buffer = new Buffer(PACKET_SIZE);
+    private _packet: Buffer = Buffer.allocUnsafe(PACKET_SIZE);
     private _offset: number = -1;
     private _buffer: Buffer[] = [];
     private _parses: Buffer[] = [];
-    private _patsec: Buffer = new Buffer(20);
+    private _patsec: Buffer = Buffer.allocUnsafe(20);
 
     // state
     private _closed: boolean = false;
@@ -92,7 +92,7 @@ export default class TSFilter extends stream.Duplex {
     private _providePids: number[] = null; // `null` to provides all
     private _parsePids: number[] = [];
     private _tsid: number = -1;
-    private _patCRC: Buffer = new Buffer(0);
+    private _patCRC: Buffer = Buffer.allocUnsafe(0);
     private _serviceIds: number[] = [];
     private _services: any[] = [];
     private _parseServiceIds: number[] = [];
@@ -203,7 +203,7 @@ export default class TSFilter extends stream.Duplex {
         if (this._offset > 0) {
             if (chunk.length >= PACKET_SIZE - this._offset) {
                 chunk.copy(this._packet, this._offset, 0, PACKET_SIZE - this._offset);
-                this._processPacket(this._packet, true);
+                this._processPacket(this._packet);
                 offset = PACKET_SIZE - this._offset;
                 this._offset = 0;
             } else {
@@ -232,7 +232,7 @@ export default class TSFilter extends stream.Duplex {
             }
 
             if (length - offset >= PACKET_SIZE) {
-                this._processPacket(chunk.slice(offset, offset + PACKET_SIZE), false);
+                this._processPacket(chunk.slice(offset, offset + PACKET_SIZE));
                 this._offset = 0;
             } else {
                 chunk.copy(this._packet, 0, offset);
@@ -253,7 +253,7 @@ export default class TSFilter extends stream.Duplex {
         callback();
     }
 
-    private _processPacket(packet: Buffer, mustCopy: boolean): void {
+    private _processPacket(packet: Buffer): void {
 
         const pid = packet.readUInt16BE(1) & 0x1FFF;
 
@@ -262,9 +262,7 @@ export default class TSFilter extends stream.Duplex {
             return;
         }
 
-        if (mustCopy === true) {
-            packet = new Buffer(packet);
-        }
+        packet = Buffer.from(packet);
 
         // parse
         if (pid === 0 && this._patCRC.compare(packet.slice(packet[7] + 4, packet[7] + 8))) {
@@ -287,9 +285,6 @@ export default class TSFilter extends stream.Duplex {
 
         // PAT (0) rewriting
         if (pid === 0 && this._pmtPid !== -1) {
-            if (mustCopy === false) {
-                packet = new Buffer(packet);
-            }
             this._patsec.copy(packet, 5, 0);
         }
 
@@ -551,8 +546,8 @@ export default class TSFilter extends stream.Duplex {
             for (let i = 0; i < 0x08; i++) {
                 [this._epgState[networkId][serviceId].basic, this._epgState[networkId][serviceId].extended].forEach(target => {
                     target.flags.push({
-                        flag: new Buffer(32).fill(0x00),
-                        ignore: new Buffer(32).fill(0xFF),
+                        flag: Buffer.alloc(32, 0x00),
+                        ignore: Buffer.alloc(32, 0xFF),
                         version_number: -1
                     });
                 });

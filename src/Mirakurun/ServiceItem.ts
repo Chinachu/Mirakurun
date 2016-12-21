@@ -72,7 +72,7 @@ export default class ServiceItem {
     }
 
     get logoData(): NodeBuffer {
-        return new Buffer(this._logoData, "base64");
+        return Buffer.from(this._logoData, "base64");
     }
 
     get hasLogoData(): boolean {
