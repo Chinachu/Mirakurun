@@ -625,7 +625,7 @@ export default class TSFilter extends stream.Duplex {
         clearTimeout(this._pmtTimer);
 
         // clear buffer
-        process.nextTick(() => {
+        setImmediate(() => {
             this._readableState.buffer = [];
             this._readableState.length = 0;
             this._patsec.fill(0);
@@ -646,7 +646,8 @@ export default class TSFilter extends stream.Duplex {
             status.epg[this._targetNetworkId] = false;
         }
 
-        this.emit("close");
+        // close
+        process.nextTick(() => this.emit("close"));
 
         log.debug("TSFilter has closed (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
 
