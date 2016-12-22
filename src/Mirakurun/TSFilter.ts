@@ -610,7 +610,7 @@ export default class TSFilter extends stream.Duplex {
         });
 
         if (this._epgReady) {
-            this.emit("epgReady");
+            process.nextTick(() => this.emit("epgReady"));
         }
     }
 
