@@ -41,7 +41,7 @@ if (process.platform === "linux" || process.platform === "darwin") {
 
     // pm2
 
-    child_process.execSync(`pm2 startup`, {
+    child_process.execSync("pm2 startup", {
         stdio: [
             null,
             process.stdout,
