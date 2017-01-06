@@ -4,12 +4,12 @@
 
 **Bold** is the recommended. also, **Node.js** `>=6.5.0` needed.
 
-* **Linux**
+* [**Linux**](#linux)
   * [PM2](http://pm2.keymetrics.io/) `>=2.0.12`
   * x86 / **x64** / ARMv7 / **ARMv8**
   * **Debian** / Ubuntu / CentOS / Gentoo
   * SystemV / OpenRC / **SystemD**
-* Win32 (Experimental)
+* [Win32](#win32) (Experimental)
   * [winser](https://github.com/jfromaniello/winser) `>=1.0.2`
   * Windows 10 RS1
 * Darwin (Experimental)
