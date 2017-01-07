@@ -9,3 +9,5 @@ typings
 lib
 doc
 test
+*.tar
+*.log

@@ -1,18 +1,20 @@
-FROM node:6-onbuild
+FROM mhart/alpine-node:6
 MAINTAINER Yuki KAN <re@pixely.jp>
 
-RUN mkdir /etc/mirakurun
-RUN cp ./config/*.yml /etc/mirakurun/
-ENV SERVER_CONFIG_PATH /etc/mirakurun/server.yml
-ENV TUNERS_CONFIG_PATH /etc/mirakurun/tuners.yml
-ENV CHANNELS_CONFIG_PATH /etc/mirakurun/channels.yml
+WORKDIR /usr/src/app
+ADD . .
 
-RUN mkdir -p /var/db/mirakurun
-ENV SERVICES_DB_PATH /var/db/mirakurun/services.json
-ENV PROGRAMS_DB_PATH /var/db/mirakurun/programs.json
+RUN mkdir /etc/mirakurun \
+    && cp ./config/*.yml /etc/mirakurun/ \
+    && mkdir -p /var/db/mirakurun \
+    && npm install \
+    && npm run build
 
-RUN npm install
-RUN npm run build
+ENV SERVER_CONFIG_PATH=/etc/mirakurun/server.yml \
+    TUNERS_CONFIG_PATH=/etc/mirakurun/tuners.yml \
+    CHANNELS_CONFIG_PATH=/etc/mirakurun/channels.yml \
+    SERVICES_DB_PATH=/var/db/mirakurun/services.json \
+    PROGRAMS_DB_PATH=/var/db/mirakurun/programs.json
 
 USER root
 EXPOSE 40772
