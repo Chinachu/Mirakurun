@@ -24,26 +24,10 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 ## Requirements / Supported Platforms
 
 * [Node.js](http://nodejs.org/) `>=6.5.0`
+* Linux w/ [PM2](http://pm2.keymetrics.io/)
+* Win32 w/ [winser](https://github.com/jfromaniello/winser)
 
-**Bold** is the recommended.
 see: [doc/Platforms.md](doc/Platforms.md)
-
-### **Linux**
-
-* [PM2](http://pm2.keymetrics.io/) `>=2.0.12`
-* x86 / **x64** / ARMv7 / **ARMv8**
-* **Debian** / Ubuntu / CentOS / Gentoo
-* SystemV / OpenRC / **SystemD**
-
-### Darwin (Experimental)
-
-* [PM2](http://pm2.keymetrics.io/) `>=2.0.12`
-* OS X v10.11 El Capitan
-
-### Win32 (Experimental)
-
-* [winser](https://github.com/jfromaniello/winser) `>=1.0.2`
-* Windows 10 RS1
 
 ## Install
 
@@ -88,7 +72,6 @@ npm uninstall mirakurun -g
 ```
 mirakurun config [server|tuners|channels]
 ```
-Typically, don't need edit this.
 
 * Also you can config on Chinachu Web App.
 * see: [doc/Configuration.md](doc/Configuration.md)
