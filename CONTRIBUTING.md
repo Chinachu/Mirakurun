@@ -2,25 +2,23 @@
 
 ## Report an Issue
 
-* https://github.com/kanreisa/Mirakurun/issues
+* https://github.com/Chinachu/Mirakurun/issues
 
 When reporting an issue we also need as much information about your environment
 that you can include. We never know what information will be pertinent when
-trying narrow down the issue. Please include least the following information:
+trying narrow down the issue. **Please include least the following information**:
 
-* Version of Mirakurun: `sudo npm list -g mirakurun`
-* Version of Chinachu: `sudo npm list -g chinachu`
+* Version of Mirakurun: `sudo mirakurun version`
 * Platform you're running on (Debian jessie, CentOS 7.1, ...)
 * Architecture you're running on (x86 or x64 or ARMv8 or ...)
+* http:// _your-mirakuruns-host_ :_port_/api/status
 
 ## Development
-
-To get started, [sign the Contributor License Agreement](https://www.clahub.com/agreements/kanreisa/Mirakurun).
 
 ### Checkout
 
 ```
-git clone git@github.com:kanreisa/Mirakurun.git
+git clone git@github.com:Chinachu/Mirakurun.git
 cd Mirakurun
 git checkout <branch>
 ```
