@@ -3,9 +3,11 @@
 /node_modules
 /doc
 /src
-/*.log
-/.editorconfig
-/.travis.yml
-/gulpfile.js
-/tsconfig.json
-/tsd.json
+*.log
+*.swp
+.editorconfig
+.travis.yml
+gulpfile.js
+tsconfig.json
+tsd.json
+Dockerfile
