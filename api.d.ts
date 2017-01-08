@@ -124,6 +124,7 @@ export interface TunerDevice {
     isAvailable: boolean;
     isFree: boolean;
     isUsing: boolean;
+    isFault: boolean;
 }
 
 export interface TunerUser {

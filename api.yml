@@ -282,6 +282,7 @@ definitions:
       - isAvailable
       - isFree
       - isUsing
+      - isFault
     properties:
       index:
         type: integer
@@ -304,6 +305,8 @@ definitions:
       isFree:
         type: boolean
       isUsing:
+        type: boolean
+      isFault:
         type: boolean
 
   TunerUser:

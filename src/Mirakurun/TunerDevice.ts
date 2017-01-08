@@ -44,6 +44,7 @@ interface Status {
     isAvailable: boolean;
     isFree: boolean;
     isUsing: boolean;
+    isFault: boolean;
 }
 
 export default class TunerDevice extends events.EventEmitter {
@@ -56,6 +57,8 @@ export default class TunerDevice extends events.EventEmitter {
     private _users: User[] = [];
 
     private _isAvailable: boolean = true;
+    private _isFault: boolean = false;
+    private _fatalCount: number = 0;
     private _exited: boolean = false;
     private _closing: boolean = false;
 
@@ -111,6 +114,10 @@ export default class TunerDevice extends events.EventEmitter {
         return this._isAvailable === true && this._channel !== null && this._users.length !== 0;
     }
 
+    get isFault(): boolean {
+        return this._isFault;
+    }
+
     getPriority(): number {
 
         let priority = -2;
@@ -134,7 +141,8 @@ export default class TunerDevice extends events.EventEmitter {
             users: this.users,
             isAvailable: this.isAvailable,
             isFree: this.isFree,
-            isUsing: this.isUsing
+            isUsing: this.isUsing,
+            isFault: this.isFault
         };
     }
 
@@ -274,6 +282,13 @@ export default class TunerDevice extends events.EventEmitter {
 
             log.fatal("TunerDevice#%d process error `%s` (pid=%d)", this._index, err.name, this._process.pid);
 
+            ++this._fatalCount;
+            if (this._fatalCount >= 3) {
+                log.fatal("TunerDevice#%d has something fault! **RESTART REQUIRED** after fix it.", this._index);
+
+                this._isFault = true;
+                this._closing = true;
+            }
             this._end();
             setTimeout(this._release.bind(this), this._config.dvbDevicePath ? 1000 : 100);
         });
@@ -373,7 +388,10 @@ export default class TunerDevice extends events.EventEmitter {
             this._users = [];
         }
 
-        this._isAvailable = true;
+        if (this._isFault === false) {
+            this._isAvailable = true;
+        }
+
         this._closing = false;
         this._exited = false;
 
@@ -388,6 +406,8 @@ export default class TunerDevice extends events.EventEmitter {
             ++status.errorCount.tunerDeviceRespawn;
 
             this._spawn(this._channel);
+        } else {
+            this._fatalCount = 0;
         }
     }
 
