@@ -50,7 +50,7 @@ main () {
   local cmd="$1"
   shift
   case $cmd in
-    config | log | status | start | stop | restart )
+    config | log | status | start | stop | restart | version )
       cmd="mirakurun_$cmd"
       ;;
     * )
@@ -103,6 +103,10 @@ mirakurun_restart() {
   pm2 restart processes.json && return 0
 }
 
+mirakurun_version () {
+  npm list -g mirakurun && return 0
+}
+
 mirakurun_help () {
   cat <<EOF
 
@@ -121,6 +125,7 @@ start             Start services.
 stop              Stop services.
 restart           Restart services.
 
+version           Version info.
 help              Output this information.
 
 EOF
