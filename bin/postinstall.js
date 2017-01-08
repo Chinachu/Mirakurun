@@ -29,18 +29,36 @@ if (process.platform === "linux" || process.platform === "darwin") {
     if (process.getuid() !== 0) {
         process.exit(0);
     }
+    const prefix = "/usr/local";
+    const configDir = path.join(prefix, "etc/mirakurun");
+    const dataDir = path.join(prefix, "var/db/mirakurun");
+    const logDir = path.join(prefix, "var/log");
 
-    child_process.execSync("mkdir -vp /usr/local/etc/mirakurun");
-    child_process.execSync("mkdir -vp /usr/local/var/log");
-    child_process.execSync("mkdir -vp /usr/local/var/run");
-    child_process.execSync("mkdir -vp /usr/local/var/db/mirakurun");
+    child_process.execSync(`mkdir -vp ${configDir}`);
+    child_process.execSync(`mkdir -vp ${dataDir}`);
+    child_process.execSync(`mkdir -vp ${logDir}`);
 
-    child_process.execSync("cp -vn config/server.yml /usr/local/etc/mirakurun/server.yml");
-    child_process.execSync("cp -vn config/tuners.yml /usr/local/etc/mirakurun/tuners.yml");
-    child_process.execSync("cp -vn config/channels.yml /usr/local/etc/mirakurun/channels.yml");
+    const serverConfigPath = path.join(configDir, "server.yml");
+    const tunersConfigPath = path.join(configDir, "tuners.yml");
+    const channelsConfigPath = path.join(configDir, "channels.yml");
+
+    if (fs.existsSync(serverConfigPath) === false) {
+        copyFileSync("config/server.yml", serverConfigPath);
+    }
+    if (fs.existsSync(tunersConfigPath) === false) {
+        copyFileSync("config/tuners.yml", tunersConfigPath);
+    }
+    if (fs.existsSync(channelsConfigPath) === false) {
+        copyFileSync("config/channels.yml", channelsConfigPath);
+    }
 
     // pm2
 
+    if (process.env.DOCKER === "YES") {
+        console.log("Note: running in Docker.");
+        process.exit(0);
+    }
+    
     child_process.execSync("pm2 startup", {
         stdio: [
             null,

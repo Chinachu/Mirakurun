@@ -28,6 +28,11 @@ if (process.platform === "linux" || process.platform === "darwin") {
         process.exit(0);
     }
 
+    if (process.env.DOCKER === "YES") {
+        console.log("Note: running in Docker.");
+        process.exit(0);
+    }
+
     child_process.execSync("pm2 stop processes.json -s", {
         stdio: [
             null,
@@ -55,4 +60,3 @@ if (process.platform === "linux" || process.platform === "darwin") {
     } catch (e) {
     }
 }
-

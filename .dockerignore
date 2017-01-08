@@ -1,0 +1,13 @@
+.vscode
+.editorconfig
+.git
+.gitignore
+.npmignore
+.travis.yml
+node_modules
+typings
+lib
+doc
+test
+*.tar
+*.log
