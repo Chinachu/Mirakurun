@@ -647,7 +647,10 @@ export default class TSFilter extends stream.Duplex {
         }
 
         // close
-        process.nextTick(() => this.emit("close"));
+        process.nextTick(() => {
+            this.emit("close");
+            this.emit("end");
+        });
 
         log.debug("TSFilter has closed (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
 
