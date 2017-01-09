@@ -58,15 +58,15 @@
     "aribts": "^1.3.3",
     "body-parser": "^1.15.2",
     "express": "^4.14.0",
-    "express-openapi": "^0.32.1",
-    "ip": "^1.1.3",
-    "js-yaml": "^3.5.2",
+    "express-openapi": "^0.33.0",
+    "ip": "^1.1.4",
+    "js-yaml": "^3.7.0",
     "latest-version": "^2.0.0",
     "morgan": "^1.7.0",
     "munin-plugin": "0.0.9",
     "promise-queue": "^2.2.3",
     "sift": "^3.2.4",
-    "tail": "^1.1.1"
+    "tail": "^1.2.1"
   },
   "devDependencies": {
     "del": "^2.2.0",
