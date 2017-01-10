@@ -88,6 +88,12 @@ mirakurun log server
 mirakurun [status|start|stop|restart]
 ```
 
+#### Version Info
+
+```
+mirakurun version
+```
+
 ## Munin Plugin
 
 **Required**
