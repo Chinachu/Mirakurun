@@ -31,7 +31,8 @@
   },
   "license": "Apache-2.0",
   "bin": {
-    "mirakurun": "bin/cli.sh"
+    "mirakurun": "bin/cli.sh",
+    "mirakurun-epgdump": "bin/epgdump.js"
   },
   "main": "lib/client.js",
   "scripts": {
