@@ -57,7 +57,7 @@ namespace db {
             [description: string]: string;
         };
 
-        // series?: ProgramSeries;
+        series?: ProgramSeries;
 
         relatedItems?: ProgramRelatedItem[];
     }
@@ -99,14 +99,15 @@ namespace db {
         "48kHz" = 48000
     }
 
-    /* export interface ProgramSeries {
+    export interface ProgramSeries {
         id: number;
-        repeatCount: number;
+        repeat: number;
         pattern: number;
         expiresAt: number;
+        episode: number;
         lastEpisode: number;
         name: string;
-    } */
+    }
 
     export interface ProgramRelatedItem {
         networkId?: number;

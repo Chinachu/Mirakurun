@@ -110,6 +110,10 @@ interface EventState {
         version: number; // basic
         _raw: Buffer;
     };
+    series: {
+        version: number; // basic
+        _raw: Buffer;
+    };
     group: {
         version: number; // basic
         _raw: Buffer;
@@ -190,6 +194,10 @@ class EPG extends stream.Writable {
                         _raw: null
                     },
                     audio: {
+                        version: -1,
+                        _raw: null
+                    },
+                    series: {
                         version: -1,
                         _raw: null
                     },
@@ -372,6 +380,38 @@ class EPG extends stream.Writable {
                             audio: {
                                 samplingRate: SAMPLING_RATE[d.sampling_rate],
                                 componentType: d.component_type
+                            }
+                        });
+
+                        break;
+
+                    // series
+                    case 0xD5:
+                        if (state.series.version === eit.version_number) {
+                            break;
+                        }
+                        state.series.version = eit.version_number;
+
+                        if (
+                            state.series._raw !== null &&
+                            state.series._raw.compare(d._raw) === 0
+                        ) {
+                            break;
+                        }
+
+                        state.series._raw = d._raw;
+
+                        state.program.update({
+                            series: {
+                                id: d.series_id,
+                                repeat: d.repeat_label,
+                                pattern: d.program_pattern,
+                                expiresAt: d.expire_date_valid_flag === 1 ?
+                                    getTime(Buffer.from(d.expire_date.toString(16), "hex")) :
+                                    -1,
+                                episode: d.episode_number,
+                                lastEpisode: d.last_episode_number,
+                                name: new TsChar(d.series_name_char).decode()
                             }
                         });
 

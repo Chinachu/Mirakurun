@@ -81,6 +81,8 @@ export interface Program {
         componentType: number;
     }
 
+    series?: ProgramSeries;
+
     extended?: {
         [description: string]: string;
     };
@@ -106,6 +108,16 @@ export enum ProgramAudioSamplingRate {
     "32kHz" = 32000,
     "44.1kHz" = 44100,
     "48kHz" = 48000
+}
+
+export interface ProgramSeries {
+    id: number;
+    repeat: number;
+    pattern: number;
+    expiresAt: number;
+    episode: number;
+    lastEpisode: number;
+    name: string;
 }
 
 export interface ProgramRelatedItem {

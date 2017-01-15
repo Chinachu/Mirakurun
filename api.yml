@@ -179,24 +179,24 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RelatedItem'
-      #series:
-      #  type: object
-      #  properties:
-      #    id:
-      #      type: integer
-      #    repeatCount:
-      #      type: integer
-      #      minimum: 0
-      #    pattern:
-      #      $ref: '#/definitions/ProgramPattern'
-      #    expiresAt:
-      #      $ref: '#/definitions/UnixtimeMS'
-      #    episode:
-      #      $ref: '#/definitions/ProgramEpisodeNumber'
-      #    lastEpisode:
-      #      $ref: '#/definitions/ProgramEpisodeNumber'
-      #    name:
-      #      type: string
+      series:
+        type: object
+        properties:
+          id:
+            type: integer
+          repeat:
+            type: integer
+            minimum: 0
+          pattern:
+            $ref: '#/definitions/ProgramPattern'
+          expiresAt:
+            $ref: '#/definitions/UnixtimeMS'
+          episode:
+            $ref: '#/definitions/ProgramEpisodeNumber'
+          lastEpisode:
+            $ref: '#/definitions/ProgramEpisodeNumber'
+          name:
+            type: string
 
   ProgramGenre:
     type: object
@@ -239,10 +239,10 @@ definitions:
       - 44100 # 110
       - 48000 # 111
 
-  #ProgramPattern:
-  #  type: integer
-  #  minimum: 0
-  #  maximum: 7
+  ProgramPattern:
+    type: integer
+    minimum: 0
+    maximum: 7
     # ARIB STD-B10 Vol.2
     # 0x0 不定期（0x1 – 0x7で定義されるもの以外）
     # 0x1 帯番組（毎日、平日のみ毎日、土・日のみなど）、週に複数回の編成
@@ -253,10 +253,10 @@ definitions:
     # 0x6 定期または不定期の蓄積用の編成
     # 0x7 未定義
 
-  #ProgramEpisodeNumber:
-  #  type: integer
-  #  minimum: 1
-  #  maximum: 4095
+  ProgramEpisodeNumber:
+    type: integer
+    minimum: 1
+    maximum: 4095
 
   RelatedItem:
     type: object
