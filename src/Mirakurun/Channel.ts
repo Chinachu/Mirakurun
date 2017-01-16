@@ -120,7 +120,7 @@ export default class Channel {
 
     private _epgGatherer(): void {
 
-        queue.add(() => {
+        queue.add(async () => {
 
             const networkIds = [...new Set(_.service.items.map(item => item.networkId))];
 
@@ -134,30 +134,22 @@ export default class Channel {
 
                 log.debug("Network#%d EPG gathering has queued", networkId);
 
-                queue.add(() => {
-                    return new Promise((resolve) => {
+                queue.add(async () => {
 
-                        log.info("Network#%d EPG gathering has started", networkId);
+                    log.info("Network#%d EPG gathering has started", networkId);
 
-                        Tuner.getEPG(services[0].channel)
-                            .then(() => {
-                                log.info("Network#%d EPG gathering has finished", networkId);
-                                resolve();
-                            })
-                            .catch(error => {
-                                log.warn("Network#%d EPG gathering has failed [%s]", networkId, error);
-                                resolve();
-                            });
-                    });
+                    try {
+                        await Tuner.getEPG(services[0].channel);
+                        log.info("Network#%d EPG gathering has finished", networkId);
+                    } catch (e) {
+                        log.warn("Network#%d EPG gathering has failed [%s]", networkId, e);
+                    }
                 });
             });
 
-            queue.add(() => {
+            queue.add(async () => {
                 setTimeout(this._epgGatherer.bind(this), this._epgGatheringInterval);
-                return Promise.resolve();
             });
-
-            return Promise.resolve();
         });
     }
 

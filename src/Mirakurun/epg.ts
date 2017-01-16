@@ -460,7 +460,7 @@ class EPG extends stream.Writable {
 
         log.info("EPG GC has queued");
 
-        queue.add(() => {
+        queue.add(async () => {
 
             const now = Date.now();
             let count = 0;
@@ -481,8 +481,6 @@ class EPG extends stream.Writable {
             setTimeout(this._gc.bind(this), this._epgGCInterval);
 
             log.info("EPG GC has finished and removed %d events", count);
-
-            return Promise.resolve();
         });
     }
 }

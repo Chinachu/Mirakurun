@@ -97,7 +97,7 @@ export default class Program {
         return items;
     }
 
-    findConflicts(networkId: number, serviceId: number, start: number, end: number) {
+    findConflicts(networkId: number, serviceId: number, start: number, end: number): ProgramItem[] {
 
         const items = [];
 
@@ -160,7 +160,7 @@ export default class Program {
 
         log.debug("Program GC has queued");
 
-        queue.add(() => {
+        queue.add(async () => {
 
             const now = Date.now();
             let count = 0;
@@ -175,8 +175,6 @@ export default class Program {
             setTimeout(this._gc.bind(this), this._programGCInterval);
 
             log.info("Program GC has finished and removed %d programs", count);
-
-            return Promise.resolve();
         });
     }
 

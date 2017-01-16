@@ -100,30 +100,25 @@ export default class ChannelItem {
 
         log.debug("ChannelItem#'%s' serviceId=%d check has queued", this._name, serviceId);
 
-        queue.add(() => {
-            return new Promise((resolve) => {
+        queue.add(async () => {
 
-                log.info("ChannelItem#'%s' serviceId=%d check has started", this._name, serviceId);
+            log.info("ChannelItem#'%s' serviceId=%d check has started", this._name, serviceId);
 
-                _.tuner.getServices(this)
-                    .then(services => services.find(service => service.serviceId === serviceId))
-                    .then(service => {
+            let services;
+            try {
+                services = await _.tuner.getServices(this);
+            } catch (e) {
+                log.warn("ChannelItem#'%s' serviceId=%d check has failed [%s]", this._name, serviceId, e);
 
-                        log.debug("ChannelItem#'%s' serviceId=%d: %s", this._name, serviceId, JSON.stringify(service, null, "  "));
+                setTimeout(() => this.addService(serviceId), 180000);
+                return;
+            }
 
-                        new ServiceItem(this, service.networkId, service.serviceId, service.name, service.type, service.logoId);
+            const service = services.find(service => service.serviceId === serviceId);
 
-                        resolve();
-                    })
-                    .catch(error => {
+            log.debug("ChannelItem#'%s' serviceId=%d: %s", this._name, serviceId, JSON.stringify(service, null, "  "));
 
-                        log.warn("ChannelItem#'%s' serviceId=%d check has failed [%s]", this._name, serviceId, error);
-
-                        setTimeout(() => this.addService(serviceId), 180000);
-
-                        resolve();
-                    });
-            });
+            new ServiceItem(this, service.networkId, service.serviceId, service.name, service.type, service.logoId);
         });
     }
 
@@ -139,48 +134,42 @@ export default class ChannelItem {
 
         log.debug("ChannelItem#'%s' service scan has queued", this._name);
 
-        queue.add(() => {
-            return new Promise((resolve) => {
+        queue.add(async () => {
 
-                log.info("ChannelItem#'%s' service scan has started", this._name);
+            log.info("ChannelItem#'%s' service scan has started", this._name);
 
-                _.tuner.getServices(this)
-                    .then(services => {
+            let services;
+            try {
+                services = await _.tuner.getServices(this);
+            } catch (e) {
+                log.warn("ChannelItem#'%s' service scan has failed [%s]", this._name, e);
 
-                        log.debug("ChannelItem#'%s' services: %s", this._name, JSON.stringify(services, null, "  "));
+                setTimeout(() => this.serviceScan(add), add ? 180000 : 3600000);
+                return;
+            }
 
-                        services.forEach(service => {
+            log.debug("ChannelItem#'%s' services: %s", this._name, JSON.stringify(services, null, "  "));
 
-                            const item = _.service.get(service.networkId, service.serviceId);
-                            if (item !== null) {
-                                item.name = service.name;
-                                item.type = service.type;
-                                item.logoId = service.logoId;
-                            } else if (add === true) {
-                                new ServiceItem(
-                                    this,
-                                    service.networkId,
-                                    service.serviceId,
-                                    service.name,
-                                    service.type,
-                                    service.logoId
-                                );
-                            }
-                        });
+            services.forEach(service => {
 
-                        log.info("ChannelItem#'%s' service scan has finished", this._name);
-
-                        resolve();
-                    })
-                    .catch(error => {
-
-                        log.warn("ChannelItem#'%s' service scan has failed [%s]", this._name, error);
-
-                        setTimeout(() => this.serviceScan(add), add ? 180000 : 3600000);
-
-                        resolve();
-                    });
+                const item = _.service.get(service.networkId, service.serviceId);
+                if (item !== null) {
+                    item.name = service.name;
+                    item.type = service.type;
+                    item.logoId = service.logoId;
+                } else if (add === true) {
+                    new ServiceItem(
+                        this,
+                        service.networkId,
+                        service.serviceId,
+                        service.name,
+                        service.type,
+                        service.logoId
+                    );
+                }
             });
+
+            log.info("ChannelItem#'%s' service scan has finished", this._name);
         });
     }
 }

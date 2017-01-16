@@ -119,7 +119,7 @@ export default class Tuner {
         return this._getStream(setting, user);
     }
 
-    getEPG(channel: ChannelItem, time?: number): Promise<void> {
+    async getEPG(channel: ChannelItem, time?: number): Promise<void> {
 
         if (!time) {
             time = _.config.server.epgRetrievalTime || 1000 * 60 * 10;
@@ -145,20 +145,15 @@ export default class Tuner {
             disableDecoder: true
         };
 
-        return this._getStream(setting, user)
-            .then(stream => {
-                return new Promise<void>((resolve) => {
-                    setTimeout(() => stream.emit("close"), time);
-                    stream.once("epgReady", () => stream.emit("close"));
-                    stream.once("close", resolve);
-                });
-            })
-            .catch(error => {
-                return Promise.reject(error);
-            });
+        const stream = await this._getStream(setting, user);
+        return new Promise<void>((resolve) => {
+            setTimeout(() => stream.emit("close"), time);
+            stream.once("epgReady", () => stream.emit("close"));
+            stream.once("close", resolve);
+        });
     }
 
-    getServices(channel: ChannelItem): Promise<db.Service[]> {
+    async getServices(channel: ChannelItem): Promise<db.Service[]> {
 
         const setting: StreamSetting = {
             channel: channel,
@@ -172,34 +167,29 @@ export default class Tuner {
             disableDecoder: true
         };
 
-        return this._getStream(setting, user)
-            .then(stream => {
-                return new Promise((resolve, reject) => {
+        const stream = await this._getStream(setting, user);
+        return new Promise<db.Service[]>((resolve, reject) => {
 
-                    let services: db.Service[] = null;
+            let services: db.Service[] = null;
 
-                    setTimeout(() => stream.emit("close"), 10000);
+            setTimeout(() => stream.emit("close"), 10000);
 
-                    stream.once("services", _services => {
-                        services = _services;
-                        stream.emit("close");
-                    });
-
-                    stream.once("close", () => {
-
-                        stream.removeAllListeners("services");
-
-                        if (services === null) {
-                            reject(new Error("stream has closed before get services"));
-                        } else {
-                            resolve(services);
-                        }
-                    });
-                });
-            })
-            .catch(error => {
-                return Promise.reject(error);
+            stream.once("services", _services => {
+                services = _services;
+                stream.emit("close");
             });
+
+            stream.once("close", () => {
+
+                stream.removeAllListeners("services");
+
+                if (services === null) {
+                    reject(new Error("stream has closed before get services"));
+                } else {
+                    resolve(services);
+                }
+            });
+        });
     }
 
     private _load(): this {
