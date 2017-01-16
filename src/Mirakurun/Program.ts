@@ -180,6 +180,10 @@ export default class Program {
         });
     }
 
+    static getProgramId(networkId: number, serviceId: number, eventId: number): number {
+        return parseInt(networkId + (serviceId / 100000).toFixed(5).slice(2) + (eventId / 100000).toFixed(5).slice(2), 10);
+    }
+
     static add(item: ProgramItem): void {
         return _.program.add(item);
     }

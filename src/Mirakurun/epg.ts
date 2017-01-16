@@ -20,6 +20,8 @@ import * as stream from "stream";
 import * as log from "./log";
 import db from "./db";
 import queue from "./queue";
+import Program from "./Program";
+const getProgramId = Program.getProgramId;
 import ProgramItem from "./ProgramItem";
 const aribts = require("aribts");
 const TsChar = aribts.TsChar;
@@ -515,10 +517,6 @@ function isOutOfDate(state: EventState, eit): boolean {
     }
 
     return true;
-}
-
-function getProgramId(networkId: number, serviceId: number, eventId: number): number {
-    return parseInt(networkId + (serviceId / 100000).toFixed(5).slice(2) + (eventId / 100000).toFixed(5).slice(2), 10);
 }
 
 function getTime(buffer: Buffer): number {
