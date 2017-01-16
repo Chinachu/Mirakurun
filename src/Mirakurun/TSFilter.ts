@@ -173,7 +173,7 @@ export default class TSFilter extends stream.Duplex {
         this.once("finish", this._close.bind(this));
         this.once("close", this._close.bind(this));
 
-        log.debug("TSFilter has created (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
+        log.info("TSFilter has created (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
 
         if (this._ready === false) {
             log.debug("TSFilter is waiting for serviceId=%s, eventId=%s", this._provideServiceId, this._provideEventId);
@@ -198,7 +198,7 @@ export default class TSFilter extends stream.Duplex {
 
         // stringent safety measure
         if (this._readableState.length > this.highWaterMark) {
-            log.error("TSFilter is overflowing the buffer...");
+            log.warn("TSFilter is overflowing the buffer...");
 
             if (this._overflowTimer === null) {
                 this._overflowTimer = setTimeout(() => {
@@ -396,7 +396,7 @@ export default class TSFilter extends stream.Duplex {
         if (this._ready === false && this._provideServiceId !== null && this._provideEventId === null) {
             this._ready = true;
 
-            log.debug("TSFilter is now ready for serviceId=%d", this._provideServiceId);
+            log.info("TSFilter is now ready for serviceId=%d", this._provideServiceId);
         }
 
         if (data.program_info[0]) {
@@ -489,13 +489,13 @@ export default class TSFilter extends stream.Duplex {
                 if (this._ready === false) {
                     this._ready = true;
 
-                    log.debug("TSFilter is now ready for eventId=%d", this._provideEventId);
+                    log.info("TSFilter is now ready for eventId=%d", this._provideEventId);
                 }
             } else {
                 if (this._ready === true) {
                     this._ready = false;
 
-                    log.debug("TSFilter is closing because eventId=%d has ended...", this._provideEventId);
+                    log.info("TSFilter is closing because eventId=%d has ended...", this._provideEventId);
 
                     return this._close();
                 }
@@ -537,7 +537,7 @@ export default class TSFilter extends stream.Duplex {
             _.service.findByNetworkIdWithLogoId(data.original_network_id, dataModule.logo_id).forEach(service => {
                 service.logoData = logoData;
 
-                log.debug("TSFilter updated serviceId=%d logo data", service.serviceId);
+                log.info("TSFilter updated serviceId=%d logo data", service.serviceId);
             });
         }
     }
@@ -688,7 +688,7 @@ export default class TSFilter extends stream.Duplex {
             this.emit("end");
         });
 
-        log.debug("TSFilter has closed (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
+        log.info("TSFilter has closed (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
 
         --status.streamCount.tsFilter;
     }

@@ -133,7 +133,7 @@ namespace db {
 
     function load(path) {
 
-        log.debug("load db `%s`", path);
+        log.info("load db `%s`", path);
 
         if (fs.existsSync(path) === true) {
             return require(path);
@@ -144,7 +144,7 @@ namespace db {
 
     function save(path: string, data: any[]): Promise<void> {
 
-        log.debug("save db `%s`", path);
+        log.info("save db `%s`", path);
 
         return new Promise<void>((resolve, reject) => {
 

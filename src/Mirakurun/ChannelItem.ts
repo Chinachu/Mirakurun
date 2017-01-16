@@ -98,7 +98,7 @@ export default class ChannelItem {
             return;
         }
 
-        log.info("ChannelItem#'%s' serviceId=%d check has queued", this._name, serviceId);
+        log.debug("ChannelItem#'%s' serviceId=%d check has queued", this._name, serviceId);
 
         queue.add(() => {
             return new Promise((resolve) => {
@@ -117,7 +117,7 @@ export default class ChannelItem {
                     })
                     .catch(error => {
 
-                        log.info("ChannelItem#'%s' serviceId=%d check has failed [%s]", this._name, serviceId, error);
+                        log.warn("ChannelItem#'%s' serviceId=%d check has failed [%s]", this._name, serviceId, error);
 
                         setTimeout(() => this.addService(serviceId), 180000);
 
@@ -137,7 +137,7 @@ export default class ChannelItem {
 
     serviceScan(add: boolean): void {
 
-        log.info("ChannelItem#'%s' service scan has queued", this._name);
+        log.debug("ChannelItem#'%s' service scan has queued", this._name);
 
         queue.add(() => {
             return new Promise((resolve) => {
@@ -174,7 +174,7 @@ export default class ChannelItem {
                     })
                     .catch(error => {
 
-                        log.error("ChannelItem#'%s' service scan has failed [%s]", this._name, error);
+                        log.warn("ChannelItem#'%s' service scan has failed [%s]", this._name, error);
 
                         setTimeout(() => this.serviceScan(add), add ? 180000 : 3600000);
 

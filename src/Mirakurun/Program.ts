@@ -158,7 +158,7 @@ export default class Program {
 
     private _gc(): void {
 
-        log.info("Program GC has queued");
+        log.debug("Program GC has queued");
 
         queue.add(() => {
 

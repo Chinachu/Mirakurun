@@ -103,14 +103,14 @@ export function saveChannels(data: Channel[]): Promise<void> {
 
 function load(path) {
 
-    log.debug("load config `%s`", path);
+    log.info("load config `%s`", path);
 
     return yaml.safeLoad(fs.readFileSync(path, "utf8"));
 }
 
 function save(path, data): Promise<void> {
 
-    log.debug("save config `%s`", path);
+    log.info("save config `%s`", path);
 
     return new Promise<void>((resolve, reject) => {
 
