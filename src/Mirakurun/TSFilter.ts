@@ -21,6 +21,8 @@ import * as log from "./log";
 import epg from "./epg";
 import status from "./status";
 import _ from "./_";
+import Program from "./Program";
+import ProgramItem from "./ProgramItem";
 import ServiceItem from "./ServiceItem";
 const aribts = require("aribts");
 const calcCRC32: (buf: Buffer) => number = aribts.TsCrc32.calc;
@@ -102,6 +104,8 @@ export default class TSFilter extends stream.Duplex {
     private _epgReady: boolean = false;
     private _epgState: { [networkId: number]: { [serviceId: number]: BasicExtState } } = {};
     private _overflowTimer: NodeJS.Timer = null;
+    private _provideEventLastDetectedAt: number = -1;
+    private _provideEventTimeout: NodeJS.Timer = null;
 
     // stream options
     private highWaterMark: number = _.config.server.highWaterMark || 1024 * 1024 * 24;
@@ -125,6 +129,20 @@ export default class TSFilter extends stream.Duplex {
         }
         if (this._provideEventId !== null) {
             this._ready = false;
+
+            const program = _.program.get(
+                Program.getProgramId(
+                    this._targetNetworkId,
+                    this._provideServiceId,
+                    this._provideEventId
+                )
+            );
+            if (program) {
+                this._provideEventTimeout = setTimeout(
+                    () => this._observeProvideEvent(),
+                    program.data.startAt + program.data.duration - Date.now()
+                );
+            }
         }
         if (options.noProvide === true) {
             this._provideServiceId = null;
@@ -466,6 +484,8 @@ export default class TSFilter extends stream.Duplex {
             this._provideServiceId === data.service_id
         ) {
             if (data.events[0].event_id === this._provideEventId) {
+                this._provideEventLastDetectedAt = Date.now();
+
                 if (this._ready === false) {
                     this._ready = true;
 
@@ -520,6 +540,21 @@ export default class TSFilter extends stream.Duplex {
                 log.debug("TSFilter updated serviceId=%d logo data", service.serviceId);
             });
         }
+    }
+
+    private _observeProvideEvent(): void {
+
+        // note: EIT p/f interval is max 3s. (ARIB TR-B15)
+        if (Date.now() - this._provideEventLastDetectedAt < 10000) {
+            this._provideEventTimeout = setTimeout(
+                () => this._observeProvideEvent(),
+                3000
+            );
+            return;
+        }
+
+        log.warn("TSFilter is closing because EIT p/f timed out for eventId=%d...", this._provideEventId);
+        this._close();
     }
 
     private _updateEpgState(data): void {
@@ -623,6 +658,7 @@ export default class TSFilter extends stream.Duplex {
 
         // clear timer
         clearTimeout(this._pmtTimer);
+        clearTimeout(this._provideEventTimeout);
 
         // clear buffer
         setImmediate(() => {
