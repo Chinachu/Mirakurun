@@ -173,12 +173,8 @@ export default class TunerDevice extends events.EventEmitter {
                         throw new Error(util.format("TunerDevice#%d has higher priority user", this._index));
                     }
 
-                    try {
-                        await this._kill(true);
-                        await this._spawn(channel);
-                    } catch (e) {
-                        throw e;
-                    }
+                    await this._kill(true);
+                    await this._spawn(channel);
                 }
             } else {
                 try {
