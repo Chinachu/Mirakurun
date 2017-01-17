@@ -177,11 +177,7 @@ export default class TunerDevice extends events.EventEmitter {
                     await this._spawn(channel);
                 }
             } else {
-                try {
-                    await this._spawn(channel);
-                } catch (e) {
-                    throw e;
-                }
+                await this._spawn(channel);
             }
         }
 
