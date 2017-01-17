@@ -20,6 +20,7 @@ disableIPv6: false # boolean
 highWaterMark: 25165824 # integer (bytes)
 overflowTimeLimit: 30000 # integer (ms)
 maxBufferBytesBeforeReady: 3145728 # integer (bytes)
+eventEndTimeout: 1000 # integer (ms)
 programGCInterval: 900000 # integer (ms)
 epgGatheringInterval: 900000 # integer (ms)
 epgRetrievalTime: 600000 # integer (ms)

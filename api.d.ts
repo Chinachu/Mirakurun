@@ -168,6 +168,7 @@ export interface ConfigServer {
     highWaterMark?: number;
     overflowTimeLimit?: number;
     maxBufferBytesBeforeReady?: number;
+    eventEndTimeout?: number;
     programGCInterval?: number;
     epgGatheringInterval?: number;
     epgRetrievalTime?: number;

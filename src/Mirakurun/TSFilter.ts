@@ -116,6 +116,7 @@ export default class TSFilter extends stream.Duplex {
         bytes = bytes - bytes % PACKET_SIZE;
         return bytes;
     })();
+    private _eventEndTimeout: number = _.config.server.eventEndTimeout || 1000;
 
     // ReadableState in node/lib/_stream_readable.js
     private _readableState: any;
@@ -506,11 +507,15 @@ export default class TSFilter extends stream.Duplex {
                 }
             } else {
                 if (this._ready === true) {
-                    this._ready = false;
-
                     log.info("TSFilter is closing because eventId=%d has ended...", this._provideEventId);
 
-                    return this._close();
+                    const eventId = this._provideEventId;
+                    this._provideEventId = null;
+                    setTimeout(() => {
+                        this._ready = false;
+                        this._provideEventId = eventId;
+                        this._close();
+                    }, this._eventEndTimeout);
                 }
             }
         }

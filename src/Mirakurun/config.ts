@@ -38,6 +38,7 @@ export interface Server {
     /** Milliseconds */
     overflowTimeLimit?: number;
     maxBufferBytesBeforeReady?: number;
+    eventEndTimeout?: number;
 
     programGCInterval?: number;
     epgGatheringInterval?: number;

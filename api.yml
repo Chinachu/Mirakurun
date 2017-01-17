@@ -387,6 +387,9 @@ definitions:
         type: integer
       maxBufferBytesBeforeReady:
         type: integer
+      eventEndTimeout:
+        type: integer
+        minimum: 0
       programGCInterval:
         type: integer
       epgGatheringInterval:
