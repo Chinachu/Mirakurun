@@ -19,7 +19,7 @@ port: 40772 # integer or ~ (null)
 disableIPv6: false # boolean
 highWaterMark: 25165824 # integer (bytes)
 overflowTimeLimit: 30000 # integer (ms)
-maxBufferLengthBeforeReady: 1000 # integer (Array#length)
+maxBufferBytesBeforeReady: 3145728 # integer (bytes)
 programGCInterval: 900000 # integer (ms)
 epgGatheringInterval: 900000 # integer (ms)
 epgRetrievalTime: 600000 # integer (ms)

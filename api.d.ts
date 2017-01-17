@@ -167,7 +167,7 @@ export interface ConfigServer {
     logLevel?: LogLevel;
     highWaterMark?: number;
     overflowTimeLimit?: number;
-    maxBufferLengthBeforeReady?: number;
+    maxBufferBytesBeforeReady?: number;
     programGCInterval?: number;
     epgGatheringInterval?: number;
     epgRetrievalTime?: number;

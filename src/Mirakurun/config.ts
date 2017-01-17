@@ -37,7 +37,7 @@ export interface Server {
     highWaterMark?: number;
     /** Milliseconds */
     overflowTimeLimit?: number;
-    maxBufferLengthBeforeReady?: number;
+    maxBufferBytesBeforeReady?: number;
 
     programGCInterval?: number;
     epgGatheringInterval?: number;

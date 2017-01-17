@@ -385,7 +385,7 @@ definitions:
         type: integer
       overflowTimeLimit:
         type: integer
-      maxBufferLengthBeforeReady:
+      maxBufferBytesBeforeReady:
         type: integer
       programGCInterval:
         type: integer

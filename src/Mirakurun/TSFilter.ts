@@ -110,7 +110,12 @@ export default class TSFilter extends stream.Duplex {
     // stream options
     private highWaterMark: number = _.config.server.highWaterMark || 1024 * 1024 * 24;
     private _overflowTimeLimit: number = _.config.server.overflowTimeLimit || 1000 * 30;
-    private _maxBufferLengthBeforeReady: number = _.config.server.maxBufferLengthBeforeReady || 1000;
+    /** Number divisible by a multiple of 188 */
+    private _maxBufferBytesBeforeReady: number = (() => {
+        let bytes = _.config.server.maxBufferBytesBeforeReady || 1024 * 1024 * 3;
+        bytes = bytes - bytes % PACKET_SIZE;
+        return bytes;
+    })();
 
     // ReadableState in node/lib/_stream_readable.js
     private _readableState: any;
@@ -264,8 +269,9 @@ export default class TSFilter extends stream.Duplex {
                 this.push(Buffer.concat(this._buffer));
                 this._buffer = [];
             } else {
-                if (this._buffer.length > this._maxBufferLengthBeforeReady) {
-                    this._buffer.splice(0, this._buffer.length - this._maxBufferLengthBeforeReady);
+                this._buffer = [Buffer.concat(this._buffer)];
+                if (this._buffer[0].length > this._maxBufferBytesBeforeReady) {
+                    this._buffer[0] = this._buffer[0].slice(this._buffer[0].length - this._maxBufferBytesBeforeReady);
                 }
             }
         }
