@@ -163,7 +163,14 @@ export type EventType = "create" | "update" | "redefine";
 export interface ConfigServer {
     path?: string;
     port?: number;
+    disableIPv6?: boolean;
     logLevel?: LogLevel;
+    highWaterMark?: number;
+    overflowTimeLimit?: number;
+    maxBufferLengthBeforeReady?: number;
+    programGCInterval?: number;
+    epgGatheringInterval?: number;
+    epgRetrievalTime?: number;
 }
 
 export enum LogLevel {

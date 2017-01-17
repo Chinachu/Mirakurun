@@ -375,10 +375,24 @@ definitions:
         type: integer
         minimum: 1
         maximum: 65535
+      disableIPv6:
+        type: boolean
       logLevel:
         type: integer
         minimum: -1
         maximum: 3
+      highWaterMark:
+        type: integer
+      overflowTimeLimit:
+        type: integer
+      maxBufferLengthBeforeReady:
+        type: integer
+      programGCInterval:
+        type: integer
+      epgGatheringInterval:
+        type: integer
+      epgRetrievalTime:
+        type: integer
 
   ConfigTuners:
     type: array
