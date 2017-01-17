@@ -225,14 +225,14 @@ export default class TSFilter extends stream.Duplex {
         const length = chunk.length;
 
         if (this._offset > 0) {
-            if (chunk.length >= PACKET_SIZE - this._offset) {
+            if (length >= PACKET_SIZE - this._offset) {
                 chunk.copy(this._packet, this._offset, 0, PACKET_SIZE - this._offset);
                 this._processPacket(this._packet);
                 offset = PACKET_SIZE - this._offset;
                 this._offset = 0;
             } else {
                 chunk.copy(this._packet, this._offset);
-                this._offset += chunk.length;
+                this._offset += length;
 
                 // chunk drained
                 callback();
