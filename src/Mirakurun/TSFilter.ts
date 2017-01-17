@@ -110,6 +110,7 @@ export default class TSFilter extends stream.Duplex {
     // stream options
     private highWaterMark: number = _.config.server.highWaterMark || 1024 * 1024 * 24;
     private _overflowTimeLimit: number = _.config.server.overflowTimeLimit || 1000 * 30;
+    private _maxBufferLengthBeforeReady: number = _.config.server.maxBufferLengthBeforeReady || 1000;
 
     // ReadableState in node/lib/_stream_readable.js
     private _readableState: any;
@@ -259,8 +260,14 @@ export default class TSFilter extends stream.Duplex {
         }
 
         if (this._buffer.length !== 0) {
-            this.push(Buffer.concat(this._buffer));
-            this._buffer = [];
+            if (this._ready === true) {
+                this.push(Buffer.concat(this._buffer));
+                this._buffer = [];
+            } else {
+                if (this._buffer.length > this._maxBufferLengthBeforeReady) {
+                    this._buffer.splice(0, this._buffer.length - this._maxBufferLengthBeforeReady);
+                }
+            }
         }
 
         if (this._parses.length !== 0) {
@@ -294,7 +301,7 @@ export default class TSFilter extends stream.Duplex {
             this._parses.push(packet);
         }
 
-        if (this._ready === false) {
+        if (this._ready === false && (pid === 0x12 || this._provideEventId === null)) {
             return;
         }
         if (this._providePids !== null && this._providePids.indexOf(pid) === -1) {
