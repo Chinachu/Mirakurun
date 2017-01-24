@@ -39,20 +39,6 @@ export const put: Operation = (req, res) => {
             return;
         }
 
-        let command;
-        const args = [
-            "install",
-            "mirakurun@latest",
-            "-g",
-            "--production"
-        ];
-        if (process.platform === "win32") {
-            command = "npm.cmd";
-        } else {
-            command = "npm";
-            args.push("--unsafe");
-        }
-
         res.setHeader("Content-Type", "text/plain; charset=utf-8");
         res.status(202);
         res.write("Updating...\n");
@@ -65,9 +51,9 @@ export const put: Operation = (req, res) => {
         const out = openSync(path, "a");
         const err = openSync(path, "a");
 
-        res.write(`> ${command} ${args.join(" ")}\n\n`);
+        res.write(`> node lib/updater\n\n`);
 
-        const npm = spawn(command, args, {
+        const npm = spawn("node", ["lib/updater"], {
             detached: true,
             stdio: ["ignore", out, err]
         });
