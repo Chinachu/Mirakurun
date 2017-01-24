@@ -42,6 +42,7 @@ export const get: Operation = (req, res) => {
     if (service.hasLogoData === false) {
         res.writeHead(503, "Logo Data Unavailable");
         res.end();
+        return;
     }
 
     res.setHeader("Content-Type", "image/png");
