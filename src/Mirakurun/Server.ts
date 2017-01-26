@@ -73,7 +73,8 @@ class Server {
 
             if (
                 (req.ip && ip.isPrivate(req.ip) === true) ||
-                req.get("Origin") !== undefined
+                req.get("Origin") !== undefined ||
+                req.get("Referer") !== undefined
             ) {
                 res.status(403).end();
                 return;
