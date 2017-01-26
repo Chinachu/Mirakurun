@@ -83,7 +83,7 @@ class Server {
         api.info.version = pkg.version;
 
         openapi.initialize({
-            app: app,　　　　　　　　　　　　　　　
+            app: app,
             apiDoc: api,
             docsPath: "/docs",
             paths: "./lib/Mirakurun/api"
