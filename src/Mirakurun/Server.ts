@@ -72,7 +72,7 @@ class Server {
         app.use((req: express.Request, res: express.Response, next) => {
 
             if (
-                (req.ip && ip.isPrivate(req.ip) === true) ||
+                (req.ip && ip.isPrivate(req.ip) === false) ||
                 req.get("Origin") !== undefined ||
                 req.get("Referer") !== undefined
             ) {
