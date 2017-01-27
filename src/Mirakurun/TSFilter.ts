@@ -28,12 +28,12 @@ import * as aribts from "aribts";
 const calcCRC32: (buf: Buffer) => number = aribts.TsCrc32.calc;
 
 interface StreamOptions extends stream.DuplexOptions {
-    networkId?: number;
-    serviceId?: number;
-    eventId?: number;
-    noProvide?: boolean;
-    parseSDT?: boolean;
-    parseEIT?: boolean;
+    readonly networkId?: number;
+    readonly serviceId?: number;
+    readonly eventId?: number;
+    readonly noProvide?: boolean;
+    readonly parseSDT?: boolean;
+    readonly parseEIT?: boolean;
 }
 
 const PACKET_SIZE = 188;

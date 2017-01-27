@@ -33,16 +33,16 @@ interface User extends common.User {
 }
 
 interface Status {
-    index: number;
-    name: string;
-    types: common.ChannelType[];
-    command: string;
-    pid: number;
-    users: common.User[];
-    isAvailable: boolean;
-    isFree: boolean;
-    isUsing: boolean;
-    isFault: boolean;
+    readonly index: number;
+    readonly name: string;
+    readonly types: common.ChannelType[];
+    readonly command: string;
+    readonly pid: number;
+    readonly users: common.User[];
+    readonly isAvailable: boolean;
+    readonly isFree: boolean;
+    readonly isUsing: boolean;
+    readonly isFault: boolean;
 }
 
 export default class TunerDevice extends events.EventEmitter {

@@ -23,7 +23,7 @@ import Service from "./Service";
 import Program from "./Program";
 
 interface Shared {
-    config: {
+    readonly config: {
         server?: config.Server;
         channels?: config.Channel[];
         tuners?: config.Tuner[];

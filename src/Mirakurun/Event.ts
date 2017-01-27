@@ -20,10 +20,10 @@ import { EventEmitter } from "events";
 import _ from "./_";
 
 export interface EventMessage {
-    resource: EventResource;
-    type: EventType;
-    data: any;
-    time: number;
+    readonly resource: EventResource;
+    readonly type: EventType;
+    readonly data: any;
+    readonly time: number;
 }
 
 export type EventResource = "program" | "service" | "tuner";

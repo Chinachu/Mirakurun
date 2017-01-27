@@ -19,9 +19,9 @@
 import * as express from "express";
 
 export interface Error {
-    code: number;
-    reason: string;
-    errors: any[];
+    readonly code: number;
+    readonly reason: string;
+    readonly errors: any[];
 }
 
 export function responseError(res: express.Response, code: number, reason?: string): express.Response {

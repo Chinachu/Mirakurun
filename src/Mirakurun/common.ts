@@ -16,10 +16,10 @@
 "use strict";
 
 export interface User {
-    id: string;
-    priority: number;
-    agent?: string;
-    disableDecoder?: boolean;
+    readonly id: string;
+    readonly priority: number;
+    readonly agent?: string;
+    readonly disableDecoder?: boolean;
 }
 
 export type ChannelType = "GR" | "BS" | "CS" | "SKY";

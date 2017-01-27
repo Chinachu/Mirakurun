@@ -23,60 +23,60 @@ import * as log from "./log";
 
 export interface Server {
     // as Local Server
-    path?: string;
+    readonly path?: string;
 
     // as Remote Server
-    port?: number;
+    readonly port?: number;
 
     /** `true` to disable IPv6 listening */
-    disableIPv6?: boolean;
+    readonly disableIPv6?: boolean;
 
-    logLevel?: log.LogLevel;
+    readonly logLevel?: log.LogLevel;
 
     /** Byte */
-    highWaterMark?: number;
+    readonly highWaterMark?: number;
     /** Milliseconds */
-    overflowTimeLimit?: number;
-    maxBufferBytesBeforeReady?: number;
-    eventEndTimeout?: number;
+    readonly overflowTimeLimit?: number;
+    readonly maxBufferBytesBeforeReady?: number;
+    readonly eventEndTimeout?: number;
 
-    programGCInterval?: number;
-    epgGatheringInterval?: number;
-    epgRetrievalTime?: number;
+    readonly programGCInterval?: number;
+    readonly epgGatheringInterval?: number;
+    readonly epgRetrievalTime?: number;
 }
 
 export interface Tuner {
-    name: string;
+    readonly name: string;
 
     // GR / BS / CS / SKY
-    types: common.ChannelType[];
+    readonly types: common.ChannelType[];
 
     // for chardev / dvb
-    command?: string;
+    readonly command?: string;
 
     // for dvb
-    dvbDevicePath?: string;
+    readonly dvbDevicePath?: string;
 
     // decoder
-    decoder?: string;
+    readonly decoder?: string;
 
-    isDisabled?: boolean;
+    readonly isDisabled?: boolean;
 }
 
 export interface Channel {
-    name: string;
+    readonly name: string;
 
     // GR / BS / CS / SKY
-    type: common.ChannelType;
+    readonly type: common.ChannelType;
 
     // passed to tuning command
-    channel: string;
-    satelite?: string;
+    readonly channel: string;
+    readonly satelite?: string;
 
     // service id
-    serviceId?: number;
+    readonly serviceId?: number;
 
-    isDisabled?: boolean;
+    readonly isDisabled?: boolean;
 }
 
 export function loadServer(): Server {
