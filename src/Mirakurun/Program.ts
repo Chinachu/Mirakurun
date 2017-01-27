@@ -18,13 +18,13 @@
 
 import * as stream from "stream";
 import * as fs from "fs";
+import * as sift from "sift";
 import * as log from "./log";
 import _ from "./_";
 import db from "./db";
 import queue from "./queue";
 import ServiceItem from "./ServiceItem";
 import ProgramItem from "./ProgramItem";
-const sift = require("sift");
 
 export default class Program {
 

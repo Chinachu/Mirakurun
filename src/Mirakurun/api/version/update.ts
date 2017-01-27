@@ -16,13 +16,13 @@
 "use strict";
 
 import { Operation } from "express-openapi";
-import * as api from "../../api";
 import { openSync, unlinkSync, existsSync } from "fs";
 import { join } from "path";
 import { spawn } from "child_process";
 import { tmpdir } from "os";
-const Tail = require("tail").Tail;
-const latestVersion = require("latest-version");
+import { Tail } from "tail";
+import * as latestVersion from "latest-version";
+import * as api from "../../api";
 const current = require("../../../../package.json").version as string;
 
 export const put: Operation = (req, res) => {

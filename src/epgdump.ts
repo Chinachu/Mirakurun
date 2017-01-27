@@ -44,7 +44,7 @@ if (fs.existsSync(dest) === true && force === false) {
 process.env.SERVER_CONFIG_PATH = "./config/server.yml";
 process.env.PROGRAMS_DB_PATH = dest;
 
-const aribts = require("aribts");
+import * as aribts from "aribts";
 import _ from "./Mirakurun/_";
 import Event from "./Mirakurun/Event";
 import Program from "./Mirakurun/Program";

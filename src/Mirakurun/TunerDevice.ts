@@ -28,8 +28,6 @@ import status from "./status";
 import Event from "./Event";
 import ChannelItem from "./ChannelItem";
 
-const Queue = require("promise-queue");
-
 interface User extends common.User {
     _stream?: stream.Duplex;
 }

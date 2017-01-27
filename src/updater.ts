@@ -17,7 +17,7 @@
 "use strict";
 
 import { spawn, ChildProcess } from "child_process";
-const latestVersion = require("latest-version");
+import * as latestVersion from "latest-version";
 const pkg = require("../package.json");
 
 if (process.env.DOCKER === "YES") {

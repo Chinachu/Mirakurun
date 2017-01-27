@@ -23,7 +23,7 @@ import queue from "./queue";
 import Program from "./Program";
 const getProgramId = Program.getProgramId;
 import ProgramItem from "./ProgramItem";
-const aribts = require("aribts");
+import * as aribts from "aribts";
 const TsChar = aribts.TsChar;
 const TsDate = aribts.TsDate;
 

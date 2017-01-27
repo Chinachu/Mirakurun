@@ -16,9 +16,9 @@
 "use strict";
 
 import { Operation } from "express-openapi";
+import * as latestVersion from "latest-version";
 import * as api from "../api";
 import { Version } from "../../../api";
-const latestVersion = require("latest-version");
 const pkg = require("../../../package.json");
 
 export const get: Operation = (req, res) => {

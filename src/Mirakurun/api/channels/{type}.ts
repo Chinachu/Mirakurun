@@ -16,9 +16,9 @@
 "use strict";
 
 import { Operation } from "express-openapi";
+import * as sift from "sift";
 import * as api from "../../api";
 import Channel from "../../Channel";
-const sift = require("sift");
 
 export const parameters = [
     {

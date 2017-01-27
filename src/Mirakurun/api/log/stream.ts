@@ -18,7 +18,7 @@
 import { Operation } from "express-openapi";
 import * as fs from "fs";
 import * as api from "../../api";
-const Tail = require("tail").Tail;
+import { Tail } from "tail";
 
 export const get: Operation = (req, res) => {
 

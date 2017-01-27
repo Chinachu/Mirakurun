@@ -24,7 +24,7 @@ import _ from "./_";
 import Program from "./Program";
 import ProgramItem from "./ProgramItem";
 import ServiceItem from "./ServiceItem";
-const aribts = require("aribts");
+import * as aribts from "aribts";
 const calcCRC32: (buf: Buffer) => number = aribts.TsCrc32.calc;
 
 interface StreamOptions extends stream.DuplexOptions {
