@@ -19,6 +19,7 @@ import { Operation } from "express-openapi";
 import * as sift from "sift";
 import * as api from "../api";
 import Service from "../Service";
+import ServiceItem from "../ServiceItem";
 
 export const get: Operation = (req, res) => {
 
@@ -30,8 +31,40 @@ export const get: Operation = (req, res) => {
         return ret;
     });
 
+    services.sort((a: ServiceItem, b: ServiceItem) => getOrder(a) - getOrder(b));
+
     api.responseJSON(res, sift(req.query, services));
 };
+
+function getOrder(service: ServiceItem): number {
+
+    let order: string;
+
+    switch (service.channel.type) {
+        case "GR":
+            order = "1";
+            break;
+        case "BS":
+            order = "2";
+            break;
+        case "CS":
+            order = "3";
+            break;
+        case "SKY":
+            order = "4";
+            break;
+    }
+
+    if (service.remoteControlKeyId) {
+        order += (100 + service.remoteControlKeyId).toString(10);
+    } else {
+        order += "200";
+    }
+
+    order += (10000 + service.serviceId).toString(10);
+
+    return parseInt(order, 10);
+}
 
 get.apiDoc = {
     tags: ["services"],
