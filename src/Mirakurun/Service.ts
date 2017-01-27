@@ -150,7 +150,7 @@ export default class Service {
             );
         });
 
-        if (dropped === true) {
+        if (dropped) {
             this.save();
         }
     }

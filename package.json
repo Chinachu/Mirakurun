@@ -66,19 +66,19 @@
     "morgan": "^1.7.0",
     "munin-plugin": "0.0.9",
     "promise-queue": "^2.2.3",
-    "sift": "^3.2.4",
+    "sift": "^3.2.6",
     "tail": "^1.2.1"
   },
   "devDependencies": {
     "del": "^2.2.0",
     "gulp": "^3.9.1",
     "gulp-mocha": "^3.0.1",
-    "gulp-sourcemaps": "^1.6.0",
+    "gulp-sourcemaps": "^2.4.0",
     "gulp-tslint": "^6.1.1",
-    "gulp-typescript": "^2.13.6",
+    "gulp-typescript": "^3.1.4",
     "tslint": "^3.15.1",
-    "typescript": "^1.8.10",
-    "typings": "^2.0.0"
+    "typescript": "^2.1.5",
+    "typings": "^2.1.0"
   },
   "engines": {
     "node": ">=6.5.0"

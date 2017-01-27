@@ -17,7 +17,7 @@
 
 import { Operation } from "express-openapi";
 import * as api from "../api";
-import { Version } from "../../../api.d.ts";
+import { Version } from "../../../api";
 const latestVersion = require("latest-version");
 const pkg = require("../../../package.json");
 

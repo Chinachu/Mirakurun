@@ -52,7 +52,7 @@ import epg from "./Mirakurun/epg";
 import * as config from "./Mirakurun/config";
 import * as log from "./Mirakurun/log";
 
-log.logLevel = log.LogLevel.INFO;
+(<any>log).logLevel = log.LogLevel.INFO;
 _.config.server = config.loadServer();
 new Event();
 new Program();

@@ -58,7 +58,7 @@ _.config.channels = config.loadChannels();
 _.config.tuners = config.loadTuners();
 
 if (typeof _.config.server.logLevel === "number") {
-    log.logLevel = _.config.server.logLevel;
+    (<any>log).logLevel = _.config.server.logLevel;
 }
 
 new Event();

@@ -156,25 +156,18 @@ export default class Client {
         });
     }
 
-    private _requestStream(method: RequestMethod, path: string, option: RequestOption = {}): Promise<http.IncomingMessage> {
+    private async _requestStream(method: RequestMethod, path: string, option: RequestOption = {}): Promise<http.IncomingMessage> {
 
-        return new Promise((resolve, reject) => {
+        const res = await this._httpRequest(method, path, option);
 
-            this._httpRequest(method, path, option).then(
-                res => {
-
-                    if (res.statusCode >= 200 && res.statusCode <= 202) {
-                        resolve(res);
-                    } else {
-                        reject(res);
-                    }
-                },
-                err => reject(err)
-            );
-        });
+        if (res.statusCode >= 200 && res.statusCode <= 202) {
+            return res;
+        } else {
+            throw res;
+        }
     }
 
-    private _getTS(path: string, decode = true): Promise<http.IncomingMessage> {
+    private async _getTS(path: string, decode = true): Promise<http.IncomingMessage> {
 
         const option: RequestOption = {
             query: {
@@ -182,20 +175,13 @@ export default class Client {
             }
         };
 
-        return new Promise((resolve, reject) => {
+        const res = await this._requestStream("GET", path, option);
 
-            this._requestStream("GET", path, option).then(
-                res => {
-
-                    if (res.headers["content-type"] === "video/MP2T") {
-                        resolve(res);
-                    } else {
-                        reject(res);
-                    }
-                },
-                err => reject(err)
-            );
-        });
+        if (res.headers["content-type"] === "video/MP2T") {
+            return res;
+        } else {
+            throw res;
+        }
     }
 
     request(method: RequestMethod, path: string, option: RequestOption = {}): Promise<Response>|Promise<ErrorResponse> {
@@ -250,189 +236,182 @@ export default class Client {
         });
     }
 
-    getChannels(query?: ChannelsQuery): Promise<apid.Channel[]> {
+    async getChannels(query?: ChannelsQuery): Promise<apid.Channel[]> {
 
-        return this.request("GET", "/channels", { query: query })
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", "/channels", { query: query });
+        return res.body as apid.Channel[];
     }
 
-    getChannelsByType(type: apid.ChannelType, query?: ChannelsQuery): Promise<apid.Channel[]> {
+    async getChannelsByType(type: apid.ChannelType, query?: ChannelsQuery): Promise<apid.Channel[]> {
 
-        return this.request("GET", `/channels/${type}`, { query: query })
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", `/channels/${type}`, { query: query });
+        return res.body as apid.Channel[];
     }
 
-    getChannel(type: apid.ChannelType, channel: string): Promise<apid.Channel> {
+    async getChannel(type: apid.ChannelType, channel: string): Promise<apid.Channel> {
 
-        return this.request("GET", `/channels/${type}/${channel}`)
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", `/channels/${type}/${channel}`);
+        return res.body as apid.Channel;
     }
 
-    getServicesByChannel(type: apid.ChannelType, channel: string): Promise<apid.Service[]> {
+    async getServicesByChannel(type: apid.ChannelType, channel: string): Promise<apid.Service[]> {
 
-        return this.request("GET", `/channels/${type}/${channel}/services`)
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", `/channels/${type}/${channel}/services`);
+        return res.body as apid.Service[];
     }
 
-    getServiceByChannel(type: apid.ChannelType, channel: string, sid: apid.ServiceId): Promise<apid.Service> {
+    async getServiceByChannel(type: apid.ChannelType, channel: string, sid: apid.ServiceId): Promise<apid.Service> {
 
-        return this.request("GET", `/channels/${type}/${channel}/services/${sid}`)
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", `/channels/${type}/${channel}/services/${sid}`);
+        return res.body as apid.Service;
     }
 
-    getServiceStreamByChannel(type: apid.ChannelType, channel: string, sid: apid.ServiceId, decode?: boolean): Promise<http.IncomingMessage> {
+    async getServiceStreamByChannel(type: apid.ChannelType, channel: string, sid: apid.ServiceId, decode?: boolean): Promise<http.IncomingMessage> {
 
-        return this._getTS(`/channels/${type}/${channel}/services/${sid}/stream`, decode)
-                   .then(res => Promise.resolve(res));
+        return await this._getTS(`/channels/${type}/${channel}/services/${sid}/stream`, decode);
     }
 
-    getChannelStream(type: apid.ChannelType, channel: string, decode?: boolean): Promise<http.IncomingMessage> {
+    async getChannelStream(type: apid.ChannelType, channel: string, decode?: boolean): Promise<http.IncomingMessage> {
 
-        return this._getTS(`/channels/${type}/${channel}/stream`, decode)
-                   .then(res => Promise.resolve(res));
+        return await this._getTS(`/channels/${type}/${channel}/stream`, decode);
     }
 
-    getPrograms(query?: ProgramsQuery): Promise<apid.Program[]> {
+    async getPrograms(query?: ProgramsQuery): Promise<apid.Program[]> {
 
-        return this.request("GET", "/programs", { query: query })
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", "/programs", { query: query });
+        return res.body as apid.Program[];
     }
 
-    getProgram(id: apid.ProgramId): Promise<apid.Program> {
+    async getProgram(id: apid.ProgramId): Promise<apid.Program> {
 
-        return this.request("GET", `/programs/${id}`)
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", `/programs/${id}`);
+        return res.body as apid.Program;
     }
 
-    getProgramStream(id: apid.ProgramId, decode?: boolean): Promise<http.IncomingMessage> {
+    async getProgramStream(id: apid.ProgramId, decode?: boolean): Promise<http.IncomingMessage> {
 
-        return this._getTS(`/programs/${id}/stream`, decode)
-                   .then(res => Promise.resolve(res));
+        return await this._getTS(`/programs/${id}/stream`, decode);
     }
 
-    getServices(query?: ServicesQuery): Promise<apid.Service[]> {
+    async getServices(query?: ServicesQuery): Promise<apid.Service[]> {
 
-        return this.request("GET", "/services", { query: query })
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", "/services", { query: query });
+        return res.body as apid.Service[];
     }
 
-    getService(id: apid.ServiceItemId): Promise<apid.Service> {
+    async getService(id: apid.ServiceItemId): Promise<apid.Service> {
 
-        return this.request("GET", `/services/${id}`)
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", `/services/${id}`);
+        return res.body as apid.Service;
     }
 
-    getLogoImage(id: apid.ServiceItemId): Promise<Buffer> {
+    async getLogoImage(id: apid.ServiceItemId): Promise<Buffer> {
 
-        return this.request("GET", `/services/${id}/logo`)
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", `/services/${id}/logo`);
+        return res.body as Buffer;
     }
 
-    getServiceStream(id: apid.ServiceItemId, decode?: boolean): Promise<http.IncomingMessage> {
+    async getServiceStream(id: apid.ServiceItemId, decode?: boolean): Promise<http.IncomingMessage> {
 
-        return this._getTS(`/services/${id}/stream`, decode)
-                   .then(res => Promise.resolve(res));
+        return await this._getTS(`/services/${id}/stream`, decode);
     }
 
-    getTuners(): Promise<apid.TunerDevice[]> {
+    async getTuners(): Promise<apid.TunerDevice[]> {
 
-        return this.request("GET", "/tuners")
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", "/tuners");
+        return res.body as apid.TunerDevice[];
     }
 
-    getTuner(index: number): Promise<apid.TunerDevice> {
+    async getTuner(index: number): Promise<apid.TunerDevice> {
 
-        return this.request("GET", `/tuners/${index}`)
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", `/tuners/${index}`);
+        return res.body as apid.TunerDevice;
     }
 
-    getTunerProcess(index: number): Promise<apid.TunerProcess> {
+    async getTunerProcess(index: number): Promise<apid.TunerProcess> {
 
-        return this.request("GET", `/tuners/${index}/process`)
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", `/tuners/${index}/process`);
+        return res.body as apid.TunerProcess;
     }
 
-    killTunerProcess(index: number): Promise<apid.TunerProcess> {
+    async killTunerProcess(index: number): Promise<apid.TunerProcess> {
 
-        return this.request("DELETE", `/tuners/${index}/process`)
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("DELETE", `/tuners/${index}/process`);
+        return res.body as apid.TunerProcess;
     }
 
-    getEvents(): Promise<apid.Event[]> {
+    async getEvents(): Promise<apid.Event[]> {
 
-        return this.request("GET", "/events")
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", "/events");
+        return res.body as apid.Event[];
     }
 
-    getEventsStream(query?: EventsQuery): Promise<http.IncomingMessage> {
+    async getEventsStream(query?: EventsQuery): Promise<http.IncomingMessage> {
 
-        return this._requestStream("GET", "/events/stream", { query: query })
-                   .then(res => Promise.resolve(res));
+        return await this._requestStream("GET", "/events/stream", { query: query });
     }
 
-    getChannelsConfig(): Promise<apid.ConfigChannels> {
+    async getChannelsConfig(): Promise<apid.ConfigChannels> {
 
-        return this.request("GET", "/config/channels")
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", "/config/channels");
+        return res.body as apid.ConfigChannels;
     }
 
-    updateChannelsConfig(channels: apid.ConfigChannels): Promise<apid.ConfigChannels> {
+    async updateChannelsConfig(channels: apid.ConfigChannels): Promise<apid.ConfigChannels> {
 
-        return this.request("PUT", "/config/channels", { body: channels })
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("PUT", "/config/channels", { body: channels });
+        return res.body as apid.ConfigChannels;
     }
 
-    getServerConfig(): Promise<apid.ConfigServer> {
+    async getServerConfig(): Promise<apid.ConfigServer> {
 
-        return this.request("GET", "/config/server")
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", "/config/server");
+        return res.body as apid.ConfigServer;
     }
 
-    updateServerConfig(server: apid.ConfigServer): Promise<apid.ConfigServer> {
+    async updateServerConfig(server: apid.ConfigServer): Promise<apid.ConfigServer> {
 
-        return this.request("PUT", "/config/server", { body: server })
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("PUT", "/config/server", { body: server });
+        return res.body as apid.ConfigServer;
     }
 
-    getTunersConfig(): Promise<apid.ConfigTuners> {
+    async getTunersConfig(): Promise<apid.ConfigTuners> {
 
-        return this.request("GET", "/config/tuners")
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", "/config/tuners");
+        return res.body as apid.ConfigTuners;
     }
 
-    updateTunersConfig(tuners: apid.ConfigTuners): Promise<apid.ConfigTuners> {
+    async updateTunersConfig(tuners: apid.ConfigTuners): Promise<apid.ConfigTuners> {
 
-        return this.request("PUT", "/config/tuners", { body: tuners })
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("PUT", "/config/tuners", { body: tuners });
+        return res.body as apid.ConfigTuners;
     }
 
-    getLog(): Promise<string> {
+    async getLog(): Promise<string> {
 
-        return this.request("GET", "/log")
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", "/log");
+        return res.body as string;
     }
 
-    getLogStream(): Promise<http.IncomingMessage> {
+    async getLogStream(): Promise<http.IncomingMessage> {
 
-        return this._requestStream("GET", "/log/stream")
-                   .then(res => Promise.resolve(res));
+        return await this._requestStream("GET", "/log/stream");
     }
 
-    checkVersion(): Promise<apid.Version> {
+    async checkVersion(): Promise<apid.Version> {
 
-        return this.request("GET", "/version")
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", "/version");
+        return res.body as apid.Version;
     }
 
-    updateVersion(force?: boolean): Promise<http.IncomingMessage> {
+    async updateVersion(force?: boolean): Promise<http.IncomingMessage> {
 
-        return this._requestStream("PUT", "/log/stream", { query: { force: force } })
-                   .then(res => Promise.resolve(res));
+        return await this._requestStream("PUT", "/log/stream", { query: { force: force } });
     }
 
-    getStatus(): Promise<apid.Status> {
+    async getStatus(): Promise<apid.Status> {
 
-        return this.request("GET", "/status")
-                   .then(res => Promise.resolve(res.body));
+        const res = await this.request("GET", "/status");
+        return res.body as apid.Status;
     }
 }

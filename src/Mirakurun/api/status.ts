@@ -17,7 +17,7 @@
 
 import { Operation } from "express-openapi";
 import * as api from "../api";
-import { Status } from "../../../api.d.ts";
+import { Status } from "../../../api";
 import status from "../status";
 import Program from "../Program";
 import Tuner from "../Tuner";

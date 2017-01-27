@@ -142,7 +142,7 @@ export default class Program {
             new ProgramItem(program, true);
         });
 
-        if (dropped === true) {
+        if (dropped) {
             this.save();
         }
     }
