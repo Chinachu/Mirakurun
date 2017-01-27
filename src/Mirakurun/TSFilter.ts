@@ -32,6 +32,7 @@ interface StreamOptions extends stream.DuplexOptions {
     readonly serviceId?: number;
     readonly eventId?: number;
     readonly noProvide?: boolean;
+    readonly parseNIT?: boolean;
     readonly parseSDT?: boolean;
     readonly parseEIT?: boolean;
 }
@@ -74,6 +75,7 @@ export default class TSFilter extends stream.Duplex {
     // options
     private _provideServiceId: number;
     private _provideEventId: number;
+    private _parseNIT: boolean = false;
     private _parseSDT: boolean = false;
     private _parseEIT: boolean = false;
     private _targetNetworkId: number;
@@ -96,7 +98,6 @@ export default class TSFilter extends stream.Duplex {
     private _tsid: number = -1;
     private _patCRC: Buffer = Buffer.allocUnsafe(0);
     private _serviceIds: number[] = [];
-    private _services: any[] = [];
     private _parseServiceIds: number[] = [];
     private _pmtPid: number = -1;
     private _pmtTimer: NodeJS.Timer;
@@ -157,6 +158,9 @@ export default class TSFilter extends stream.Duplex {
             this._providePids = [];
             this._ready = false;
         }
+        if (options.parseNIT === true) {
+            this._parseNIT = true;
+        }
         if (options.parseSDT === true) {
             this._parseSDT = true;
         }
@@ -172,6 +176,7 @@ export default class TSFilter extends stream.Duplex {
         this._parser.resume();
         this._parser.on("pat", this._onPAT.bind(this));
         this._parser.on("pmt", this._onPMT.bind(this));
+        this._parser.on("nit", this._onNIT.bind(this));
         this._parser.on("sdt", this._onSDT.bind(this));
         this._parser.on("eit", this._onEIT.bind(this));
         this._parser.on("tot", this._onTOT.bind(this));
@@ -334,7 +339,15 @@ export default class TSFilter extends stream.Duplex {
             const id = data.programs[i].program_number as number;
 
             if (id === 0) {
-                log.debug("TSFilter detected NIT PID=%d", data.programs[i].network_PID);
+                const NIT_PID = data.programs[i].network_PID;
+
+                log.debug("TSFilter detected NIT PID=%d", NIT_PID);
+
+                if (this._parseNIT === true) {
+                    if (this._parsePids.indexOf(NIT_PID) === -1) {
+                        this._parsePids.push(NIT_PID);
+                    }
+                }
                 continue;
             }
 
@@ -440,14 +453,47 @@ export default class TSFilter extends stream.Duplex {
         }
     }
 
+    private _onNIT(pid, data): void {
+
+        const _network = {
+            networkId: data.network_id,
+            areaCode: -1,
+            remoteControlKeyId: -1
+        };
+
+        if (data.transport_streams[0]) {
+            for (const desc of data.transport_streams[0].transport_descriptors) {
+                switch (desc.descriptor_tag) {
+                    case 0xFA:
+                        _network.areaCode = desc.area_code;
+                        break;
+                    case 0xCD:
+                        _network.remoteControlKeyId = desc.remote_control_key_id;
+                        break;
+                }
+            }
+        }
+
+        this.emit("network", _network);
+
+        const index = this._parsePids.indexOf(pid);
+        if (index !== -1) {
+            this._parsePids.splice(index, 1);
+        }
+    }
+
     private _onSDT(pid, data): void {
 
         if (this._tsid !== data.transport_stream_id) {
             return;
         }
 
+        const _services = [];
+
         for (let i = 0, l = data.services.length; i < l; i++) {
-            if (this._serviceIds.indexOf(data.services[i].service_id) === -1) {
+            const service = data.services[i];
+
+            if (this._serviceIds.indexOf(service.service_id) === -1) {
                 continue;
             }
 
@@ -455,14 +501,14 @@ export default class TSFilter extends stream.Duplex {
             let type = -1;
             let logoId = -1;
 
-            for (let j = 0, m = data.services[i].descriptors.length; j < m; j++) {
-                if (data.services[i].descriptors[j].descriptor_tag === 0x48) {
-                    name = new aribts.TsChar(data.services[i].descriptors[j].service_name_char).decode();
-                    type = data.services[i].descriptors[j].service_type;
+            for (let j = 0, m = service.descriptors.length; j < m; j++) {
+                if (service.descriptors[j].descriptor_tag === 0x48) {
+                    name = new aribts.TsChar(service.descriptors[j].service_name_char).decode();
+                    type = service.descriptors[j].service_type;
                 }
 
-                if (data.services[i].descriptors[j].descriptor_tag === 0xCF) {
-                    logoId = data.services[i].descriptors[j].logo_id;
+                if (service.descriptors[j].descriptor_tag === 0xCF) {
+                    logoId = service.descriptors[j].logo_id;
                 }
 
                 if (name !== "" && logoId !== -1) {
@@ -470,10 +516,10 @@ export default class TSFilter extends stream.Duplex {
                 }
             }
 
-            if (this._services.some(service => service.id === data.services[i].service_id) === false) {
-                this._services.push({
+            if (_services.some(_service => _service.id === service.service_id) === false) {
+                _services.push({
                     networkId: data.original_network_id,
-                    serviceId: data.services[i].service_id,
+                    serviceId: service.service_id,
                     name: name,
                     type: type,
                     logoId: logoId
@@ -481,7 +527,7 @@ export default class TSFilter extends stream.Duplex {
             }
         }
 
-        this.emit("services", this._services);
+        this.emit("services", _services);
 
         const index = this._parsePids.indexOf(pid);
         if (index !== -1) {

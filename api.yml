@@ -110,9 +110,11 @@ definitions:
       name:
         type: string
       logoId:
-        type: number
+        type: integer
       hasLogoData:
         type: boolean
+      remoteControlKeyId:
+        type: integer
       channel:
         $ref: '#/definitions/Channel'
 
@@ -262,11 +264,11 @@ definitions:
     type: object
     properties:
       networkId:
-        type: number
+        type: integer
       serviceId:
-        type: number
+        type: integer
       eventId:
-        type: number
+        type: integer
 
   # tuner ---------------------------------------------------------------------
 
@@ -495,11 +497,11 @@ definitions:
         type: object
         properties:
           tunerDevice:
-            type: number
+            type: integer
           tsFilter:
-            type: number
+            type: integer
           decoder:
-            type: number
+            type: integer
       errorCount:
         type: object
         properties:

@@ -55,6 +55,7 @@ export interface Service {
     name: string;
     logoId?: number;
     hasLogoData?: boolean;
+    remoteControlKeyId?: number;
     channel?: Channel;
 }
 

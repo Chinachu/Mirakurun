@@ -30,6 +30,7 @@ namespace db {
         type: number;
         logoId: number;
         logoData?: string; // base64
+        remoteControlKeyId?: number;
         channel: Channel;
     }
 

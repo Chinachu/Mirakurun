@@ -19,6 +19,7 @@
 import * as stream from "stream";
 import _ from "./_";
 import queue from "./queue";
+import db from "./db";
 import * as log from "./log";
 import * as common from "./common";
 import * as config from "./config";
@@ -138,7 +139,7 @@ export default class ChannelItem {
 
             log.info("ChannelItem#'%s' service scan has started", this._name);
 
-            let services;
+            let services: db.Service[];
             try {
                 services = await _.tuner.getServices(this);
             } catch (e) {
@@ -157,6 +158,7 @@ export default class ChannelItem {
                     item.name = service.name;
                     item.type = service.type;
                     item.logoId = service.logoId;
+                    item.remoteControlKeyId = service.remoteControlKeyId;
                 } else if (add === true) {
                     new ServiceItem(
                         this,
@@ -164,7 +166,9 @@ export default class ChannelItem {
                         service.serviceId,
                         service.name,
                         service.type,
-                        service.logoId
+                        service.logoId,
+                        undefined,
+                        service.remoteControlKeyId
                     );
                 }
             });

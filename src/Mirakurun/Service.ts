@@ -146,7 +146,8 @@ export default class Service {
                 service.name,
                 service.type,
                 service.logoId,
-                service.logoData
+                service.logoData,
+                service.remoteControlKeyId
             );
         });
 

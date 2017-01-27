@@ -34,7 +34,8 @@ export default class ServiceItem {
         private _name?: string,
         private _type?: number,
         private _logoId?: number,
-        private _logoData?: string
+        private _logoData?: string,
+        private _remoteControlKeyId?: number
     ) {
 
         this._id = ServiceItem.createId(_networkId, _serviceId);
@@ -77,6 +78,10 @@ export default class ServiceItem {
 
     get hasLogoData(): boolean {
         return !!this._logoData;
+    }
+
+    get remoteControlKeyId(): number {
+        return this._remoteControlKeyId;
     }
 
     get channel(): ChannelItem {
@@ -123,6 +128,16 @@ export default class ServiceItem {
         }
     }
 
+    set remoteControlKeyId(id: number) {
+
+        if (this._remoteControlKeyId !== id) {
+            this._remoteControlKeyId = id;
+
+            _.service.save();
+            this._updated();
+        }
+    }
+
     export(full = false): db.Service {
 
         const ret: db.Service = {
@@ -132,6 +147,7 @@ export default class ServiceItem {
             name: this._name || "",
             type: this._type,
             logoId: this._logoId,
+            remoteControlKeyId: this._remoteControlKeyId,
             channel: {
                 type: this._channel.type,
                 channel: this._channel.channel

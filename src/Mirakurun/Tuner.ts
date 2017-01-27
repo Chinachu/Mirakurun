@@ -35,6 +35,7 @@ interface StreamSetting {
     serviceId?: number;
     eventId?: number;
     noProvide?: boolean;
+    parseNIT?: boolean;
     parseSDT?: boolean;
     parseEIT?: boolean;
 }
@@ -158,6 +159,7 @@ export default class Tuner {
         const setting: StreamSetting = {
             channel: channel,
             noProvide: true,
+            parseNIT: true,
             parseSDT: true
         };
 
@@ -170,22 +172,46 @@ export default class Tuner {
         const stream = await this._getStream(setting, user);
         return new Promise<db.Service[]>((resolve, reject) => {
 
+            let network = {
+                networkId: -1,
+                areaCode: -1,
+                remoteControlKeyId: -1
+            };
             let services: db.Service[] = null;
 
             setTimeout(() => stream.emit("close"), 10000);
 
-            stream.once("services", _services => {
-                services = _services;
-                stream.emit("close");
-            });
+            Promise.all([
+                new Promise((resolve, reject) => {
+                    stream.once("network", _network => {
+                        network = _network;
+                        resolve();
+                    });
+                }),
+                new Promise((resolve, reject) => {
+                    stream.once("services", _services => {
+                        services = _services;
+                        resolve();
+                    });
+                }),
+            ]).then(() => stream.emit("close"));
 
             stream.once("close", () => {
 
+                stream.removeAllListeners("network");
                 stream.removeAllListeners("services");
 
-                if (services === null) {
+                if (network.networkId === -1) {
+                    reject(new Error("stream has closed before get network"));
+                } else if (services === null) {
                     reject(new Error("stream has closed before get services"));
                 } else {
+                    if (network.remoteControlKeyId !== -1) {
+                        services.forEach(service => {
+                            service.remoteControlKeyId = network.remoteControlKeyId;
+                        });
+                    }
+
                     resolve(services);
                 }
             });
@@ -304,6 +330,7 @@ export default class Tuner {
                         serviceId: setting.serviceId,
                         eventId: setting.eventId,
                         noProvide: setting.noProvide,
+                        parseNIT: setting.parseNIT,
                         parseSDT: setting.parseSDT,
                         parseEIT: setting.parseEIT
                     });
