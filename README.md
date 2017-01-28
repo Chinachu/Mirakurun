@@ -1,4 +1,4 @@
-[![Mirakurun](https://yabumi.cc/153eab7d76cd45beb272b916.svg)](https://github.com/Chinachu/Mirakurun)
+[![Mirakurun](https://yabumi.cc/159e63f5c692b3b0dae47765.svg)](https://github.com/Chinachu/Mirakurun)
 
 # Mirakurun
 
@@ -23,7 +23,7 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 
 ## Requirements / Supported Platforms
 
-* [Node.js](http://nodejs.org/) `>=6.5.0`
+* [Node.js](http://nodejs.org/) `>=6.5.0 <7.0.0`
 * Linux w/ [PM2](http://pm2.keymetrics.io/)
 * Win32 w/ [winser](https://github.com/jfromaniello/winser)
 
