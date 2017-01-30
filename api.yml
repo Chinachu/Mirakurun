@@ -78,6 +78,8 @@ definitions:
         type: string
       satelite:
         type: string
+      space:
+        type: number
       services:
         type: array
         items:

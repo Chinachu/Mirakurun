@@ -230,7 +230,7 @@ export default class TunerDevice extends events.EventEmitter {
         }
 
         if (ch.space) {
-            cmd = cmd.replace("<space>", ch.space.toString());
+            cmd = cmd.replace("<space>", ch.space.toString(10));
         } else {
             cmd = cmd.replace("<space>", "0"); // set default value to '0'
         }
