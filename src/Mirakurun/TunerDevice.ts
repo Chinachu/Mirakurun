@@ -229,6 +229,12 @@ export default class TunerDevice extends events.EventEmitter {
             cmd = cmd.replace("<satelite>", ch.satelite);
         }
 
+        if (ch.space) {
+            cmd = cmd.replace("<space>", ch.space.toString());
+        } else {
+            cmd = cmd.replace("<space>", "0"); // set default value to '0'
+        }
+
         this._process = child_process.spawn(cmd.split(" ")[0], cmd.split(" ").slice(1));
         this._command = cmd;
         this._channel = ch;

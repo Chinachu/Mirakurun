@@ -81,6 +81,7 @@ sudo mirakurun config channels
   # below are optional
   serviceId: 1234 # integer
   satelite: JCSAT4A # string for <satelite> in tuner command
+  space: 0 # Tuning space number, which replaces <space> in tuner command (as integer; set to 0 if isn't specified)
   isDisabled: false # boolean
 ```
 

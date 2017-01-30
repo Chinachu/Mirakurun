@@ -101,6 +101,11 @@ export default class Channel {
                 return;
             }
 
+            if (channel.space && typeof channel.space !== "number") {
+                log.error("invalid type of property `space` in channel#%d (%s) configuration", i, channel.name);
+                return;
+            }
+
             if (channel.serviceId && typeof channel.serviceId !== "number") {
                 log.error("invalid type of property `serviceId` in channel#%d (%s) configuration", i, channel.name);
                 return;
