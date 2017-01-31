@@ -77,6 +77,12 @@ export interface ServicesQuery {
     "channel.channel"?: string;
 }
 
+export interface ChannelScanOption {
+    type?: apid.ChannelType;
+    min?: number;
+    max?: number;
+}
+
 export default class Client {
 
     basePath = spec.basePath as string;
@@ -361,6 +367,13 @@ export default class Client {
 
         const res = await this.request("PUT", "/config/channels", { body: channels });
         return res.body as apid.ConfigChannels;
+    }
+
+    async channelScan(option?: ChannelScanOption): Promise<http.IncomingMessage> {
+
+        return await this._requestStream("PUT", "/config/channels/scan", {
+            query: option
+        });
     }
 
     async getServerConfig(): Promise<apid.ConfigServer> {
