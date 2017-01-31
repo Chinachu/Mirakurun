@@ -72,6 +72,7 @@ export interface Channel {
     // passed to tuning command
     readonly channel: string;
     readonly satelite?: string;
+    readonly space?: number;
 
     // service id
     readonly serviceId?: number;
