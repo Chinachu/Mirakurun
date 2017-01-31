@@ -45,7 +45,6 @@ export interface Channel {
     satelite?: string;
     space?: number;
     services?: Service[];
-
 }
 
 export type ChannelType = "GR" | "BS" | "CS" | "SKY";
