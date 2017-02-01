@@ -91,7 +91,7 @@ export const put: Operation = async (req, res) => {
             type: type,
             channel: channel
         };
-        result.push(channelItem);
+        result.unshift(channelItem);
         ++count;
 
         res.write(`-> ${JSON.stringify(channelItem)}\n\n`);
