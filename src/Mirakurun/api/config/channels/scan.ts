@@ -46,7 +46,7 @@ export const put: Operation = async (req, res) => {
     res.status(200);
     res.write(`channel scanning... (type: "${type}")\n\n`);
 
-    for (let i = req.query.min; i < req.query.max; i++) {
+    for (let i = req.query.min; i <= req.query.max; i++) {
         const channel = i.toString(10);
         res.write(`channel: "${channel}" ...\n`);
 
