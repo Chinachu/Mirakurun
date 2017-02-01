@@ -91,13 +91,19 @@ export const put: Operation = async (req, res) => {
             type: type,
             channel: channel
         };
-        result.unshift(channelItem);
+        result.push(channelItem);
         ++count;
 
         res.write(`-> ${JSON.stringify(channelItem)}\n\n`);
     }
 
-    result.sort((a, b) => channelOrder[a.type] - channelOrder[b.type]);
+    result.sort((a, b) => {
+        if (a.type === b.type && /^[0-9]+$/.test(a.channel + b.channel) === true) {
+            return parseInt(a.channel, 10) - parseInt(b.channel, 10);
+        } else {
+            return channelOrder[a.type] - channelOrder[b.type];
+        }
+    });
     config.saveChannels(result);
 
     res.write(`-> total ${count} channels found and ${result.length} channels stored.\n\n`);
