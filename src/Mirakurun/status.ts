@@ -54,7 +54,7 @@ const status: Status = {
 };
 
 const tl = status.timerAccuracy;
-let last: number[];
+let last: [number, number];
 
 function tick() {
     // main loop

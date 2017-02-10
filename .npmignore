@@ -9,6 +9,5 @@
 Dockerfile
 gulpfile.js
 tsconfig.json
-typings.json
 *.log
 *.swp

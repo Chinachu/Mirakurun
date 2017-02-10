@@ -40,8 +40,6 @@
     "debug": "node --max_old_space_size=256 --inspect --debug-brk lib/server.js",
     "start.win32": "node.exe --max_old_space_size=256 bin/init.win32.js",
     "debug.win32": "node.exe --max_old_space_size=256 --inspect --debug-brk bin/init.win32.js",
-    "typings": "typings",
-    "typings-install": "typings install",
     "build": "gulp build",
     "watch": "gulp watch",
     "test": "gulp test",
@@ -70,6 +68,12 @@
     "tail": "^1.2.1"
   },
   "devDependencies": {
+    "@types/body-parser": "0.0.33",
+    "@types/express": "^4.0.35",
+    "@types/ip": "0.0.29",
+    "@types/js-yaml": "^3.5.29",
+    "@types/morgan": "^1.7.32",
+    "@types/node": "^7.0.5",
     "del": "^2.2.0",
     "gulp": "^3.9.1",
     "gulp-mocha": "^3.0.1",
@@ -77,8 +81,7 @@
     "gulp-tslint": "^6.1.1",
     "gulp-typescript": "^3.1.4",
     "tslint": "^3.15.1",
-    "typescript": "^2.1.5",
-    "typings": "^2.1.0"
+    "typescript": "^2.1.5"
   },
   "engines": {
     "node": ">=6.5.0 <7.0.0"
