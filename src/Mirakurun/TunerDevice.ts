@@ -352,6 +352,12 @@ export default class TunerDevice extends events.EventEmitter {
 
                 this._process.stdin.write("\n");
             } else {
+                const timer = setTimeout(() => {
+                    log.warn("TunerDevice#%d will force killed because SIGTERM timed out...", this._index);
+                    this._process.kill("SIGKILL");
+                }, 6000);
+                this._process.once("exit", () => clearTimeout(timer));
+
                 // regular way
                 this._process.kill("SIGTERM");
             }
