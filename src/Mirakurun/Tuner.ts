@@ -178,7 +178,7 @@ export default class Tuner {
             };
             let services: db.Service[] = null;
 
-            setTimeout(() => stream.emit("close"), 10000);
+            setTimeout(() => stream.emit("close"), 20000);
 
             Promise.all([
                 new Promise((resolve, reject) => {
@@ -271,7 +271,7 @@ export default class Tuner {
 
             const devices = this._getDevicesByType(setting.channel.type);
 
-            let tryCount = 20;
+            let tryCount = 50;
             const length = devices.length;
 
             function find() {
