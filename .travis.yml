@@ -3,7 +3,6 @@ node_js:
   - "6"
 install:
   - npm install
-  - npm run typings-install
   - npm run build
 script:
   - npm test
