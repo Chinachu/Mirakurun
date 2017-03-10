@@ -17,6 +17,7 @@
 
 import * as fs from "fs";
 import * as http from "http";
+import * as url from "url";
 import * as ip from "ip";
 import * as express from "express";
 import * as openapi from "express-openapi";
@@ -70,18 +71,32 @@ class Server {
 
         app.use((req: express.Request, res: express.Response, next) => {
 
-            if (
-                (req.ip && ip.isPrivate(req.ip) === false) ||
-                req.get("Origin") !== undefined ||
-                req.get("Referer") !== undefined
-            ) {
+            if (req.ip && ip.isPrivate(req.ip) === false) {
+                req.socket.end();
+                return;
+            }
+
+            if (req.get("Origin") !== undefined) {
                 res.status(403).end();
                 return;
+            }
+
+            if (req.get("Referer") !== undefined) {
+                const referer = url.parse(req.get("Referer"));
+                if (ip.isPrivate(referer.hostname) === false) {
+                    res.status(403).end();
+                    return;
+                }
             }
 
             res.setHeader("Server", "Mirakurun/" + pkg.version);
             next();
         });
+
+        if (fs.existsSync("node_modules/swagger-ui/dist") === true) {
+            app.use("/swagger-ui", express.static("node_modules/swagger-ui/dist"));
+            app.get("/api/debug", (req, res) => res.redirect("/swagger-ui/?url=/api/docs"));
+        }
 
         const api = yaml.safeLoad(fs.readFileSync("api.yml", "utf8"));
         api.info.version = pkg.version;
