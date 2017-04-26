@@ -28,9 +28,7 @@ gulp.task("tslint", () => {
         .src([
             "src/**/*.ts"
         ])
-        .pipe(tslint({
-            formatter: "verbose"
-        }))
+        .pipe(tslint())
         .pipe(tslint.report({
             summarizeFailureOutput: true
         }));
