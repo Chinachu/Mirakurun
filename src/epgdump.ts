@@ -64,7 +64,7 @@ const tsStream: stream.Transform = new aribts.TsStream();
 const readStream = fs.createReadStream(src);
 
 const transformStream = new stream.Transform({
-    transform: function(chunk, encoding, done) {
+    transform: function(chunk: Buffer, encoding: string, done: Function) {
 
         bytesRead += chunk.length;
 

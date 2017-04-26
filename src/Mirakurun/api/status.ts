@@ -66,7 +66,7 @@ export const get: Operation = (req, res) => {
         }
     };
 
-    for (let nid in status.epg) {
+    for (const nid in status.epg) {
         if (status.epg[nid] === true) {
             ret.epg.gatheringNetworks.push(parseInt(nid, 10));
         }

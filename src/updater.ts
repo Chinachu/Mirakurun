@@ -64,7 +64,7 @@ if (!pkg.dist || !pkg.dist.tarball) {
     });
 })();
 
-function spawnNpmInstall(version): ChildProcess {
+function spawnNpmInstall(version: string): ChildProcess {
 
     let command = "npm";
     const args = [

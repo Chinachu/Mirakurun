@@ -26,7 +26,7 @@ import Tuner from "./Tuner";
 export default class Channel {
 
     private _items: ChannelItem[] = [];
-    private _epgGatheringInterval = _.config.server.epgGatheringInterval || 1000 * 60 * 15;
+    private _epgGatheringInterval: number = _.config.server.epgGatheringInterval || 1000 * 60 * 15;
 
     constructor() {
 
@@ -50,7 +50,8 @@ export default class Channel {
 
     get(type: common.ChannelType, channel: string): ChannelItem {
 
-        for (let i = 0, l = this._items.length; i < l; i++) {
+        const l = this._items.length;
+        for (let i = 0; i < l; i++) {
             if (this._items[i].channel === channel && this._items[i].type === type) {
                 return this._items[i];
             }
@@ -63,7 +64,8 @@ export default class Channel {
 
         const items = [];
 
-        for (let i = 0, l = this._items.length; i < l; i++) {
+        const l = this._items.length;
+        for (let i = 0; i < l; i++) {
             if (this._items[i].type === type) {
                 items.push(this._items[i]);
             }

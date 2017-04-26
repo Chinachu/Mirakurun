@@ -130,7 +130,7 @@ interface VersionState {
 class EPG extends stream.Writable {
 
     private _epg: { [networkId: number]: { [serviceId: number]: { [eventId: number]: EventState } } } = {};
-    private _epgGCInterval = 1000 * 60 * 15;
+    private _epgGCInterval: number = 1000 * 60 * 15;
 
     constructor() {
         super({
@@ -140,7 +140,7 @@ class EPG extends stream.Writable {
         setTimeout(this._gc.bind(this), this._epgGCInterval);
     }
 
-    _write(eit: any, encoding, callback) {
+    _write(eit: any, encoding: string, callback: Function) {
 
         const networkId = eit.original_network_id;
 
@@ -154,8 +154,9 @@ class EPG extends stream.Writable {
 
         const service = this._epg[networkId][eit.service_id];
 
-        for (let i = 0, l = eit.events.length, e; i < l; i++) {
-            e = eit.events[i];
+        const l = eit.events.length;
+        for (let i = 0; i < l; i++) {
+            const e = eit.events[i];
             let state: EventState;
 
             if (typeof service[e.event_id] === "undefined") {
@@ -227,8 +228,9 @@ class EPG extends stream.Writable {
                 }
             }
 
-            for (let j = 0, m = e.descriptors.length, d; j < m; j++) {
-                d = e.descriptors[j];
+            const m = e.descriptors.length;
+            for (let j = 0; j < m; j++) {
+                const d = e.descriptors[j];
 
                 switch (d.descriptor_tag) {
                     // short_event
@@ -270,35 +272,42 @@ class EPG extends stream.Writable {
                         if (state.extended._descs[d.descriptor_number] === undefined) {
                             state.extended._descs[d.descriptor_number] = d.items;
 
-                            let comp = true;
-                            for (let i = 0, l = state.extended._descs.length; i < l; i++) {
-                                if (state.extended._descs[i] === undefined) {
-                                    comp = false;
+                            {
+                                let comp = true;
+                                const l = state.extended._descs.length;
+                                for (let i = 0; i < l; i++) {
+                                    if (state.extended._descs[i] === undefined) {
+                                        comp = false;
+                                        break;
+                                    }
+                                }
+                                if (comp === false) {
                                     break;
                                 }
-                            }
-                            if (comp === false) {
-                                break;
                             }
 
                             const extended: any = {};
 
-                            let current = "";
-                            for (let i = 0, l = state.extended._descs.length; i < l; i++) {
-                                for (let j = 0, m = state.extended._descs[i].length; j < m; j++) {
-                                    const desc = state.extended._descs[i][j].item_description_length === 0
-                                                ? current
-                                                : new TsChar(state.extended._descs[i][j].item_description_char).decode();
-                                    current = desc;
+                            {
+                                let current = "";
+                                const l = state.extended._descs.length;
+                                for (let i = 0; i < l; i++) {
+                                    const m = state.extended._descs[i].length;
+                                    for (let j = 0; j < m; j++) {
+                                        const desc = state.extended._descs[i][j].item_description_length === 0
+                                                    ? current
+                                                    : new TsChar(state.extended._descs[i][j].item_description_char).decode();
+                                        current = desc;
 
-                                    const char = new TsChar(state.extended._descs[i][j].item_char).decode();
-                                    if (extended[desc] === undefined) {
-                                        extended[desc] = char;
-                                    } else {
-                                        extended[desc] += char;
+                                        const char = new TsChar(state.extended._descs[i][j].item_char).decode();
+                                        if (extended[desc] === undefined) {
+                                            extended[desc] = char;
+                                        } else {
+                                            extended[desc] += char;
+                                        }
                                     }
+                                    state.extended._descs[i] = null; // clean up
                                 }
-                                state.extended._descs[i] = null; // clean up
                             }
 
                             state.program.update({
@@ -501,7 +510,7 @@ function isBasicTable(tableId: number): boolean {
     }
 }
 
-function isOutOfDate(state: EventState, eit): boolean {
+function isOutOfDate(state: EventState, eit: any): boolean {
 
     if (isBasicTable(eit.table_id) === true) {
         if (state.version.basic === eit.version_number) {
@@ -522,16 +531,16 @@ function getTime(buffer: Buffer): number {
 
     let y = (((mjd - 15078.2) / 365.25) | 0);
     let m = (((mjd - 14956.1 - ((y * 365.25) | 0)) / 30.6001) | 0);
-    let d = mjd - 14956 - ((y * 365.25) | 0) - ((m * 30.6001) | 0);
+    const d = mjd - 14956 - ((y * 365.25) | 0) - ((m * 30.6001) | 0);
 
     const k = (m === 14 || m === 15) ? 1 : 0;
 
     y = y + k + 1900;
     m = m - 1 - k * 12;
 
-    let h = (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);
-    let i = (buffer[3] >> 4) * 10 + (buffer[3] & 0x0F);
-    let s = (buffer[4] >> 4) * 10 + (buffer[4] & 0x0F);
+    const h = (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);
+    const i = (buffer[3] >> 4) * 10 + (buffer[3] & 0x0F);
+    const s = (buffer[4] >> 4) * 10 + (buffer[4] & 0x0F);
 
     return new Date(y, m - 1, d, h, i, s).getTime();
 }

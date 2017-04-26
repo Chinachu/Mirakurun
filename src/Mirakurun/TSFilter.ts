@@ -200,7 +200,7 @@ export default class TSFilter extends stream.Duplex {
         }
     }
 
-    _write(chunk: Buffer, encoding, callback: Function) {
+    _write(chunk: Buffer, encoding: string, callback: Function) {
 
         if (this._closed === true) {
             callback(new Error("TSFilter has closed already"));
@@ -327,13 +327,14 @@ export default class TSFilter extends stream.Duplex {
         this._buffer.push(packet);
     }
 
-    private _onPAT(pid, data): void {
+    private _onPAT(pid: number, data: any): void {
 
         this._tsid = data.transport_stream_id;
         this._serviceIds = [];
         this._parseServiceIds = [];
 
-        for (let i = 0, l = data.programs.length; i < l; i++) {
+        const l = data.programs.length;
+        for (let i = 0; i < l; i++) {
             let item: ServiceItem;
             const id = data.programs[i].program_number as number;
 
@@ -417,7 +418,7 @@ export default class TSFilter extends stream.Duplex {
         }
     }
 
-    private _onPMT(pid, data): void {
+    private _onPMT(pid: number, data: any): void {
 
         if (this._ready === false && this._provideServiceId !== null && this._provideEventId === null) {
             this._ready = true;
@@ -435,7 +436,8 @@ export default class TSFilter extends stream.Duplex {
             this._providePids.push(data.PCR_PID);
         }
 
-        for (let i = 0, l = data.streams.length; i < l; i++) {
+        const l = data.streams.length;
+        for (let i = 0; i < l; i++) {
             if (this._providePids.indexOf(data.streams[i].elementary_PID) === -1) {
                 this._providePids.push(data.streams[i].elementary_PID);
             }
@@ -452,7 +454,7 @@ export default class TSFilter extends stream.Duplex {
         }
     }
 
-    private _onNIT(pid, data): void {
+    private _onNIT(pid: number, data: any): void {
 
         const _network = {
             networkId: data.network_id,
@@ -481,7 +483,7 @@ export default class TSFilter extends stream.Duplex {
         }
     }
 
-    private _onSDT(pid, data): void {
+    private _onSDT(pid: number, data: any): void {
 
         if (this._tsid !== data.transport_stream_id) {
             return;
@@ -489,7 +491,8 @@ export default class TSFilter extends stream.Duplex {
 
         const _services = [];
 
-        for (let i = 0, l = data.services.length; i < l; i++) {
+        const l = data.services.length;
+        for (let i = 0; i < l; i++) {
             const service = data.services[i];
 
             if (this._serviceIds.indexOf(service.service_id) === -1) {
@@ -500,7 +503,8 @@ export default class TSFilter extends stream.Duplex {
             let type = -1;
             let logoId = -1;
 
-            for (let j = 0, m = service.descriptors.length; j < m; j++) {
+            const m = service.descriptors.length;
+            for (let j = 0; j < m; j++) {
                 if (service.descriptors[j].descriptor_tag === 0x48) {
                     name = new aribts.TsChar(service.descriptors[j].service_name_char).decode();
                     type = service.descriptors[j].service_type;
@@ -534,7 +538,7 @@ export default class TSFilter extends stream.Duplex {
         }
     }
 
-    private _onEIT(pid, data): void {
+    private _onEIT(pid: number, data: any): void {
 
         // detect current event
         if (
@@ -579,12 +583,12 @@ export default class TSFilter extends stream.Duplex {
         }
     }
 
-    private _onTOT(pid, data): void {
+    private _onTOT(pid: number, data: any): void {
 
         this._streamTime = getTime(data.JST_time);
     }
 
-    private _onCDT(pid, data): void {
+    private _onCDT(pid: number, data: any): void {
 
         if (data.data_type === 0x01) {
             // Logo
@@ -620,7 +624,7 @@ export default class TSFilter extends stream.Duplex {
         this._close();
     }
 
-    private _updateEpgState(data): void {
+    private _updateEpgState(data: any): void {
 
         const networkId = data.original_network_id;
         const serviceId = data.service_id;
@@ -633,11 +637,11 @@ export default class TSFilter extends stream.Duplex {
             this._epgState[networkId][serviceId] = {
                 basic: {
                     flags: [],
-                    lastFlagsId: -1,
+                    lastFlagsId: -1
                 },
                 extended: {
                     flags: [],
-                    lastFlagsId: -1,
+                    lastFlagsId: -1
                 }
             };
 
@@ -671,7 +675,7 @@ export default class TSFilter extends stream.Duplex {
 
         // update ignore field (past segment)
         if (flagsId === 0 && this._streamTime !== null) {
-            let segment = (this._streamTime + 9 * 60 * 60 * 1000) / (3 * 60 * 60 * 1000) & 0x07;
+            const segment = (this._streamTime + 9 * 60 * 60 * 1000) / (3 * 60 * 60 * 1000) & 0x07;
 
             for (let i = 0; i < segment; i++) {
                 targetFlags.flags[flagsId].ignore[i] = 0xFF;
@@ -763,16 +767,16 @@ function getTime(buffer: Buffer): number {
 
     let y = (((mjd - 15078.2) / 365.25) | 0);
     let m = (((mjd - 14956.1 - ((y * 365.25) | 0)) / 30.6001) | 0);
-    let d = mjd - 14956 - ((y * 365.25) | 0) - ((m * 30.6001) | 0);
+    const d = mjd - 14956 - ((y * 365.25) | 0) - ((m * 30.6001) | 0);
 
     const k = (m === 14 || m === 15) ? 1 : 0;
 
     y = y + k + 1900;
     m = m - 1 - k * 12;
 
-    let h = (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);
-    let i = (buffer[3] >> 4) * 10 + (buffer[3] & 0x0F);
-    let s = (buffer[4] >> 4) * 10 + (buffer[4] & 0x0F);
+    const h = (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);
+    const i = (buffer[3] >> 4) * 10 + (buffer[3] & 0x0F);
+    const s = (buffer[4] >> 4) * 10 + (buffer[4] & 0x0F);
 
     return new Date(y, m - 1, d, h, i, s).getTime();
 }

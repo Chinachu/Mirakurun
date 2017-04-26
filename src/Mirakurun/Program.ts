@@ -29,7 +29,7 @@ export default class Program {
 
     private _items: ProgramItem[] = [];
     private _saveTimerId: NodeJS.Timer;
-    private _programGCInterval = _.config.server.programGCInterval || 1000 * 60 * 15;
+    private _programGCInterval: number = _.config.server.programGCInterval || 1000 * 60 * 15;
 
     constructor() {
 
@@ -55,7 +55,8 @@ export default class Program {
 
     get(id: number): ProgramItem {
 
-        for (let i = 0, l = this._items.length; i < l; i++) {
+        const l = this._items.length;
+        for (let i = 0; i < l; i++) {
             if (this._items[i].id === id) {
                 return this._items[i];
             }
@@ -87,7 +88,8 @@ export default class Program {
 
         const items = [];
 
-        for (let i = 0, l = this._items.length; i < l; i++) {
+        const l = this._items.length;
+        for (let i = 0; i < l; i++) {
             if (this._items[i].data.serviceId === serviceId) {
                 items.push(this._items[i]);
             }
@@ -100,7 +102,8 @@ export default class Program {
 
         const items = [];
 
-        for (let i = 0, l = this._items.length; i < l; i++) {
+        const l = this._items.length;
+        for (let i = 0; i < l; i++) {
             const item = this._items[i];
             if (
                 item.data.networkId === networkId &&

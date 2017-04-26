@@ -26,7 +26,7 @@ import ServiceItem from "./ServiceItem";
 
 export default class ProgramItem {
 
-    constructor(private _data: db.Program, firstAdd = false) {
+    constructor(private _data: db.Program, firstAdd: boolean = false) {
 
         if (_.program.exists(_data.id) === true) {
             const item = _.program.get(_data.id);

@@ -26,7 +26,7 @@ export type ChannelType = "GR" | "BS" | "CS" | "SKY";
 
 export function extendObject<T, U>(b: T, a: U): T {
 
-    for (let k in a) {
+    for (const k in a) {
         (<any>b)[k] = a[k];
     }
 
@@ -37,7 +37,7 @@ export function updateObject<T, U>(b: T, a: U): boolean {
 
     let updated = false;
 
-    for (let k in a) {
+    for (const k in a) {
         if ((<any>b)[k] !== a[k]) {
             if (updated === false) {
                 updated = true;

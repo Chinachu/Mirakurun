@@ -77,12 +77,12 @@ namespace db {
         componentType: number;
     }
 
-    export type ProgramVideoType = "mpeg2" | "h.264" | "h.265"
+    export type ProgramVideoType = "mpeg2" | "h.264" | "h.265";
 
     export type ProgramVideoResolution = (
         "240p" | "480i" | "480p" | "720p" |
         "1080i" | "1080p" | "2160p" | "4320p"
-    )
+    );
 
     export interface ProgramAudio {
         samplingRate: ProgramAudioSamplingRate;
@@ -131,7 +131,7 @@ namespace db {
         return save(process.env.PROGRAMS_DB_PATH, data);
     }
 
-    function load(path) {
+    function load(path: string) {
 
         log.info("load db `%s`", path);
 

@@ -56,7 +56,8 @@ export default class Tuner {
 
     get(index: number): TunerDevice {
 
-        for (let i = 0, l = this._devices.length; i < l; i++) {
+        const l = this._devices.length;
+        for (let i = 0; i < l; i++) {
             if (this._devices[i].index === index) {
                 return this._devices[i];
             }
@@ -67,7 +68,8 @@ export default class Tuner {
 
     typeExists(type: common.ChannelType): boolean {
 
-        for (let i = 0, l = this._devices.length; i < l; i++) {
+        const l = this._devices.length;
+        for (let i = 0; i < l; i++) {
             if (this._devices[i].config.types.indexOf(type) !== -1) {
                 return true;
             }
@@ -192,7 +194,7 @@ export default class Tuner {
                         services = _services;
                         resolve();
                     });
-                }),
+                })
             ]).then(() => stream.emit("close"));
 
             stream.once("close", () => {
@@ -365,7 +367,8 @@ export default class Tuner {
 
         const devices = [];
 
-        for (let i = 0, l = this._devices.length; i < l; i++) {
+        const l = this._devices.length;
+        for (let i = 0; i < l; i++) {
             if (this._devices[i].config.types.indexOf(type) !== -1) {
                 devices.push(this._devices[i]);
             }

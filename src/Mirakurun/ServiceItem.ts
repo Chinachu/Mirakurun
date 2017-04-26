@@ -137,7 +137,7 @@ export default class ServiceItem {
         }
     }
 
-    export(full = false): db.Service {
+    export(full: boolean = false): db.Service {
 
         const ret: db.Service = {
             id: this._id,
