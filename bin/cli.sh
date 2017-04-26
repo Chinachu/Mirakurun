@@ -75,16 +75,7 @@ mirakurun_config () {
 }
 
 mirakurun_log () {
-  case $1 in
-    server )
-      pm2 logs mirakurun-$1
-      ;;
-    *)
-      mirakurun_help
-      ;;
-  esac
-
-  return 0
+  pm2 logs mirakurun-server "$@" && return 0
 }
 
 mirakurun_status () {
@@ -118,7 +109,8 @@ config server     Edit server configuration.
 config tuners     Edit tuner configuration.
 config channels   Edit channels configuration.
 
-log server        Show server log.
+log               Stream logs.
+log --help        Show usage for log stream.
 
 status            Show status of services.
 start             Start services.
