@@ -417,7 +417,7 @@ export default class Client {
 
     async updateVersion(force?: boolean): Promise<http.IncomingMessage> {
 
-        return await this._requestStream("PUT", "/log/stream", { query: { force: force } });
+        return await this._requestStream("PUT", "/version/update", { query: { force: force } });
     }
 
     async getStatus(): Promise<apid.Status> {
