@@ -101,6 +101,7 @@ export default class Client {
     private _httpRequest(method: RequestMethod, path: string, option: RequestOption = {}): Promise<http.IncomingMessage> {
 
         const opt: http.RequestOptions = {
+            method: method,
             path: this.basePath + path,
             headers: option.headers || {},
             agent: this.agent
