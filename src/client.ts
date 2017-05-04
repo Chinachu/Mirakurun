@@ -125,7 +125,7 @@ export default class Client {
         opt.headers["X-Mirakurun-Priority"] = option.priority.toString(10);
 
         if (typeof option.query === "object") {
-            path += "?" + querystring.stringify(option.query);
+            opt.path += "?" + querystring.stringify(option.query);
         }
 
         if (typeof option.body === "object") {
