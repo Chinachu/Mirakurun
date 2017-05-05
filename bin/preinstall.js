@@ -32,22 +32,6 @@ if (process.platform === "linux" || process.platform === "darwin") {
         console.log("Note: running in Docker.");
         process.exit(0);
     }
-
-    child_process.execSync("pm2 stop processes.json -s", {
-        stdio: [
-            null,
-            process.stdout,
-            process.stderr
-        ]
-    });
-
-    child_process.execSync("pm2 delete processes.json -s", {
-        stdio: [
-            null,
-            process.stdout,
-            process.stderr
-        ]
-    });
 } else if (process.platform === "win32") {
     try {
         child_process.execSync("winser -r -x", {
