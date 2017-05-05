@@ -63,7 +63,7 @@ export const put: Operation = (req, res) => {
         tail.on("line", data => res.write(data + "\n"));
 
         req.once("close", () => {
-            tail.removeAllListener("line");
+            tail.removeAllListeners("line");
             tail.unwatch();
         });
     });
