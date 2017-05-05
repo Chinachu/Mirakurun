@@ -58,14 +58,18 @@ if (process.platform === "linux" || process.platform === "darwin") {
         console.log("Note: running in Docker.");
         process.exit(0);
     }
-    
-    child_process.execSync("pm2 startup", {
-        stdio: [
-            null,
-            process.stdout,
-            process.stderr
-        ]
-    });
+
+    try {
+        child_process.execSync(`pm2 startup`, {
+            stdio: [
+                null,
+                process.stdout,
+                process.stderr
+            ]
+        });
+    } catch (e) {
+        console.log("Caution: `pm2 startup` has failed. you can try fix yourself.");
+    }
 
     child_process.execSync("pm2 start processes.json", {
         stdio: [
