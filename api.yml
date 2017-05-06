@@ -452,6 +452,8 @@ definitions:
         $ref: '#/definitions/ServiceId'
       satelite:
         type: string
+      space:
+        type: number
       isDisabled:
         type: boolean
 

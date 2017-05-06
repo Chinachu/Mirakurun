@@ -206,6 +206,7 @@ export interface ConfigChannelsItem {
     channel: string;
     satelite?: string;
     serviceId?: number;
+    space?: number;
     isDisabled?: boolean;
 }
 
