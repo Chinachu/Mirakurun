@@ -426,4 +426,10 @@ export default class Client {
         const res = await this.request("GET", "/status");
         return res.body as apid.Status;
     }
+
+    async restart(): Promise<{}> {
+
+        const res = await this.request("PUT", "/restart");
+        return res.body;
+    }
 }
