@@ -14,6 +14,7 @@ sudo mirakurun config server
 
 ```yaml
 logLevel: 2 # integer -1: FATAL to 3: DEBUG
+maxLogHistory: 1000 # integer (lines)
 path: /var/run/mirakurun.sock # string or ~ (null)
 port: 40772 # integer or ~ (null)
 disableIPv6: false # boolean

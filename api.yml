@@ -385,6 +385,9 @@ definitions:
         type: integer
         minimum: -1
         maximum: 3
+      maxLogHistory:
+        type: integer
+        minimum: 0
       highWaterMark:
         type: integer
       overflowTimeLimit:

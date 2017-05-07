@@ -167,6 +167,7 @@ export interface ConfigServer {
     port?: number;
     disableIPv6?: boolean;
     logLevel?: LogLevel;
+    maxLogHistory?: number;
     highWaterMark?: number;
     overflowTimeLimit?: number;
     maxBufferBytesBeforeReady?: number;

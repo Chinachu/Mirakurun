@@ -18,41 +18,19 @@
 import { Operation } from "express-openapi";
 import * as fs from "fs";
 import * as api from "../../api";
-import { Tail } from "tail";
+import { event } from "../../log";
 
 export const get: Operation = (req, res) => {
-
-    if (!process.env.LOG_STDOUT || !process.env.LOG_STDERR) {
-        res.writeHead(500, "Unknown Logfile Path", {
-            "Content-Type": "text/plain"
-        });
-        res.end("Unknown Logfile Path");
-        return;
-    }
-    if (!fs.existsSync(process.env.LOG_STDOUT) || !fs.existsSync(process.env.LOG_STDERR)) {
-        res.writeHead(500, "Logfile Unavailable", {
-            "Content-Type": "text/plain"
-        });
-        res.end("Logfile Unavailable");
-        return;
-    }
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.status(200);
 
-    const stdout = new Tail(process.env.LOG_STDOUT);
-    const stderr = new Tail(process.env.LOG_STDERR);
-
     req.setTimeout(1000 * 60 * 60, () => { });
     req.once("close", () => {
-        stdout.removeListener("line", _listener);
-        stdout.unwatch();
-        stderr.removeListener("line", _listener);
-        stderr.unwatch();
+        event.removeListener("data", _listener);
     });
 
-    stdout.on("line", _listener);
-    stderr.on("line", _listener);
+    event.on("data", _listener);
 
     function _listener(data: string) {
         res.write(data + "\n");

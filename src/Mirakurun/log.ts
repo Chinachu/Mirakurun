@@ -15,6 +15,7 @@
 */
 "use strict";
 
+import { EventEmitter } from "events";
 import * as util from "util";
 
 export enum LogLevel {
@@ -26,6 +27,7 @@ export enum LogLevel {
 }
 
 export let logLevel: LogLevel = LogLevel.INFO;
+export let maxLogHistory: number = 1000;
 
 let offsetStr: string;
 let offsetMS = 0;
@@ -35,6 +37,72 @@ if (/ GMT\+\d{4} /.test(new Date().toString()) === true) {
     offsetStr = offsetStr.slice(0, 3) + ":" + offsetStr.slice(3, 5);
     offsetMS = date.getTimezoneOffset() * 60 * 1000;
 }
+
+class LogEvent extends EventEmitter {
+    logs: string[] = [];
+
+    emit(ev: "data", level: LogLevel, log: string): boolean {
+
+        this.logs.push(log);
+        if (this.logs.length > maxLogHistory) {
+            this.logs.shift();
+        }
+
+        switch (level) {
+            case LogLevel.DEBUG:
+                console.log(log);
+                break;
+            case LogLevel.INFO:
+                console.info(log);
+                break;
+            case LogLevel.WARN:
+                console.warn(log);
+                break;
+            case LogLevel.ERROR:
+            case LogLevel.FATAL:
+                console.error(log);
+                break;
+        }
+
+        return super.emit(ev, log);
+    }
+
+    debug(...msgs: any[]): void {
+        if (logLevel >= LogLevel.DEBUG) {
+            this.emit("data", LogLevel.DEBUG, getLogString.call(null, "debug", arguments));
+        }
+    }
+
+    info(...msgs: any[]): void {
+        if (logLevel >= LogLevel.INFO) {
+            this.emit("data", LogLevel.INFO, getLogString.call(null, "info", arguments));
+        }
+    }
+
+    warn(...msgs: any[]): void {
+        if (logLevel >= LogLevel.WARN) {
+            this.emit("data", LogLevel.WARN, getLogString.call(null, "warn", arguments));
+        }
+    }
+
+    error(...msgs: any[]): void {
+        if (logLevel >= LogLevel.ERROR) {
+            this.emit("data", LogLevel.ERROR, getLogString.call(null, "error", arguments));
+        }
+    }
+
+    fatal(...msgs: any[]): void {
+        if (logLevel >= LogLevel.FATAL) {
+            this.emit("data", LogLevel.FATAL, getLogString.call(null, "fatal", arguments));
+        }
+    }
+
+    write(line): void {
+        this.emit("data", LogLevel.INFO, line.slice(0, -1));
+    }
+}
+
+export const event = new LogEvent();
 
 function getLogString(lvstr: string, msgs: any[]) {
 
@@ -50,37 +118,8 @@ function getLogString(lvstr: string, msgs: any[]) {
     return isoStr + " " + lvstr + ": " + util.format.apply(null, msgs);
 }
 
-export function debug(...msgs: any[]);
-export function debug(): void {
-    if (logLevel >= LogLevel.DEBUG) {
-        console.log(getLogString.call(this, "debug", arguments));
-    }
-}
-
-export function info(...msgs: any[]);
-export function info(): void {
-    if (logLevel >= LogLevel.INFO) {
-        console.info(getLogString.call(this, "info", arguments));
-    }
-}
-
-export function warn(...msgs: any[]);
-export function warn(): void {
-    if (logLevel >= LogLevel.WARN) {
-        console.warn(getLogString.call(this, "warn", arguments));
-    }
-}
-
-export function error(...msgs: any[]);
-export function error(): void {
-    if (logLevel >= LogLevel.ERROR) {
-        console.error(getLogString.call(this, "error", arguments));
-    }
-}
-
-export function fatal(...msgs: any[]);
-export function fatal(): void {
-    if (logLevel >= LogLevel.FATAL) {
-        console.error(getLogString.call(this, "fatal", arguments));
-    }
-}
+export const debug = (...msgs: any[]) => event.debug(...msgs);
+export const info = (...msgs: any[]) => event.info(...msgs);
+export const warn = (...msgs: any[]) => event.warn(...msgs);
+export const error = (...msgs: any[]) => event.error(...msgs);
+export const fatal = (...msgs: any[]) => event.fatal(...msgs);

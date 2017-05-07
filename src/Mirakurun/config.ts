@@ -31,6 +31,7 @@ export interface Server {
     readonly disableIPv6?: boolean;
 
     readonly logLevel?: log.LogLevel;
+    readonly maxLogHistory?: number;
 
     /** Byte */
     readonly highWaterMark?: number;
