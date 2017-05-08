@@ -16,8 +16,6 @@
 "use strict";
 
 import { Operation } from "express-openapi";
-import * as fs from "fs";
-import * as api from "../../api";
 import { event } from "../../log";
 
 export const get: Operation = (req, res) => {
