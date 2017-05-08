@@ -16,31 +16,21 @@
 "use strict";
 
 import { Operation } from "express-openapi";
-import { createReadStream, existsSync } from "fs";
 import * as api from "../api";
+import { event } from "../log";
 
 export const get: Operation = (req, res) => {
 
-    if (!process.env.LOG_STDOUT || !process.env.LOG_STDERR) {
-        res.writeHead(500, "Unknown Logfile Path", {
-            "Content-Type": "text/plain"
-        });
-        res.end("Unknown Logfile Path");
-        return;
-    }
-    if (!existsSync(process.env.LOG_STDOUT) || !existsSync(process.env.LOG_STDERR)) {
-        res.writeHead(500, "Logfile Unavailable", {
-            "Content-Type": "text/plain"
-        });
-        res.end("Logfile Unavailable");
-        return;
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.status(200);
+
+    const logs = event.logs;
+    const len = logs.length;
+    for (let i = 0; i < len; i++) {
+        res.write(logs[i] + "\n");
     }
 
-    res.writeHead(501, "Not Implemented", {
-        "Content-Type": "text/plain"
-    });
-
-    res.end("Not Implemented");
+    res.end();
 };
 
 get.apiDoc = {
