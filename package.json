@@ -64,7 +64,7 @@
     "morgan": "^1.7.0",
     "munin-plugin": "0.0.9",
     "promise-queue": "^2.2.3",
-    "sift": "^3.2.6",
+    "sift": "3.2.6",
     "swagger-ui": "^2.2.10",
     "tail": "^1.2.1"
   },
@@ -82,7 +82,7 @@
     "gulp-tslint": "^8.0.0",
     "gulp-typescript": "^3.1.4",
     "tslint": "^5.1.0",
-    "typescript": "^2.2.1"
+    "typescript": "^2.3.2"
   },
   "engines": {
     "node": ">=6.5.0 <7.0.0"
