@@ -127,7 +127,7 @@ command /usr/local/bin/node %c
 
 ## Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md)
+[CONTRIBUTING.md](.github/CONTRIBUTING.md)
 
 ## Slack Community
 
