@@ -17,7 +17,7 @@
 
 import * as stream from "stream";
 import * as fs from "fs";
-import * as sift from "sift";
+import sift from "sift";
 import * as log from "./log";
 import _ from "./_";
 import db from "./db";
