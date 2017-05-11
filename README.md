@@ -37,7 +37,7 @@ sudo npm install pm2 -g
 sudo npm install mirakurun -g --unsafe --production
 
 # Win32 (Windows PowerShell as Admin)
-npm install winser -g
+npm install @kanreisa/winser -g
 npm install mirakurun -g --production
 ```
 

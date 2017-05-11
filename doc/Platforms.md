@@ -12,6 +12,7 @@
 * [Win32](#win32) (Experimental)
   * [winser](https://github.com/jfromaniello/winser) `>=1.0.2`
   * Windows 10 RS1
+  * Windows 10 RS2 `npm i @kanreisa/winser -g`
 * Darwin (Experimental)
   * [PM2](http://pm2.keymetrics.io/) `>=2.0.12`
 
@@ -64,7 +65,7 @@ sudo npm uninstall mirakurun -g --unsafe
 **use Windows PowerShell as Admin.**
 
 ```
-npm install winser -g
+npm install @kanreisa/winser -g
 ```
 
 ### Installing / Updating Mirakurun
