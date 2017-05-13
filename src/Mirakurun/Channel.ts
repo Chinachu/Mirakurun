@@ -13,8 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as stream from "stream";
 import * as common from "./common";
 import * as log from "./log";
@@ -24,6 +22,22 @@ import ChannelItem from "./ChannelItem";
 import Tuner from "./Tuner";
 
 export default class Channel {
+
+    static add(item: ChannelItem): void {
+        return _.channel.add(item);
+    }
+
+    static get(type: common.ChannelType, channel: string): ChannelItem {
+        return _.channel.get(type, channel);
+    }
+
+    static findByType(type: common.ChannelType): ChannelItem[] {
+        return _.channel.findByType(type);
+    }
+
+    static all(): ChannelItem[] {
+        return _.channel.items;
+    }
 
     private _items: ChannelItem[] = [];
     private _epgGatheringInterval: number = _.config.server.epgGatheringInterval || 1000 * 60 * 15;
@@ -157,21 +171,5 @@ export default class Channel {
                 setTimeout(this._epgGatherer.bind(this), this._epgGatheringInterval);
             });
         });
-    }
-
-    static add(item: ChannelItem): void {
-        return _.channel.add(item);
-    }
-
-    static get(type: common.ChannelType, channel: string): ChannelItem {
-        return _.channel.get(type, channel);
-    }
-
-    static findByType(type: common.ChannelType): ChannelItem[] {
-        return _.channel.findByType(type);
-    }
-
-    static all(): ChannelItem[] {
-        return _.channel.items;
     }
 }

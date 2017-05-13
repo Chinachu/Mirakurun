@@ -13,16 +13,18 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as stream from "stream";
 import * as common from "./common";
 import _ from "./_";
-import db from "./db";
+import * as db from "./db";
 import Event from "./Event";
 import ChannelItem from "./ChannelItem";
 
 export default class ServiceItem {
+
+    static createId(networkId: number, serviceId: number): number {
+        return parseInt(networkId + (serviceId / 100000).toFixed(5).slice(2), 10);
+    }
 
     private _id: number;
 
@@ -63,30 +65,6 @@ export default class ServiceItem {
         return this._name || "";
     }
 
-    get type(): number {
-        return this._type;
-    }
-
-    get logoId(): number {
-        return this._logoId;
-    }
-
-    get logoData(): NodeBuffer {
-        return Buffer.from(this._logoData, "base64");
-    }
-
-    get hasLogoData(): boolean {
-        return !!this._logoData;
-    }
-
-    get remoteControlKeyId(): number {
-        return this._remoteControlKeyId;
-    }
-
-    get channel(): ChannelItem {
-        return this._channel;
-    }
-
     set name(name: string) {
 
         if (this._name !== name) {
@@ -95,6 +73,10 @@ export default class ServiceItem {
             _.service.save();
             this._updated();
         }
+    }
+
+    get type(): number {
+        return this._type;
     }
 
     set type(type: number) {
@@ -107,6 +89,10 @@ export default class ServiceItem {
         }
     }
 
+    get logoId(): number {
+        return this._logoId;
+    }
+
     set logoId(logoId: number) {
 
         if (this._logoId !== logoId) {
@@ -115,6 +101,10 @@ export default class ServiceItem {
             _.service.save();
             this._updated();
         }
+    }
+
+    get logoData(): NodeBuffer {
+        return Buffer.from(this._logoData, "base64");
     }
 
     set logoData(logo: NodeBuffer) {
@@ -127,6 +117,14 @@ export default class ServiceItem {
         }
     }
 
+    get hasLogoData(): boolean {
+        return !!this._logoData;
+    }
+
+    get remoteControlKeyId(): number {
+        return this._remoteControlKeyId;
+    }
+
     set remoteControlKeyId(id: number) {
 
         if (this._remoteControlKeyId !== id) {
@@ -135,6 +133,10 @@ export default class ServiceItem {
             _.service.save();
             this._updated();
         }
+    }
+
+    get channel(): ChannelItem {
+        return this._channel;
     }
 
     export(full: boolean = false): db.Service {
@@ -166,9 +168,5 @@ export default class ServiceItem {
 
     private _updated(): void {
         Event.emit("service", "update", this.export());
-    }
-
-    static createId(networkId: number, serviceId: number): number {
-        return parseInt(networkId + (serviceId / 100000).toFixed(5).slice(2), 10);
     }
 }

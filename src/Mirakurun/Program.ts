@@ -13,19 +13,53 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as stream from "stream";
 import * as fs from "fs";
 import sift from "sift";
 import * as log from "./log";
+import * as db from "./db";
 import _ from "./_";
-import db from "./db";
 import queue from "./queue";
 import ServiceItem from "./ServiceItem";
 import ProgramItem from "./ProgramItem";
 
 export default class Program {
+
+    static getProgramId(networkId: number, serviceId: number, eventId: number): number {
+        return parseInt(networkId + (serviceId / 100000).toFixed(5).slice(2) + (eventId / 100000).toFixed(5).slice(2), 10);
+    }
+
+    static add(item: ProgramItem): void {
+        return _.program.add(item);
+    }
+
+    static get(id: number): ProgramItem {
+        return _.program.get(id);
+    }
+
+    static remove(item: ProgramItem): void {
+        return _.program.remove(item);
+    }
+
+    static exists(id: number): boolean {
+        return _.program.exists(id);
+    }
+
+    static findByQuery(query: object): ProgramItem[] {
+        return _.program.findByQuery(query);
+    }
+
+    static findByServiceId(serviceId: number): ProgramItem[] {
+        return _.program.findByServiceId(serviceId);
+    }
+
+    static all(): ProgramItem[] {
+        return _.program.items;
+    }
+
+    static save(): void {
+        return _.program.save();
+    }
 
     private _items: ProgramItem[] = [];
     private _saveTimerId: NodeJS.Timer;
@@ -80,7 +114,7 @@ export default class Program {
         return this.get(id) !== null;
     }
 
-    findByQuery(query: Object): ProgramItem[] {
+    findByQuery(query: object): ProgramItem[] {
         return sift(query, this._items);
     }
 
@@ -178,41 +212,5 @@ export default class Program {
 
             log.info("Program GC has finished and removed %d programs", count);
         });
-    }
-
-    static getProgramId(networkId: number, serviceId: number, eventId: number): number {
-        return parseInt(networkId + (serviceId / 100000).toFixed(5).slice(2) + (eventId / 100000).toFixed(5).slice(2), 10);
-    }
-
-    static add(item: ProgramItem): void {
-        return _.program.add(item);
-    }
-
-    static get(id: number): ProgramItem {
-        return _.program.get(id);
-    }
-
-    static remove(item: ProgramItem): void {
-        return _.program.remove(item);
-    }
-
-    static exists(id: number): boolean {
-        return _.program.exists(id);
-    }
-
-    static findByQuery(query: Object): ProgramItem[] {
-        return _.program.findByQuery(query);
-    }
-
-    static findByServiceId(serviceId: number): ProgramItem[] {
-        return _.program.findByServiceId(serviceId);
-    }
-
-    static all(): ProgramItem[] {
-        return _.program.items;
-    }
-
-    static save(): void {
-        return _.program.save();
     }
 }

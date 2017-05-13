@@ -13,8 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import { EventEmitter } from "events";
 import _ from "./_";
 
@@ -29,28 +27,6 @@ export type EventResource = "program" | "service" | "tuner";
 export type EventType = "create" | "update" | "redefine";
 
 export default class Event extends EventEmitter {
-
-    private _log: EventMessage[] = [];
-
-    constructor() {
-        super();
-
-        _.event = this;
-
-        this.on("event", message => {
-
-            this._log.unshift(message);
-
-            // testing
-            if (this._log.length > 100) {
-                this._log.pop();
-            }
-        });
-    }
-
-    get log(): EventMessage[] {
-        return this._log;
-    }
 
     static get log(): EventMessage[] {
         return _.event.log;
@@ -78,5 +54,27 @@ export default class Event extends EventEmitter {
         };
 
         return _.event.emit("event", message);
+    }
+
+    private _log: EventMessage[] = [];
+
+    constructor() {
+        super();
+
+        _.event = this;
+
+        this.on("event", message => {
+
+            this._log.unshift(message);
+
+            // testing
+            if (this._log.length > 100) {
+                this._log.pop();
+            }
+        });
+    }
+
+    get log(): EventMessage[] {
+        return this._log;
     }
 }

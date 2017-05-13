@@ -13,153 +13,146 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as fs from "fs";
 import * as common from "./common";
 import * as log from "./log";
 
-namespace db {
+export interface Service {
+    id: number;
+    serviceId: number;
+    networkId: number;
+    name: string;
+    type: number;
+    logoId: number;
+    logoData?: string; // base64
+    remoteControlKeyId?: number;
+    channel: Channel;
+}
 
-    export interface Service {
-        id: number;
-        serviceId: number;
-        networkId: number;
-        name: string;
-        type: number;
-        logoId: number;
-        logoData?: string; // base64
-        remoteControlKeyId?: number;
-        channel: Channel;
-    }
+export interface Channel {
+    type: common.ChannelType;
+    channel: string;
+}
 
-    export interface Channel {
-        type: common.ChannelType;
-        channel: string;
-    }
+export interface Program {
+    id?: number;
+    eventId?: number;
+    serviceId?: number;
+    networkId?: number;
+    startAt?: number;
+    duration?: number;
+    isFree?: boolean;
 
-    export interface Program {
-        id?: number;
-        eventId?: number;
-        serviceId?: number;
-        networkId?: number;
-        startAt?: number;
-        duration?: number;
-        isFree?: boolean;
+    name?: string;
+    description?: string;
+    genres?: ProgramGenre[];
+    video?: ProgramVideo;
+    audio?: ProgramAudio;
 
-        name?: string;
-        description?: string;
-        genres?: ProgramGenre[];
-        video?: ProgramVideo;
-        audio?: ProgramAudio;
+    extended?: {
+        [description: string]: string;
+    };
 
-        extended?: {
-            [description: string]: string;
-        };
+    series?: ProgramSeries;
 
-        series?: ProgramSeries;
+    relatedItems?: ProgramRelatedItem[];
+}
 
-        relatedItems?: ProgramRelatedItem[];
-    }
+export interface ProgramGenre {
+    lv1: number;
+    lv2: number;
+    un1: number;
+    un2: number;
+}
 
-    export interface ProgramGenre {
-        lv1: number;
-        lv2: number;
-        un1: number;
-        un2: number;
-    }
+export interface ProgramVideo {
+    type: ProgramVideoType;
+    resolution: string;
 
-    export interface ProgramVideo {
-        type: ProgramVideoType;
-        resolution: string;
+    streamContent: number;
+    componentType: number;
+}
 
-        streamContent: number;
-        componentType: number;
-    }
+export type ProgramVideoType = "mpeg2" | "h.264" | "h.265";
 
-    export type ProgramVideoType = "mpeg2" | "h.264" | "h.265";
+export type ProgramVideoResolution = (
+    "240p" | "480i" | "480p" | "720p" |
+    "1080i" | "1080p" | "2160p" | "4320p"
+);
 
-    export type ProgramVideoResolution = (
-        "240p" | "480i" | "480p" | "720p" |
-        "1080i" | "1080p" | "2160p" | "4320p"
-    );
+export interface ProgramAudio {
+    samplingRate: ProgramAudioSamplingRate;
 
-    export interface ProgramAudio {
-        samplingRate: ProgramAudioSamplingRate;
+    componentType: number;
+}
 
-        componentType: number;
-    }
+export enum ProgramAudioSamplingRate {
+    "16kHz" = 16000,
+    "22.05kHz" = 22050,
+    "24kHz" = 24000,
+    "32kHz" = 32000,
+    "44.1kHz" = 44100,
+    "48kHz" = 48000
+}
 
-    export enum ProgramAudioSamplingRate {
-        "16kHz" = 16000,
-        "22.05kHz" = 22050,
-        "24kHz" = 24000,
-        "32kHz" = 32000,
-        "44.1kHz" = 44100,
-        "48kHz" = 48000
-    }
+export interface ProgramSeries {
+    id: number;
+    repeat: number;
+    pattern: number;
+    expiresAt: number;
+    episode: number;
+    lastEpisode: number;
+    name: string;
+}
 
-    export interface ProgramSeries {
-        id: number;
-        repeat: number;
-        pattern: number;
-        expiresAt: number;
-        episode: number;
-        lastEpisode: number;
-        name: string;
-    }
+export interface ProgramRelatedItem {
+    networkId?: number;
+    serviceId: number;
+    eventId: number;
+}
 
-    export interface ProgramRelatedItem {
-        networkId?: number;
-        serviceId: number;
-        eventId: number;
-    }
+export function loadServices(): Service[] {
+    return load(process.env.SERVICES_DB_PATH);
+}
 
-    export function loadServices(): Service[] {
-        return load(process.env.SERVICES_DB_PATH);
-    }
+export function saveServices(data: Service[]): Promise<void> {
+    return save(process.env.SERVICES_DB_PATH, data);
+}
 
-    export function saveServices(data: Service[]): Promise<void> {
-        return save(process.env.SERVICES_DB_PATH, data);
-    }
+export function loadPrograms(): Program[] {
+    return load(process.env.PROGRAMS_DB_PATH);
+}
 
-    export function loadPrograms(): Program[] {
-        return load(process.env.PROGRAMS_DB_PATH);
-    }
+export function savePrograms(data: Program[]): Promise<void> {
+    return save(process.env.PROGRAMS_DB_PATH, data);
+}
 
-    export function savePrograms(data: Program[]): Promise<void> {
-        return save(process.env.PROGRAMS_DB_PATH, data);
-    }
+function load(path: string) {
 
-    function load(path: string) {
+    log.info("load db `%s`", path);
 
-        log.info("load db `%s`", path);
-
-        if (fs.existsSync(path) === true) {
-            return require(path);
-        } else {
-            return [];
-        }
-    }
-
-    function save(path: string, data: any[]): Promise<void> {
-
-        log.info("save db `%s`", path);
-
-        return new Promise<void>((resolve, reject) => {
-
-            fs.writeFile(path, JSON.stringify(data), err => {
-
-                if (err) {
-                    return reject(err);
-                }
-
-                delete require.cache[require.resolve(path)];
-
-                resolve();
-            });
-        });
+    if (fs.existsSync(path) === true) {
+        return require(path);
+    } else {
+        return [];
     }
 }
 
-export default db;
+function save(path: string, data: any[]): Promise<void> {
+
+    log.info("save db `%s`", path);
+
+    return new Promise<void>((resolve, reject) => {
+
+        fs.writeFile(path, JSON.stringify(data), err => {
+
+            if (err) {
+                return reject(err);
+            }
+
+            delete require.cache[require.resolve(path)];
+
+            resolve();
+        });
+    });
+}

@@ -13,8 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as fs from "fs";
 import * as http from "http";
 import * as querystring from "querystring";
@@ -33,7 +31,7 @@ export interface RequestOption {
     /** request query */
     query?: { [key: string]: any };
     /** request body */
-    body?: string | Object;
+    body?: string | object;
 }
 
 export interface Response {
@@ -42,7 +40,7 @@ export interface Response {
     contentType: string;
     headers: { [key: string]: string };
     isSuccess: boolean;
-    body?: Object | Buffer;
+    body?: object | string | Buffer;
 }
 
 export interface ErrorResponse extends Response {
@@ -95,100 +93,6 @@ export default class Client {
 
     private _userAgent = `MirakurunClient/${pkg.version} Node/${process.version} (${process.platform})`;
 
-    constructor() {
-    }
-
-    private _httpRequest(method: RequestMethod, path: string, option: RequestOption = {}): Promise<http.IncomingMessage> {
-
-        const opt: http.RequestOptions = {
-            method: method,
-            path: this.basePath + path,
-            headers: option.headers || {},
-            agent: this.agent
-        };
-
-        if (this.host === "") {
-            opt.socketPath = this.socketPath;
-        } else {
-            opt.host = this.host;
-            opt.port = this.port;
-        }
-
-        if (this.userAgent === "") {
-            opt.headers["User-Agent"] = this._userAgent;
-        } else {
-            opt.headers["User-Agent"] = this.userAgent + " " + this._userAgent;
-        }
-
-        if (option.priority === undefined) {
-            option.priority = this.priority;
-        }
-        opt.headers["X-Mirakurun-Priority"] = option.priority.toString(10);
-
-        if (typeof option.query === "object") {
-            opt.path += "?" + querystring.stringify(option.query);
-        }
-
-        if (typeof option.body === "object") {
-            opt.headers["Content-Type"] = "application/json; charset=utf-8";
-            option.body = JSON.stringify(option.body);
-        }
-
-        return new Promise((resolve, reject) => {
-
-            const req = http.request(opt, res => {
-
-                if (res.statusCode > 300 && res.statusCode < 400 && res.headers["location"]) {
-                    if (/^\//.test(res.headers["location"]) === false) {
-                        reject(new Error(`Error: Redirecting location "${res.headers["location"]}" isn't supported.`));
-                        return;
-                    }
-                    this._httpRequest(method, res.headers["location"], option)
-                        .then(resolve, reject);
-                    return;
-                }
-
-                resolve(res);
-            });
-
-            req.on("error", reject);
-
-            // write request body
-            if (typeof option.body === "string") {
-                req.write(option.body + "\n");
-            }
-            req.end();
-        });
-    }
-
-    private async _requestStream(method: RequestMethod, path: string, option: RequestOption = {}): Promise<http.IncomingMessage> {
-
-        const res = await this._httpRequest(method, path, option);
-
-        if (res.statusCode >= 200 && res.statusCode <= 202) {
-            return res;
-        } else {
-            throw res;
-        }
-    }
-
-    private async _getTS(path: string, decode = true): Promise<http.IncomingMessage> {
-
-        const option: RequestOption = {
-            query: {
-                decode: decode ? "1" : "0"
-            }
-        };
-
-        const res = await this._requestStream("GET", path, option);
-
-        if (res.headers["content-type"] === "video/MP2T") {
-            return res;
-        } else {
-            throw res;
-        }
-    }
-
     request(method: RequestMethod, path: string, option: RequestOption = {}): Promise<Response>|Promise<ErrorResponse> {
 
         return new Promise((resolve, reject) => {
@@ -206,7 +110,7 @@ export default class Client {
 
                     const chunks: Buffer[] = [];
 
-                    res.on("data", chunk => chunks.push(<Buffer>chunk));
+                    res.on("data", chunk => chunks.push(chunk as Buffer));
                     res.on("end", () => {
 
                         const buffer = Buffer.concat(chunks);
@@ -431,5 +335,96 @@ export default class Client {
 
         const res = await this.request("PUT", "/restart");
         return res.body;
+    }
+
+    private _httpRequest(method: RequestMethod, path: string, option: RequestOption = {}): Promise<http.IncomingMessage> {
+
+        const opt: http.RequestOptions = {
+            method: method,
+            path: this.basePath + path,
+            headers: option.headers || {},
+            agent: this.agent
+        };
+
+        if (this.host === "") {
+            opt.socketPath = this.socketPath;
+        } else {
+            opt.host = this.host;
+            opt.port = this.port;
+        }
+
+        if (this.userAgent === "") {
+            opt.headers["User-Agent"] = this._userAgent;
+        } else {
+            opt.headers["User-Agent"] = this.userAgent + " " + this._userAgent;
+        }
+
+        if (option.priority === undefined) {
+            option.priority = this.priority;
+        }
+        opt.headers["X-Mirakurun-Priority"] = option.priority.toString(10);
+
+        if (typeof option.query === "object") {
+            opt.path += "?" + querystring.stringify(option.query);
+        }
+
+        if (typeof option.body === "object") {
+            opt.headers["Content-Type"] = "application/json; charset=utf-8";
+            option.body = JSON.stringify(option.body);
+        }
+
+        return new Promise((resolve, reject) => {
+
+            const req = http.request(opt, res => {
+
+                if (res.statusCode > 300 && res.statusCode < 400 && res.headers.location) {
+                    if (/^\//.test(res.headers.location) === false) {
+                        reject(new Error(`Error: Redirecting location "${res.headers.location}" isn't supported.`));
+                        return;
+                    }
+                    this._httpRequest(method, res.headers.location, option)
+                        .then(resolve, reject);
+                    return;
+                }
+
+                resolve(res);
+            });
+
+            req.on("error", reject);
+
+            // write request body
+            if (typeof option.body === "string") {
+                req.write(option.body + "\n");
+            }
+            req.end();
+        });
+    }
+
+    private async _requestStream(method: RequestMethod, path: string, option: RequestOption = {}): Promise<http.IncomingMessage> {
+
+        const res = await this._httpRequest(method, path, option);
+
+        if (res.statusCode >= 200 && res.statusCode <= 202) {
+            return res;
+        } else {
+            throw res;
+        }
+    }
+
+    private async _getTS(path: string, decode = true): Promise<http.IncomingMessage> {
+
+        const option: RequestOption = {
+            query: {
+                decode: decode ? "1" : "0"
+            }
+        };
+
+        const res = await this._requestStream("GET", path, option);
+
+        if (res.headers["content-type"] === "video/MP2T") {
+            return res;
+        } else {
+            throw res;
+        }
     }
 }

@@ -13,8 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as config from "./config";
 import Event from "./Event";
 import Tuner from "./Tuner";

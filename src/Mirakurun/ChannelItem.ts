@@ -13,12 +13,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as stream from "stream";
 import _ from "./_";
 import queue from "./queue";
-import db from "./db";
+import * as db from "./db";
 import * as log from "./log";
 import * as common from "./common";
 import * as config from "./config";

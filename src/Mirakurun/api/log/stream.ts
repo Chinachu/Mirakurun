@@ -13,8 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import { Operation } from "express-openapi";
 import { event } from "../../log";
 
@@ -23,7 +21,7 @@ export const get: Operation = (req, res) => {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.status(200);
 
-    req.setTimeout(1000 * 60 * 60, () => { });
+    req.setTimeout(1000 * 60 * 60, () => { return; });
     req.once("close", () => {
         event.removeListener("data", _listener);
     });

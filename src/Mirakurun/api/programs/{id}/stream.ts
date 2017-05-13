@@ -13,8 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import { Operation } from "express-openapi";
 import * as api from "../../../api";
 import Program from "../../../Program";
@@ -54,7 +52,7 @@ export const get: Operation = (req, res) => {
 
     let requestAborted = false;
     req.once("close", () => requestAborted = true);
-    req.setTimeout(1000 * 60 * 10, () => { }); // 10 minites
+    req.setTimeout(1000 * 60 * 10, () => { return; }); // 10 minites
 
     program.getStream({
         id: (req.ip || "unix") + ":" + (req.connection.remotePort || Date.now()),

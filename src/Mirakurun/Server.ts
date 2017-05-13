@@ -13,8 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as fs from "fs";
 import * as http from "http";
 import * as url from "url";
@@ -25,8 +23,8 @@ import * as morgan from "morgan";
 import * as bodyParser from "body-parser";
 import * as yaml from "js-yaml";
 import * as log from "./log";
+import * as system from "./system";
 import regexp from "./regexp";
-import system from "./system";
 import _ from "./_";
 
 const pkg = require("../../package.json");

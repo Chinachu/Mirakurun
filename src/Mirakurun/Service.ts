@@ -13,16 +13,50 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as stream from "stream";
 import * as log from "./log";
+import * as db from "./db";
 import _ from "./_";
-import db from "./db";
 import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
 
 export default class Service {
+
+    static add(item: ServiceItem): void {
+        return _.service.add(item);
+    }
+
+    static get(id: number): ServiceItem;
+    static get(networkId: number, serviceId: number): ServiceItem;
+    static get(id: number, serviceId?: number) {
+        return _.service.get(id, serviceId);
+    }
+
+    static exists(id: number): boolean;
+    static exists(networkId: number, serviceId: number): boolean;
+    static exists(id: number, serviceId?: number) {
+        return _.service.exists(id, serviceId);
+    }
+
+    static findByChannel(channel: ChannelItem): ServiceItem[] {
+        return _.service.findByChannel(channel);
+    }
+
+    static findByNetworkId(networkId: number): ServiceItem[] {
+        return _.service.findByNetworkId(networkId);
+    }
+
+    static findByNetworkIdWithLogoId(networkId: number, logoId: number): ServiceItem[] {
+        return _.service.findByNetworkIdWithLogoId(networkId, logoId);
+    }
+
+    static all(): ServiceItem[] {
+        return _.service.items;
+    }
+
+    static save(): void {
+        return _.service.save();
+    }
 
     private _items: ServiceItem[] = [];
     private _saveTimerId: NodeJS.Timer;
@@ -167,41 +201,5 @@ export default class Service {
         db.saveServices(
             this._items.map(service => service.export(true))
         );
-    }
-
-    static add(item: ServiceItem): void {
-        return _.service.add(item);
-    }
-
-    static get(id: number): ServiceItem;
-    static get(networkId: number, serviceId: number): ServiceItem;
-    static get(id: number, serviceId?: number) {
-        return _.service.get(id, serviceId);
-    }
-
-    static exists(id: number): boolean;
-    static exists(networkId: number, serviceId: number): boolean;
-    static exists(id: number, serviceId?: number) {
-        return _.service.exists(id, serviceId);
-    }
-
-    static findByChannel(channel: ChannelItem): ServiceItem[] {
-        return _.service.findByChannel(channel);
-    }
-
-    static findByNetworkId(networkId: number): ServiceItem[] {
-        return _.service.findByNetworkId(networkId);
-    }
-
-    static findByNetworkIdWithLogoId(networkId: number, logoId: number): ServiceItem[] {
-        return _.service.findByNetworkIdWithLogoId(networkId, logoId);
-    }
-
-    static all(): ServiceItem[] {
-        return _.service.items;
-    }
-
-    static save(): void {
-        return _.service.save();
     }
 }

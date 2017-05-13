@@ -13,8 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 if (process.platform !== "win32") {
     if (process.getuid() !== 0) {
         console.error("root please.");
@@ -57,10 +55,10 @@ _.config.channels = config.loadChannels();
 _.config.tuners = config.loadTuners();
 
 if (typeof _.config.server.logLevel === "number") {
-    (<any>log).logLevel = _.config.server.logLevel;
+    (<any> log).logLevel = _.config.server.logLevel;
 }
 if (typeof _.config.server.maxLogHistory === "number") {
-    (<any>log).maxLogHistory = _.config.server.maxLogHistory;
+    (<any> log).maxLogHistory = _.config.server.maxLogHistory;
 }
 
 new Event();

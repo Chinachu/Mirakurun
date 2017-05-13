@@ -13,8 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 interface Status {
     epg: { [networkId: number]: boolean };
     streamCount: {

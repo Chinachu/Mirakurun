@@ -13,8 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as fs from "fs";
 import * as yaml from "js-yaml";
 import * as common from "./common";
@@ -111,7 +109,7 @@ function load(path: string) {
     return yaml.safeLoad(fs.readFileSync(path, "utf8"));
 }
 
-function save(path: string, data: Object): Promise<void> {
+function save(path: string, data: object): Promise<void> {
 
     log.info("save config `%s`", path);
 

@@ -13,53 +13,46 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as os from "os";
 import * as ip from "ip";
 import regexp from "./regexp";
 
-namespace system {
+export function getPrivateIPv4Addresses(): string[] {
 
-    export function getPrivateIPv4Addresses(): string[] {
+    const addresses = [];
 
-        const addresses = [];
+    const interfaces = os.networkInterfaces();
+    Object.keys(interfaces).forEach(k => {
+        interfaces[k]
+            .filter(a => {
+                return (
+                    a.family === "IPv4" &&
+                    a.internal === false &&
+                    ip.isPrivate(a.address) === true
+                );
+            })
+            .forEach(a => addresses.push(a.address));
+    });
 
-        const interfaces = os.networkInterfaces();
-        Object.keys(interfaces).forEach(k => {
-            interfaces[k]
-                .filter(a => {
-                    return (
-                        a.family === "IPv4" &&
-                        a.internal === false &&
-                        ip.isPrivate(a.address) === true
-                    );
-                })
-                .forEach(a => addresses.push(a.address));
-        });
-
-        return addresses;
-    }
-
-    export function getPrivateIPv6Addresses(): string[] {
-
-        const addresses = [];
-
-        const interfaces = os.networkInterfaces();
-        Object.keys(interfaces).forEach(k => {
-            interfaces[k]
-                .filter(a => {
-                    return (
-                        a.family === "IPv6" &&
-                        a.internal === false &&
-                        ip.isPrivate(a.address) === true
-                    );
-                })
-                .forEach(a => addresses.push(a.address + "%" + k));
-        });
-
-        return addresses;
-    }
+    return addresses;
 }
 
-export default system;
+export function getPrivateIPv6Addresses(): string[] {
+
+    const addresses = [];
+
+    const interfaces = os.networkInterfaces();
+    Object.keys(interfaces).forEach(k => {
+        interfaces[k]
+            .filter(a => {
+                return (
+                    a.family === "IPv6" &&
+                    a.internal === false &&
+                    ip.isPrivate(a.address) === true
+                );
+            })
+            .forEach(a => addresses.push(a.address + "%" + k));
+    });
+
+    return addresses;
+}

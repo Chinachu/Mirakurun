@@ -13,10 +13,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as stream from "stream";
 import * as fs from "fs";
+import * as path from "path";
 
 if (process.argv.length < 3) {
     console.error("Mirakurun EPG Dump Test Program");
@@ -25,8 +24,8 @@ if (process.argv.length < 3) {
 }
 
 const force = process.argv[process.argv.length - 3] === "-f";
-const src = process.argv[process.argv.length - 2];
-const dest = process.argv[process.argv.length - 1];
+const src = path.resolve(process.cwd(), process.argv[process.argv.length - 2]);
+const dest = path.resolve(process.cwd(), process.argv[process.argv.length - 1]);
 
 console.log("src:", src);
 console.log("dest:", dest);
@@ -40,7 +39,7 @@ if (fs.existsSync(dest) === true && force === false) {
     process.exit(1);
 }
 
-process.env.SERVER_CONFIG_PATH = "./config/server.yml";
+process.env.SERVER_CONFIG_PATH = path.resolve(__dirname, "../config/server.yml");
 process.env.PROGRAMS_DB_PATH = dest;
 
 import * as aribts from "aribts";
@@ -51,7 +50,7 @@ import epg from "./Mirakurun/epg";
 import * as config from "./Mirakurun/config";
 import * as log from "./Mirakurun/log";
 
-(<any>log).logLevel = log.LogLevel.INFO;
+(<any> log).logLevel = log.LogLevel.INFO;
 _.config.server = config.loadServer();
 new Event();
 new Program();
@@ -64,7 +63,7 @@ const tsStream: stream.Transform = new aribts.TsStream();
 const readStream = fs.createReadStream(src);
 
 const transformStream = new stream.Transform({
-    transform: function(chunk: Buffer, encoding: string, done: Function) {
+    transform: function (chunk: Buffer, encoding: string, done: Function) {
 
         bytesRead += chunk.length;
 

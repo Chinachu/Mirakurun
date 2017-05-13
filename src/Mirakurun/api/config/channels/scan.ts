@@ -13,12 +13,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import { Operation } from "express-openapi";
 import * as api from "../../../api";
 import * as config from "../../../config";
-import db from "../../../db";
+import * as db from "../../../db";
 import Tuner from "../../../Tuner";
 
 let isScanning = false;
@@ -52,7 +50,7 @@ export const put: Operation = async (req, res) => {
 
         let services: db.Service[];
         try {
-            services = await Tuner.getServices(<any>{
+            services = await Tuner.getServices(<any> {
                 type: type,
                 channel: channel
             });

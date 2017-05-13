@@ -13,11 +13,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as stream from "stream";
 import * as log from "./log";
-import db from "./db";
+import * as db from "./db";
 import queue from "./queue";
 import Program from "./Program";
 const getProgramId = Program.getProgramId;
@@ -338,8 +336,8 @@ class EPG extends stream.Writable {
 
                         state.program.update({
                             video: {
-                                type: <db.ProgramVideoType>STREAM_CONTENT[d.stream_content] || null,
-                                resolution: <db.ProgramVideoResolution>COMPONENT_TYPE[d.component_type] || null,
+                                type: <db.ProgramVideoType> STREAM_CONTENT[d.stream_content] || null,
+                                resolution: <db.ProgramVideoResolution> COMPONENT_TYPE[d.component_type] || null,
 
                                 streamContent: d.stream_content,
                                 componentType: d.component_type

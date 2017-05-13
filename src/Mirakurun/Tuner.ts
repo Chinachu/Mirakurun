@@ -13,15 +13,13 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import * as child_process from "child_process";
 import * as stream from "stream";
 import * as common from "./common";
 import * as log from "./log";
+import * as db from "./db";
 import _ from "./_";
 import status from "./status";
-import db from "./db";
 import TunerDevice from "./TunerDevice";
 import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
@@ -40,6 +38,38 @@ interface StreamSetting {
 }
 
 export default class Tuner {
+
+    static all(): TunerDevice[] {
+        return _.tuner.devices;
+    }
+
+    static get(index: number): TunerDevice {
+        return _.tuner.get(index);
+    }
+
+    static typeExists(type: common.ChannelType): boolean {
+        return _.tuner.typeExists(type);
+    }
+
+    static getChannelStream(channel: ChannelItem, user: common.User): Promise<stream.Readable> {
+        return _.tuner.getChannelStream(channel, user);
+    }
+
+    static getServiceStream(service: ServiceItem, user: common.User): Promise<stream.Readable> {
+        return _.tuner.getServiceStream(service, user);
+    }
+
+    static getProgramStream(program: ProgramItem, user: common.User): Promise<stream.Readable> {
+        return _.tuner.getProgramStream(program, user);
+    }
+
+    static getEPG(channel: ChannelItem, time?: number): Promise<void> {
+        return _.tuner.getEPG(channel, time);
+    }
+
+    static getServices(channel: ChannelItem): Promise<db.Service[]> {
+        return _.tuner.getServices(channel);
+    }
 
     private _devices: TunerDevice[] = [];
 
@@ -375,37 +405,5 @@ export default class Tuner {
         }
 
         return devices;
-    }
-
-    static all(): TunerDevice[] {
-        return _.tuner.devices;
-    }
-
-    static get(index: number): TunerDevice {
-        return _.tuner.get(index);
-    }
-
-    static typeExists(type: common.ChannelType): boolean {
-        return _.tuner.typeExists(type);
-    }
-
-    static getChannelStream(channel: ChannelItem, user: common.User): Promise<stream.Readable> {
-        return _.tuner.getChannelStream(channel, user);
-    }
-
-    static getServiceStream(service: ServiceItem, user: common.User): Promise<stream.Readable> {
-        return _.tuner.getServiceStream(service, user);
-    }
-
-    static getProgramStream(program: ProgramItem, user: common.User): Promise<stream.Readable> {
-        return _.tuner.getProgramStream(program, user);
-    }
-
-    static getEPG(channel: ChannelItem, time?: number): Promise<void> {
-        return _.tuner.getEPG(channel, time);
-    }
-
-    static getServices(channel: ChannelItem): Promise<db.Service[]> {
-        return _.tuner.getServices(channel);
     }
 }

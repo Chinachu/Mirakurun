@@ -13,8 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-"use strict";
-
 import { spawn, ChildProcess } from "child_process";
 import * as latestVersion from "latest-version";
 const pkg = require("../package.json");
