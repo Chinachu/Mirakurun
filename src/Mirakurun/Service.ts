@@ -17,14 +17,11 @@ import * as stream from "stream";
 import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
+import Event from "./Event";
 import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
 
 export default class Service {
-
-    static add(item: ServiceItem): void {
-        return _.service.add(item);
-    }
 
     static get(id: number): ServiceItem;
     static get(networkId: number, serviceId: number): ServiceItem;
@@ -54,16 +51,10 @@ export default class Service {
         return _.service.items;
     }
 
-    static save(): void {
-        return _.service.save();
-    }
-
     private _items: ServiceItem[] = [];
     private _saveTimerId: NodeJS.Timer;
 
     constructor() {
-
-        _.service = this;
 
         this._load();
     }
@@ -74,11 +65,15 @@ export default class Service {
 
     add(item: ServiceItem): void {
 
-        if (this.get(item.id) === null) {
-            this._items.push(item);
-
-            this.save();
+        if (this.get(item.id) !== null) {
+            return;
         }
+
+        this._items.push(item);
+
+        Event.emit("service", "create", item.export());
+
+        this.save();
     }
 
     get(id: number): ServiceItem;
@@ -177,15 +172,17 @@ export default class Service {
                 return;
             }
 
-            new ServiceItem(
-                channelItem,
-                service.networkId,
-                service.serviceId,
-                service.name,
-                service.type,
-                service.logoId,
-                service.logoData,
-                service.remoteControlKeyId
+            this.add(
+                new ServiceItem(
+                    channelItem,
+                    service.networkId,
+                    service.serviceId,
+                    service.name,
+                    service.type,
+                    service.logoId,
+                    service.logoData,
+                    service.remoteControlKeyId
+                )
             );
         });
 

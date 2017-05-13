@@ -22,7 +22,7 @@ import ChannelItem from "./ChannelItem";
 
 export default class ServiceItem {
 
-    static createId(networkId: number, serviceId: number): number {
+    static getId(networkId: number, serviceId: number): number {
         return parseInt(networkId + (serviceId / 100000).toFixed(5).slice(2), 10);
     }
 
@@ -39,14 +39,7 @@ export default class ServiceItem {
         private _remoteControlKeyId?: number
     ) {
 
-        this._id = ServiceItem.createId(_networkId, _serviceId);
-
-        if (_.service.exists(this._id) === true) {
-            return this;
-        }
-
-        _.service.add(this);
-        Event.emit("service", "create", this.export());
+        this._id = ServiceItem.getId(_networkId, _serviceId);
     }
 
     get id(): number {

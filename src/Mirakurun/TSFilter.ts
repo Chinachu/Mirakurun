@@ -18,7 +18,6 @@ import * as log from "./log";
 import epg from "./epg";
 import status from "./status";
 import _ from "./_";
-import Program from "./Program";
 import ProgramItem from "./ProgramItem";
 import ServiceItem from "./ServiceItem";
 import * as aribts from "aribts";
@@ -136,7 +135,7 @@ export default class TSFilter extends stream.Duplex {
             this._ready = false;
 
             const program = _.program.get(
-                Program.getProgramId(
+                ProgramItem.getId(
                     this._targetNetworkId,
                     this._provideServiceId,
                     this._provideEventId

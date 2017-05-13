@@ -32,15 +32,6 @@ export default class ChannelItem {
 
     constructor(config: config.Channel) {
 
-        const pre = _.channel.get(config.type, config.channel);
-        if (pre !== null) {
-            if (config.serviceId) {
-                pre.addService(config.serviceId);
-            }
-
-            return pre;
-        }
-
         this._name = config.name;
         this._type = config.type;
         this._channel = config.channel;
@@ -58,8 +49,6 @@ export default class ChannelItem {
                 setTimeout(() => this.serviceScan(false), 180000);
             }
         }, 3000);
-
-        _.channel.add(this);
     }
 
     get name(): string {
@@ -123,7 +112,9 @@ export default class ChannelItem {
 
             log.debug("ChannelItem#'%s' serviceId=%d: %s", this._name, serviceId, JSON.stringify(service, null, "  "));
 
-            new ServiceItem(this, service.networkId, service.serviceId, service.name, service.type, service.logoId);
+            _.service.add(
+                new ServiceItem(this, service.networkId, service.serviceId, service.name, service.type, service.logoId)
+            );
         });
     }
 
@@ -164,15 +155,17 @@ export default class ChannelItem {
                     item.logoId = service.logoId;
                     item.remoteControlKeyId = service.remoteControlKeyId;
                 } else if (add === true) {
-                    new ServiceItem(
-                        this,
-                        service.networkId,
-                        service.serviceId,
-                        service.name,
-                        service.type,
-                        service.logoId,
-                        undefined,
-                        service.remoteControlKeyId
+                    _.service.add(
+                        new ServiceItem(
+                            this,
+                            service.networkId,
+                            service.serviceId,
+                            service.name,
+                            service.type,
+                            service.logoId,
+                            undefined,
+                            service.remoteControlKeyId
+                        )
                     );
                 }
             });

@@ -61,12 +61,12 @@ if (typeof _.config.server.maxLogHistory === "number") {
     (<any> log).maxLogHistory = _.config.server.maxLogHistory;
 }
 
-new Event();
-new Tuner();
-new Channel();
-new Service();
-new Program();
-new Server();
+_.event = new Event();
+_.tuner = new Tuner();
+_.channel = new Channel();
+_.service = new Service();
+_.program = new Program();
+_.server = new Server();
 
 function setEnv(name: string, value: string) {
     process.env[name] = process.env[name] || value;

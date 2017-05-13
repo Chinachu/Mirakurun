@@ -52,8 +52,8 @@ import * as log from "./Mirakurun/log";
 
 (<any> log).logLevel = log.LogLevel.INFO;
 _.config.server = config.loadServer();
-new Event();
-new Program();
+_.event = new Event();
+_.program = new Program();
 
 const size = fs.statSync(src).size;
 let bytesRead = 0;

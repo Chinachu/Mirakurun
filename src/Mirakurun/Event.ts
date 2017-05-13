@@ -61,8 +61,6 @@ export default class Event extends EventEmitter {
     constructor() {
         super();
 
-        _.event = this;
-
         this.on("event", message => {
 
             this._log.unshift(message);

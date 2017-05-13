@@ -16,10 +16,10 @@
 import * as stream from "stream";
 import * as log from "./log";
 import * as db from "./db";
+import _ from "./_";
 import queue from "./queue";
-import Program from "./Program";
-const getProgramId = Program.getProgramId;
 import ProgramItem from "./ProgramItem";
+const getProgramId = ProgramItem.getId;
 import * as aribts from "aribts";
 const TsChar = aribts.TsChar;
 const TsDate = aribts.TsDate;
@@ -158,21 +158,24 @@ class EPG extends stream.Writable {
             let state: EventState;
 
             if (typeof service[e.event_id] === "undefined") {
+                const id = getProgramId(networkId, eit.service_id, e.event_id);
+                const programItem = _.program.get(id) || new ProgramItem({
+                    id: id,
+
+                    eventId: e.event_id,
+                    serviceId: eit.service_id,
+                    networkId: networkId,
+                    startAt: getTime(e.start_time),
+                    duration: getTimeFromBCD24(e.duration),
+                    isFree: e.free_CA_mode === 0
+                });
+
                 state = {
                     version: {
                         basic: isBasicTable(eit.table_id) ? eit.version_number : -1,
                         extended: isBasicTable(eit.table_id) ? -1 : eit.version_number
                     },
-                    program: new ProgramItem({
-                        id: getProgramId(networkId, eit.service_id, e.event_id),
-
-                        eventId: e.event_id,
-                        serviceId: eit.service_id,
-                        networkId: networkId,
-                        startAt: getTime(e.start_time),
-                        duration: getTimeFromBCD24(e.duration),
-                        isFree: e.free_CA_mode === 0
-                    }),
+                    program: programItem,
 
                     short: {
                         version: -1,

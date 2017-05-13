@@ -24,69 +24,34 @@ import ServiceItem from "./ServiceItem";
 
 export default class ProgramItem {
 
-    constructor(private _data: db.Program, firstAdd: boolean = false) {
+    static getId(networkId: number, serviceId: number, eventId: number): number {
+        return parseInt(networkId + (serviceId / 100000).toFixed(5).slice(2) + (eventId / 100000).toFixed(5).slice(2), 10);
+    }
 
-        if (_.program.exists(_data.id) === true) {
-            const item = _.program.get(_data.id);
-            item.update(_data);
-            return item;
-        }
+    constructor(public data: db.Program) {
 
-        const removedIds = [];
-
-        if (firstAdd === false) {
-            _.program.findConflicts(
-                _data.networkId,
-                _data.serviceId,
-                _data.startAt,
-                _data.startAt + _data.duration
-            ).forEach(item => {
-
-                item.remove();
-
-                log.debug(
-                    "ProgramItem#%d (networkId=%d, eventId=%d) has removed for redefine to ProgramItem#%d (eventId=%d)",
-                    item.data.id, item.data.networkId, item.data.eventId,
-                    _data.id, _data.eventId
-                );
-
-                removedIds.push(item.data.id);
-            });
-        }
-
-        _.program.add(this);
-
-        if (firstAdd === false) {
-            Event.emit("program", "create", this._data);
-            removedIds.forEach(id => Event.emit("program", "redefine", { from: id, to: _data.id }));
+        if (!data.id) {
+            data.id = ProgramItem.getId(data.networkId, data.serviceId, data.eventId);
         }
     }
 
     get id(): number {
-        return this._data.id;
+        return this.data.id;
     }
 
     get service(): ServiceItem {
-        return _.service.get(this._data.networkId, this._data.serviceId);
-    }
-
-    get data(): db.Program {
-        return this._data;
+        return _.service.get(this.data.networkId, this.data.serviceId);
     }
 
     update(data: db.Program): void {
 
-        if (common.updateObject(this._data, data) === true) {
+        if (common.updateObject(this.data, data) === true) {
             _.program.save();
-            Event.emit("program", "update", this._data);
+            Event.emit("program", "update", this.data);
         }
     }
 
     getStream(user: common.User): Promise<stream.Readable> {
         return _.tuner.getProgramStream(this, user);
-    }
-
-    remove(): void {
-        _.program.remove(this);
     }
 }

@@ -19,26 +19,15 @@ import sift from "sift";
 import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
+import Event from "./Event";
 import queue from "./queue";
 import ServiceItem from "./ServiceItem";
 import ProgramItem from "./ProgramItem";
 
 export default class Program {
 
-    static getProgramId(networkId: number, serviceId: number, eventId: number): number {
-        return parseInt(networkId + (serviceId / 100000).toFixed(5).slice(2) + (eventId / 100000).toFixed(5).slice(2), 10);
-    }
-
-    static add(item: ProgramItem): void {
-        return _.program.add(item);
-    }
-
     static get(id: number): ProgramItem {
         return _.program.get(id);
-    }
-
-    static remove(item: ProgramItem): void {
-        return _.program.remove(item);
     }
 
     static exists(id: number): boolean {
@@ -57,17 +46,11 @@ export default class Program {
         return _.program.items;
     }
 
-    static save(): void {
-        return _.program.save();
-    }
-
     private _items: ProgramItem[] = [];
     private _saveTimerId: NodeJS.Timer;
     private _programGCInterval: number = _.config.server.programGCInterval || 1000 * 60 * 15;
 
     constructor() {
-
-        _.program = this;
 
         this._load();
 
@@ -78,13 +61,42 @@ export default class Program {
         return this._items;
     }
 
-    add(item: ProgramItem): void {
+    add(item: ProgramItem, firstAdd: boolean = false): void {
 
-        if (this.get(item.id) === null) {
-            this._items.push(item);
-
-            this.save();
+        if (this.get(item.id) !== null) {
+            return;
         }
+
+        const removedIds = [];
+
+        if (firstAdd === false) {
+            _.program.findConflicts(
+                item.data.networkId,
+                item.data.serviceId,
+                item.data.startAt,
+                item.data.startAt + item.data.duration
+            ).forEach(conflictedItem => {
+
+                this.remove(conflictedItem);
+
+                log.debug(
+                    "ProgramItem#%d (networkId=%d, eventId=%d) has removed for redefine to ProgramItem#%d (eventId=%d)",
+                    conflictedItem.data.id, conflictedItem.data.networkId, conflictedItem.data.eventId,
+                    item.data.id, item.data.eventId
+                );
+
+                removedIds.push(conflictedItem.data.id);
+            });
+        }
+
+        this._items.push(item);
+
+        if (firstAdd === false) {
+            Event.emit("program", "create", item.data);
+            removedIds.forEach(id => Event.emit("program", "redefine", { from: id, to: item.data.id }));
+        }
+
+        this.save();
     }
 
     get(id: number): ProgramItem {
@@ -175,7 +187,7 @@ export default class Program {
                 return;
             }
 
-            new ProgramItem(program, true);
+            this.add(new ProgramItem(program), true);
         });
 
         if (dropped) {
@@ -204,7 +216,7 @@ export default class Program {
             this._items.forEach(program => {
                 if (now > (program.data.startAt + program.data.duration)) {
                     ++count;
-                    program.remove();
+                    this.remove(program);
                 }
             });
 

@@ -23,10 +23,6 @@ import Tuner from "./Tuner";
 
 export default class Channel {
 
-    static add(item: ChannelItem): void {
-        return _.channel.add(item);
-    }
-
     static get(type: common.ChannelType, channel: string): ChannelItem {
         return _.channel.get(type, channel);
     }
@@ -43,8 +39,6 @@ export default class Channel {
     private _epgGatheringInterval: number = _.config.server.epgGatheringInterval || 1000 * 60 * 15;
 
     constructor() {
-
-        _.channel = this;
 
         this._load();
 
@@ -134,7 +128,14 @@ export default class Channel {
                 return;
             }
 
-            new ChannelItem(channel);
+            const pre = this.get(channel.type, channel.channel);
+            if (pre) {
+                if (channel.serviceId) {
+                    pre.addService(channel.serviceId);
+                }
+            } else {
+                this.add(new ChannelItem(channel));
+            }
         });
     }
 

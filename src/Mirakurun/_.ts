@@ -19,6 +19,7 @@ import Tuner from "./Tuner";
 import Channel from "./Channel";
 import Service from "./Service";
 import Program from "./Program";
+import Server from "./Server";
 
 interface Shared {
     readonly config: {
@@ -31,6 +32,7 @@ interface Shared {
     channel?: Channel;
     service?: Service;
     program?: Program;
+    server?: Server;
 }
 
 const _: Shared = {
