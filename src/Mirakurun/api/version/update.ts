@@ -23,47 +23,46 @@ import * as latestVersion from "latest-version";
 import * as api from "../../api";
 const current = require("../../../../package.json").version as string;
 
-export const put: Operation = (req, res) => {
+export const put: Operation = async (req, res) => {
 
     if (!req.query.force && !process.env.pm_uptime && !process.env.USING_WINSER) {
         api.responseError(res, 500);
         return;
     }
 
-    latestVersion("mirakurun").then(latest => {
+    const latest = await latestVersion("mirakurun");
 
-        if (!req.query.force && current === latest) {
-            api.responseError(res, 409, "Update Nothing");
-            return;
-        }
+    if (!req.query.force && current === latest) {
+        api.responseError(res, 409, "Update Nothing");
+        return;
+    }
 
-        res.setHeader("Content-Type", "text/plain; charset=utf-8");
-        res.status(202);
-        res.write("Updating...\n");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.status(202);
+    res.write("Updating...\n");
 
-        const path = join(tmpdir(), "Mirakurun_Updating.log");
-        if (existsSync(path) === true) {
-            unlinkSync(path);
-        }
+    const path = join(tmpdir(), "Mirakurun_Updating.log");
+    if (existsSync(path) === true) {
+        unlinkSync(path);
+    }
 
-        const out = openSync(path, "a");
-        const err = openSync(path, "a");
+    const out = openSync(path, "a");
+    const err = openSync(path, "a");
 
-        res.write(`> node lib/updater\n\n`);
+    res.write(`> node lib/updater\n\n`);
 
-        const npm = spawn("node", ["lib/updater"], {
-            detached: true,
-            stdio: ["ignore", out, err]
-        });
-        npm.unref();
+    const npm = spawn("node", ["lib/updater"], {
+        detached: true,
+        stdio: ["ignore", out, err]
+    });
+    npm.unref();
 
-        const tail = new Tail(path);
-        tail.on("line", data => res.write(data + "\n"));
+    const tail = new Tail(path);
+    tail.on("line", data => res.write(data + "\n"));
 
-        req.once("close", () => {
-            tail.removeAllListeners("line");
-            tail.unwatch();
-        });
+    req.once("close", () => {
+        tail.removeAllListeners("line");
+        tail.unwatch();
     });
 };
 

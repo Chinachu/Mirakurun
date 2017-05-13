@@ -19,19 +19,14 @@ import * as api from "../api";
 import { Version } from "../../../api";
 const pkg = require("../../../package.json");
 
-export const get: Operation = (req, res) => {
+export const get: Operation = async (req, res) => {
 
     const version: Version = {
         current: pkg.version,
-        latest: null
+        latest: await latestVersion("mirakurun")
     };
 
-    latestVersion("mirakurun").then(latest => {
-
-        version.latest = latest;
-
-        api.responseJSON(res, version);
-    });
+    api.responseJSON(res, version);
 };
 
 get.apiDoc = {
