@@ -30,6 +30,7 @@ gulp.task("tslint", () => {
         ])
         .pipe(tslint())
         .pipe(tslint.report({
+            emitError: false,
             summarizeFailureOutput: true
         }));
 });
@@ -46,6 +47,7 @@ gulp.task("tsc", ["clean"], () => {
         .pipe(sourcemaps.init())
         .pipe(typescript({
             typescript: require("typescript"),
+            alwaysStrict: true,
             target: "ES6",
             module: "commonjs",
             moduleResolution: "node",
@@ -64,6 +66,7 @@ gulp.task("build", ["tsc"], () => {
         ])
         .pipe(typescript({
             typescript: require("typescript"),
+            alwaysStrict: true,
             target: "ES6",
             module: "commonjs",
             moduleResolution: "node",
