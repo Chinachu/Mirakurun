@@ -273,41 +273,33 @@ class EPG extends stream.Writable {
                         if (state.extended._descs[d.descriptor_number] === undefined) {
                             state.extended._descs[d.descriptor_number] = d.items;
 
-                            {
-                                let comp = true;
-                                const l = state.extended._descs.length;
-                                for (let i = 0; i < l; i++) {
-                                    if (state.extended._descs[i] === undefined) {
-                                        comp = false;
-                                        break;
-                                    }
-                                }
-                                if (comp === false) {
+                            let comp = true;
+                            for (const descs of state.extended._descs) {
+                                if (descs === undefined) {
+                                    comp = false;
                                     break;
                                 }
+                            }
+                            if (comp === false) {
+                                break;
                             }
 
                             const extended: any = {};
 
-                            {
-                                let current = "";
-                                const l = state.extended._descs.length;
-                                for (let i = 0; i < l; i++) {
-                                    const m = state.extended._descs[i].length;
-                                    for (let j = 0; j < m; j++) {
-                                        const desc = state.extended._descs[i][j].item_description_length === 0
-                                                    ? current
-                                                    : new TsChar(state.extended._descs[i][j].item_description_char).decode();
-                                        current = desc;
+                            let current = "";
+                            for (const descs of state.extended._descs) {
+                                for (const desc of descs) {
+                                    const key = desc.item_description_length === 0
+                                                ? current
+                                                : new TsChar(desc.item_description_char).decode();
+                                    current = key;
 
-                                        const char = new TsChar(state.extended._descs[i][j].item_char).decode();
-                                        if (extended[desc] === undefined) {
-                                            extended[desc] = char;
-                                        } else {
-                                            extended[desc] += char;
-                                        }
+                                    const char = new TsChar(desc.item_char).decode();
+                                    if (extended[key] === undefined) {
+                                        extended[key] = char;
+                                    } else {
+                                        extended[key] += char;
                                     }
-                                    state.extended._descs[i] = null; // clean up
                                 }
                             }
 
