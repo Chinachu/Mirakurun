@@ -5,7 +5,7 @@
 **Bold** is the recommended. also, **Node.js** `>=6.5.0` needed.
 
 * [**Linux**](#linux)
-  * [PM2](http://pm2.keymetrics.io/) `>=2.0.12`
+  * [PM2](http://pm2.keymetrics.io/) `>=2.4.0`
   * x86 / **x64** / ARMv7 / **ARMv8**
   * **Debian** / Ubuntu / CentOS / Gentoo
   * SystemV / OpenRC / **SystemD**
@@ -14,7 +14,7 @@
   * Windows 10 RS1
   * Windows 10 RS2 `npm i @kanreisa/winser -g`
 * Darwin (Experimental)
-  * [PM2](http://pm2.keymetrics.io/) `>=2.0.12`
+  * [PM2](http://pm2.keymetrics.io/) `>=2.4.0`
 
 ## Linux
 
@@ -22,7 +22,7 @@
 
 * [**via Package Manager**](https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions) (recommended)
 * [nave](https://github.com/isaacs/nave)
-  * `sudo /path/to/nave.sh usemain 6.9`
+  * `sudo /path/to/nave.sh usemain 6.10`
 
 ### Installing PM2
 
