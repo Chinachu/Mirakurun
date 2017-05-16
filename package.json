@@ -64,6 +64,7 @@
     "morgan": "^1.7.0",
     "munin-plugin": "0.0.9",
     "promise-queue": "^2.2.3",
+    "semver": "^5.3.0",
     "sift": "3.3.7",
     "swagger-ui": "2.2.10",
     "tail": "^1.2.1"

@@ -22,6 +22,16 @@ if (process.env["npm_config_global"] !== "true") {
 const fs = require("fs");
 const path = require("path");
 const child_process = require("child_process");
+const semver = require("semver");
+const pkg = require("../package.json");
+
+// node check
+if (semver.satisfies(process.version, pkg.engines.node) === true) {
+    console.log("Version:", `node@${process.version}`, "[OK]");
+} else {
+    console.error("Version:", `node@${process.version}`, "[NG]", "Expected:", pkg.engines.node);
+    process.exit(1);
+}
 
 // init
 
@@ -29,6 +39,7 @@ if (process.platform === "linux" || process.platform === "darwin") {
     if (process.getuid() !== 0) {
         process.exit(0);
     }
+
     const prefix = "/usr/local";
     const configDir = path.join(prefix, "etc/mirakurun");
     const dataDir = path.join(prefix, "var/db/mirakurun");
@@ -59,6 +70,16 @@ if (process.platform === "linux" || process.platform === "darwin") {
         process.exit(0);
     }
 
+    // pm2 check
+    const pm2Version = child_process.execSync("pm2 -v", { encoding: "utf8" }).trim();
+    const pm2Expected = ">=2.4.0 <3.0.0";
+    if (semver.satisfies(pm2Version, pm2Expected) === true) {
+        console.log("Version:", `pm2@${pm2Version}`, "[OK]");
+    } else {
+        console.error("Version:", `pm2@${pm2Version}`, "[NG]", "Expected:", pm2Expected);
+        process.exit(1);
+    }
+
     try {
         child_process.execSync(`pm2 startup`, {
             stdio: [
@@ -87,6 +108,16 @@ if (process.platform === "linux" || process.platform === "darwin") {
         ]
     });
 } else if (process.platform === "win32") {
+    // winser check
+    const winserVersion = child_process.execSync("winser -v", { encoding: "utf8" }).replace(/^[a-z]+ /, "");
+    const winserExpected = ">=1.0.2 <2.0.0";
+    if (semver.satisfies(winserVersion, winserExpected) === true) {
+        console.log("Version:", `winser@${winserVersion}`, "[OK]");
+    } else {
+        console.error("Version:", `winser@${winserVersion}`, "[NG]", "Expected:", winserExpected);
+        process.exit(1);
+    }
+
     const configDir = path.join(process.env.USERPROFILE, ".Mirakurun");
     const dataDir = path.join(process.env.LOCALAPPDATA, "Mirakurun");
 
