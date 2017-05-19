@@ -2,7 +2,7 @@
   "name": "mirakurun",
   "preferGlobal": true,
   "description": "Japanese DTV Tuner Server Service.",
-  "version": "2.5.2",
+  "version": "2.5.3",
   "homepage": "https://github.com/Chinachu/Mirakurun",
   "keywords": [
     "mirakurun",
