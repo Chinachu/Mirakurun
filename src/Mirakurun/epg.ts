@@ -159,16 +159,20 @@ class EPG extends stream.Writable {
 
             if (typeof service[e.event_id] === "undefined") {
                 const id = getProgramId(networkId, eit.service_id, e.event_id);
-                const programItem = _.program.get(id) || new ProgramItem({
-                    id: id,
+                let programItem = _.program.get(id);
+                if (!programItem) {
+                    programItem = new ProgramItem({
+                        id: id,
 
-                    eventId: e.event_id,
-                    serviceId: eit.service_id,
-                    networkId: networkId,
-                    startAt: getTime(e.start_time),
-                    duration: getTimeFromBCD24(e.duration),
-                    isFree: e.free_CA_mode === 0
-                });
+                        eventId: e.event_id,
+                        serviceId: eit.service_id,
+                        networkId: networkId,
+                        startAt: getTime(e.start_time),
+                        duration: getTimeFromBCD24(e.duration),
+                        isFree: e.free_CA_mode === 0
+                    });
+                    _.program.add(programItem);
+                }
 
                 state = {
                     version: {
