@@ -70,6 +70,9 @@ if (process.platform === "linux" || process.platform === "darwin") {
         process.exit(0);
     }
 
+    const testFlight = child_process.execSync("pm2 -v", { encoding: "utf8" });
+    console.log(testFlight);
+
     // pm2 check
     const pm2Version = child_process.execSync("pm2 -v", { encoding: "utf8" }).trim();
     const pm2Expected = ">=2.4.0 <3.0.0";
