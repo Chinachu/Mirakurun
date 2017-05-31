@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Bold** is the recommended. also, **Node.js** `>=6.5.0` needed.
+**Bold** is the recommended. also, **Node.js** `>=6.5.0 <7.0.0` or `>=8.0.0 <9.0.0` needed.
 
 * [**Linux**](#linux)
   * [PM2](http://pm2.keymetrics.io/) `>=2.4.0`
