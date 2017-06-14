@@ -132,8 +132,8 @@ command /usr/local/bin/node %c
 
 ## Supporting
 
-* [Tip4Commit](https://tip4commit.com/github/Chinachu/Mirakurun) (BTC) - for Committers
-* 19DVwyWGGVqDhFQnkeh8ahZGZJxZp3g6wy (BTC) - for Directly to the Project Owner
+* [Tip4Commit](https://tip4commit.com/github/Chinachu/Mirakurun) (BTC) - to Committers
+* `19DVwyWGGVqDhFQnkeh8ahZGZJxZp3g6wy` (BTC) - Directly to the Project Owner
 
 ## Slack Community
 
