@@ -9,6 +9,7 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 [![Linux Build][travis-img]][travis-url]
 [![Dependency Status][dep-img]][dep-url]
 [![devDependency Status][devdep-img]][devdep-url]
+[![tip for next commit](https://tip4commit.com/projects/43158.svg)](https://tip4commit.com/github/Chinachu/Mirakurun)
 
 ## Features
 
@@ -128,6 +129,11 @@ command /usr/local/bin/node %c
 ## Contributing
 
 [CONTRIBUTING.md](.github/CONTRIBUTING.md)
+
+## Supporting
+
+* [Tip4Commit](https://tip4commit.com/github/Chinachu/Mirakurun) (BTC) - for Committers
+* 19DVwyWGGVqDhFQnkeh8ahZGZJxZp3g6wy (BTC) - for Directly to the Project Owner
 
 ## Slack Community
 
