@@ -109,6 +109,12 @@ export default class ChannelItem {
             }
 
             const service = services.find(service => service.serviceId === serviceId);
+            if (!service) {
+                log.warn("ChannelItem#'%s' serviceId=%d check has failed [no service]", this._name, serviceId);
+
+                setTimeout(() => this.addService(serviceId), 3600000);
+                return;
+            }
 
             log.debug("ChannelItem#'%s' serviceId=%d: %s", this._name, serviceId, JSON.stringify(service, null, "  "));
 
