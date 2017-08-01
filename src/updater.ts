@@ -25,7 +25,7 @@ if (process.platform !== "win32" && process.getuid() !== 0) {
     console.error("Error: root please.");
     process.exit(1);
 }
-if (!pkg.dist || !pkg.dist.tarball) {
+if (!pkg._resolved) {
     console.error("Error: incompatible environment. (installed from not npm?)");
     process.exit(1);
 }
