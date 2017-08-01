@@ -134,6 +134,9 @@ export default class Channel {
                     pre.addService(channel.serviceId);
                 }
             } else {
+                if (channel.type !== "GR") {
+                    (<any> channel).name = `${channel.type}:${channel.channel}`;
+                }
                 this.add(new ChannelItem(channel));
             }
         });
