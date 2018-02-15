@@ -13,3 +13,4 @@ tslint.json
 *.m2ts
 *.log
 *.swp
+test.*
