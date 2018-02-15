@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Bold** is the recommended. also, **Node.js** `>=6.5.0 <7.0.0` or `>=8.0.0 <9.0.0` needed.
+**Bold** is the recommended. also, **Node.js** `^8.9.4 < 9` needed.
 
 * [**Linux**](#linux)
   * [PM2](http://pm2.keymetrics.io/) `>=2.4.0`
@@ -12,7 +12,7 @@
 * [Win32](#win32) (Experimental)
   * [winser](https://github.com/jfromaniello/winser) `>=1.0.2`
   * Windows 10 RS1
-  * Windows 10 RS2 `npm i @kanreisa/winser -g`
+  * Windows 10 RS2/RS3 `npm i @kanreisa/winser -g`
 * Darwin (Experimental)
   * [PM2](http://pm2.keymetrics.io/) `>=2.4.0`
 
