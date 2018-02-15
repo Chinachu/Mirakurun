@@ -40,7 +40,7 @@ export default class Event extends EventEmitter {
         _.event.once("event", listener);
     }
 
-    static removeListener(listener: Function): void {
+    static removeListener(listener: (...args: any[]) => void): void {
         _.event.removeListener("event", listener);
     }
 

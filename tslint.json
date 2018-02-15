@@ -152,7 +152,6 @@
         "variable-declaration": "onespace"
       }
     ],
-    "typeof-compare": true,
     "unified-signatures": false,
     "use-isnan": true,
     "variable-name": false,

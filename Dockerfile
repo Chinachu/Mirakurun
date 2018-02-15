@@ -1,5 +1,5 @@
-FROM mhart/alpine-node:6
-MAINTAINER Yuki KAN <re@pixely.jp>
+FROM mhart/alpine-node:8
+LABEL maintainer "Yuki KAN <re@pixely.jp>"
 
 WORKDIR /usr/src/app
 ADD . .

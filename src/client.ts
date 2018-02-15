@@ -18,6 +18,7 @@ import * as http from "http";
 import * as querystring from "querystring";
 import * as yaml from "js-yaml";
 import * as apid from "../api";
+import { IncomingHttpHeaders } from "http";
 const pkg = require("../package.json");
 const spec = yaml.safeLoad(fs.readFileSync(__dirname + "/../api.yml", "utf8"));
 
@@ -38,7 +39,7 @@ export interface Response {
     status: number;
     statusText: string;
     contentType: string;
-    headers: { [key: string]: string };
+    headers: IncomingHttpHeaders;
     isSuccess: boolean;
     body?: object | string | Buffer;
 }
