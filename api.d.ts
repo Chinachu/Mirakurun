@@ -131,7 +131,7 @@ export interface ProgramRelatedItem {
 export interface TunerDevice {
     index: number;
     name: string;
-    types: ChannelType;
+    types: ChannelType[];
     command: string;
     pid: number;
     users: TunerUser[];
