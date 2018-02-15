@@ -15,10 +15,8 @@
 */
 "use strict";
 
-const colors = require("colors");
-
 if (process.env["npm_config_global"] !== "true") {
-    console.log("Note: add `-g` to install Mirakurun as Server!".yellow);
+    console.log("Note: add `-g` to install Mirakurun as Server!");
     process.exit(0);
 }
 
@@ -26,12 +24,12 @@ const child_process = require("child_process");
 
 if (process.platform === "linux" || process.platform === "darwin") {
     if (process.getuid() !== 0) {
-        console.log("Note: `sudo npm install mirakurun -g --unsafe --production` to install Mirakurun as Server.".yellow);
+        console.log("Note: `sudo npm install mirakurun -g --unsafe --production` to install Mirakurun as Server.");
         process.exit(0);
     }
 
     if (process.env.DOCKER === "YES") {
-        console.log("Note: running in Docker.".yellow);
+        console.log("Note: running in Docker.");
         process.exit(0);
     }
 } else if (process.platform === "win32") {
