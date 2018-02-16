@@ -430,8 +430,6 @@ definitions:
         type: string
       isDisabled:
         type: boolean
-      isPT2:
-        type: boolean
 
   ConfigChannels:
     type: array
