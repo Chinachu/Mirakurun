@@ -188,13 +188,17 @@ export enum LogLevel {
 export type ConfigTuners = ConfigTunersItem[];
 
 export interface ConfigTunersItem {
+    /** tuner name for identifying. */
     name: string;
+    /** channel type. */
     types: ChannelType[];
-    /** for chardev / dvb */
+    /** command to get TS. (chardev / dvb) */
     command?: string;
-    /** for dvb */
+    /** dvr adapter device path (dvb) */
     dvbDevicePath?: string;
+    /** CAS processor command if needed. */
     decoder?: string;
+    /** `true` to **disable** this tuner. */
     isDisabled?: boolean;
 }
 
