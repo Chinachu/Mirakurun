@@ -22,7 +22,7 @@
 
 * [**via Package Manager**](https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions) (recommended)
 * [nave](https://github.com/isaacs/nave)
-  * `sudo /path/to/nave.sh usemain 6.10`
+  * `sudo /path/to/nave.sh usemain 8.9.4`
 
 ### Installing PM2
 

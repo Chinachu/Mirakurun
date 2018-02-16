@@ -42,6 +42,7 @@ sudo mirakurun config tuners
     - GR
     - BS
     - CS
+    - SKY
   command: cmd <channel> --arg1 --arg2 ... # string
   # below are optional
   dvbDevicePath: /dev/dvb/adapter/dvr/path # string
