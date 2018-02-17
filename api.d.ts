@@ -136,6 +136,7 @@ export interface TunerDevice {
     pid: number;
     users: TunerUser[];
     isAvailable: boolean;
+    isRemote: boolean;
     isFree: boolean;
     isUsing: boolean;
     isFault: boolean;
@@ -192,10 +193,16 @@ export interface ConfigTunersItem {
     name: string;
     /** channel type. */
     types: ChannelType[];
-    /** command to get TS. (chardev / dvb) */
+    /** [chardev][dvb] command to get TS. */
     command?: string;
-    /** dvr adapter device path (dvb) */
+    /** [dvb] dvr adapter device path */
     dvbDevicePath?: string;
+    /** [remote] specify to use remote Mirakurun host like as `192.168.1.x`. */
+    remoteMirakurunHost?: string;
+    /** [remote] specify to use remote Mirakurun port number (default: 40772). */
+    remoteMirakurunPort?: number;
+    /** [remote] `true` to use remote decoder. `false` to use local decoder. (if decoder specified) */
+    remoteMirakurunDecoder?: boolean;
     /** CAS processor command if needed. */
     decoder?: string;
     /** `true` to **disable** this tuner. */

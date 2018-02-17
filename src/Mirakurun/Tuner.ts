@@ -176,11 +176,15 @@ export default class Tuner {
         };
 
         const stream = await this._getStream(setting, user);
-        return new Promise<void>((resolve) => {
-            setTimeout(() => stream.emit("close"), time);
-            stream.once("epgReady", () => stream.emit("close"));
-            stream.once("close", resolve);
-        });
+        if (stream === null) {
+            return Promise.resolve();
+        } else {
+            return new Promise<void>((resolve) => {
+                setTimeout(() => stream.emit("close"), time);
+                stream.once("epgReady", () => stream.emit("close"));
+                stream.once("close", resolve);
+            });
+        }
     }
 
     async getServices(channel: ChannelItem): Promise<db.Service[]> {
@@ -255,7 +259,7 @@ export default class Tuner {
 
         tuners.forEach((tuner, i) => {
 
-            if (!tuner.name || !tuner.types || !tuner.command) {
+            if (!tuner.name || !tuner.types || (!tuner.remoteMirakurunHost && !tuner.command)) {
                 log.error("missing required property in tuner#%s configuration", i);
                 return;
             }
@@ -271,13 +275,28 @@ export default class Tuner {
                 return;
             }
 
-            if (typeof tuner.command !== "string") {
+            if (!tuner.remoteMirakurunHost && typeof tuner.command !== "string") {
                 log.error("invalid type of property `command` in tuner#%s configuration", i);
                 return;
             }
 
             if (tuner.dvbDevicePath && typeof tuner.dvbDevicePath !== "string") {
                 log.error("invalid type of property `dvbDevicePath` in tuner#%s configuration", i);
+                return;
+            }
+
+            if (tuner.remoteMirakurunHost && typeof tuner.remoteMirakurunHost !== "string") {
+                log.error("invalid type of property `remoteMirakurunHost` in tuner#%s configuration", i);
+                return;
+            }
+
+            if (tuner.remoteMirakurunPort && Number.isInteger(tuner.remoteMirakurunPort) === false) {
+                log.error("invalid type of property `remoteMirakurunPort` in tuner#%s configuration", i);
+                return;
+            }
+
+            if (tuner.remoteMirakurunDecoder !== undefined && typeof tuner.remoteMirakurunDecoder !== "boolean") {
+                log.error("invalid type of property `remoteMirakurunDecoder` in tuner#%s configuration", i);
                 return;
             }
 
@@ -313,6 +332,25 @@ export default class Tuner {
                     if (devices[i].isAvailable === true && devices[i].channel === setting.channel) {
                         device = devices[i];
                         break;
+                    }
+                }
+
+                // x. use remote data
+                if (device === null && setting.noProvide === true) {
+                    const remoteDevice = devices.find(device => device.isRemote);
+                    if (remoteDevice) {
+                        if (setting.networkId !== undefined && setting.parseEIT === true) {
+                            remoteDevice.getRemotePrograms({ networkId: setting.networkId })
+                                .then(async programs => {
+                                    await common.sleep(1000);
+                                    await _.program.findByNetworkIdAndReplace(setting.networkId, programs);
+                                    await common.sleep(1000);
+                                })
+                                .then(() => resolve(null))
+                                .catch(err => reject(err));
+
+                            return;
+                        }
                     }
                 }
 

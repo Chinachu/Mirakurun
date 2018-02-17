@@ -164,6 +164,27 @@ export default class Program {
         return items;
     }
 
+    async findByNetworkIdAndReplace(networkId: number, programs: db.Program[]): Promise<void> {
+
+        let count = 0;
+
+        for (let i = this._items.length - 1; i >= 0; i--) {
+            if (this._items[i].data.networkId === networkId) {
+                this._items.splice(i, 1);
+                --count;
+            }
+        }
+
+        for (const program of programs) {
+            this.add(new ProgramItem(program), true);
+            ++count;
+        }
+
+        log.debug("programs replaced (networkId=%d, count=%d)", networkId, count);
+
+        this.save();
+    }
+
     save(): void {
         clearTimeout(this._saveTimerId);
         this._saveTimerId = setTimeout(() => this._save(), 3000);

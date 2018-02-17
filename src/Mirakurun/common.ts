@@ -46,3 +46,9 @@ export function updateObject<T, U>(b: T, a: U): boolean {
 
     return updated;
 }
+
+export function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => {
+        setTimeout(resolve, ms);
+    });
+}

@@ -306,6 +306,8 @@ definitions:
           $ref: '#/definitions/TunerUser'
       isAvailable:
         type: boolean
+      isRemote:
+        type: boolean
       isFree:
         type: boolean
       isUsing:
@@ -426,6 +428,12 @@ definitions:
         type: string
       dvbDevicePath:
         type: string
+      remoteMirakurunHost:
+        type: string
+      remoteMirakurunPort:
+        type: integer
+      remoteMirakurunDecoder:
+        type: boolean
       decoder:
         type: string
       isDisabled:

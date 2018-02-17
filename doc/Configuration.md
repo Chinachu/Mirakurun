@@ -43,9 +43,15 @@ sudo mirakurun config tuners
     - BS
     - CS
     - SKY
+  # for chardev/dvb
   command: cmd <channel> --arg1 --arg2 ... # string
-  # below are optional
+  # for dvb
   dvbDevicePath: /dev/dvb/adapter/dvr/path # string
+  # for multiplexing w/ remote Mirakurun
+  remoteMirakurunHost: 192.168.x.x # string
+  remoteMirakurunPort: 40772 # integer
+  remoteMirakurunDecoder: false # boolean
+  # below are optional
   decoder: cmd # string
   isDisabled: false # boolean
 ```

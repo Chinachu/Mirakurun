@@ -55,6 +55,11 @@ export interface Tuner {
     // for dvb
     readonly dvbDevicePath?: string;
 
+    // for multiplexing w/ remote Mirakurun
+    readonly remoteMirakurunHost?: string;
+    readonly remoteMirakurunPort?: number;
+    readonly remoteMirakurunDecoder?: boolean;
+
     // decoder
     readonly decoder?: string;
 

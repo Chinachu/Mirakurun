@@ -21,9 +21,11 @@ import * as util from "util";
 import * as common from "./common";
 import * as log from "./log";
 import * as config from "./config";
+import * as apid from "../../api";
 import status from "./status";
 import Event from "./Event";
 import ChannelItem from "./ChannelItem";
+import Client, { ProgramsQuery } from "../client";
 
 interface User extends common.User {
     _stream?: stream.Duplex;
@@ -37,6 +39,7 @@ interface Status {
     readonly pid: number;
     readonly users: common.User[];
     readonly isAvailable: boolean;
+    readonly isRemote: boolean;
     readonly isFree: boolean;
     readonly isUsing: boolean;
     readonly isFault: boolean;
@@ -52,6 +55,7 @@ export default class TunerDevice extends events.EventEmitter {
     private _users: User[] = [];
 
     private _isAvailable: boolean = true;
+    private _isRemote: boolean = false;
     private _isFault: boolean = false;
     private _fatalCount: number = 0;
     private _exited: boolean = false;
@@ -59,6 +63,7 @@ export default class TunerDevice extends events.EventEmitter {
 
     constructor(private _index: number, private _config: config.Tuner) {
         super();
+        this._isRemote = !!this._config.remoteMirakurunHost;
         Event.emit("tuner", "create", this.export());
         log.debug("TunerDevice#%d initialized", this._index);
     }
@@ -101,6 +106,10 @@ export default class TunerDevice extends events.EventEmitter {
         return this._isAvailable;
     }
 
+    get isRemote(): boolean {
+        return this._isRemote;
+    }
+
     get isFree(): boolean {
         return this._isAvailable === true && this._channel === null && this._users.length === 0;
     }
@@ -135,6 +144,7 @@ export default class TunerDevice extends events.EventEmitter {
             pid: this.pid,
             users: this.users,
             isAvailable: this.isAvailable,
+            isRemote: this.isRemote,
             isFree: this.isFree,
             isUsing: this.isUsing,
             isFault: this.isFault
@@ -213,6 +223,29 @@ export default class TunerDevice extends events.EventEmitter {
         this._updated();
     }
 
+    async getRemotePrograms(query?: ProgramsQuery): Promise<apid.Program[]> {
+
+        if (!this._isRemote) {
+            throw new Error(util.format("TunerDevice#%d is not remote device", this._index));
+        }
+
+        log.debug(
+            "TunerDevice#%d fetching remote programs from %s:%d...",
+            this._index, this.config.remoteMirakurunHost, this.config.remoteMirakurunPort
+        );
+
+        const client = new Client();
+        client.host = this.config.remoteMirakurunHost;
+        client.port = this.config.remoteMirakurunPort;
+        client.userAgent = "Mirakurun (Remote)";
+
+        const programs = await client.getPrograms(query);
+
+        log.info("TunerDevice#%d fetched %d remote programs", this._index, programs.length);
+
+        return programs;
+    }
+
     private async _spawn(ch: ChannelItem): Promise<void> {
 
         log.debug("TunerDevice#%d spawn...", this._index);
@@ -221,7 +254,20 @@ export default class TunerDevice extends events.EventEmitter {
             throw new Error(util.format("TunerDevice#%d has process", this._index));
         }
 
-        let cmd = this._config.command;
+        let cmd: string;
+
+        if (this._isRemote === true) {
+            cmd = "node lib/remote";
+            cmd += " " + this._config.remoteMirakurunHost;
+            cmd += " " + (this._config.remoteMirakurunPort || 40772);
+            cmd += " " + ch.type;
+            cmd += " " + ch.channel;
+            if (this._config.remoteMirakurunDecoder === true) {
+                cmd += " decode";
+            }
+        } else {
+            cmd = this._config.command;
+        }
 
         cmd = cmd.replace("<channel>", ch.channel);
 
