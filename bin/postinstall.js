@@ -114,7 +114,7 @@ if (process.platform === "linux" || process.platform === "darwin") {
 } else if (process.platform === "win32") {
     // winser check
     const winserVersion = child_process.execSync("winser -v", { encoding: "utf8" }).replace(/^[a-z]+ /, "").trim();
-    const winserExpected = ">=1.0.2 <2.0.0";
+    const winserExpected = ">=1.0.3 <2.0.0";
     if (semver.satisfies(winserVersion, winserExpected) === true) {
         console.log("Version:", `winser@${winserVersion}`.green, "[OK]".bgGreen);
     } else {
