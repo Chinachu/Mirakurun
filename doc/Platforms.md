@@ -47,7 +47,7 @@ sudo npm uninstall mirakurun -g --unsafe
   * `server.yml`
   * `tuners.yml`
   * `channels.yml`
-* `/usr/local/db/mirakurun/` - databases
+* `/usr/local/var/db/mirakurun/` - databases
   * `services.json`
   * `programs.json`
 * `/usr/local/var/log/mirakurun.stdout.log` - normal log
