@@ -84,7 +84,7 @@ export default class TSFilter extends stream.Duplex {
     private _offset: number = -1;
     private _buffer: Buffer[] = [];
     private _parses: Buffer[] = [];
-    private _patsec: Buffer = Buffer.allocUnsafe(20);
+    private _patsec: Buffer = Buffer.allocUnsafe(PACKET_SIZE - 4 - 1); // TS header, pointer_field
 
     // state
     private _closed: boolean = false;
@@ -394,6 +394,9 @@ export default class TSFilter extends stream.Duplex {
 
                     // calculate CRC32
                     this._patsec.writeInt32BE(calcCRC32(this._patsec.slice(0, 16)), 16);
+
+                    // padding
+                    this._patsec.fill(0xff, 20);
                 }
             }
 
