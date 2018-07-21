@@ -21,6 +21,7 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 * Realtime EPG Parser
 * Supports most Tuner Devices (chardev, DVB / ISDB-T, ISDB-S, DVB-S2)
 * IPv6 Support
+* [Multiplexing Mirakuruns](doc/Mirakuruns.md)
 
 ## Requirements / Supported Platforms
 
