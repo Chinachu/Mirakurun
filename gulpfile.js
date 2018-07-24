@@ -35,56 +35,69 @@ gulp.task("tslint", () => {
         }));
 });
 
-gulp.task("clean", ["tslint"], () => {
-    del.sync(["lib"]);
-});
+gulp.task("clean", gulp.series(
+    "tslint",
+    callback => {
+        del.sync(["lib"]);
+        callback();
+    }
+));
 
-gulp.task("tsc", ["clean"], () => {
-    return gulp
-        .src([
-            "src/**/*.ts"
-        ])
-        .pipe(sourcemaps.init())
-        .pipe(typescript({
-            typescript: require("typescript"),
-            alwaysStrict: true,
-            target: "ES6",
-            module: "commonjs",
-            moduleResolution: "node",
-            removeComments: false,
-            declarationFiles: false
-        }))
-        .js
-        .pipe(sourcemaps.write("./"))
-        .pipe(gulp.dest("lib"));
-});
+gulp.task("tsc", gulp.series(
+    "clean",
+    () => {
+        return gulp
+            .src([
+                "src/**/*.ts"
+            ])
+            .pipe(sourcemaps.init())
+            .pipe(typescript({
+                typescript: require("typescript"),
+                alwaysStrict: true,
+                target: "ES6",
+                module: "commonjs",
+                moduleResolution: "node",
+                removeComments: false,
+                declarationFiles: false
+            }))
+            .js
+            .pipe(sourcemaps.write("./"))
+            .pipe(gulp.dest("lib"));
+    }
+));
 
-gulp.task("build", ["tsc"], () => {
-    return gulp
-        .src([
-            "src/client.ts"
-        ])
-        .pipe(typescript({
-            typescript: require("typescript"),
-            alwaysStrict: true,
-            target: "ES6",
-            module: "commonjs",
-            moduleResolution: "node",
-            removeComments: false,
-            declarationFiles: true
-        }))
-        .dts
-        .pipe(gulp.dest("lib"));
-});
+gulp.task("build", gulp.series(
+    "tsc",
+    () => {
+        return gulp
+            .src([
+                "src/client.ts"
+            ])
+            .pipe(typescript({
+                typescript: require("typescript"),
+                alwaysStrict: true,
+                target: "ES6",
+                module: "commonjs",
+                moduleResolution: "node",
+                removeComments: false,
+                declarationFiles: true
+            }))
+            .dts
+            .pipe(gulp.dest("lib"));
+    }
+));
 
 gulp.task("test", test)
 
 gulp.task("watch", () => {
-    gulp.watch("src/**/*.ts", ["build"]);
-    gulp.watch("test/**/*.js", ["test"]);
+    gulp.watch("src/**/*.ts", "build");
+    gulp.watch("test/**/*.js", "test");
 });
 
-gulp.task("default", ["build"], test);
+gulp.task("default", gulp.series(
+    "build",
+    test
+));
 
 function test() {
     return gulp
