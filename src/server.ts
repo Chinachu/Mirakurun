@@ -13,14 +13,18 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-if (process.platform !== "win32") {
-    if (process.getuid() !== 0) {
-        console.error("root please.");
-        process.exit(1);
+require("dotenv").config();
+import { execSync } from "child_process";
+
+if (process.platform === "linux") {
+    if (process.getuid() === 0) {
+        execSync(`renice -n -10 -p ${ process.pid }`);
+        execSync(`ionice -c 1 -n 7 -p ${ process.pid }`);
+    } else {
+        console.warn("running in not root!");
     }
 }
 
-import { execSync } from "child_process";
 import _ from "./Mirakurun/_";
 import status from "./Mirakurun/status";
 import Event from "./Mirakurun/Event";
@@ -44,11 +48,6 @@ setEnv("TUNERS_CONFIG_PATH", "/usr/local/etc/mirakurun/tuners.yml");
 setEnv("CHANNELS_CONFIG_PATH", "/usr/local/etc/mirakurun/channels.yml");
 setEnv("SERVICES_DB_PATH", "/usr/local/var/db/mirakurun/services.json");
 setEnv("PROGRAMS_DB_PATH", "/usr/local/var/db/mirakurun/programs.json");
-
-if (process.platform === "linux") {
-    execSync(`renice -n -10 -p ${ process.pid }`);
-    execSync(`ionice -c 1 -n 7 -p ${ process.pid }`);
-}
 
 _.config.server = config.loadServer();
 _.config.channels = config.loadChannels();

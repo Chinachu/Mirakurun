@@ -17,11 +17,9 @@
 
 const fs = require("fs");
 const gulp = require("gulp");
-const mocha = require('gulp-mocha');
 const tslint = require("gulp-tslint");
 const typescript = require("gulp-typescript");
 const sourcemaps = require("gulp-sourcemaps");
-const del = require("del");
 
 gulp.task("tslint", () => {
     return gulp
@@ -35,16 +33,8 @@ gulp.task("tslint", () => {
         }));
 });
 
-gulp.task("clean", gulp.series(
-    "tslint",
-    callback => {
-        del.sync(["lib"]);
-        callback();
-    }
-));
-
 gulp.task("tsc", gulp.series(
-    "clean",
+    "tslint",
     () => {
         return gulp
             .src([
