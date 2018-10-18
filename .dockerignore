@@ -4,6 +4,7 @@
 .gitignore
 .npmignore
 .travis.yml
+.env
 node_modules
 lib
 doc

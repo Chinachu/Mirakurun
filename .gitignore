@@ -2,4 +2,5 @@
 /lib
 *.log
 *.swp
+.env
 test.*

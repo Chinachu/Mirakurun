@@ -6,6 +6,7 @@
 .editorconfig
 .gitignore
 .travis.yml
+.env
 Dockerfile
 gulpfile.js
 tsconfig.json
