@@ -75,7 +75,7 @@ export const get: Operation = (req, res) => {
 
     service.getStream({
         id: (req.ip || "unix") + ":" + (req.connection.remotePort || Date.now()),
-        priority: req.get("X-Mirakurun-Priority") || 0,
+        priority: parseInt(req.get("X-Mirakurun-Priority"), 10) || 0,
         agent: req.get("User-Agent"),
         disableDecoder: (req.query.decode === 0)
     })
