@@ -15,7 +15,6 @@
 */
 "use strict";
 
-const fs = require("fs");
 const gulp = require("gulp");
 const tslint = require("gulp-tslint");
 const typescript = require("gulp-typescript");
@@ -77,26 +76,8 @@ gulp.task("build", gulp.series(
     }
 ));
 
-gulp.task("test", test)
-
 gulp.task("watch", () => {
-    gulp.watch("src/**/*.ts", "build");
-    gulp.watch("test/**/*.js", "test");
+    gulp.watch("src/**/*.ts", gulp.task("build"));
 });
 
-gulp.task("default", gulp.series(
-    "build",
-    test
-));
-
-function test() {
-    return gulp
-        .src(["test/**/*.js"])
-        .pipe(
-            mocha({
-                reporter: "spec",
-                timeout: 3000,
-                slow: 10
-            })
-        );
-}
+gulp.task("default", gulp.task("build"));
