@@ -376,6 +376,10 @@ export default class Tuner {
 
                 // 4. takeover existing
                 if (device === null) {
+                    devices.sort((t1, t2) => {
+                        return t1.getPriority() - t2.getPriority();
+                    });
+
                     for (let i = 0; i < length; i++) {
                         if (devices[i].isUsing === true && devices[i].getPriority() < user.priority) {
                             device = devices[i];
