@@ -12,5 +12,8 @@ insert_final_newline = true
 [*.{yml,json,sh}]
 indent_size = 2
 
+[*.sh]
+end_of_line = lf
+
 [package.json]
 end_of_line = lf
