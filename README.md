@@ -121,6 +121,12 @@ create `/etc/munin/plugin-conf.d/mirakurun.conf` like below:
 command /usr/local/bin/node %c
 ```
 
+## PM2 Plus (Keymetrics)
+
+You can use PM2 Plus to realtime monitoring if running by PM2.
+
+* [PM2 Plus](https://pm2.io/plus/) (Keymetrics)
+
 ## Client Implementations
 
 * [Mirakurun UI](https://github.com/Chinachu/Mirakurun-UI)
