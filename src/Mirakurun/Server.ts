@@ -83,7 +83,7 @@ class Server {
 
             if (req.get("Referer") !== undefined) {
                 const referer = url.parse(req.get("Referer"));
-                if (ip.isPrivate(referer.hostname) === false) {
+                if (referer.hostname !== "localhost" && ip.isPrivate(referer.hostname) === false) {
                     res.status(403).end();
                     return;
                 }
