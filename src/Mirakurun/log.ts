@@ -41,6 +41,10 @@ class LogEvent extends EventEmitter {
 
     emit(ev: "data", level: LogLevel, log: string): boolean {
 
+        if (logLevel < level) {
+            return;
+        }
+
         this.logs.push(log);
         if (this.logs.length > maxLogHistory) {
             this.logs.shift();
@@ -66,37 +70,27 @@ class LogEvent extends EventEmitter {
     }
 
     debug(...msgs: any[]): void {
-        if (logLevel >= LogLevel.DEBUG) {
-            this.emit("data", LogLevel.DEBUG, getLogString.call(null, "debug", arguments));
-        }
+        this.emit("data", LogLevel.DEBUG, getLogString.call(null, "debug", arguments));
     }
 
     info(...msgs: any[]): void {
-        if (logLevel >= LogLevel.INFO) {
-            this.emit("data", LogLevel.INFO, getLogString.call(null, "info", arguments));
-        }
+        this.emit("data", LogLevel.INFO, getLogString.call(null, "info", arguments));
     }
 
     warn(...msgs: any[]): void {
-        if (logLevel >= LogLevel.WARN) {
-            this.emit("data", LogLevel.WARN, getLogString.call(null, "warn", arguments));
-        }
+        this.emit("data", LogLevel.WARN, getLogString.call(null, "warn", arguments));
     }
 
     error(...msgs: any[]): void {
-        if (logLevel >= LogLevel.ERROR) {
-            this.emit("data", LogLevel.ERROR, getLogString.call(null, "error", arguments));
-        }
+        this.emit("data", LogLevel.ERROR, getLogString.call(null, "error", arguments));
     }
 
     fatal(...msgs: any[]): void {
-        if (logLevel >= LogLevel.FATAL) {
-            this.emit("data", LogLevel.FATAL, getLogString.call(null, "fatal", arguments));
-        }
+        this.emit("data", LogLevel.FATAL, getLogString.call(null, "fatal", arguments));
     }
 
     write(line): void {
-        this.emit("data", LogLevel.INFO, line.slice(0, -1));
+        this.emit("data", LogLevel.INFO, getLogString("info", [line.slice(0, -1)]));
     }
 }
 
