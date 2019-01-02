@@ -8,6 +8,10 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
 
 - **install**: fix missing `colors` dependency.
 
+### Dependencies
+
+- colors: `^1.3.3`
+
 ## 2.7.5 (2018-12-25)
 
 ### Server Changes
@@ -32,7 +36,7 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
 
 ### Dependencies
 
-- aribts: `1.3.3"` → `^1.3.4`
+- aribts: `1.3.3` → `^1.3.4`
 
 ## 2.7.2 (2018-10-19)
 
