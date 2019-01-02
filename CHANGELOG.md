@@ -2,6 +2,12 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.7.7 (2019-01-03)
+
+### Server Changes
+
+- **log**: fix comply http logs to log level setting.  [#41](https://github.com/Chinachu/Mirakurun/issues/41)
+
 ## 2.7.6 (2019-01-02)
 
 ### Server Changes
