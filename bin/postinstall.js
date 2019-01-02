@@ -23,6 +23,7 @@ const fs = require("fs");
 const path = require("path");
 const child_process = require("child_process");
 const semver = require("semver");
+const colors = require("colors");
 const pkg = require("../package.json");
 
 // node check
