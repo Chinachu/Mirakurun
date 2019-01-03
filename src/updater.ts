@@ -74,7 +74,7 @@ function spawnNpmInstall(version: string): ChildProcess {
     if (process.platform === "win32") {
         command = "npm.cmd";
     } else {
-        args.push("--unsafe");
+        args.push("--unsafe-perm");
     }
 
     console.log(">", command, ...args);

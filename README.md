@@ -36,7 +36,7 @@ see: [doc/Platforms.md](doc/Platforms.md)
 ```
 # Linux / Darwin
 sudo npm install pm2 -g
-sudo npm install mirakurun -g --unsafe --production
+sudo npm install mirakurun -g --unsafe-perm --production
 
 # Win32 (Windows PowerShell as Admin)
 npm install winser@1.0.3 -g
@@ -47,7 +47,7 @@ npm install mirakurun -g --production
 
 ```
 # Linux / Darwin
-sudo npm install mirakurun@latest -g --unsafe --production
+sudo npm install mirakurun@latest -g --unsafe-perm --production
 
 # Win32 (Windows PowerShell as Admin)
 npm install mirakurun@latest -g --production
@@ -57,7 +57,7 @@ npm install mirakurun@latest -g --production
 
 ```
 # Linux / Darwin
-sudo npm uninstall mirakurun -g --unsafe
+sudo npm uninstall mirakurun -g --unsafe-perm
 
 # Win32 (Windows PowerShell as Admin)
 npm uninstall mirakurun -g

@@ -24,7 +24,7 @@ const child_process = require("child_process");
 
 if (process.platform === "linux" || process.platform === "darwin") {
     if (process.getuid() !== 0) {
-        console.log("Note: `sudo npm install mirakurun -g --unsafe --production` to install Mirakurun as Server.");
+        console.log("Note: `sudo npm install mirakurun -g --unsafe-perm --production` to install Mirakurun as Server.");
         process.exit(0);
     }
 

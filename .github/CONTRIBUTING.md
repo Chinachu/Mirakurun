@@ -36,7 +36,7 @@ npm run build
 ```
 # Linux / Darwin
 sudo npm install pm2 -g
-sudo npm install . -g --unsafe --production
+sudo npm install . -g --unsafe-perm --production
 
 # Win32 (Windows PowerShell as Admin)
 npm install winser -g

@@ -7,7 +7,7 @@ ADD . .
 USER root
 ENV DOCKER=YES
 
-RUN npm i && npm i -g --production --unsafe
+RUN npm i && npm i -g --production --unsafe-perm
 
 WORKDIR /usr/lib/node_modules/mirakurun/
 CMD [ "npm", "start" ]

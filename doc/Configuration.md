@@ -70,7 +70,7 @@ Specify the CAS processor command if needed.
 
 ```sh
 # this is implementation example. for test only.
-sudo npm install arib-b25-stream-test -g --unsafe
+sudo npm install arib-b25-stream-test -g --unsafe-perm
 ```
 
 ## channels.yml

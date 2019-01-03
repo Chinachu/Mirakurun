@@ -32,13 +32,13 @@ sudo npm install pm2 -g
 ### Installing / Updating Mirakurun
 
 ```
-sudo npm install mirakurun@latest -g --unsafe --production
+sudo npm install mirakurun@latest -g --unsafe-perm --production
 ```
 
 ### Uninstalling Mirakurun
 
 ```
-sudo npm uninstall mirakurun -g --unsafe
+sudo npm uninstall mirakurun -g --unsafe-perm
 ```
 
 ### Default Paths
