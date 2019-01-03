@@ -2,6 +2,17 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.8.0 (2019-01-03)
+
+- use `--unsafe-perm` instead of `--unsafe`.
+
+### Server Changes
+
+- **node**: change `--max_old_space_size=256` to `--max_old_space_size=512`.
+- **log**: env `LOG_STDOUT`, `LOG_STDERR` are not used anymore.
+- **install**: add way to install **not** using `--unsafe-perm`.
+- **cli**: add `init` command to init as service manually.
+
 ## 2.7.7 (2019-01-03)
 
 ### Server Changes
