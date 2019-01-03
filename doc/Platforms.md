@@ -48,7 +48,6 @@ sudo mirakurun restart # when updated
 sudo npm uninstall mirakurun -g --unsafe-perm
 
 # Advanced
-sudo npm uninstall mirakurun -g
 sudo pm2 stop mirakurun-server
 sudo pm2 delete mirakurun-server
 sudo pm2 save
