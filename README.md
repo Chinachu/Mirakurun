@@ -33,41 +33,21 @@ see: [doc/Platforms.md](doc/Platforms.md)
 
 ## Install
 
-```
-# Linux / Darwin
-sudo npm install pm2 -g
-sudo npm install mirakurun -g --unsafe-perm --production
-
-# Win32 (Windows PowerShell as Admin)
-npm install winser@1.0.3 -g
-npm install mirakurun -g --production
-```
-
-### Update
-
-```
-# Linux / Darwin
-sudo npm install mirakurun@latest -g --unsafe-perm --production
-
-# Win32 (Windows PowerShell as Admin)
-npm install mirakurun@latest -g --production
-```
-
-### Uninstall
-
-```
-# Linux / Darwin
-sudo npm uninstall mirakurun -g --unsafe-perm
-
-# Win32 (Windows PowerShell as Admin)
-npm uninstall mirakurun -g
-```
+see: [doc/Platforms.md](doc/Platforms.md)
 
 ## CLI
 
 **Only Linux / Darwin Platform**
 
 ### Administration
+
+#### Init
+
+Init as service manually.
+
+```
+mirakurun init
+```
 
 #### Config
 

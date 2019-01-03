@@ -15,7 +15,7 @@
 */
 "use strict";
 
-if (process.env["npm_config_global"] !== "true") {
+if (process.env["npm_config_global"] && process.env["npm_config_global"] !== "true") {
     process.exit(0);
 }
 
@@ -26,7 +26,7 @@ if (process.platform === "linux" || process.platform === "darwin") {
         process.exit(0);
     }
 
-    execSync("pm2 stop processes.json", {
+    execSync("pm2 stop mirakurun-server", {
         stdio: [
             null,
             process.stdout,
@@ -34,7 +34,7 @@ if (process.platform === "linux" || process.platform === "darwin") {
         ]
     });
 
-    execSync("pm2 delete processes.json", {
+    execSync("pm2 delete mirakurun-server", {
         stdio: [
             null,
             process.stdout,

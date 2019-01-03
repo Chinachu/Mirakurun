@@ -21,7 +21,7 @@
 
 * [**via Package Manager**](https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions) (recommended)
 * [nave](https://github.com/isaacs/nave)
-  * `sudo /path/to/nave.sh usemain 8.9.4`
+  * `sudo /path/to/nave.sh usemain 10.15.0`
 
 ### Installing PM2
 
@@ -32,13 +32,27 @@ sudo npm install pm2 -g
 ### Installing / Updating Mirakurun
 
 ```
-sudo npm install mirakurun@latest -g --unsafe-perm --production
+# Quick
+sudo npm install mirakurun -g --unsafe-perm --production
+
+# Advanced
+sudo npm install mirakurun -g --production
+sudo mirakurun init # to install as service
+sudo mirakurun restart # when updated
 ```
 
 ### Uninstalling Mirakurun
 
 ```
+# Quick
 sudo npm uninstall mirakurun -g --unsafe-perm
+
+# Advanced
+sudo npm uninstall mirakurun -g
+sudo pm2 stop mirakurun-server
+sudo pm2 delete mirakurun-server
+sudo pm2 save
+sudo npm uninstall mirakurun -g
 ```
 
 ### Default Paths

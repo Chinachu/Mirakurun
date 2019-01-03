@@ -50,7 +50,7 @@ main () {
   local cmd="$1"
   shift
   case $cmd in
-    config | log | status | start | stop | restart | version )
+    init | config | log | status | start | stop | restart | version )
       cmd="mirakurun_$cmd"
       ;;
     * )
@@ -59,6 +59,12 @@ main () {
   esac
 
   $cmd "$@" && exit 0 || fail "failed somehow"
+}
+
+mirakurun_init() {
+  node bin/preuninstall.js
+  node bin/postinstall.js
+  return 0
 }
 
 mirakurun_config () {
@@ -83,15 +89,15 @@ mirakurun_status () {
 }
 
 mirakurun_start () {
-  pm2 start processes.json && return 0
+  pm2 start mirakurun-server && return 0
 }
 
 mirakurun_stop () {
-  pm2 stop processes.json && return 0
+  pm2 stop mirakurun-server && return 0
 }
 
 mirakurun_restart() {
-  pm2 restart processes.json && return 0
+  pm2 restart mirakurun-server && return 0
 }
 
 mirakurun_version () {
@@ -104,6 +110,8 @@ mirakurun_help () {
 Usage: mirakurun <command> ...
 
 <command>:
+
+init              Init as service manually.
 
 config server     Edit server configuration.
 config tuners     Edit tuner configuration.
