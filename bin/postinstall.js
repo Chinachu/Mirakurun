@@ -160,8 +160,6 @@ if (process.platform === "linux" || process.platform === "darwin") {
             "--set", "Type SERVICE_WIN32_OWN_PROCESS",
             "--set", `AppStdout ${ stdoutLogPath }`,
             "--set", `AppStderr ${ stderrLogPath }`,
-            "--env", `LOG_STDOUT=${ stdoutLogPath }`,
-            "--env", `LOG_STDERR=${ stderrLogPath }`,
             "--env", `USERPROFILE=${ process.env.USERPROFILE }`,
             "--env", `LOCALAPPDATA=${ process.env.LOCALAPPDATA }`,
             "--env", "USING_WINSER=1"
