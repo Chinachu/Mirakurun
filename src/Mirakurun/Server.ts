@@ -93,8 +93,8 @@ class Server {
             next();
         });
 
-        if (fs.existsSync("node_modules/swagger-ui/dist") === true) {
-            app.use("/swagger-ui", express.static("node_modules/swagger-ui/dist"));
+        if (fs.existsSync("node_modules/swagger-ui-dist") === true) {
+            app.use("/swagger-ui", express.static("node_modules/swagger-ui-dist"));
             app.get("/api/debug", (req, res) => res.redirect("/swagger-ui/?url=/api/docs"));
         }
 
