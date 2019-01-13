@@ -2,6 +2,17 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.8.1 (2019-01-14)
+
+### Server Changes
+
+- **debug**: use [swagger-ui-dist](https://www.npmjs.com/package/swagger-ui-dist) instead of [swagger-ui](https://www.npmjs.com/package/swagger-ui).
+
+### Dependencies
+
+- swagger-ui-dist: `^3.20.5`
+- swagger-ui: _(removed)_
+
 ## 2.8.0 (2019-01-03)
 
 - use `--unsafe-perm` instead of `--unsafe`.
