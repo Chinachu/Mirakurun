@@ -2,6 +2,12 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.8.3 (2019-01-15)
+
+### Server Changes
+
+- **updater**: fix update failure. (please note: this fixes effective for later than this version.)
+
 ## 2.8.2 (2019-01-15)
 
 - **install**: fix wrong expression to detect global install.
