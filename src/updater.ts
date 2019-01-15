@@ -14,6 +14,7 @@
    limitations under the License.
 */
 import { spawn, ChildProcess } from "child_process";
+import { openSync } from "fs";
 import * as latestVersion from "latest-version";
 const pkg = require("../package.json");
 
@@ -79,9 +80,20 @@ function spawnNpmInstall(version: string): ChildProcess {
 
     console.log(">", command, ...args);
 
+    let out: number;
+    if (process.env.UPDATER_LOG_PATH) {
+        out = openSync(process.env.UPDATER_LOG_PATH, "a");
+    }
+
     const npm = spawn(command, args, {
-        stdio: ["ignore", process.stdout, process.stderr]
+        detached: true,
+        stdio: [
+            "ignore",
+            out || process.stdout,
+            out || process.stderr
+        ]
     });
+    npm.unref();
 
     return npm;
 }

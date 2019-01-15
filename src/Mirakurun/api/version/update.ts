@@ -14,7 +14,6 @@
    limitations under the License.
 */
 import { Operation } from "express-openapi";
-import { openSync, unlinkSync, existsSync } from "fs";
 import { join } from "path";
 import { spawn } from "child_process";
 import { tmpdir } from "os";
@@ -42,18 +41,16 @@ export const put: Operation = async (req, res) => {
     res.write("Updating...\n");
 
     const path = join(tmpdir(), "Mirakurun_Updating.log");
-    if (existsSync(path) === true) {
-        unlinkSync(path);
-    }
-
-    const out = openSync(path, "a");
-    const err = openSync(path, "a");
 
     res.write(`> node lib/updater\n\n`);
 
+    const env = JSON.parse(JSON.stringify(process.env));
+    env.UPDATER_LOG_PATH = path;
+
     const npm = spawn("node", ["lib/updater"], {
         detached: true,
-        stdio: ["ignore", out, err]
+        stdio: "ignore",
+        env
     });
     npm.unref();
 
