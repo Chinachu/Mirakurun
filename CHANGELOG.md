@@ -2,6 +2,10 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.8.2 (2019-01-15)
+
+- **install**: fix wrong expression to detect global install.
+
 ## 2.8.1 (2019-01-14)
 
 ### Server Changes
