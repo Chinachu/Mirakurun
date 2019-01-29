@@ -102,7 +102,7 @@ export const put: Operation = async (req, res) => {
 
     result.sort((a, b) => {
         if (a.type === b.type) {
-            return a.channel.localeCompare(b.channel, {}, compareOptions);
+            return a.channel.localeCompare(b.channel, undefined, compareOptions);
         } else {
             return channelOrder[a.type] - channelOrder[b.type];
         }
