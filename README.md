@@ -17,17 +17,25 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 * Unix Sockets / TCP
 * Advanced Tuner Process Management
 * Priority Management
+* Tuner Device Pooling
 * Integrated MPEG-2 TS Parser, Filter
 * Realtime EPG Parser
 * Supports most Tuner Devices (chardev, DVB / ISDB-T, ISDB-S, DVB-S2)
 * IPv6 Support
 * [Multiplexing Mirakuruns](doc/Mirakuruns.md)
 
+#### Figure: Variety of the MPEG-2 TS Stream API
+
+![](https://yabumi.cc/1689b554eb4aea9bad992068.svg)
+
+#### Figure: Stream Flow
+
+![](https://yabumi.cc/1689b5d310c654a770d44e7a.svg)
+
 ## Requirements / Supported Platforms
 
-* [Node.js](http://nodejs.org/) `8.9.4 > 9` or `10.11.0 > 11`
+* [Node.js](http://nodejs.org/) 8, 10
 * Linux w/ [PM2](http://pm2.keymetrics.io/)
-* Win32 w/ [winser](https://github.com/jfromaniello/winser)
 
 see: [doc/Platforms.md](doc/Platforms.md)
 
@@ -109,10 +117,12 @@ You can use PM2 Plus to realtime monitoring if running by PM2.
 
 ## Client Implementations
 
-* [Mirakurun UI](https://github.com/Chinachu/Mirakurun-UI)
 * [Rivarun](https://github.com/Chinachu/Rivarun)
-* [BonDriver_Mirakurun](https://github.com/h-mineta/BonDriver_Mirakurun)
-
+* [BonDriver_Mirakurun](https://github.com/Chinachu/BonDriver_Mirakurun)
+* Mirakurun Client ([Built-in](https://github.com/Chinachu/Mirakurun/blob/master/src/client.ts))
+  * [Mirakurun UI](https://github.com/Chinachu/Mirakurun-UI)
+  * [Chinachu γ](https://github.com/Chinachu/Chinachu/wiki/Gamma-Installation-V2)
+  * [EPGStation](https://github.com/l3tnun/EPGStation)
 ## Contributing
 
 [CONTRIBUTING.md](.github/CONTRIBUTING.md)
