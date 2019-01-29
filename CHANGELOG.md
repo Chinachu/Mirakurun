@@ -2,6 +2,18 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.8.4 (2019-01-30)
+
+### Server Changes
+
+- **api**: \[Channel Scan API\] support sort by non-integer channel string. [#42](https://github.com/Chinachu/Mirakurun/pull/42/commits/cdd8a258ab6711853bf3570ae64c501c05a2f189)
+
+### Dependencies
+
+- dotenv: `^6.1.0` → `^6.2.0`
+- express-openapi: `^3.6.0` → `^3.7.0`
+- js-yaml: `^3.12.0` → `^3.12.1`
+
 ## 2.8.3 (2019-01-15)
 
 ### Server Changes
