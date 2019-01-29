@@ -21,6 +21,11 @@ import Tuner from "../../../Tuner";
 
 let isScanning = false;
 
+const compareOptions = {
+    sensitivity: "base",
+    numeric: true
+};
+
 const channelOrder = {
     GR: 1,
     BS: 2,
@@ -96,8 +101,8 @@ export const put: Operation = async (req, res) => {
     }
 
     result.sort((a, b) => {
-        if (a.type === b.type && /^[0-9]+$/.test(a.channel + b.channel) === true) {
-            return parseInt(a.channel, 10) - parseInt(b.channel, 10);
+        if (a.type === b.type) {
+            return a.channel.localeCompare(b.channel, {}, compareOptions);
         } else {
             return channelOrder[a.type] - channelOrder[b.type];
         }
