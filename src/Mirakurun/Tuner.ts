@@ -418,7 +418,8 @@ export default class Tuner {
                                     tsFilter.emit("close");
                                     --status.streamCount.decoder;
                                 });
-                                tsFilter.once("close", () => decoder.kill("SIGKILL"));
+                                decoder.stdin.once("finish", () => decoder.kill("SIGKILL"));
+                                tsFilter.once("close", () => decoder.stdin.end());
                                 tsFilter.pipe(decoder.stdin);
                                 resolve(decoder.stdout);
                             }
