@@ -382,6 +382,9 @@ export default class TunerDevice extends events.EventEmitter {
 
         if (!this._process || !this._process.pid) {
             throw new Error(util.format("TunerDevice#%d has not process", this._index));
+        } else if (this._closing) {
+            log.debug("TunerDevice#%d return because it is closing", this._index);
+            return;
         }
 
         this._isAvailable = false;
