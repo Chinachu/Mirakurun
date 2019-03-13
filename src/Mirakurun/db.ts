@@ -132,8 +132,15 @@ function load(path: string) {
     log.info("load db `%s`", path);
 
     if (fs.existsSync(path) === true) {
-        return require(path);
+        const json = fs.readFileSync(path, "utf8");
+        try {
+            return JSON.parse(json);
+        } catch (e) {
+            log.error("db `%s` is broken (%s: %s)", path, e.name, e.message);
+            return [];
+        }
     } else {
+        log.warn("db `%s` is not exists", path);
         return [];
     }
 }
@@ -149,8 +156,6 @@ function save(path: string, data: any[]): Promise<void> {
             if (err) {
                 return reject(err);
             }
-
-            delete require.cache[require.resolve(path)];
 
             resolve();
         });
