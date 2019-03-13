@@ -61,7 +61,7 @@
     "express": "^4.16.4",
     "express-openapi": "^3.7.0",
     "ip": "^1.1.4",
-    "js-yaml": "^3.12.1",
+    "js-yaml": "^3.12.2",
     "latest-version": "^3.1.0",
     "morgan": "^1.9.1",
     "munin-plugin": "0.0.9",
@@ -69,9 +69,9 @@
     "opencollective-postinstall": "^2.0.1",
     "promise-queue": "^2.2.3",
     "semver": "^5.6.0",
-    "sift": "5.1.0",
+    "sift": "^7.0.1",
     "swagger-ui-dist": "^3.21.0",
-    "tail": "^1.4.0"
+    "tail": "^2.0.2"
   },
   "devDependencies": {
     "@types/body-parser": "^1.17.0",
