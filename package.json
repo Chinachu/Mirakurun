@@ -46,7 +46,7 @@
     "clean": "rimraf lib/*",
     "prepublishOnly": "npm run clean && npm run build",
     "preinstall": "node bin/preinstall.js",
-    "postinstall": "node bin/postinstall.js",
+    "postinstall": "node bin/postinstall.js && opencollective-postinstall",
     "preuninstall": "node bin/preuninstall.js"
   },
   "directories": {
@@ -65,11 +65,13 @@
     "latest-version": "^3.1.0",
     "morgan": "^1.9.1",
     "munin-plugin": "0.0.9",
+    "opencollective-postinstall": "^2.0.1",
     "promise-queue": "^2.2.3",
     "semver": "^5.6.0",
     "sift": "5.1.0",
     "swagger-ui-dist": "^3.20.5",
-    "tail": "^1.4.0"
+    "tail": "^1.4.0",
+    "opencollective": "^1.0.3"
   },
   "devDependencies": {
     "@types/body-parser": "^1.17.0",
@@ -95,5 +97,9 @@
     "linux",
     "darwin",
     "win32"
-  ]
+  ],
+  "collective": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/Mirakurun"
+  }
 }
