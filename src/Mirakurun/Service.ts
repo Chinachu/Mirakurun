@@ -158,7 +158,7 @@ export default class Service {
 
         let dropped = false;
 
-        db.loadServices().forEach(service => {
+        db.loadServices(_.configIntegrity.channels).forEach(service => {
 
             const channelItem = _.channel.get(service.channel.type, service.channel.channel);
 
@@ -196,7 +196,8 @@ export default class Service {
         log.debug("saving services...");
 
         db.saveServices(
-            this._items.map(service => service.export(true))
+            this._items.map(service => service.export(true)),
+            _.configIntegrity.channels
         );
     }
 }

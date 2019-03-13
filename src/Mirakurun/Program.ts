@@ -197,7 +197,7 @@ export default class Program {
         const now = Date.now();
         let dropped = false;
 
-        db.loadPrograms().forEach(program => {
+        db.loadPrograms(_.configIntegrity.channels).forEach(program => {
 
             if (typeof program.networkId === "undefined") {
                 dropped = true;
@@ -221,7 +221,8 @@ export default class Program {
         log.debug("saving programs...");
 
         db.savePrograms(
-            this._items.map(program => program.data)
+            this._items.map(program => program.data),
+            _.configIntegrity.channels
         );
     }
 

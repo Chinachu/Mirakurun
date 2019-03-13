@@ -15,6 +15,7 @@
 */
 require("dotenv").config();
 import { execSync } from "child_process";
+import { createHash } from "crypto";
 
 if (process.platform === "linux") {
     if (process.getuid() === 0) {
@@ -51,6 +52,7 @@ setEnv("PROGRAMS_DB_PATH", "/usr/local/var/db/mirakurun/programs.json");
 
 _.config.server = config.loadServer();
 _.config.channels = config.loadChannels();
+_.configIntegrity.channels = createHash("sha256").update(JSON.stringify(_.config.channels)).digest("base64");
 _.config.tuners = config.loadTuners();
 
 if (typeof _.config.server.logLevel === "number") {

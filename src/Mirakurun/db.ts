@@ -111,30 +111,39 @@ export interface ProgramRelatedItem {
     eventId: number;
 }
 
-export function loadServices(): Service[] {
-    return load(process.env.SERVICES_DB_PATH);
+export function loadServices(integrity: string): Service[] {
+    return load(process.env.SERVICES_DB_PATH, integrity);
 }
 
-export function saveServices(data: Service[]): Promise<void> {
-    return save(process.env.SERVICES_DB_PATH, data);
+export function saveServices(data: Service[], integrity: string): Promise<void> {
+    return save(process.env.SERVICES_DB_PATH, data, integrity);
 }
 
-export function loadPrograms(): Program[] {
-    return load(process.env.PROGRAMS_DB_PATH);
+export function loadPrograms(integrity: string): Program[] {
+    return load(process.env.PROGRAMS_DB_PATH, integrity);
 }
 
-export function savePrograms(data: Program[]): Promise<void> {
-    return save(process.env.PROGRAMS_DB_PATH, data);
+export function savePrograms(data: Program[], integrity: string): Promise<void> {
+    return save(process.env.PROGRAMS_DB_PATH, data, integrity);
 }
 
-function load(path: string) {
+function load(path: string, integrity: string) {
 
-    log.info("load db `%s`", path);
+    log.info("load db `%s` w/ integrity (%s)", path, integrity);
 
     if (fs.existsSync(path) === true) {
         const json = fs.readFileSync(path, "utf8");
         try {
-            return JSON.parse(json);
+            const array: any[] = JSON.parse(json);
+            if (array.length > 0 && array[0].__integrity__) {
+                if (integrity === array[0].__integrity__) {
+                    return array.slice(1);
+                } else {
+                    log.warn("db `%s` integrity check has failed", path);
+                    return [];
+                }
+            }
+            return array;
         } catch (e) {
             log.error("db `%s` is broken (%s: %s)", path, e.name, e.message);
             return [];
@@ -145,9 +154,11 @@ function load(path: string) {
     }
 }
 
-function save(path: string, data: any[]): Promise<void> {
+function save(path: string, data: any[], integrity: string): Promise<void> {
 
-    log.info("save db `%s`", path);
+    log.info("save db `%s` w/ integirty (%s)", path, integrity);
+
+    data.unshift({ __integrity__: integrity });
 
     return new Promise<void>((resolve, reject) => {
 

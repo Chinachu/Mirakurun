@@ -27,6 +27,9 @@ interface Shared {
         channels?: config.Channel[];
         tuners?: config.Tuner[];
     };
+    readonly configIntegrity: {
+        channels: string;
+    };
     event?: Event;
     tuner?: Tuner;
     channel?: Channel;
@@ -36,7 +39,10 @@ interface Shared {
 }
 
 const _: Shared = {
-    config: {}
+    config: {},
+    configIntegrity: {
+        channels: ""
+    }
 };
 
 export default _;
