@@ -2,6 +2,27 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.9.0 (2019-03-14)
+
+- **package**: Activating Open Collective [#45](https://github.com/Chinachu/Mirakurun/pull/45)
+
+### Server Changes
+
+- **db**: improve error handling. [#48](https://github.com/Chinachu/Mirakurun/issues/48)
+- **db**: added integrity check. [#35](https://github.com/Chinachu/Mirakurun/issues/35)
+- **tuner**: fix EPIPE error occurred by decoder.kill [#46](https://github.com/Chinachu/Mirakurun/pull/46)
+- **tuner-device**: fix duplicate function call of _kill() [#47](https://github.com/Chinachu/Mirakurun/pull/47)
+
+### Dependencies
+
+- opencollective: `^1.0.3`
+- opencollective-postinstall: `^2.0.1`
+- dotenv: `^6.2.0` → `^7.0.0`
+- swagger-ui-dist: `^3.20.5` → `^3.21.0`
+- js-yaml: `^3.12.1` → `^3.12.2`
+- sift: `5.1.0` → `^7.0.1`
+- tail: `^1.4.0` → `^2.0.2`
+
 ## 2.8.4 (2019-01-30)
 
 ### Server Changes
