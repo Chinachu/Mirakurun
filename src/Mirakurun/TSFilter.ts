@@ -66,8 +66,8 @@ interface FlagState {
     version_number: number;
 }
 
-// BS/CS logo
-class DownloadLogoData {
+// download BS/CS logo data
+class DownloadData {
     done: boolean = false;
     moduleSize: number;
     moduleVersion: number;
@@ -77,8 +77,13 @@ class DownloadLogoData {
         this.moduleVersion = moduleDII.moduleVersion;
     }
 }
-function MakeDownloadLogoDatasKey(downloadId: number, moduleId: number, moduleVersion: number): string {
+function MakeDownloadDatasKey(downloadId: number, moduleId: number, moduleVersion: number): string {
     return downloadId.toString(10) + "_" + moduleId.toString(10) + "_" + moduleVersion.toString(10);
+}
+interface Service {
+    service_id: number;
+    pmt_pid: number;
+    service_type: number;
 }
 
 export default class TSFilter extends stream.Duplex {
@@ -134,7 +139,12 @@ export default class TSFilter extends stream.Duplex {
     private _readableState: any;
 
     // BS/CS logo
-    private _downloadLogoDatas: Map<string, DownloadLogoData> = null;
+    private _downloadBSCSLogoData: boolean = true;
+    // reserved download datas
+    private _downloadDatas: Map<string, DownloadData> = null;
+    // Identifying Engineering service
+    private _downloadDataPids: Map<number, boolean> = null;
+    private _downloadDataServices: Map<number, Service> = null;  // key = service_id
 
     constructor(options: StreamOptions) {
         super({
@@ -145,7 +155,6 @@ export default class TSFilter extends stream.Duplex {
         this._provideServiceId = options.serviceId || null;
         this._provideEventId = options.eventId || null;
 
-        log.debug(`construct TSFilter _provideServiceId=${this._provideServiceId}`);
         if (this._provideServiceId !== null) {
             this._providePids = [...PROVIDE_PIDS];
             this._ready = false;
@@ -196,7 +205,6 @@ export default class TSFilter extends stream.Duplex {
         this._parser.on("eit", this._onEIT.bind(this));
         this._parser.on("tot", this._onTOT.bind(this));
         this._parser.on("cdt", this._onCDT.bind(this));
-        this._parser.on("dsmcc", this._onDSMCC.bind(this));
 
         this.once("finish", this._close.bind(this));
         this.once("close", this._close.bind(this));
@@ -325,8 +333,8 @@ export default class TSFilter extends stream.Duplex {
         } else if (
             ((pid === 0x12 || pid === 0x29) && (this._parseEIT === true || this._provideEventId !== null)) ||
             pid === 0x14 ||
-            pid === 0x0779 ||   // Dpa BS common
-            this._parsePids.indexOf(pid) !== -1
+            this._parsePids.indexOf(pid) !== -1 ||
+            (this._downloadDataPids !== null && this._downloadDataPids.has(pid))
         ) {
             this._parses.push(packet);
         }
@@ -438,6 +446,44 @@ export default class TSFilter extends stream.Duplex {
                 this._parsePids.push(0x11);
             }
         }
+
+        if (this._downloadBSCSLogoData) {
+            // Ready for download
+            // reset datas
+            this._downloadDatas = new Map<string, DownloadData>();
+            this._downloadDataPids = new Map<number, boolean>();
+            this._downloadDataServices = new Map<number, Service>();
+            // reset event listener
+            this._parser
+                .removeListener("dsmcc", this._onDSMCC.bind(this))
+                .on("dsmcc", this._onDSMCC.bind(this));
+            this._parser
+                .removeListener("pmt", this._onPMT_DownloadData.bind(this))
+                .on("pmt", this._onPMT_DownloadData.bind(this));
+            this._parser
+                .removeListener("sdt", this._onSDT_DownloadData.bind(this))
+                .on("sdt", this._onSDT_DownloadData.bind(this));
+            this._downloadDataPids.set(0x11, true);
+            // service, PMT PID
+            for (const program of data.programs) {
+                if (program.program_number === 0) {
+                    // NIT
+                    continue;
+                }
+                const service_id = program.program_number;
+                const pmt_pid = program.program_map_PID;
+                log.debug("TSFilter PAT(download) service_id=%d -> PMT PID=%d", service_id, pmt_pid);
+
+                // parse PMT PID
+                this._downloadDataPids.set(pmt_pid, true);
+                // add service data
+                this._downloadDataServices.set(service_id, {
+                    service_id: service_id,
+                    pmt_pid: pmt_pid,
+                    service_type: -1
+                });
+            }
+        }
     }
 
     private _onPMT(pid: number, data: any): void {
@@ -446,6 +492,10 @@ export default class TSFilter extends stream.Duplex {
             this._ready = true;
 
             log.info("TSFilter is now ready for serviceId=%d", this._provideServiceId);
+        }
+
+        if (this._providePids === null) {
+            return;
         }
 
         if (data.program_info[0]) {
@@ -631,8 +681,95 @@ export default class TSFilter extends stream.Duplex {
         }
     }
 
+    private _onPMT_DownloadData(pid: number, data: any): void {
+        const service_id = data.program_number;
+        const service = this._downloadDataServices.get(service_id);
+
+        if (!service || service.service_type === -1) {
+            return;
+        }
+
+        if (service.service_type === 0xA4) {
+            // Engineering service: service.service_type = 0xA4
+
+            log.debug("TSFilter PMT(download) PID=%d service_id=%d", pid, service_id);
+
+            const elementaryPids = [];
+            for (const stream of data.streams) {
+                // for (const descriptor of stream.ES_info) {
+                //     if (descriptor.descriptor_tag === 0x52) {
+                //         // Stream identifier descriptor
+                //         // common data: component_tag = 0x79 or 0x7A ?
+                //         // https://github.com/DBCTRADO/LibISDB/blob/master/LibISDB/Filters/LogoDownloaderFilter.cpp
+                //         switch (descriptor.component_tag) {
+                //             case 0x79:
+                //             case 0x7A:
+                //                 elementaryPids.push(stream.elementary_PID);
+                //                 break;
+                //         }
+                //     }
+                // }
+
+                // Anything
+                elementaryPids.push(stream.elementary_PID);
+            }
+
+            for (const elementaryPid of elementaryPids) {
+                log.debug("TSFilter PMT(download) detected elementaryPID=%d", elementaryPid);
+                this._downloadDataPids.set(elementaryPid, true);
+            }
+        }
+
+        // done or unnecessary
+        this._downloadDataPids.delete(pid);
+        this._downloadDataServices.delete(service_id);
+        log.debug("TSFilter PMT(download) deleted PID=%d service_id=%d", pid, service_id);
+        if (this._downloadDataServices.size === 0) {
+            // Unnecessary listener
+            this._parser.removeListener("pmt", this._onPMT_DownloadData.bind(this));
+            log.debug("TSFilter PMT(download) removed Listener PMT");
+        }
+    }
+
+    private _onSDT_DownloadData(pid: number, data: any): void {
+        if (data.table_id !== 0x42) {
+            // not Actual stream
+            return;
+        }
+
+        // Actual stream
+        for (const service of data.services) {
+            const dlService = this._downloadDataServices.get(service.service_id);
+            if (!dlService) {
+                continue;
+            }
+            for (const descriptor of service.descriptors) {
+                if (descriptor.descriptor_tag === 0x48) {
+                    // Service descriptor
+                    // service_type = 0xA4: Engineering Service
+                    dlService.service_type = descriptor.service_type;
+                    log.debug("TSFilter SDT(download) service_id=%d service_type=%d", service.service_id, descriptor.service_type);
+                }
+            }
+            if (dlService.service_type !== 0xA4) {
+                this._downloadDataPids.delete(dlService.pmt_pid);
+                this._downloadDataServices.delete(service.service_id);
+                log.debug("TSFilter SDT(download) deleted PMT PID=%d service_id=%d", dlService.pmt_pid, service.service_id);
+                if (this._downloadDataServices.size === 0) {
+                    // Unnecessary listener
+                    this._parser.removeListener("pmt", this._onPMT_DownloadData.bind(this));
+                    log.debug("TSFilter SDT(download) removed Listener PMT");
+                }
+            }
+        }
+
+        // done
+        this._downloadDataPids.delete(pid); // pid = 0x11
+        this._parser.removeListener("sdt", this._onSDT_DownloadData.bind(this));
+        log.debug("TSFilter SDT(download) removed Listener SDT");
+    }
+
     private _onDSMCC(pid: number, data: any): void {
-        log.debug(`dsmcc pid=${pid} ${data}`);
         switch (data.table_id) {
             case 0x3B:
                 // DII
@@ -662,17 +799,17 @@ export default class TSFilter extends stream.Duplex {
                     continue;
                 }
 
-                const key = MakeDownloadLogoDatasKey(objDii.downloadId, module.moduleId, module.moduleVersion);
+                const key = MakeDownloadDatasKey(objDii.downloadId, module.moduleId, module.moduleVersion);
 
                 log.debug("TSFilter detected DSM-CC BS/CS logo DII PID=%d downloadId=%d moduleId=%d moduleVersion=%d date=%s",
                     pid, objDii.downloadId, module.moduleId, module.moduleVersion, new Date(this._streamTime).toISOString());
 
-                if (this._downloadLogoDatas === null) {
-                    this._downloadLogoDatas = new Map<string, DownloadLogoData>();
+                if (this._downloadDatas === null) {
+                    this._downloadDatas = new Map<string, DownloadData>();
                 }
 
-                if (!this._downloadLogoDatas.has(key)) {
-                    this._downloadLogoDatas.set(key, new DownloadLogoData(module));
+                if (!this._downloadDatas.has(key)) {
+                    this._downloadDatas.set(key, new DownloadData(module));
 
                     log.debug("TSFilter reserved downloading BS/CS logo PID=%d downloadId=%d moduleId=%d moduleVersion=%d date=%s",
                         pid, objDii.downloadId, module.moduleId, module.moduleVersion, new Date(this._streamTime).toISOString());
@@ -682,21 +819,21 @@ export default class TSFilter extends stream.Duplex {
     }
 
     private _onDSMCC_DDB(pid: number, data: any): void {
-        if (this._downloadLogoDatas === null) {
+        if (this._downloadDatas === null) {
             return;
         }
 
         const objDdb = data.message;
 
-        const key = MakeDownloadLogoDatasKey(objDdb.downloadId, objDdb.moduleId, objDdb.moduleVersion);
-        if (!this._downloadLogoDatas.has(key)) {
+        const key = MakeDownloadDatasKey(objDdb.downloadId, objDdb.moduleId, objDdb.moduleVersion);
+        if (!this._downloadDatas.has(key)) {
             return;
         }
-        if (this._downloadLogoDatas.get(key).done) {
+        if (this._downloadDatas.get(key).done) {
             return;
         }
 
-        const downloadLogoData = this._downloadLogoDatas.get(key);
+        const downloadLogoData = this._downloadDatas.get(key);
 
         downloadLogoData.blocks[objDdb.blockNumber] = objDdb.blockDataByte;
 
