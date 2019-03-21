@@ -2,6 +2,12 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.10.0 (2019-03-21)
+
+### Server Changes
+
+- **status**: add more property for diagnostics.
+
 ## 2.9.0 (2019-03-14)
 
 - **package**: Activating Open Collective [#45](https://github.com/Chinachu/Mirakurun/pull/45)
