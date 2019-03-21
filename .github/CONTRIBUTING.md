@@ -8,11 +8,8 @@ When reporting an issue we also need as much information about your environment
 that you can include. We never know what information will be pertinent when
 trying narrow down the issue. **Please include least the following information**:
 
-* Version of Mirakurun: `sudo mirakurun version`
-* Version of Node: `node -v`
-* Version of NPM: `npm -v`
 * Platform you're running on (Debian jessie, CentOS 7.1, ...)
-* Architecture you're running on (x86 or x64 or ARMv8 or ...)
+* (if Mirakurun is working) http://_mirakurun-server-ip_:40772/api/status → https://gist.github.com/
 
 ## Development
 
