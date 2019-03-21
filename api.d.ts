@@ -228,11 +228,13 @@ export interface Version {
 }
 
 export interface Status {
+    time: number;
     version: string;
     process: {
         arch: string;
         platform: string;
         versions: any;
+        env: any;
         pid: number;
         memoryUsage: NodeJS.MemoryUsage;
     };

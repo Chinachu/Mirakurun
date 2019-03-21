@@ -477,6 +477,10 @@ definitions:
   Status:
     type: object
     properties:
+      time:
+        type: integer
+      version:
+        type: string
       process:
         type: object
         properties:
@@ -485,6 +489,8 @@ definitions:
           platform:
             type: string
           versions:
+            type: object
+          env:
             type: object
           pid:
             type: integer

@@ -25,11 +25,24 @@ const pkg = require("../../../package.json");
 export const get: Operation = (req, res) => {
 
     const ret: Status = {
+        time: Date.now(),
         version: pkg.version,
         process: {
             arch: process.arch,
             platform: process.platform,
             versions: process.versions,
+            env: {
+                PATH: process.env.PATH,
+                DOCKER: process.env.DOCKER,
+                pm_uptime: process.env.pm_uptime,
+                USING_WINSER: process.env.USING_WINSER,
+                NODE_ENV: process.env.NODE_ENV,
+                SERVER_CONFIG_PATH: process.env.SERVER_CONFIG_PATH,
+                TUNERS_CONFIG_PATH: process.env.TUNERS_CONFIG_PATH,
+                CHANNELS_CONFIG_PATH: process.env.CHANNELS_CONFIG_PATH,
+                SERVICES_DB_PATH: process.env.SERVICES_DB_PATH,
+                PROGRAMS_DB_PATH: process.env.PROGRAMS_DB_PATH
+            },
             pid: process.pid,
             memoryUsage: process.memoryUsage()
         },
