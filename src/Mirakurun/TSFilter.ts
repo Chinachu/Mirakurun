@@ -468,6 +468,13 @@ export default class TSFilter extends stream.Duplex {
             for (const program of data.programs) {
                 if (program.program_number === 0) {
                     // NIT
+                    // PID = 0x10
+                    const nit_pid = program.network_PID;
+                    log.debug("TSFilter PAT(download) NIT PID=%d", nit_pid);
+                    this._parser
+                        .removeListener("nit", this._onNIT_DownloadData.bind(this))
+                        .on("nit", this._onNIT_DownloadData.bind(this));
+                    this._downloadDataPids.set(nit_pid, true);
                     continue;
                 }
                 const service_id = program.program_number;
@@ -681,6 +688,17 @@ export default class TSFilter extends stream.Duplex {
         }
     }
 
+    private _removePMT_DownloadData(pid: number, service_id: number, event_name: string) {
+        this._downloadDataPids.delete(pid);
+        this._downloadDataServices.delete(service_id);
+        log.debug("TSFilter %s deleted PID=%d service_id=%d", event_name, pid, service_id);
+        if (this._downloadDataServices.size === 0) {
+            // Unnecessary listener
+            this._parser.removeListener("pmt", this._onPMT_DownloadData.bind(this));
+            log.debug("TSFilter %s removed Listener PMT", event_name);
+        }
+    }
+
     private _onPMT_DownloadData(pid: number, data: any): void {
         const service_id = data.program_number;
         const service = this._downloadDataServices.get(service_id);
@@ -721,14 +739,7 @@ export default class TSFilter extends stream.Duplex {
         }
 
         // done or unnecessary
-        this._downloadDataPids.delete(pid);
-        this._downloadDataServices.delete(service_id);
-        log.debug("TSFilter PMT(download) deleted PID=%d service_id=%d", pid, service_id);
-        if (this._downloadDataServices.size === 0) {
-            // Unnecessary listener
-            this._parser.removeListener("pmt", this._onPMT_DownloadData.bind(this));
-            log.debug("TSFilter PMT(download) removed Listener PMT");
-        }
+        this._removePMT_DownloadData(pid, service_id, "PMT(download)");
     }
 
     private _onSDT_DownloadData(pid: number, data: any): void {
@@ -751,15 +762,9 @@ export default class TSFilter extends stream.Duplex {
                     log.debug("TSFilter SDT(download) service_id=%d service_type=%d", service.service_id, descriptor.service_type);
                 }
             }
-            if (dlService.service_type !== 0xA4) {
-                this._downloadDataPids.delete(dlService.pmt_pid);
-                this._downloadDataServices.delete(service.service_id);
-                log.debug("TSFilter SDT(download) deleted PMT PID=%d service_id=%d", dlService.pmt_pid, service.service_id);
-                if (this._downloadDataServices.size === 0) {
-                    // Unnecessary listener
-                    this._parser.removeListener("pmt", this._onPMT_DownloadData.bind(this));
-                    log.debug("TSFilter SDT(download) removed Listener PMT");
-                }
+            if (dlService.service_type !== -1 && dlService.service_type !== 0xA4) {
+                // service_type = 0xA4: Engineering Service
+                this._removePMT_DownloadData(dlService.pmt_pid, service.service_id, "SDT(download)");
             }
         }
 
@@ -767,6 +772,39 @@ export default class TSFilter extends stream.Duplex {
         this._downloadDataPids.delete(pid); // pid = 0x11
         this._parser.removeListener("sdt", this._onSDT_DownloadData.bind(this));
         log.debug("TSFilter SDT(download) removed Listener SDT");
+    }
+
+    private _onNIT_DownloadData(pid: number, data: any): void {
+        if (data.table_id !== 0x40) {
+            // not Actual stream
+            return;
+        }
+
+        // Actual stream
+        for (const transport_stream of data.transport_streams) {
+            for (const desc of transport_stream.transport_descriptors) {
+                if (desc.descriptor_tag === 0x41) {
+                    // Service list descriptor
+                    for (const service of desc.services) {
+                        const dlService = this._downloadDataServices.get(service.service_id);
+                        if (!dlService) {
+                            continue;
+                        }
+                        log.debug("TSFilter NIT(download) service_id=%d service_type=%d", service.service_id, service.service_type);
+                        dlService.service_type = service.service_type;
+                        if (dlService.service_type !== 0xA4) {
+                            // service_type = 0xA4: Engineering Service
+                            this._removePMT_DownloadData(dlService.pmt_pid, service.service_id, "NIT(download)");
+                        }
+                    }
+                }
+            }
+        }
+
+        // done
+        this._downloadDataPids.delete(pid); // pid = 0x10
+        this._parser.removeListener("nit", this._onNIT_DownloadData.bind(this));
+        log.debug("TSFilter NIT(download) removed Listener NIT");
     }
 
     private _onDSMCC(pid: number, data: any): void {
