@@ -2,6 +2,12 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.10.1 (2019-04-08)
+
+### Server Changes
+
+- **ts-filter**: fix unexpected PAT CRC [#53](https://github.com/Chinachu/Mirakurun/pull/53)
+
 ## 2.10.0 (2019-03-21)
 
 ### Server Changes
