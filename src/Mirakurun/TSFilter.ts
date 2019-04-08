@@ -299,7 +299,7 @@ export default class TSFilter extends stream.Duplex {
 
         // parse
         if (pid === 0 && this._patCRC.compare(packet.slice(packet[7] + 4, packet[7] + 8))) {
-            this._patCRC = packet.slice(packet[7] + 4, packet[7] + 8);
+            this._patCRC = Buffer.from(packet.slice(packet[7] + 4, packet[7] + 8));
             this._parses.push(packet);
         } else if (
             ((pid === 0x12 || pid === 0x29) && (this._parseEIT === true || this._provideEventId !== null)) ||
