@@ -47,6 +47,10 @@ export default class Program {
     }
 
     private _items: ProgramItem[] = [];
+    // At this moment, this is used only for improving the performance
+    // of the `get` and `exists` methods.  But it may be possible to
+    // replace _items with _itemMap and keep the API compatibility.
+    private _itemMap: { [programId: number]: ProgramItem } = {};
     private _saveTimerId: NodeJS.Timer;
     private _programGCInterval: number = _.config.server.programGCInterval || 1000 * 60 * 15;
 
@@ -63,7 +67,7 @@ export default class Program {
 
     add(item: ProgramItem, firstAdd: boolean = false): void {
 
-        if (this.get(item.id) !== null) {
+        if (this.exists(item.id)) {
             return;
         }
 
@@ -90,6 +94,7 @@ export default class Program {
         }
 
         this._items.push(item);
+        this._itemMap[item.id] = item;
 
         if (firstAdd === false) {
             Event.emit("program", "create", item.data);
@@ -100,14 +105,9 @@ export default class Program {
     }
 
     get(id: number): ProgramItem {
-
-        const l = this._items.length;
-        for (let i = 0; i < l; i++) {
-            if (this._items[i].id === id) {
-                return this._items[i];
-            }
+        if (id in this._itemMap) {
+            return this._itemMap[id];
         }
-
         return null;
     }
 
@@ -116,6 +116,7 @@ export default class Program {
         const index = this._items.indexOf(item);
 
         if (index !== -1) {
+            delete this._itemMap[item.id];
             this._items.splice(index, 1);
 
             this.save();
@@ -123,7 +124,7 @@ export default class Program {
     }
 
     exists(id: number): boolean {
-        return this.get(id) !== null;
+        return id in this._itemMap;
     }
 
     findByQuery(query: object): ProgramItem[] {
@@ -170,7 +171,7 @@ export default class Program {
 
         for (let i = this._items.length - 1; i >= 0; i--) {
             if (this._items[i].data.networkId === networkId) {
-                this._items.splice(i, 1);
+                this.remove(this._items[i]);
                 --count;
             }
         }
