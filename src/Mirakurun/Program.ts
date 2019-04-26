@@ -165,7 +165,7 @@ export default class Program {
         return items;
     }
 
-    async findByNetworkIdAndReplace(networkId: number, programs: db.Program[]): Promise<void> {
+    findByNetworkIdAndReplace(networkId: number, programs: db.Program[]): void {
 
         let count = 0;
 

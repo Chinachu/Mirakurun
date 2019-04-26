@@ -343,7 +343,7 @@ export default class Tuner {
                             remoteDevice.getRemotePrograms({ networkId: setting.networkId })
                                 .then(async programs => {
                                     await common.sleep(1000);
-                                    await _.program.findByNetworkIdAndReplace(setting.networkId, programs);
+                                    _.program.findByNetworkIdAndReplace(setting.networkId, programs);
                                     await common.sleep(1000);
                                 })
                                 .then(() => resolve(null))
