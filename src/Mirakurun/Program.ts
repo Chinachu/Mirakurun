@@ -50,7 +50,7 @@ export default class Program {
     // At this moment, this is used only for improving the performance
     // of the `get` and `exists` methods.  But it may be possible to
     // replace _items with _itemMap and keep the API compatibility.
-    private _itemMap: { [programId: number]: ProgramItem } = {};
+    private _itemMap: Map<number, ProgramItem> = new Map<number, ProgramItem>();
     private _saveTimerId: NodeJS.Timer;
     private _programGCInterval: number = _.config.server.programGCInterval || 1000 * 60 * 15;
 
@@ -94,7 +94,7 @@ export default class Program {
         }
 
         this._items.push(item);
-        this._itemMap[item.id] = item;
+        this._itemMap.set(item.id, item);
 
         if (firstAdd === false) {
             Event.emit("program", "create", item.data);
@@ -104,11 +104,8 @@ export default class Program {
         this.save();
     }
 
-    get(id: number): ProgramItem {
-        if (id in this._itemMap) {
-            return this._itemMap[id];
-        }
-        return null;
+    get(id: number): ProgramItem | null {
+        return this._itemMap.get(id) || null;
     }
 
     remove(item: ProgramItem): void {
@@ -116,7 +113,7 @@ export default class Program {
         const index = this._items.indexOf(item);
 
         if (index !== -1) {
-            delete this._itemMap[item.id];
+            this._itemMap.delete(item.id);
             this._items.splice(index, 1);
 
             this.save();
@@ -124,7 +121,7 @@ export default class Program {
     }
 
     exists(id: number): boolean {
-        return id in this._itemMap;
+        return this._itemMap.has(id);
     }
 
     findByQuery(query: object): ProgramItem[] {
