@@ -215,6 +215,7 @@ export default class TSFilter extends stream.Duplex {
                 }, this._overflowTimeLimit);
             }
 
+            callback();  // just drop the chunk
             ++status.errorCount.bufferOverflow;
             return;
         }
