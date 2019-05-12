@@ -2,6 +2,19 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.11.0 (2019-05-12)
+
+- **docker**: fixed something wrong.
+
+### Server Changes
+
+- **program**: improve performance. [#55](https://github.com/Chinachu/Mirakurun/pull/55)
+- **ts-filter**: drop the chunk when the buffer overflows. [#57](https://github.com/Chinachu/Mirakurun/issues/57) [#58](https://github.com/Chinachu/Mirakurun/pull/58)
+
+### Dependencies
+
+- js-yaml: `^3.12.2` → `^3.13.1`
+
 ## 2.10.1 (2019-04-08)
 
 ### Server Changes

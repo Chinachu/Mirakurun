@@ -8,6 +8,5 @@
 node_modules
 lib
 doc
-test
 *.tar
 *.log

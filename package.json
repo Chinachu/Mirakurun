@@ -2,7 +2,7 @@
   "name": "mirakurun",
   "preferGlobal": true,
   "description": "Japanese DTV Tuner Server Service.",
-  "version": "2.10.1",
+  "version": "2.11.0",
   "homepage": "https://github.com/Chinachu/Mirakurun",
   "keywords": [
     "mirakurun",
@@ -47,7 +47,9 @@
     "prepublishOnly": "npm run clean && npm run build",
     "preinstall": "node bin/preinstall.js",
     "postinstall": "node bin/postinstall.js && opencollective-postinstall",
-    "preuninstall": "node bin/preuninstall.js"
+    "preuninstall": "node bin/preuninstall.js",
+    "docker-build": "docker build --rm --tag=mirakurun .",
+    "docker-run": "docker run -it --rm -p 41772:41772 --env-file .env --cap-add=SYS_ADMIN --cap-add=SYS_NICE -v ./config:/usr/local/etc/mirakurun mirakurun"
   },
   "directories": {
     "doc": "doc",
