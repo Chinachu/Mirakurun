@@ -1,19 +1,15 @@
-FROM node:10-alpine
+FROM mhart/alpine-node:8
+LABEL maintainer "Yuki KAN <re@pixely.jp>"
 
-LABEL maintainer="Yuki KAN <re@pixely.jp>"
+WORKDIR /usr/src/app
+ADD . .
 
+USER root
 ENV DOCKER=YES
 
-COPY . /tmp/src/
+RUN npm i && npm i -g --production --unsafe-perm
 
-RUN set -eux \
- && (cd /tmp/src; npm i) \
- && (cd /tmp/src; npm run build) \
- && (cd /tmp/src; npm i -g --production --unsafe-perm $(npm pack)) \
- # cleanup
- && npm cache clean --force \
- && rm -rf /tmp/*
-
-WORKDIR /usr/local/lib/node_modules/mirakurun/
-EXPOSE 40772
+WORKDIR /usr/lib/node_modules/mirakurun/
 CMD [ "npm", "start" ]
+
+EXPOSE 40772
