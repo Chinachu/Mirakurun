@@ -46,7 +46,7 @@ export default class Program {
         return _.program.items;
     }
 
-    private _items: ProgramItem[] = [];
+    private _itemMap: Map<number, ProgramItem> = new Map<number, ProgramItem>();
     private _saveTimerId: NodeJS.Timer;
     private _programGCInterval: number = _.config.server.programGCInterval || 1000 * 60 * 15;
 
@@ -57,13 +57,14 @@ export default class Program {
         setTimeout(this._gc.bind(this), this._programGCInterval);
     }
 
+    // CAUTION: This getter method creates a new Array object every time.
     get items(): ProgramItem[] {
-        return this._items;
+        return Array.from(this._itemIterator);
     }
 
     add(item: ProgramItem, firstAdd: boolean = false): void {
 
-        if (this.get(item.id) !== null) {
+        if (this.exists(item.id)) {
             return;
         }
 
@@ -89,7 +90,7 @@ export default class Program {
             });
         }
 
-        this._items.push(item);
+        this._itemMap.set(item.id, item);
 
         if (firstAdd === false) {
             Event.emit("program", "create", item.data);
@@ -99,45 +100,33 @@ export default class Program {
         this.save();
     }
 
-    get(id: number): ProgramItem {
-
-        const l = this._items.length;
-        for (let i = 0; i < l; i++) {
-            if (this._items[i].id === id) {
-                return this._items[i];
-            }
-        }
-
-        return null;
+    get(id: number): ProgramItem | null {
+        return this._itemMap.get(id) || null;
     }
 
     remove(item: ProgramItem): void {
-
-        const index = this._items.indexOf(item);
-
-        if (index !== -1) {
-            this._items.splice(index, 1);
-
+        if (this._itemMap.delete(item.id)) {
             this.save();
         }
     }
 
     exists(id: number): boolean {
-        return this.get(id) !== null;
+        return this._itemMap.has(id);
     }
 
     findByQuery(query: object): ProgramItem[] {
-        return sift(query, this._items);
+        // Pass `this.items` instead of `this._itemIterator`.
+        // Because IterableIterator<T> doesn't have the `filter()` method.
+        return sift(query, this.items);
     }
 
     findByServiceId(serviceId: number): ProgramItem[] {
 
         const items = [];
 
-        const l = this._items.length;
-        for (let i = 0; i < l; i++) {
-            if (this._items[i].data.serviceId === serviceId) {
-                items.push(this._items[i]);
+        for (const item of this._itemIterator) {
+            if (item.data.serviceId === serviceId) {
+                items.push(item);
             }
         }
 
@@ -148,9 +137,7 @@ export default class Program {
 
         const items = [];
 
-        const l = this._items.length;
-        for (let i = 0; i < l; i++) {
-            const item = this._items[i];
+        for (const item of this._itemIterator) {
             if (
                 item.data.networkId === networkId &&
                 item.data.serviceId === serviceId &&
@@ -164,13 +151,18 @@ export default class Program {
         return items;
     }
 
-    async findByNetworkIdAndReplace(networkId: number, programs: db.Program[]): Promise<void> {
+    findByNetworkIdAndReplace(networkId: number, programs: db.Program[]): void {
 
         let count = 0;
 
-        for (let i = this._items.length - 1; i >= 0; i--) {
-            if (this._items[i].data.networkId === networkId) {
-                this._items.splice(i, 1);
+        // The `reverse()` method never changes the original data.  Because
+        // `this.items` returns a new Array object created from the original
+        // data.
+        for (const item of this.items.reverse()) {
+            if (item.data.networkId === networkId) {
+                // Calling `this.remove(item)` here is safe.  Because that never
+                // changes the Array object we're iterating here.
+                this.remove(item);
                 --count;
             }
         }
@@ -188,6 +180,10 @@ export default class Program {
     save(): void {
         clearTimeout(this._saveTimerId);
         this._saveTimerId = setTimeout(() => this._save(), 3000);
+    }
+
+    private get _itemIterator(): IterableIterator<ProgramItem> {
+        return this._itemMap.values();
     }
 
     private _load(): void {
@@ -221,9 +217,17 @@ export default class Program {
         log.debug("saving programs...");
 
         db.savePrograms(
-            this._items.map(program => program.data),
+            this._collectDBData(),
             _.configIntegrity.channels
         );
+    }
+
+    private _collectDBData(): db.Program[] {
+        const results = [];
+        for (const item of this._itemIterator) {
+            results.push(item.data);
+        }
+        return results;
     }
 
     private _gc(): void {
@@ -235,12 +239,12 @@ export default class Program {
             const now = Date.now();
             let count = 0;
 
-            this._items.forEach(program => {
+            for (const program of this._itemIterator) {
                 if (now > (program.data.startAt + program.data.duration)) {
                     ++count;
                     this.remove(program);
                 }
-            });
+            }
 
             setTimeout(this._gc.bind(this), this._programGCInterval);
 
