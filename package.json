@@ -61,7 +61,7 @@
     "express": "^4.16.4",
     "express-openapi": "^3.7.0",
     "ip": "^1.1.4",
-    "js-yaml": "^3.12.2",
+    "js-yaml": "^3.13.1",
     "latest-version": "^3.1.0",
     "morgan": "^1.9.1",
     "munin-plugin": "0.0.9",
