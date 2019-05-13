@@ -1,4 +1,4 @@
-FROM node:10.15.3 AS build
+FROM node:10.15.3-slim AS build
 WORKDIR /app
 ENV DOCKER=YES
 ADD . .
