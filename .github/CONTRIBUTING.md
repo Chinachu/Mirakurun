@@ -52,4 +52,4 @@ Stop-Service mirakurun
 npm run debug.win32
 ```
 
-If you've any questions, please ask on Slack.
+If you've any questions, please ask on Discord.

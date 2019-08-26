@@ -11,7 +11,7 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 [![devDependency Status][devdep-img]][devdep-url]
 [![tip for next commit](https://tip4commit.com/projects/43158.svg)](https://tip4commit.com/github/Chinachu/Mirakurun)
 [![Backers on Open Collective](https://opencollective.com/Mirakurun/backers/badge.svg)](#backers)
- [![Sponsors on Open Collective](https://opencollective.com/Mirakurun/sponsors/badge.svg)](#sponsors) 
+ [![Sponsors on Open Collective](https://opencollective.com/Mirakurun/sponsors/badge.svg)](#sponsors)
 
 ## Features
 
@@ -134,14 +134,13 @@ You can use PM2 Plus to realtime monitoring if running by PM2.
 * [Tip4Commit](https://tip4commit.com/github/Chinachu/Mirakurun) (BTC) - to Every Committers
 * `1ND6fuKgQ8kKZnyoCRfJqe6cijsScd5Ttf` (BTC) - Directly to the Project Team
 
-## Slack Community
+## Discord Community
 
-* Join: https://slack.chinachu.moe/
-* Login: https://chinachu.slack.com/
+* Invitation: https://discord.gg/X7KU5W9
 
 ## Contributors
 
-This project exists thanks to all the people who contribute. 
+This project exists thanks to all the people who contribute.
 <a href="https://github.com/Chinachu/Mirakurun/graphs/contributors"><img src="https://opencollective.com/Mirakurun/contributors.svg?width=890&button=false" /></a>
 
 
