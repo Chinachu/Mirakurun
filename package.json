@@ -36,10 +36,10 @@
   },
   "main": "lib/client.js",
   "scripts": {
-    "start": "node --max_old_space_size=512 lib/server.js",
-    "debug": "node --max_old_space_size=512 --inspect --debug-brk lib/server.js",
-    "start.win32": "node.exe --max_old_space_size=512 bin/init.win32.js",
-    "debug.win32": "node.exe --max_old_space_size=512 --inspect --debug-brk bin/init.win32.js",
+    "start": "node -r source-map-support/register --max_old_space_size=512 lib/server.js",
+    "debug": "node -r source-map-support/register --max_old_space_size=512 --inspect --debug-brk lib/server.js",
+    "start.win32": "node.exe -r source-map-support/register --max_old_space_size=512 bin/init.win32.js",
+    "debug.win32": "node.exe -r source-map-support/register --max_old_space_size=512 --inspect --debug-brk bin/init.win32.js",
     "build": "gulp build",
     "watch": "gulp watch",
     "test": "mocha --exit test/*.spec.js",
@@ -72,6 +72,7 @@
     "promise-queue": "^2.2.3",
     "semver": "^5.6.0",
     "sift": "^7.0.1",
+    "source-map-support": "^0.5.16",
     "swagger-ui-dist": "^3.21.0",
     "tail": "^2.0.2"
   },
