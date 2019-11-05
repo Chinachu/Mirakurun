@@ -2,6 +2,18 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.12.0 (2019-11-05)
+
+Improved startup stability. fixed stack trace for TypeScript codes.
+
+### Server Changes
+
+- **server**: await network up. [#60](https://github.com/Chinachu/Mirakurun/issues/60)
+
+### Dependencies
+
+- source-map-support: `^0.5.16`
+
 ## 2.11.0 (2019-05-12)
 
 - **docker**: fixed something wrong.
