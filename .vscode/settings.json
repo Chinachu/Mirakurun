@@ -3,9 +3,10 @@
     "editor.insertSpaces": true,
     "editor.renderWhitespace": "all",
     "editor.formatOnType": false,
-    "editor.autoClosingBrackets": true,
+    "editor.autoClosingBrackets": "always",
     "files.trimTrailingWhitespace": true,
     "git.enabled": true,
     "git.autofetch": false,
-    "typescript.tsdk": "./node_modules/typescript/lib"
+    "typescript.tsdk": "./node_modules/typescript/lib",
+    "terminal.integrated.shell.windows": "C:\\Windows\\System32\\bash.exe"
 }
