@@ -69,6 +69,8 @@ _.service = new Service();
 _.program = new Program();
 _.server = new Server();
 
+_.server.init();
+
 function setEnv(name: string, value: string) {
     process.env[name] = process.env[name] || value;
 }

@@ -22,6 +22,7 @@ import * as openapi from "express-openapi";
 import * as morgan from "morgan";
 import * as bodyParser from "body-parser";
 import * as yaml from "js-yaml";
+import { sleep } from "./common";
 import * as log from "./log";
 import * as system from "./system";
 import regexp from "./regexp";
@@ -31,9 +32,15 @@ const pkg = require("../../package.json");
 
 class Server {
 
+    private _isRunning = false;
     private _servers: http.Server[] = [];
 
-    constructor() {
+    async init() {
+
+        if (this._isRunning === true) {
+            throw new Error("Server is running");
+        }
+        this._isRunning = true;
 
         const serverConfig = _.config.server;
 
@@ -44,6 +51,18 @@ class Server {
         }
 
         if (serverConfig.port) {
+            while (true) {
+                try {
+                    if (system.getPrivateIPv4Addresses().length > 0) {
+                        break;
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+                log.warn("Server hasn't detected IPv4 addresses...");
+                await sleep(5000);
+            }
+
             addresses = [
                 ...addresses,
                 ...system.getPrivateIPv4Addresses(),
