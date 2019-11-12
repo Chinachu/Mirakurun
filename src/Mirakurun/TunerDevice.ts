@@ -229,15 +229,12 @@ export default class TunerDevice extends events.EventEmitter {
             throw new Error(util.format("TunerDevice#%d is not remote device", this._index));
         }
 
-        log.debug(
-            "TunerDevice#%d fetching remote programs from %s:%d...",
-            this._index, this.config.remoteMirakurunHost, this.config.remoteMirakurunPort
-        );
-
         const client = new Client();
         client.host = this.config.remoteMirakurunHost;
-        client.port = this.config.remoteMirakurunPort;
+        client.port = this.config.remoteMirakurunPort || 40772;
         client.userAgent = "Mirakurun (Remote)";
+
+        log.debug("TunerDevice#%d fetching remote programs from %s:%d...", this._index, client.host, client.port);
 
         const programs = await client.getPrograms(query);
 
