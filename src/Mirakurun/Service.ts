@@ -80,7 +80,7 @@ export default class Service {
     get(networkId: number, serviceId: number): ServiceItem;
     get(id: number, serviceId?: number) {
 
-        if (typeof serviceId === "undefined") {
+        if (serviceId === undefined) {
             const l = this._items.length;
             for (let i = 0; i < l; i++) {
                 if (this._items[i].id === id) {
@@ -167,7 +167,7 @@ export default class Service {
                 return;
             }
 
-            if (typeof service.networkId === "undefined" || typeof service.serviceId === "undefined") {
+            if (service.networkId === undefined || service.serviceId === undefined) {
                 dropped = true;
                 return;
             }

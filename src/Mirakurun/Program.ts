@@ -195,7 +195,7 @@ export default class Program {
 
         db.loadPrograms(_.configIntegrity.channels).forEach(program => {
 
-            if (typeof program.networkId === "undefined") {
+            if (program.networkId === undefined) {
                 dropped = true;
                 return;
             }

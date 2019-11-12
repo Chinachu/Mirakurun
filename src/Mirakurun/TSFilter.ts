@@ -630,11 +630,11 @@ export default class TSFilter extends stream.Duplex {
         const networkId = data.original_network_id;
         const serviceId = data.service_id;
 
-        if (typeof this._epgState[networkId] === "undefined") {
+        if (this._epgState[networkId] === undefined) {
             this._epgState[networkId] = {};
         }
 
-        if (typeof this._epgState[networkId][serviceId] === "undefined") {
+        if (this._epgState[networkId][serviceId] === undefined) {
             this._epgState[networkId][serviceId] = {
                 basic: {
                     flags: [],
