@@ -299,7 +299,7 @@ class EPG extends stream.Writable {
                                     current = key;
 
                                     if (extended[key] === undefined) {
-                                        extended[key] = new Buffer(desc.item_char);
+                                        extended[key] = Buffer.from(desc.item_char);
                                     } else {
                                         extended[key] = Buffer.concat([extended[key], desc.item_char]);
                                     }
