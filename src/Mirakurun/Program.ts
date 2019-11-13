@@ -57,7 +57,7 @@ export default class Program {
         setTimeout(this._gc.bind(this), this._programGCInterval);
     }
 
-    // CAUTION: This getter method creates a new Array object every time.
+    /** CAUTION: This getter method creates a new Array object every time. */
     get items(): ProgramItem[] {
         return Array.from(this._itemIterator);
     }
