@@ -629,6 +629,7 @@ export default class TSFilter extends stream.Duplex {
 
         const networkId = data.original_network_id;
         const serviceId = data.service_id;
+        const versionNumber = data.version_number;
 
         if (this._epgState[networkId] === undefined) {
             this._epgState[networkId] = {};
@@ -664,9 +665,17 @@ export default class TSFilter extends stream.Duplex {
         const sectionNumber = data.section_number & 0x07;
         const segmentLastSectionNumber = data.segment_last_section_number & 0x07;
         const targetFlags = (data.table_id & 0x0F) < 0x08 ? this._epgState[networkId][serviceId].basic : this._epgState[networkId][serviceId].extended;
+        const targetFlag = targetFlags.flags[flagsId];
 
         if ((targetFlags.lastFlagsId !== lastFlagsId) ||
-            (targetFlags.flags[flagsId].version_number !== -1 && targetFlags.flags[flagsId].version_number !== data.version_number)) {
+            (targetFlag.version_number !== -1 && targetFlag.version_number !== versionNumber)) {
+            // version check
+            if (targetFlag.version_number !== -1) {
+                const verDiff = versionNumber - targetFlag.version_number;
+                if (verDiff === -1 || verDiff > 1) {
+                    return;
+                }
+            }
             // reset fields
             for (let i = 0; i < 0x08; i++) {
                 targetFlags.flags[i].flag.fill(0x00);
@@ -679,26 +688,26 @@ export default class TSFilter extends stream.Duplex {
             const segment = (this._streamTime + 9 * 60 * 60 * 1000) / (3 * 60 * 60 * 1000) & 0x07;
 
             for (let i = 0; i < segment; i++) {
-                targetFlags.flags[flagsId].ignore[i] = 0xFF;
+                targetFlag.ignore[i] = 0xFF;
             }
         }
 
         // update ignore field (segment)
         for (let i = lastSegmentNumber + 1; i < 0x20 ; i++) {
-            targetFlags.flags[flagsId].ignore[i] = 0xFF;
+            targetFlag.ignore[i] = 0xFF;
         }
 
         // update ignore field (section)
         for (let i = segmentLastSectionNumber + 1; i < 8; i++) {
-            targetFlags.flags[flagsId].ignore[segmentNumber] |= 1 << i;
+            targetFlag.ignore[segmentNumber] |= 1 << i;
         }
 
         // update flag field
-        targetFlags.flags[flagsId].flag[segmentNumber] |= 1 << sectionNumber;
+        targetFlag.flag[segmentNumber] |= 1 << sectionNumber;
 
         // update last_table_id & version_number
         targetFlags.lastFlagsId = lastFlagsId;
-        targetFlags.flags[flagsId].version_number = data.version_number;
+        targetFlag.version_number = versionNumber;
 
         this._epgReady = Object.keys(this._epgState).every(nid => {
             return Object.keys(this._epgState[nid]).every(sid => {
