@@ -2,6 +2,17 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.13.0 (2019-11-12)
+
+Improved EPG processing performance. fixed unreliable codes.
+
+- **package**: add support node@12
+
+### Server Changes
+
+- **ts-filter**: added EIT version check.
+- **tuner-device** / **remote**: fixed missing default value of `remoteMirakurunPort` to `40772`.
+
 ## 2.12.0 (2019-11-05)
 
 Improved startup stability. fixed stack trace for TypeScript codes.
