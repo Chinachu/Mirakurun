@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Bold** is the recommended. also, **Node.js** `^8.9.4 < 9 || ^10.11.0 < 11` needed.
+**Bold** is the recommended. also, **Node.js** `^8.9.4 < 9 || ^10.11.0 < 11 || ^12.13.0 < 13` needed.
 
 * [**Linux**](#linux)
   * [PM2](http://pm2.keymetrics.io/) `>=2.4.0`
@@ -19,9 +19,16 @@
 
 ### Installing Node.js
 
-* [**via Package Manager**](https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions) (recommended)
+* **via Package Manager** (recommended)
+  * [Debian / Ubuntu](https://github.com/nodesource/distributions/blob/master/README.md#deb) (deb)
+    * `curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -`
+    * `sudo apt-get install -y nodejs`
+  * [CentOS](https://github.com/nodesource/distributions/blob/master/README.md#rpm) (rpm)
+    * (root) `curl -sL https://rpm.nodesource.com/setup_12.x | bash -`
+  * [Gentoo](https://nodejs.org/en/download/package-manager/#gentoo)
+    * `emerge nodejs`
 * [nave](https://github.com/isaacs/nave)
-  * `sudo /path/to/nave.sh usemain 10.15.0`
+  * `sudo /path/to/nave.sh usemain 12.13.0`
 
 ### Installing PM2
 
