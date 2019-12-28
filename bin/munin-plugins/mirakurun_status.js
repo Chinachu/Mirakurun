@@ -108,6 +108,12 @@ function finalize(status) {
             uncaughtException.setMin("0");
             uncaughtException.setValue(status.errorCount.uncaughtException);
 
+            const unhandledRejection = new munin.Model.Default('unhandled rejection')
+            unhandledRejection.setDraw("AREA");
+            unhandledRejection.setType("DERIVE");
+            unhandledRejection.setMin("0");
+            unhandledRejection.setValue(status.errorCount.unhandledRejection);
+
             const bufferOverflow = new munin.Model.Default('buffer overflow')
             bufferOverflow.setDraw("STACK");
             bufferOverflow.setType("DERIVE");
@@ -121,6 +127,7 @@ function finalize(status) {
             tunerDeviceRespawn.setValue(status.errorCount.tunerDeviceRespawn);
 
             g.add(uncaughtException);
+            g.add(unhandledRejection);
             g.add(bufferOverflow);
             g.add(tunerDeviceRespawn);
 

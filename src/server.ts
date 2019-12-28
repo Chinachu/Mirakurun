@@ -43,6 +43,10 @@ process.on("uncaughtException", err => {
     ++status.errorCount.uncaughtException;
     console.error(err.stack);
 });
+process.on("unhandledRejection", err => {
+    ++status.errorCount.unhandledRejection;
+    console.error(err);
+});
 
 setEnv("SERVER_CONFIG_PATH", "/usr/local/etc/mirakurun/server.yml");
 setEnv("TUNERS_CONFIG_PATH", "/usr/local/etc/mirakurun/tuners.yml");

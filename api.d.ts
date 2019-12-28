@@ -249,6 +249,7 @@ export interface Status {
     };
     errorCount: {
         uncaughtException: number;
+        unhandledRejection: number;
         bufferOverflow: number;
         tunerDeviceRespawn: number;
     };

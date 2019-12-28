@@ -526,6 +526,8 @@ definitions:
         properties:
           uncaughtException:
             type: integer
+          unhandledRejection:
+            type: integer
           bufferOverflow:
             type: integer
           tunerDeviceRespawn:

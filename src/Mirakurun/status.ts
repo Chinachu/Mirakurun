@@ -21,6 +21,7 @@ interface Status {
     };
     errorCount: {
         uncaughtException: number;
+        unhandledRejection: number;
         bufferOverflow: number;
         tunerDeviceRespawn: number;
     };
@@ -40,6 +41,7 @@ const status: Status = {
     },
     errorCount: {
         uncaughtException: 0,
+        unhandledRejection: 0,
         bufferOverflow: 0,
         tunerDeviceRespawn: 0
     },
