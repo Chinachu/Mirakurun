@@ -2,6 +2,32 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.14.0 (2020-02-17)
+
+- **package**: updates node version to `^8.17.0 < 9 || ^10.15.0 < 11 || ^12.14.0 < 13`.
+
+### Server Changes
+
+- **server**: catch `unhandledRejection`.
+- **status**: add `unhandledRejection` errorCount.
+
+### Client Changes
+
+- improved stability and bug fixes.
+
+### Dependencies
+
+- openapi-types: `^1.3.5`
+- aribts: `^1.3.4` → `^1.3.5`
+- body-parser: `^1.18.3` → `^1.19.0`
+- colors: `^1.3.3` → `^1.4.0`
+- dotenv: `^7.0.0` → `^8.2.0`
+- express: `^4.16.4` → `^4.17.1`
+- semver: `^5.6.0` → `^7.1.3`
+- swagger-ui-dist: `^3.21.0` → `^3.25.0`
+- tail: `^2.0.2` → `^2.0.3`
+- (typescript): `2.7.2` → `^3.7.5`
+
 ## 2.13.0 (2019-11-12)
 
 Improved EPG processing performance. fixed unreliable codes.
