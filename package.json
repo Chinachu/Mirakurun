@@ -102,6 +102,10 @@
     "darwin",
     "win32"
   ],
+  "funding": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/Mirakurun"
+  },
   "collective": {
     "type": "opencollective",
     "url": "https://opencollective.com/Mirakurun"
