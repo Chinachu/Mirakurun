@@ -17,10 +17,11 @@ import * as fs from "fs";
 import * as http from "http";
 import * as querystring from "querystring";
 import * as yaml from "js-yaml";
+import { OpenAPIV2 } from "openapi-types";
 import * as apid from "../api";
 import { IncomingHttpHeaders } from "http";
 const pkg = require("../package.json");
-const spec = yaml.safeLoad(fs.readFileSync(__dirname + "/../api.yml", "utf8"));
+const spec: OpenAPIV2.Document = yaml.safeLoad(fs.readFileSync(__dirname + "/../api.yml", "utf8"));
 
 export type RequestMethod = "GET" | "POST" | "PUT" | "DELETE";
 
@@ -41,7 +42,7 @@ export interface Response {
     contentType: string;
     headers: IncomingHttpHeaders;
     isSuccess: boolean;
-    body?: object | string | Buffer;
+    body?: any | string | Buffer;
 }
 
 export interface ErrorResponse extends Response {
@@ -82,7 +83,8 @@ export interface ChannelScanOption {
 
 export default class Client {
 
-    basePath = spec.basePath as string;
+    basePath = spec.basePath;
+    docsPath = "/docs";
     /** positive integer */
     priority = 0;
     host = "";
@@ -93,6 +95,7 @@ export default class Client {
     userAgent = "";
 
     private _userAgent = `MirakurunClient/${pkg.version} Node/${process.version} (${process.platform})`;
+    private _docs: OpenAPIV2.Document;
 
     request(method: RequestMethod, path: string, option: RequestOption = {}): Promise<Response>|Promise<ErrorResponse> {
 
@@ -118,6 +121,8 @@ export default class Client {
 
                         if (ret.contentType === "application/json") {
                             ret.body = JSON.parse(buffer.toString("utf8"));
+                        } else if (ret.contentType === "text/plain") {
+                            ret.body = buffer.toString("utf8");
                         } else {
                             ret.body = buffer;
                         }
@@ -146,195 +151,264 @@ export default class Client {
         });
     }
 
+    async call(operationId: string, param: { [key: string]: any } = {}): Promise<any|http.IncomingMessage> {
+
+        if (!this._docs) {
+            await this._getDocs();
+        }
+
+        let path: string;
+        let method: RequestMethod;
+        let parameters: OpenAPIV2.GeneralParameterObject[];
+        let operation: OpenAPIV2.OperationObject;
+        for (path in this._docs.paths) {
+            const p = this._docs.paths[path] as OpenAPIV2.PathItemObject;
+            if (p.post && p.post.operationId === operationId) {
+                method = "POST";
+                parameters = [...p.parameters, ...(p.post.parameters || [])] as any;
+                operation = p.post;
+                break;
+            }
+            if (p.get && p.get.operationId === operationId) {
+                method = "GET";
+                parameters = [...p.parameters, ...(p.get.parameters || [])] as any;
+                operation = p.get;
+                break;
+            }
+            if (p.put && p.put.operationId === operationId) {
+                method = "PUT";
+                parameters = [...p.parameters, ...(p.put.parameters || [])] as any;
+                operation = p.put;
+                break;
+            }
+            if (p.delete && p.delete.operationId === operationId) {
+                method = "DELETE";
+                parameters = [...p.parameters, ...(p.delete.parameters || [])] as any;
+                operation = p.delete;
+                break;
+            }
+        }
+
+        if (!operation) {
+            throw new Error(`operationId "${operationId}" is not found.`);
+        }
+
+        const option: RequestOption = {
+            headers: {},
+            query: {}
+        };
+
+        for (const p of parameters) {
+            if (param[p.name] === undefined || param[p.name] === null) {
+                if (p.required) {
+                    throw new Error(`Required parameter "${p.name}" is undefined.`);
+                }
+                continue;
+            }
+            if (p.in === "path") {
+                path = path.replace(`{${p.name}}`, param[p.name]);
+            } else if (p.in === "header") {
+                option.headers[p.name] = param[p.name];
+            } else if (p.in === "query") {
+                option.query[p.name] = param[p.name];
+            } else if (p.in === "body" && p.name === "body") {
+                option.body = param.body;
+            }
+        }
+
+        if (operation.tags.indexOf("stream") !== -1) {
+            return await this._requestStream(method, path, option);
+        }
+        return await this.request(method, path, option);
+    }
+
     async getChannels(query?: ChannelsQuery): Promise<apid.Channel[]> {
 
-        const res = await this.request("GET", "/channels", { query: query });
+        const res = await this.call("getChannels", query);
         return res.body as apid.Channel[];
     }
 
     async getChannelsByType(type: apid.ChannelType, query?: ChannelsQuery): Promise<apid.Channel[]> {
 
-        const res = await this.request("GET", `/channels/${type}`, { query: query });
+        const res = await this.call("getChannelsByType", { type, ...query });
         return res.body as apid.Channel[];
     }
 
     async getChannel(type: apid.ChannelType, channel: string): Promise<apid.Channel> {
 
-        const res = await this.request("GET", `/channels/${type}/${channel}`);
+        const res = await this.call("getChannel", { type, channel });
         return res.body as apid.Channel;
     }
 
     async getServicesByChannel(type: apid.ChannelType, channel: string): Promise<apid.Service[]> {
 
-        const res = await this.request("GET", `/channels/${type}/${channel}/services`);
+        const res = await this.call("getServicesByChannel", { type, channel });
         return res.body as apid.Service[];
     }
 
     async getServiceByChannel(type: apid.ChannelType, channel: string, sid: apid.ServiceId): Promise<apid.Service> {
 
-        const res = await this.request("GET", `/channels/${type}/${channel}/services/${sid}`);
+        const res = await this.call("getServiceByChannel", { type, channel, sid });
         return res.body as apid.Service;
     }
 
-    async getServiceStreamByChannel(type: apid.ChannelType, channel: string, sid: apid.ServiceId, decode?: boolean): Promise<http.IncomingMessage> {
+    async getServiceStreamByChannel(type: apid.ChannelType, channel: string, sid: apid.ServiceId, decode?: boolean, priority?: number): Promise<http.IncomingMessage> {
 
-        return await this._getTS(`/channels/${type}/${channel}/services/${sid}/stream`, decode);
+        return await this.call("getServiceStreamByChannel", { type, channel, sid, "decode": decode ? 1 : 0, "X-Mirakurun-Priority": priority });
     }
 
-    async getChannelStream(type: apid.ChannelType, channel: string, decode?: boolean): Promise<http.IncomingMessage> {
+    async getChannelStream(type: apid.ChannelType, channel: string, decode?: boolean, priority?: number): Promise<http.IncomingMessage> {
 
-        return await this._getTS(`/channels/${type}/${channel}/stream`, decode);
+        return await this.call("getChannelStream", { type, channel, "decode": decode ? 1 : 0, "X-Mirakurun-Priority": priority });
     }
 
     async getPrograms(query?: ProgramsQuery): Promise<apid.Program[]> {
 
-        const res = await this.request("GET", "/programs", { query: query });
+        const res = await this.call("getPrograms", query);
         return res.body as apid.Program[];
     }
 
     async getProgram(id: apid.ProgramId): Promise<apid.Program> {
 
-        const res = await this.request("GET", `/programs/${id}`);
+        const res = await this.call("getProgram", { id });
         return res.body as apid.Program;
     }
 
-    async getProgramStream(id: apid.ProgramId, decode?: boolean): Promise<http.IncomingMessage> {
+    async getProgramStream(id: apid.ProgramId, decode?: boolean, priority?: number): Promise<http.IncomingMessage> {
 
-        return await this._getTS(`/programs/${id}/stream`, decode);
+        return await this.call("getProgramStream", { id, "decode": decode ? 1 : 0, "X-Mirakurun-Priority": priority });
     }
 
     async getServices(query?: ServicesQuery): Promise<apid.Service[]> {
 
-        const res = await this.request("GET", "/services", { query: query });
+        const res = await this.call("getServices", query);
         return res.body as apid.Service[];
     }
 
     async getService(id: apid.ServiceItemId): Promise<apid.Service> {
 
-        const res = await this.request("GET", `/services/${id}`);
+        const res = await this.call("getService", { id });
         return res.body as apid.Service;
     }
 
     async getLogoImage(id: apid.ServiceItemId): Promise<Buffer> {
 
-        const res = await this.request("GET", `/services/${id}/logo`);
+        const res = await this.call("getLogoImage", { id });
         return res.body as Buffer;
     }
 
-    async getServiceStream(id: apid.ServiceItemId, decode?: boolean): Promise<http.IncomingMessage> {
+    async getServiceStream(id: apid.ServiceItemId, decode?: boolean, priority?: number): Promise<http.IncomingMessage> {
 
-        return await this._getTS(`/services/${id}/stream`, decode);
+        return await this.call("getServiceStream", { id, "decode": decode ? 1 : 0, "X-Mirakurun-Priority": priority });
     }
 
     async getTuners(): Promise<apid.TunerDevice[]> {
 
-        const res = await this.request("GET", "/tuners");
+        const res = await this.call("getTuners");
         return res.body as apid.TunerDevice[];
     }
 
     async getTuner(index: number): Promise<apid.TunerDevice> {
 
-        const res = await this.request("GET", `/tuners/${index}`);
+        const res = await this.call("getTuner", { index });
         return res.body as apid.TunerDevice;
     }
 
     async getTunerProcess(index: number): Promise<apid.TunerProcess> {
 
-        const res = await this.request("GET", `/tuners/${index}/process`);
+        const res = await this.call("getTunerProcess", { index });
         return res.body as apid.TunerProcess;
     }
 
     async killTunerProcess(index: number): Promise<apid.TunerProcess> {
 
-        const res = await this.request("DELETE", `/tuners/${index}/process`);
+        const res = await this.call("killTunerProcess", { index });
         return res.body as apid.TunerProcess;
     }
 
     async getEvents(): Promise<apid.Event[]> {
 
-        const res = await this.request("GET", "/events");
+        const res = await this.call("getEvents");
         return res.body as apid.Event[];
     }
 
     async getEventsStream(query?: EventsQuery): Promise<http.IncomingMessage> {
 
-        return await this._requestStream("GET", "/events/stream", { query: query });
+        return await this.call("getEventsStream", query);
     }
 
     async getChannelsConfig(): Promise<apid.ConfigChannels> {
 
-        const res = await this.request("GET", "/config/channels");
+        const res = await this.call("getChannelsConfig");
         return res.body as apid.ConfigChannels;
     }
 
     async updateChannelsConfig(channels: apid.ConfigChannels): Promise<apid.ConfigChannels> {
 
-        const res = await this.request("PUT", "/config/channels", { body: channels });
+        const res = await this.call("updateChannelsConfig", { body: channels });
         return res.body as apid.ConfigChannels;
     }
 
     async channelScan(option?: ChannelScanOption): Promise<http.IncomingMessage> {
 
-        return await this._requestStream("PUT", "/config/channels/scan", {
-            query: option
-        });
+        return await this.call("channelScan", option);
     }
 
     async getServerConfig(): Promise<apid.ConfigServer> {
 
-        const res = await this.request("GET", "/config/server");
+        const res = await this.call("getServerConfig");
         return res.body as apid.ConfigServer;
     }
 
     async updateServerConfig(server: apid.ConfigServer): Promise<apid.ConfigServer> {
 
-        const res = await this.request("PUT", "/config/server", { body: server });
+        const res = await this.call("updateServerConfig", { body: server });
         return res.body as apid.ConfigServer;
     }
 
     async getTunersConfig(): Promise<apid.ConfigTuners> {
 
-        const res = await this.request("GET", "/config/tuners");
+        const res = await this.call("getTunersConfig");
         return res.body as apid.ConfigTuners;
     }
 
     async updateTunersConfig(tuners: apid.ConfigTuners): Promise<apid.ConfigTuners> {
 
-        const res = await this.request("PUT", "/config/tuners", { body: tuners });
+        const res = await this.call("updateTunersConfig", { body: tuners });
         return res.body as apid.ConfigTuners;
     }
 
     async getLog(): Promise<string> {
 
-        const res = await this.request("GET", "/log");
+        const res = await this.call("getLog");
         return res.body as string;
     }
 
     async getLogStream(): Promise<http.IncomingMessage> {
 
-        return await this._requestStream("GET", "/log/stream");
+        return await this.call("getLogStream");
     }
 
     async checkVersion(): Promise<apid.Version> {
 
-        const res = await this.request("GET", "/version");
+        const res = await this.call("checkVersion");
         return res.body as apid.Version;
     }
 
     async updateVersion(force?: boolean): Promise<http.IncomingMessage> {
 
-        return await this._requestStream("PUT", "/version/update", { query: { force: force } });
+        return await this.call("updateVersion", { force });
     }
 
     async getStatus(): Promise<apid.Status> {
 
-        const res = await this.request("GET", "/status");
+        const res = await this.call("getStatus");
         return res.body as apid.Status;
     }
 
     async restart(): Promise<{}> {
 
-        const res = await this.request("PUT", "/restart");
+        const res = await this.call("restart");
         return res.body;
     }
 
@@ -380,7 +454,7 @@ export default class Client {
 
                 if (res.statusCode > 300 && res.statusCode < 400 && res.headers.location) {
                     if (/^\//.test(res.headers.location) === false) {
-                        reject(new Error(`Error: Redirecting location "${res.headers.location}" isn't supported.`));
+                        reject(new Error(`Redirecting location "${res.headers.location}" isn't supported.`));
                         return;
                     }
                     this._httpRequest(method, res.headers.location, option)
@@ -408,24 +482,19 @@ export default class Client {
         if (res.statusCode >= 200 && res.statusCode <= 202) {
             return res;
         } else {
+            if (res.statusCode) {
+                throw new Error(`Bad status respond (${res.statusCode} ${res.statusMessage}).`);
+            }
             throw res;
         }
     }
 
-    private async _getTS(path: string, decode = true): Promise<http.IncomingMessage> {
+    private async _getDocs() {
 
-        const option: RequestOption = {
-            query: {
-                decode: decode ? "1" : "0"
-            }
-        };
-
-        const res = await this._requestStream("GET", path, option);
-
-        if (res.headers["content-type"] === "video/MP2T") {
-            return res;
-        } else {
-            throw res;
+        const res = await this.request("GET", this.docsPath);
+        if (res.isSuccess !== true) {
+            throw new Error(`Failed to get "${this.docsPath}".`);
         }
+        this._docs = res.body;
     }
 }
