@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Bold** is the recommended. also, **Node.js** `^8.9.4 < 9 || ^10.11.0 < 11 || ^12.13.0 < 13` needed.
+**Bold** is the recommended. also, **Node.js** `^8.17.0 < 9 || ^10.15.0 < 11 || ^12.14.0 < 13` needed.
 
 * [**Linux**](#linux)
   * [PM2](http://pm2.keymetrics.io/) `>=2.4.0`
@@ -28,7 +28,7 @@
   * [Gentoo](https://nodejs.org/en/download/package-manager/#gentoo)
     * `emerge nodejs`
 * [nave](https://github.com/isaacs/nave)
-  * `sudo /path/to/nave.sh usemain 12.13.0`
+  * `sudo /path/to/nave.sh usemain 12.14.0`
 
 ### Installing PM2
 

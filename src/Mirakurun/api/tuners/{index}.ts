@@ -29,7 +29,7 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
 
-    const tuner = Tuner.get(req.params.index);
+    const tuner = Tuner.get(req.params.index as any as number);
 
     if (tuner === null) {
         api.responseError(res, 404);

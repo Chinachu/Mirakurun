@@ -17,20 +17,21 @@ import { Operation } from "express-openapi";
 import sift from "sift";
 import * as api from "../../api";
 import Channel from "../../Channel";
+import { ChannelTypes, ChannelType } from "../../common";
 
 export const parameters = [
     {
         in: "path",
         name: "type",
         type: "string",
-        enum: ["GR", "BS", "CS", "SKY"],
+        enum: Object.keys(ChannelTypes),
         required: true
     }
 ];
 
 export const get: Operation = (req, res) => {
 
-    const channels = Channel.findByType(req.params.type).map(channel => {
+    const channels = Channel.findByType(req.params.type as ChannelType).map(channel => {
 
         const ch: any = channel.export();
 

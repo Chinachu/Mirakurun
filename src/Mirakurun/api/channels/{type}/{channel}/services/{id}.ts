@@ -17,13 +17,14 @@ import { Operation } from "express-openapi";
 import * as api from "../../../../../api";
 import Channel from "../../../../../Channel";
 import Service from "../../../../../Service";
+import { ChannelTypes, ChannelType } from "../../../../../common";
 
 export const parameters = [
     {
         in: "path",
         name: "type",
         type: "string",
-        enum: ["GR", "BS", "CS", "SKY"],
+        enum: Object.keys(ChannelTypes),
         required: true
     },
     {
@@ -43,14 +44,15 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
 
-    const channel = Channel.get(req.params.type, req.params.channel);
+    const channel = Channel.get(req.params.type as ChannelType, req.params.channel);
 
     if (channel === null) {
         api.responseError(res, 404);
         return;
     }
 
-    const service = Service.findByChannel(channel).find(sv => (sv.id === req.params.id || sv.serviceId === req.params.id));
+    const reqId = req.params.id as any as number;
+    const service = Service.findByChannel(channel).find(sv => (sv.id === reqId || sv.serviceId === reqId));
 
     if (!service) {
         api.responseError(res, 404);

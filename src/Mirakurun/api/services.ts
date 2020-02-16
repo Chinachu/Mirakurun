@@ -18,6 +18,7 @@ import sift from "sift";
 import * as api from "../api";
 import Service from "../Service";
 import ServiceItem from "../ServiceItem";
+import { ChannelTypes } from "../common";
 
 export const get: Operation = (req, res) => {
 
@@ -96,7 +97,7 @@ get.apiDoc = {
             in: "query",
             name: "channel.type",
             type: "string",
-            enum: ["GR", "BS", "CS", "SKY"],
+            enum: Object.keys(ChannelTypes),
             required: false
         },
         {

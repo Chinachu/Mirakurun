@@ -30,7 +30,7 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
 
-    const program = Program.get(req.params.id);
+    const program = Program.get(req.params.id as any as number);
 
     if (program === null) {
         api.responseError(res, 404);

@@ -42,7 +42,7 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
 
-    const service = Service.get(req.params.id);
+    const service = Service.get(req.params.id as any as number);
 
     if (service === null || service === undefined) {
         api.responseError(res, 404);

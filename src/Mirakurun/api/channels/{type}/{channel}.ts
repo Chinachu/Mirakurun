@@ -16,13 +16,14 @@
 import { Operation } from "express-openapi";
 import * as api from "../../../api";
 import Channel from "../../../Channel";
+import { ChannelTypes, ChannelType } from "../../../common";
 
 export const parameters = [
     {
         in: "path",
         name: "type",
         type: "string",
-        enum: ["GR", "BS", "CS", "SKY"],
+        enum: Object.keys(ChannelTypes),
         required: true
     },
     {
@@ -35,7 +36,7 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
 
-    const channel = Channel.get(req.params.type, req.params.channel);
+    const channel = Channel.get(req.params.type as ChannelType, req.params.channel);
 
     if (channel === null) {
         api.responseError(res, 404);

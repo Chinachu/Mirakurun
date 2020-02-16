@@ -20,7 +20,14 @@ export interface User {
     readonly disableDecoder?: boolean;
 }
 
-export type ChannelType = "GR" | "BS" | "CS" | "SKY";
+export enum ChannelTypes {
+    "GR" = "GR",
+    "BS" = "BS",
+    "CS" = "CS",
+    "SKY" = "SKY"
+}
+
+export type ChannelType = keyof typeof ChannelTypes;
 
 export function extendObject<T, U>(b: T, a: U): T {
 

@@ -29,7 +29,7 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
 
-    const tuner = Tuner.get(req.params.index);
+    const tuner = Tuner.get(req.params.index as any as number);
 
     if (tuner === null || Number.isInteger(tuner.pid) === false) {
         api.responseError(res, 404);
@@ -66,7 +66,7 @@ get.apiDoc = {
 
 export const del: Operation = (req, res) => {
 
-    const tuner = Tuner.get(req.params.index);
+    const tuner = Tuner.get(req.params.index as any as number);
 
     if (tuner === null || Number.isInteger(tuner.pid) === false) {
         api.responseError(res, 404);

@@ -17,6 +17,7 @@ import { Operation } from "express-openapi";
 import sift from "sift";
 import * as api from "../api";
 import Channel from "../Channel";
+import { ChannelTypes } from "../common";
 
 export const get: Operation = (req, res) => {
 
@@ -45,7 +46,7 @@ get.apiDoc = {
             in: "query",
             name: "type",
             type: "string",
-            enum: ["GR", "BS", "CS", "SKY"],
+            enum: Object.keys(ChannelTypes),
             required: false
         },
         {
