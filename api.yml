@@ -4,7 +4,7 @@ info:
   version: ~
   description: DVR Tuner Server Service for Chinachu Air.
   contact:
-    name: Yuki KAN
+    name: kanreisa
     url: https://github.com/kanreisa
 basePath: /api
 consumes:
