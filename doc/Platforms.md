@@ -9,6 +9,8 @@
   * x86 / **x64** / ARMv7 / **ARMv8**
   * **Debian** / Ubuntu / CentOS / Gentoo
   * SystemV / OpenRC / **SystemD**
+* Docker on Linux (Testing)
+  * Docker Hub: [chinachu/mirakurun](https://hub.docker.com/r/chinachu/mirakurun)
 * [Win32](#win32) (Experimental)
   * [winser](https://github.com/jfromaniello/winser) `>=1.0.3`
   * Windows 10 RS3 `npm i winser@1.0.3 -g`

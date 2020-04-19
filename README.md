@@ -13,6 +13,8 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 [![Backers on Open Collective](https://opencollective.com/Mirakurun/backers/badge.svg)](#backers)
  [![Sponsors on Open Collective](https://opencollective.com/Mirakurun/sponsors/badge.svg)](#sponsors)
 
+[![dockeri.co](https://dockeri.co/image/chinachu/mirakurun)][docker-url]
+
 ## Features
 
 * RESTful API (Open API) - has designed like HTTP version of Spinel
@@ -37,7 +39,7 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 ## Requirements / Supported Platforms
 
 * [Node.js](http://nodejs.org/) 10, 12
-* Linux w/ [PM2](http://pm2.keymetrics.io/)
+* Linux w/ [PM2](http://pm2.keymetrics.io/) or [Docker](https://hub.docker.com/r/chinachu/mirakurun)
 
 see: [doc/Platforms.md](doc/Platforms.md)
 
@@ -184,3 +186,4 @@ Support this project by becoming a sponsor. Your logo will show up here with a l
 [dep-url]: https://david-dm.org/Chinachu/Mirakurun
 [devdep-img]: https://david-dm.org/Chinachu/Mirakurun/dev-status.svg
 [devdep-url]: https://david-dm.org/Chinachu/Mirakurun#info=devDependencies
+[docker-url]: https://hub.docker.com/r/chinachu/mirakurun
