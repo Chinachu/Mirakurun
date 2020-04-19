@@ -96,11 +96,11 @@ export default class ServiceItem {
         }
     }
 
-    get logoData(): NodeBuffer {
+    get logoData(): Buffer {
         return Buffer.from(this._logoData, "base64");
     }
 
-    set logoData(logo: NodeBuffer) {
+    set logoData(logo: Buffer) {
 
         if (this._logoData !== logo.toString("base64")) {
             this._logoData = logo.toString("base64");

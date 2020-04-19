@@ -26,7 +26,7 @@ export const get: Operation = (req, res) => {
     req.setTimeout(1000 * 60 * 60, () => { return; });
     req.once("close", () => Event.removeListener(_listener));
 
-    Event.on(_listener);
+    Event.onEvent(_listener);
 
     function _listener(message: EventMessage) {
 

@@ -32,11 +32,11 @@ export default class Event extends EventEmitter {
         return _.event.log;
     }
 
-    static on(listener: (message: EventMessage) => void): void {
+    static onEvent(listener: (message: EventMessage) => void): void {
         _.event.on("event", listener);
     }
 
-    static once(listener: (message: EventMessage) => void): void {
+    static onceEvent(listener: (message: EventMessage) => void): void {
         _.event.once("event", listener);
     }
 

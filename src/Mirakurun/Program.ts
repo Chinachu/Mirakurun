@@ -62,6 +62,10 @@ export default class Program {
         return Array.from(this._itemIterator);
     }
 
+    private get _itemIterator(): IterableIterator<ProgramItem> {
+        return this._itemMap.values();
+    }
+
     add(item: ProgramItem, firstAdd: boolean = false): void {
 
         if (this.exists(item.id)) {
@@ -180,10 +184,6 @@ export default class Program {
     save(): void {
         clearTimeout(this._saveTimerId);
         this._saveTimerId = setTimeout(() => this._save(), 3000);
-    }
-
-    private get _itemIterator(): IterableIterator<ProgramItem> {
-        return this._itemMap.values();
     }
 
     private _load(): void {

@@ -1,10 +1,17 @@
 {
   "compilerOptions": {
     "alwaysStrict": true,
-    "target": "es6",
+    "target": "es2017",
     "removeComments": false,
     "module": "commonjs",
     "moduleResolution": "node",
-    "sourceMap": true
-  }
+    "sourceMap": true,
+    "outDir": "lib"
+  },
+  "exclude": [
+    "node_modules"
+  ],
+  "include": [
+    "src/**/*.ts"
+  ]
 }

@@ -16,7 +16,7 @@
     "tv"
   ],
   "author": {
-    "name": "Yuki KAN",
+    "name": "kanreisa",
     "url": "https://github.com/kanreisa"
   },
   "contributors": [
@@ -40,9 +40,9 @@
     "debug": "node -r source-map-support/register --max_old_space_size=512 --inspect --debug-brk lib/server.js",
     "start.win32": "node.exe -r source-map-support/register --max_old_space_size=512 bin/init.win32.js",
     "debug.win32": "node.exe -r source-map-support/register --max_old_space_size=512 --inspect --debug-brk bin/init.win32.js",
-    "build": "gulp build",
-    "watch": "gulp watch",
-    "test": "mocha --exit test/*.spec.js",
+    "build": "tslint --project . && tsc --declaration",
+    "watch": "tsc -w --declaration",
+    "test": "tslint --project . && mocha --exit test/*.spec.js",
     "clean": "rimraf lib/*",
     "prepublishOnly": "npm run clean && npm run build",
     "preinstall": "node bin/preinstall.js",
@@ -64,7 +64,7 @@
     "express-openapi": "^3.7.0",
     "ip": "^1.1.4",
     "js-yaml": "^3.13.1",
-    "latest-version": "^3.1.0",
+    "latest-version": "^5.1.0",
     "morgan": "^1.9.1",
     "munin-plugin": "0.0.9",
     "openapi-types": "^1.3.5",
@@ -83,18 +83,14 @@
     "@types/ip": "^1.1.0",
     "@types/js-yaml": "^3.12.2",
     "@types/morgan": "^1.7.37",
-    "@types/node": "^8.10.59",
-    "gulp": "^4.0.2",
-    "gulp-sourcemaps": "^2.6.5",
-    "gulp-tslint": "^8.1.4",
-    "gulp-typescript": "^4.0.2",
-    "mocha": "^5.2.0",
+    "@types/node": "^10.17.20",
+    "mocha": "^6.2.3",
     "rimraf": "^3.0.2",
-    "tslint": "^5.20.1",
+    "tslint": "^6.1.1",
     "typescript": "^3.7.5"
   },
   "engines": {
-    "node": "^8.17.0 < 9 || ^10.15.0 < 11 || ^12.14.0 < 13"
+    "node": "^10.15.0 < 11 || ^12 || ^13"
   },
   "engineStrict": true,
   "os": [
