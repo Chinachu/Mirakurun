@@ -1,6 +1,8 @@
 /node_modules
 /lib
+/tmp
+.env
+*.tar
 *.log
 *.swp
-.env
 test.*
