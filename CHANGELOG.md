@@ -2,6 +2,18 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 2.15.0 (2020-04-19)
+
+- **package**: update node version to `^10.15.0 < 11 || ^12 || ^13`.
+  - note: dropped node@8 support.
+- **docker**: official build is now resumed.
+  - _(very sorry for stopped few months)_
+
+### Dependencies
+
+- latest-version: `^3.1.0` → `^5.1.0`
+- (gulp): _(removed)_
+
 ## 2.14.0 (2020-02-17)
 
 - **package**: updates node version to `^8.17.0 < 9 || ^10.15.0 < 11 || ^12.14.0 < 13`.
