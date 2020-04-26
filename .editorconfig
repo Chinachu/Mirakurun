@@ -17,3 +17,9 @@ end_of_line = lf
 
 [package.json]
 end_of_line = lf
+
+[bin/epgdump.js]
+end_of_line = lf
+
+[bin/munin-plugins/*.js]
+end_of_line = lf
