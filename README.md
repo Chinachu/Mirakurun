@@ -38,7 +38,7 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 
 ## Requirements / Supported Platforms
 
-* [Node.js](http://nodejs.org/) 10, 12
+* [Node.js](http://nodejs.org/) 10, 12, 14
 * Linux w/ [PM2](http://pm2.keymetrics.io/) or [Docker](https://hub.docker.com/r/chinachu/mirakurun)
 
 see: [doc/Platforms.md](doc/Platforms.md)

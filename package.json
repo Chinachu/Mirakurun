@@ -90,7 +90,7 @@
     "typescript": "^3.7.5"
   },
   "engines": {
-    "node": "^10.15.0 < 11 || ^12 || ^13"
+    "node": "^10.15.0 < 11 || ^12 || ^14"
   },
   "engineStrict": true,
   "os": [
