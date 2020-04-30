@@ -11,9 +11,22 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 [![devDependency Status][devdep-img]][devdep-url]
 [![tip for next commit](https://tip4commit.com/projects/43158.svg)](https://tip4commit.com/github/Chinachu/Mirakurun)
 [![Backers on Open Collective](https://opencollective.com/Mirakurun/backers/badge.svg)](#backers)
- [![Sponsors on Open Collective](https://opencollective.com/Mirakurun/sponsors/badge.svg)](#sponsors)
+[![Sponsors on Open Collective](https://opencollective.com/Mirakurun/sponsors/badge.svg)](#sponsors)
+
+## Docker
 
 [![dockeri.co](https://dockeri.co/image/chinachu/mirakurun)][docker-url]
+
+see: available [Tags](https://hub.docker.com/r/chinachu/mirakurun/tags) (Docker Hub)
+
+### Image Variants
+
+* `chinachu/mirakurun:<version>-plain`
+* `chinachu/mirakurun:<version>-pcscd`
+  * includes pcscd
+* `chinachu/mirakurun:<version>-pcscd-recpt1`
+  * includes pcscd
+  * includes recpt1 (without driver)
 
 ## Features
 
@@ -127,6 +140,7 @@ You can use PM2 Plus to realtime monitoring if running by PM2.
   * [Mirakurun UI](https://github.com/Chinachu/Mirakurun-UI)
   * [Chinachu γ](https://github.com/Chinachu/Chinachu/wiki/Gamma-Installation-V2)
   * [EPGStation](https://github.com/l3tnun/EPGStation)
+
 ## Contributing
 
 [CONTRIBUTING.md](.github/CONTRIBUTING.md)
