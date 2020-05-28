@@ -109,7 +109,7 @@ export default class TSFilter extends stream.Duplex {
     private _overflowTimeLimit: number = _.config.server.overflowTimeLimit || 1000 * 30;
     /** Number divisible by a multiple of 188 */
     private _maxBufferBytesBeforeReady: number = (() => {
-        let bytes = _.config.server.maxBufferBytesBeforeReady || 1024 * 1024 * 3;
+        let bytes = _.config.server.maxBufferBytesBeforeReady || 1024 * 1024 * 8;
         bytes = bytes - bytes % PACKET_SIZE;
         return bytes;
     })();
