@@ -13,10 +13,32 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+import { execSync } from "child_process";
+import { dirname } from "path";
 import * as fs from "fs";
 import * as yaml from "js-yaml";
 import * as common from "./common";
 import * as log from "./log";
+
+type Writable<T> = { -readonly [K in keyof T]: T[K] };
+
+const {
+    DOCKER,
+    SERVER_CONFIG_PATH,
+    TUNERS_CONFIG_PATH,
+    CHANNELS_CONFIG_PATH,
+    LOG_LEVEL,
+    MAX_LOG_HISTORY,
+    HIGH_WATER_MARK,
+    OVERFLOW_TIME_LIMIT,
+    MAX_BUFFER_BYTES_BEFORE_READY,
+    EVENT_END_TIMEOUT,
+    PROGRAM_GC_INTERVAL,
+    EPG_GATHERING_INTERVAL,
+    EPG_RETRIEVAL_TIME
+} = process.env;
+
+const IS_DOCKER = DOCKER === "YES";
 
 export interface Server {
     // as Local Server
@@ -84,39 +106,249 @@ export interface Channel {
 }
 
 export function loadServer(): Server {
-    return load(process.env.SERVER_CONFIG_PATH);
+
+    const path = SERVER_CONFIG_PATH;
+
+    // mkdir if not exists
+    const dirPath = dirname(path);
+    if (fs.existsSync(dirPath) === false) {
+        log.info("missing directory `%s`", dirPath);
+        try {
+            log.info("making directory `%s`", dirPath);
+            fs.mkdirSync(dirPath, { recursive: true });
+        } catch (e) {
+            log.fatal("failed to make directory `%s`", dirPath);
+            console.error(e);
+            process.exit(1);
+        }
+    }
+
+    // copy if not exists
+    if (fs.existsSync(path) === false) {
+        log.info("missing server config `%s`", path);
+        // copy if not exists
+        try {
+            log.info("copying default server config to `%s`", path);
+            if (process.platform === "win32") {
+                fs.copyFileSync("config/server.win32.yml", path);
+            } else {
+                fs.copyFileSync("config/server.yml", path);
+            }
+        } catch (e) {
+            log.fatal("failed to copy server config to `%s`", path);
+            console.error(e);
+            process.exit(1);
+        }
+    }
+    const config: Writable<Server> = load("server", path);
+
+    // Docker
+    if (IS_DOCKER) {
+        config.path = "/var/run/mirakurun.sock";
+        config.port = 40772;
+        config.disableIPv6 = true;
+
+        if (typeof LOG_LEVEL !== "undefined" && /^-?[0123]$/.test(LOG_LEVEL)) {
+            config.logLevel = parseInt(LOG_LEVEL, 10);
+        }
+        if (typeof MAX_LOG_HISTORY !== "undefined" && /^[0-9]+$/.test(MAX_LOG_HISTORY)) {
+            config.maxLogHistory = parseInt(MAX_LOG_HISTORY, 10);
+        }
+        if (typeof HIGH_WATER_MARK !== "undefined" && /^[0-9]+$/.test(HIGH_WATER_MARK)) {
+            config.highWaterMark = parseInt(HIGH_WATER_MARK, 10);
+        }
+        if (typeof OVERFLOW_TIME_LIMIT !== "undefined" && /^[0-9]+$/.test(OVERFLOW_TIME_LIMIT)) {
+            config.overflowTimeLimit = parseInt(OVERFLOW_TIME_LIMIT, 10);
+        }
+        if (typeof MAX_BUFFER_BYTES_BEFORE_READY !== "undefined" && /^[0-9]+$/.test(MAX_BUFFER_BYTES_BEFORE_READY)) {
+            config.maxBufferBytesBeforeReady = parseInt(MAX_BUFFER_BYTES_BEFORE_READY, 10);
+        }
+        if (typeof EVENT_END_TIMEOUT !== "undefined" && /^[0-9]+$/.test(EVENT_END_TIMEOUT)) {
+            config.eventEndTimeout = parseInt(EVENT_END_TIMEOUT, 10);
+        }
+        if (typeof PROGRAM_GC_INTERVAL !== "undefined" && /^[0-9]+$/.test(PROGRAM_GC_INTERVAL)) {
+            config.programGCInterval = parseInt(PROGRAM_GC_INTERVAL, 10);
+        }
+        if (typeof EPG_GATHERING_INTERVAL !== "undefined" && /^[0-9]+$/.test(EPG_GATHERING_INTERVAL)) {
+            config.epgGatheringInterval = parseInt(EPG_GATHERING_INTERVAL, 10);
+        }
+        if (typeof EPG_RETRIEVAL_TIME !== "undefined" && /^[0-9]+$/.test(EPG_RETRIEVAL_TIME)) {
+            config.epgRetrievalTime = parseInt(EPG_RETRIEVAL_TIME, 10);
+        }
+
+        log.info("load server config (merged w/ env): %s", JSON.stringify(config));
+    }
+
+    return config as Readonly<Server>;
 }
 
 export function saveServer(data: Server): Promise<void> {
-    return save(process.env.SERVER_CONFIG_PATH, data);
+    return save("server", SERVER_CONFIG_PATH, data);
 }
 
 export function loadTuners(): Tuner[] {
-    return load(process.env.TUNERS_CONFIG_PATH);
+
+    const path = TUNERS_CONFIG_PATH;
+
+    // mkdir if not exists
+    const dirPath = dirname(path);
+    if (fs.existsSync(dirPath) === false) {
+        log.info("missing directory `%s`", dirPath);
+        try {
+            log.info("making directory `%s`", dirPath);
+            fs.mkdirSync(dirPath, { recursive: true });
+        } catch (e) {
+            log.fatal("failed to make directory `%s`", dirPath);
+            console.error(e);
+            process.exit(1);
+        }
+    }
+
+    // auto
+    if (process.platform === "linux" && fs.existsSync(path) === false) {
+        log.info("missing tuners config `%s`", path);
+        log.info("trying to detect tuners...");
+        const tuners: Tuner[] = [];
+
+        // detect dvbdev
+        try {
+            execSync("which dvb-fe-tool");
+
+            const adapters = fs.readdirSync("/dev/dvb").filter(name => /^adapter[0-9]+$/.test(name));
+            for (let i = 0; i < adapters.length; i++) {
+                log.info("detected DVB device: %s", adapters[i]);
+
+                execSync("sleep 1");
+                const properties = execSync(`dvb-fe-tool -a ${i} 2>&1 || true`, { encoding: "utf8" });
+                const isISDBT = properties.includes("[ISDBT]");
+                const isISDBS = properties.includes("[ISDBS]");
+                if (!isISDBT && !isISDBS) {
+                    continue;
+                }
+
+                const tuner: Writable<Tuner> = {
+                    name: adapters[i],
+                    types: undefined,
+                    dvbDevicePath: `/dev/dvb/adapter${i}/dvr0`,
+                    decoder: "arib-b25-stream-test"
+                };
+
+                if (isISDBT) {
+                    tuner.types = ["GR"];
+                    tuner.command = `dvbv5-zap -a ${i} -c ./config/dvbconf-for-isdb/conf/dvbv5_channels_isdbt.conf -r -P <channel>`;
+                } else if (isISDBS) {
+                    tuner.types = ["BS", "CS"];
+                    tuner.command = `dvbv5-zap -a ${i} -c ./config/dvbconf-for-isdb/conf/dvbv5_channels_isdbs.conf -r -P <channel>`;
+                }
+
+                tuners.push(tuner);
+
+                log.info("added tuner config (generated): %s", JSON.stringify(tuner));
+            }
+        } catch (e) {
+            if (/which dvb-fe-tool/.test(e.message)) {
+                log.warn("`dvb-fe-tool` is required to detect DVB devices. (%s)", e.message);
+            } else {
+                console.error(e);
+            }
+        }
+
+        log.info("detected %d tuners!", tuners.length);
+
+        if (tuners.length > 0) {
+            try {
+                log.info("writing auto generated tuners config to `%s`", path);
+                fs.writeFileSync(path, yaml.safeDump(tuners));
+            } catch (e) {
+                log.fatal("failed to write tuners config to `%s`", path);
+                console.error(e);
+                process.exit(1);
+            }
+        }
+    }
+
+    // copy if not exists
+    if (fs.existsSync(path) === false) {
+        log.info("missing tuners config `%s`", path);
+        try {
+            log.info("copying default tuners config to `%s`", path);
+            if (process.platform === "win32") {
+                fs.copyFileSync("config/tuners.win32.yml", path);
+            } else {
+                fs.copyFileSync("config/tuners.yml", path);
+            }
+        } catch (e) {
+            log.fatal("failed to copy tuners config to `%s`", path);
+            console.error(e);
+            process.exit(1);
+        }
+    }
+
+    return load("tuners", path);
 }
 
 export function saveTuners(data: Tuner[]): Promise<void> {
-    return save(process.env.TUNERS_CONFIG_PATH, data);
+    return save("tuners", TUNERS_CONFIG_PATH, data);
 }
 
 export function loadChannels(): Channel[] {
-    return load(process.env.CHANNELS_CONFIG_PATH);
+
+    const path = CHANNELS_CONFIG_PATH;
+
+    // mkdir if not exists
+    const dirPath = dirname(path);
+    if (fs.existsSync(dirPath) === false) {
+        log.info("missing directory `%s`", dirPath);
+        try {
+            log.info("making directory `%s`", dirPath);
+            fs.mkdirSync(dirPath, { recursive: true });
+        } catch (e) {
+            log.fatal("failed to make directory `%s`", dirPath);
+            console.error(e);
+            process.exit(1);
+        }
+    }
+
+    // copy if not exists
+    if (fs.existsSync(path) === false) {
+        log.info("missing channels config `%s`", path);
+        try {
+            log.info("copying default channels config to `%s`", path);
+            if (process.platform === "win32") {
+                fs.copyFileSync("config/channels.win32.yml", path);
+            } else {
+                fs.copyFileSync("config/channels.yml", path);
+            }
+        } catch (e) {
+            log.fatal("failed to copy channels config to `%s`", path);
+            console.error(e);
+            process.exit(1);
+        }
+    }
+
+    return load("channels", path);
 }
 
 export function saveChannels(data: Channel[]): Promise<void> {
-    return save(process.env.CHANNELS_CONFIG_PATH, data);
+    return save("channels", CHANNELS_CONFIG_PATH, data);
 }
 
-function load(path: string) {
+function load(name: "server", path: string): Server;
+function load(name: "tuners", path: string): Tuner[];
+function load(name: "channels", path: string): Channel[];
+function load(name: string, path: string) {
 
-    log.info("load config `%s`", path);
+    log.info("load %s config `%s`", name, path);
 
     return yaml.safeLoad(fs.readFileSync(path, "utf8"));
 }
 
-function save(path: string, data: object): Promise<void> {
+function save(name: "server", path: string, data: Server): Promise<void>;
+function save(name: "tuners", path: string, data: Tuner[]): Promise<void>;
+function save(name: "channels", path: string, data: Channel[]): Promise<void>;
+function save(name: string, path: string, data: object): Promise<void> {
 
-    log.info("save config `%s`", path);
+    log.info("save %s config `%s`", name, path);
 
     return new Promise<void>((resolve, reject) => {
 

@@ -41,38 +41,17 @@ if (process.platform === "linux" || process.platform === "darwin") {
         process.exit(0);
     }
 
-    const prefix = "/usr/local";
-    const configDir = path.join(prefix, "etc/mirakurun");
-    const dataDir = path.join(prefix, "var/db/mirakurun");
-    const logDir = path.join(prefix, "var/log");
-
-    child_process.execSync(`mkdir -vp ${configDir}`);
-    child_process.execSync(`mkdir -vp ${dataDir}`);
-    child_process.execSync(`mkdir -vp ${logDir}`);
-
-    const serverConfigPath = path.join(configDir, "server.yml");
-    const tunersConfigPath = path.join(configDir, "tuners.yml");
-    const channelsConfigPath = path.join(configDir, "channels.yml");
-
-    if (fs.existsSync(serverConfigPath) === false) {
-        copyFileSync("config/server.yml", serverConfigPath);
-    }
-    if (fs.existsSync(tunersConfigPath) === false) {
-        copyFileSync("config/tuners.yml", tunersConfigPath);
-    }
-    if (fs.existsSync(channelsConfigPath) === false) {
-        copyFileSync("config/channels.yml", channelsConfigPath);
-    }
-
-    // pm2
-
     if (process.env.DOCKER === "YES") {
         console.log("Note: running in Docker.");
         process.exit(0);
     }
 
+    // pm2
     const testFlight = child_process.execSync("pm2 -v", { encoding: "utf8" });
     console.log(testFlight);
+
+    const logDir = path.join("/usr/local/var/log");
+    child_process.execSync(`mkdir -vp ${logDir}`);
 
     // pm2 check
     const pm2Version = child_process.execSync("pm2 -v", { encoding: "utf8" }).trim();
@@ -122,32 +101,12 @@ if (process.platform === "linux" || process.platform === "darwin") {
         process.exit(1);
     }
 
-    const configDir = path.join(process.env.USERPROFILE, ".Mirakurun");
-    const dataDir = path.join(process.env.LOCALAPPDATA, "Mirakurun");
-
-    if (fs.existsSync(configDir) === false) {
-        fs.mkdirSync(configDir);
-    }
-    if (fs.existsSync(dataDir) === false) {
-        fs.mkdirSync(dataDir);
-    }
-
-    const serverConfigPath = path.join(configDir, "server.yml");
-    const tunersConfigPath = path.join(configDir, "tuners.yml");
-    const channelsConfigPath = path.join(configDir, "channels.yml");
-
-    if (fs.existsSync(serverConfigPath) === false) {
-        copyFileSync("config\\server.win32.yml", serverConfigPath);
-    }
-    if (fs.existsSync(tunersConfigPath) === false) {
-        copyFileSync("config\\tuners.win32.yml", tunersConfigPath);
-    }
-    if (fs.existsSync(channelsConfigPath) === false) {
-        copyFileSync("config\\channels.win32.yml", channelsConfigPath);
-    }
-
     // winser
 
+    const dataDir = path.join(process.env.LOCALAPPDATA, "Mirakurun");
+    if (fs.existsSync(dataDir) === false) {
+        fs.mkdirSync(dataDir, { recursive: true });
+    }
     const stdoutLogPath = path.join(dataDir, "stdout");
     const stderrLogPath = path.join(dataDir, "stderr");
 
@@ -172,8 +131,4 @@ if (process.platform === "linux" || process.platform === "darwin") {
             ]
         }
     );
-}
-
-function copyFileSync(src, dest) {
-    fs.writeFileSync(dest, fs.readFileSync(src));
 }

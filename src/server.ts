@@ -26,17 +26,6 @@ if (process.platform === "linux") {
     }
 }
 
-import _ from "./Mirakurun/_";
-import status from "./Mirakurun/status";
-import Event from "./Mirakurun/Event";
-import Tuner from "./Mirakurun/Tuner";
-import Channel from "./Mirakurun/Channel";
-import Service from "./Mirakurun/Service";
-import Program from "./Mirakurun/Program";
-import Server from "./Mirakurun/Server";
-import * as config from "./Mirakurun/config";
-import * as log from "./Mirakurun/log";
-
 process.title = "Mirakurun: Server";
 
 process.on("uncaughtException", err => {
@@ -53,6 +42,17 @@ setEnv("TUNERS_CONFIG_PATH", "/usr/local/etc/mirakurun/tuners.yml");
 setEnv("CHANNELS_CONFIG_PATH", "/usr/local/etc/mirakurun/channels.yml");
 setEnv("SERVICES_DB_PATH", "/usr/local/var/db/mirakurun/services.json");
 setEnv("PROGRAMS_DB_PATH", "/usr/local/var/db/mirakurun/programs.json");
+
+import _ from "./Mirakurun/_";
+import status from "./Mirakurun/status";
+import Event from "./Mirakurun/Event";
+import Tuner from "./Mirakurun/Tuner";
+import Channel from "./Mirakurun/Channel";
+import Service from "./Mirakurun/Service";
+import Program from "./Mirakurun/Program";
+import Server from "./Mirakurun/Server";
+import * as config from "./Mirakurun/config";
+import * as log from "./Mirakurun/log";
 
 _.config.server = config.loadServer();
 _.config.channels = config.loadChannels();
@@ -72,6 +72,11 @@ _.channel = new Channel();
 _.service = new Service();
 _.program = new Program();
 _.server = new Server();
+
+if (process.env.SETUP === "true") {
+    log.info("setup is done.");
+    process.exit(0);
+}
 
 _.server.init();
 

@@ -25,6 +25,7 @@ const munin = require("munin-plugin");
 const pkg = require("../../package.json");
 
 let configPath = "/usr/local/etc/mirakurun/server.yml";
+let socketPath = "";
 
 if (process.platform === "win32") {
     configPath = path.join(process.env.USERPROFILE, ".Mirakurun\\server.yml");
@@ -33,11 +34,25 @@ if (process.platform === "win32") {
 if (process.platform === "linux") {
     execSync(`renice -n 19 -p ${ process.pid }`);
     execSync(`ionice -c 3 -p ${ process.pid }`);
+
+    if (fs.existsSync("/usr/local/mirakurun/run/mirakurun.sock")) {
+        configPath = "";
+        socketPath = "/usr/local/mirakurun/run/mirakurun.sock";
+    }
 }
 
-const config = yaml.safeLoad(fs.readFileSync(configPath, "utf8"));
+if (configPath !== "") {
+    const config = yaml.safeLoad(fs.readFileSync(configPath, "utf8"));
 
-if (!config.path) {
+    if (!config.path) {
+        console.error("Error: Socket Path Undefined.");
+        process.exit(1);
+    }
+
+    socketPath = config.path;
+}
+
+if (socketPath === "") {
     console.error("Error: Socket Path Undefined.");
     process.exit(1);
 }
@@ -45,7 +60,7 @@ if (!config.path) {
 {
     const opt = {
         method: "GET",
-        socketPath: config.path,
+        socketPath: socketPath,
         path: "/api/status",
         userAgent: `Mirakurun/${pkg.version} (munin-plugin) Node/${process.version} (${process.platform})`
     };

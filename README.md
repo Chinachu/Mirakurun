@@ -19,14 +19,18 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 
 see: available [Tags](https://hub.docker.com/r/chinachu/mirakurun/tags) (Docker Hub)
 
-### Image Variants
+### Quick Install
 
-* `chinachu/mirakurun:<version>-plain`
-* `chinachu/mirakurun:<version>-pcscd`
-  * includes pcscd
-* `chinachu/mirakurun:<version>-pcscd-recpt1`
-  * includes pcscd
-  * includes recpt1 (without driver)
+```sh
+mkdir ~/mirakurun/
+cd ~/mirakurun/
+wget https://raw.githubusercontent.com/Chinachu/Mirakurun/master/docker/docker-compose.yml
+docker-compose pull
+docker-compose run --rm -e SETUP=true mirakurun
+docker-compose up -d
+```
+
+see: [doc/Platforms.md](doc/Platforms.md)
 
 ## Features
 
@@ -56,50 +60,9 @@ see: available [Tags](https://hub.docker.com/r/chinachu/mirakurun/tags) (Docker 
 
 see: [doc/Platforms.md](doc/Platforms.md)
 
-## Install
+## **Install / Update / Uninstall / CLI**
 
 see: [doc/Platforms.md](doc/Platforms.md)
-
-## CLI
-
-**Only Linux / Darwin Platform**
-
-### Administration
-
-#### Init
-
-Init as service manually.
-
-```
-mirakurun init
-```
-
-#### Config
-
-```
-mirakurun config [server|tuners|channels]
-```
-
-* Also you can config on Chinachu Web App.
-* see: [doc/Configuration.md](doc/Configuration.md)
-
-#### Log Stream
-
-```
-mirakurun log server
-```
-
-#### Service Management
-
-```
-mirakurun [status|start|stop|restart]
-```
-
-#### Version Info
-
-```
-mirakurun version
-```
 
 ## Munin Plugin
 
@@ -148,7 +111,7 @@ You can use PM2 Plus to realtime monitoring if running by PM2.
 ## Supporting
 
 * [Tip4Commit](https://tip4commit.com/github/Chinachu/Mirakurun) (BTC) - to Every Committers
-* `1ND6fuKgQ8kKZnyoCRfJqe6cijsScd5Ttf` (BTC) - Directly to the Project Team
+* [Open Collective](https://opencollective.com/Mirakurun) (USD) - Pool (TBD)
 
 ## Discord Community
 
@@ -159,13 +122,11 @@ You can use PM2 Plus to realtime monitoring if running by PM2.
 This project exists thanks to all the people who contribute.
 <a href="https://github.com/Chinachu/Mirakurun/graphs/contributors"><img src="https://opencollective.com/Mirakurun/contributors.svg?width=890&button=false" /></a>
 
-
 ## Backers
 
 Thank you to all our backers! 🙏 [[Become a backer](https://opencollective.com/Mirakurun#backer)]
 
 <a href="https://opencollective.com/Mirakurun#backers" target="_blank"><img src="https://opencollective.com/Mirakurun/backers.svg?width=890"></a>
-
 
 ## Sponsors
 
@@ -181,8 +142,6 @@ Support this project by becoming a sponsor. Your logo will show up here with a l
 <a href="https://opencollective.com/Mirakurun/sponsor/7/website" target="_blank"><img src="https://opencollective.com/Mirakurun/sponsor/7/avatar.svg"></a>
 <a href="https://opencollective.com/Mirakurun/sponsor/8/website" target="_blank"><img src="https://opencollective.com/Mirakurun/sponsor/8/avatar.svg"></a>
 <a href="https://opencollective.com/Mirakurun/sponsor/9/website" target="_blank"><img src="https://opencollective.com/Mirakurun/sponsor/9/avatar.svg"></a>
-
-
 
 ## License
 

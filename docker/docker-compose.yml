@@ -1,0 +1,31 @@
+version: "3.7"
+services:
+  mirakurun:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    image: chinachu/mirakurun:latest
+    cap_add:
+      - SYS_ADMIN
+      - SYS_NICE
+    environment:
+      TZ: Asia/Tokyo
+      # LOG_LEVEL: "3"
+      # DEBUG: "true"
+    ports:
+      - 40772:40772
+      - 9229:9229
+    devices:
+      - /dev/bus:/dev/bus
+      - /dev/dvb:/dev/dvb
+    volumes:
+      - /usr/local/mirakurun/run/:/var/run/
+      - /usr/local/mirakurun/opt/:/opt/
+      - /usr/local/mirakurun/config/:/app-config/
+      - /usr/local/mirakurun/data/:/app-data/
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-file: "1"
+        max-size: 10m

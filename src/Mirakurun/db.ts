@@ -13,6 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+import { dirname } from "path";
 import * as fs from "fs";
 import * as common from "./common";
 import * as log from "./log";
@@ -149,7 +150,7 @@ function load(path: string, integrity: string) {
             return [];
         }
     } else {
-        log.warn("db `%s` is not exists", path);
+        log.info("db `%s` is not exists", path);
         return [];
     }
 }
@@ -161,6 +162,16 @@ function save(path: string, data: any[], integrity: string): Promise<void> {
     data.unshift({ __integrity__: integrity });
 
     return new Promise<void>((resolve, reject) => {
+
+        // mkdir if not exists
+        const dirPath = dirname(path);
+        if (fs.existsSync(dirPath) === false) {
+            try {
+                fs.mkdirSync(dirPath, { recursive: true });
+            } catch (e) {
+                return reject(e);
+            }
+        }
 
         fs.writeFile(path, JSON.stringify(data), err => {
 

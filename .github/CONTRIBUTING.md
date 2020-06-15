@@ -23,32 +23,38 @@ git checkout <branch>
 
 ### Build
 
-```
+```sh
+# Docker on Linux
+npm run docker-build
+
+# Linux / Win32
 npm install
 npm run build
 ```
 
-### Install
+### Run
 
-```
-# Linux / Darwin
-sudo npm install pm2 -g
-sudo npm install . -g --unsafe-perm --production
+```sh
+# Docker on Linux
+npm run docker-run
+
+# Linux
+sudo npm run start
 
 # Win32 (Windows PowerShell as Admin)
-npm install winser -g
-npm install . -g --production
+npm run start.win32
 ```
 
 ### Debug
 
-```
-# Linux / Darwin
-sudo mirakurun stop
+```sh
+# Docker on Linux
+npm run docker-debug
+
+# Linux
 sudo npm run debug
 
 # Win32 (Windows PowerShell as Admin)
-Stop-Service mirakurun
 npm run debug.win32
 ```
 

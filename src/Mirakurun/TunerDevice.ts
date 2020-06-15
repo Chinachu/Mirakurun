@@ -340,7 +340,7 @@ export default class TunerDevice extends events.EventEmitter {
         });
 
         this._process.stderr.on("data", data => {
-            log.info("TunerDevice#%d > %s", this._index, data.toString().trim());
+            log.debug("TunerDevice#%d > %s", this._index, data.toString().trim());
         });
 
         // flowing start
@@ -398,6 +398,8 @@ export default class TunerDevice extends events.EventEmitter {
                 this._process.once("exit", () => clearTimeout(timer));
 
                 this._process.stdin.write("\n");
+            } else if (/^dvbv5-zap /.test(this._command) === true) {
+                this._process.kill("SIGKILL");
             } else {
                 const timer = setTimeout(() => {
                     log.warn("TunerDevice#%d will force killed because SIGTERM timed out...", this._index);
