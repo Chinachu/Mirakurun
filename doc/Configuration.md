@@ -20,7 +20,7 @@ port: 40772 # integer or ~ (null) *Ignored in Docker
 disableIPv6: false # boolean *Ignored in Docker
 highWaterMark: 25165824 # integer (bytes)
 overflowTimeLimit: 30000 # integer (ms)
-maxBufferBytesBeforeReady: 3145728 # integer (bytes)
+maxBufferBytesBeforeReady: 8388608 # integer (bytes)
 eventEndTimeout: 1000 # integer (ms)
 programGCInterval: 900000 # integer (ms)
 epgGatheringInterval: 900000 # integer (ms)
