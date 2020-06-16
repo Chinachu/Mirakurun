@@ -2,6 +2,21 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.0.0 (2020-06-16)
+
+Enhanced Docker, DVB support.
+
+- **docker**: pcscd included.
+- **docker**: DVBv5 Tools included.
+- **docker**: auto install `arib-b25-stream-test`.
+- **munin-plugins**: docker (host) support.
+
+### Server Changes
+
+- **config**: add auto tuners configuration for DVB (ISDB-T, ISDB-S) devices.
+- **ts-filter**: change default value of `maxBufferBytesBeforeReady` from `3MB` to `8MB`. [#67](https://github.com/Chinachu/Mirakurun/pull/67)
+- **tuner-device**: send `SIGKILL` to kill if using `dvbv5-zap`.
+
 ## 2.15.2 (2020-04-26)
 
 - **package**: update node version to `^10.15.0 < 11 || ^12 || ^14`.
