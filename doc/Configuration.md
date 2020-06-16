@@ -27,6 +27,20 @@ epgGatheringInterval: 900000 # integer (ms)
 epgRetrievalTime: 600000 # integer (ms)
 ```
 
+### Environment Values (Docker)
+
+```sh
+LOG_LEVEL
+MAX_LOG_HISTORY
+HIGH_WATER_MARK
+OVERFLOW_TIME_LIMIT
+MAX_BUFFER_BYTES_BEFORE_READY
+EVENT_END_TIMEOUT
+PROGRAM_GC_INTERVAL
+EPG_GATHERING_INTERVAL
+EPG_RETRIEVAL_TIME
+```
+
 ## tuners.yml
 
 ```sh
