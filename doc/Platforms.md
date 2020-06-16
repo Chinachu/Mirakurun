@@ -5,13 +5,17 @@
 **Bold** is the recommended. also, **Node.js** `^10.15.0 < 11 || ^12 || ^14` needed.
 
 * [**Docker on Linux**](#docker-on-linux)
-  * Docker Hub: [chinachu/mirakurun](https://hub.docker.com/r/chinachu/mirakurun)
-* [**Linux**](#linux)
+  * [Docker Engine](https://docs.docker.com/engine/install/) `>=18.06.0`
+  * [Docker Compose](https://docs.docker.com/compose/install/) `>=1.22.0`
+  * **x64**
+  * **Ubuntu Server 20.04** / Debian 9 / CentOS 8.1
+  * Note: Desktop / VM is not supported.
+* [Linux](#linux)
   * [PM2](http://pm2.keymetrics.io/) `>=2.4.0`
   * x86 / **x64** / ARMv7 / **ARMv8**
-  * **Debian** / **Ubuntu** / CentOS / Gentoo
+  * **Debian** / **Ubuntu Server** / CentOS / Gentoo
   * SystemV / OpenRC / **SystemD**
-  * Note: VM is not supported.
+  * Note: Desktop / VM is not supported.
 * [Win32](#win32) (Experimental)
   * [winser](https://github.com/jfromaniello/winser) `>=1.0.3`
   * Windows 10 RS3 `npm i winser@1.0.3 -g`
@@ -20,9 +24,18 @@
 ## Docker on Linux
 
 **Note:**
+
+* Desktop / VM is not supported. lacking reliability by critical performance issue.
 * You must uninstall pcscd if installed.
 * PT2/PT3/PX-* users: Use default DVB driver instead of chardev driver.
   * please uninstall chardev drivers then reboot before install.
+
+### Docker
+
+```sh
+# for new machine
+curl -sSL https://get.docker.com/ | CHANNEL=stable sh
+```
 
 ### Install / Uninstall / Update
 
