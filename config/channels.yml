@@ -1,32 +1,32 @@
-- name: MX
+- name: ＴＯＫＹＯ　ＭＸ
   type: GR
   channel: '16'
 
-- name: CX
+- name: フジテレビ
   type: GR
   channel: '21'
 
-- name: TBS
+- name: ＴＢＳ
   type: GR
   channel: '22'
 
-- name: TX
+- name: テレビ東京
   type: GR
   channel: '23'
 
-- name: EX
+- name: テレビ朝日
   type: GR
   channel: '24'
 
-- name: NTV
+- name: 日テレ
   type: GR
   channel: '25'
 
-- name: NHK E
+- name: ＮＨＫＥテレ・東京
   type: GR
   channel: '26'
 
-- name: NHK G
+- name: ＮＨＫ総合・東京
   type: GR
   channel: '27'
 
@@ -40,95 +40,95 @@
   channel: BS15_0
   serviceId: 102
 
-- name: NHK BS Premium
+- name: ＮＨＫＢＳプレミアム
   type: BS
-  channel: BS15_1
+  channel: BS03_1
   serviceId: 103
 
-- name: NHK BS Premium (Sub)
+- name: ＮＨＫＢＳプレミアム
   type: BS
-  channel: BS15_1
+  channel: BS03_1
   serviceId: 104
 
-- name: BS Nippon
+- name: ＢＳ日テレ
   type: BS
   channel: BS13_0
   serviceId: 141
 
-- name: BS Nippon (Sub)
+- name: ＢＳ日テレ
   type: BS
   channel: BS13_0
   serviceId: 142
 
-- name: BS Asahi
+- name: ＢＳ朝日１
   type: BS
   channel: BS01_0
   serviceId: 151
 
-- name: BS Asahi (Sub)
+- name: ＢＳ朝日２
   type: BS
   channel: BS01_0
   serviceId: 152
 
-- name: BS-TBS
+- name: ＢＳ－ＴＢＳ
   type: BS
   channel: BS01_1
   serviceId: 161
 
-- name: BS JAPAN
+- name: ＢＳテレ東
   type: BS
-  channel: BS03_1
+  channel: BS01_2
   serviceId: 171
 
-- name: BS Fuji
+- name: ＢＳフジ・１８１
   type: BS
   channel: BS13_1
   serviceId: 181
 
-- name: WOWOW Prime
+- name: ＷＯＷＯＷプライム
   type: BS
   channel: BS03_0
   serviceId: 191
   isDisabled: true
 
-- name: WOWOW Live
+- name: ＷＯＷＯＷライブ
   type: BS
   channel: BS05_0
   serviceId: 192
   isDisabled: true
 
-- name: WOWOW Cinema
+- name: ＷＯＷＯＷシネマ
   type: BS
   channel: BS05_1
   serviceId: 193
   isDisabled: true
 
-- name: BS11
+- name: ＢＳ１１イレブン
   type: BS
   channel: BS09_0
   serviceId: 211
 
-- name: BS SPTV
+- name: ＢＳスカパー！
   type: BS
   channel: BS11_1
   serviceId: 241
-  isDisabled: true
 
-- name: SPTV Promo
-  type: CS
-  channel: CS4
-  serviceId: 100
-
-- name: TV Asahi Ch. 1
+- name: テレ朝チャンネル1
   type: CS
   channel: CS2
   serviceId: 298
   isDisabled: true
 
-- name: TV Asahi Ch. 2
+- name: テレ朝チャンネル2
   type: CS
   channel: CS2
   serviceId: 299
+  isDisabled: true
+
+- name: 日テレプラス
+  type: CS
+  channel: CS24
+  serviceId: 300
   isDisabled: true
 
 - name: AT-X
