@@ -87,7 +87,7 @@ vim /usr/local/mirakurun/config/tuners.yml
 vim /usr/local/mirakurun/config/channels.yml
 ```
 
-see: [doc/Configuration.md](doc/Configuration.md)
+see: [Configuration.md](Configuration.md)
 
 ### 💡 How to Use: Non-DVB Devices
 
@@ -175,7 +175,7 @@ sudo npm uninstall mirakurun -g
 mirakurun config [server|tuners|channels]
 ```
 
-see: [doc/Configuration.md](doc/Configuration.md)
+see: [Configuration.md](Configuration.md)
 
 #### Log Stream
 
