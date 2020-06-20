@@ -15,6 +15,7 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../../../api";
+import * as common from "../../../common";
 import * as config from "../../../config";
 import * as db from "../../../db";
 import Tuner from "../../../Tuner";
@@ -41,7 +42,9 @@ export const put: Operation = async (req, res) => {
     }
 
     isScanning = true;
-    const type = req.query.type;
+    const type = req.query.type as common.ChannelType;
+    const min = req.query.min as any as number;
+    const max = req.query.max as any as number;
     const result: config.Channel[] = config.loadChannels().filter(channel => channel.type !== type);
     let count = 0;
 
@@ -49,7 +52,7 @@ export const put: Operation = async (req, res) => {
     res.status(200);
     res.write(`channel scanning... (type: "${type}")\n\n`);
 
-    for (let i = req.query.min; i <= req.query.max; i++) {
+    for (let i = min; i <= max; i++) {
         const channel = i.toString(10);
         res.write(`channel: "${channel}" ...\n`);
 

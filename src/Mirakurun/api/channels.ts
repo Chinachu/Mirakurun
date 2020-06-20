@@ -35,7 +35,7 @@ export const get: Operation = (req, res) => {
         return ch;
     });
 
-    api.responseJSON(res, sift(req.query, channels));
+    api.responseJSON(res, sift(req.query as any, channels));
 };
 
 get.apiDoc = {

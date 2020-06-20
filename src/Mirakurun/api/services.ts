@@ -32,7 +32,7 @@ export const get: Operation = (req, res) => {
 
     services.sort((a: ServiceItem, b: ServiceItem) => getOrder(a) - getOrder(b));
 
-    api.responseJSON(res, sift(req.query, services));
+    api.responseJSON(res, sift(req.query as any, services));
 };
 
 function getOrder(service: ServiceItem): number {
