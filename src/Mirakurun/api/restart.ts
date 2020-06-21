@@ -39,6 +39,10 @@ export const put: Operation = (req, res) => {
         res.setHeader("Content-Type", "application/json; charset=utf-8");
         res.status(202);
         res.end(JSON.stringify({ _cmd_pid: cmd.pid }));
+    } else if (process.env.DOCKER === "YES") {
+        res.status(202);
+        res.end(JSON.stringify({ _exit: 0 }));
+        setTimeout(() => process.exit(0), 0);
     } else {
         api.responseError(res, 500);
     }
