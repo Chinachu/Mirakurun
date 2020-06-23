@@ -143,11 +143,15 @@ Support this project by becoming a sponsor. Your logo will show up here with a l
 <a href="https://opencollective.com/Mirakurun/sponsor/8/website" target="_blank"><img src="https://opencollective.com/Mirakurun/sponsor/8/avatar.svg"></a>
 <a href="https://opencollective.com/Mirakurun/sponsor/9/website" target="_blank"><img src="https://opencollective.com/Mirakurun/sponsor/9/avatar.svg"></a>
 
-## License
+## Copyright / License
 
-[Apache License, Version 2.0](LICENSE)
+&copy; 2016-2020 [kanreisa](https://github.com/kanreisa).
 
-**Commercial License/Support** is provided by [Pixely LLC](https://pixely.jp/).
+* Code: [Apache License, Version 2.0](LICENSE)
+* Docs: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+* Logo: [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+**Commercial License / Support** is provided by [Pixely LLC](https://pixely.jp/).
 
 [npm-img]: https://img.shields.io/npm/v/mirakurun.svg
 [npm-url]: https://npmjs.org/package/mirakurun

@@ -2,14 +2,15 @@
   "compilerOptions": {
     "alwaysStrict": true,
     "target": "es2017",
-    "removeComments": false,
+    "removeComments": true,
     "module": "commonjs",
     "moduleResolution": "node",
     "sourceMap": true,
     "outDir": "lib"
   },
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "src/ui"
   ],
   "include": [
     "src/**/*.ts"

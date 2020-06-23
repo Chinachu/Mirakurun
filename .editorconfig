@@ -9,7 +9,7 @@ indent_style = space
 indent_size = 4
 insert_final_newline = true
 
-[*.{yml,json,sh,md}]
+[*.{yml,json,sh,md,html,svg}]
 indent_size = 2
 
 [*.sh]

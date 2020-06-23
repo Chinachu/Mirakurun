@@ -419,7 +419,6 @@ definitions:
     properties:
       name:
         type: string
-        maxLength: 8
       types:
         type: array
         items:

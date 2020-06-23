@@ -1,0 +1,67 @@
+/*
+   Copyright 2020 kanreisa
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+div.logs {
+    overflow: scroll;
+    height: calc(100vh - 300px);
+    box-sizing: border-box;
+    padding: 8px 0;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    border: 2px solid #605e5c;
+    background: #292827;
+    color: #bbb;
+}
+
+div.logs > div {
+    padding: 2px 16px;
+    word-break: break-all;
+    white-space: break-spaces;
+}
+
+div.logs > div.latest {
+    padding: 0;
+}
+
+div.logs > div:hover {
+    background: #1b1a19;
+}
+
+div.logs > div.level-debug {
+    color: #a098e5;
+}
+
+div.logs > div.level-info {
+    color: #eee;
+}
+
+div.logs > div.type-create {
+    color: #c3d825;
+}
+
+div.logs > div.level-warn,
+div.logs > div.type-update {
+    color: #f6ad49;
+}
+
+div.logs > div.level-error,
+div.logs > div.type-redefine {
+    color: #e95464;
+}
+
+div.logs > div.level-fatal {
+    color: #fff;
+    background: #c9171e;
+}

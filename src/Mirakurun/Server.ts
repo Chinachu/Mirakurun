@@ -96,8 +96,11 @@ class Server {
             }
 
             if (req.get("Origin") !== undefined) {
-                res.status(403).end();
-                return;
+                const origin = url.parse(req.get("Referer"));
+                if (origin.hostname !== "localhost" && ip.isPrivate(origin.hostname) === false) {
+                    res.status(403).end();
+                    return;
+                }
             }
 
             if (req.get("Referer") !== undefined) {
@@ -111,6 +114,18 @@ class Server {
             res.setHeader("Server", "Mirakurun/" + pkg.version);
             next();
         });
+
+        app.use(express.static("lib/ui", {
+            setHeaders: (res, path) => {
+                if ((<any> express.static.mime).lookup(path) === "image/svg+xml") {
+                    res.setHeader("Cache-Control", "public, max-age=86400");
+                }
+            }
+        }));
+        app.use("/eventemitter3", express.static("node_modules/eventemitter3"));
+        app.use("/react", express.static("node_modules/react"));
+        app.use("/react-dom", express.static("node_modules/react-dom"));
+        app.use("/office-ui-fabric-react", express.static("node_modules/office-ui-fabric-react"));
 
         if (fs.existsSync("node_modules/swagger-ui-dist") === true) {
             app.use("/swagger-ui", express.static("node_modules/swagger-ui-dist"));
