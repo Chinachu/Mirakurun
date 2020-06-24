@@ -2,6 +2,26 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.1.0 (2020-06-24)
+
+UI added.
+
+### Server Changes
+
+- **config**: update default `channels.yml`.
+- **api**: \[Restart API\] add Docker support.
+- **ui**: added. (beta)
+
+### Dependencies
+
+- express-openapi: `^3.7.0` → `^6.0.0`
+- react: `^16.13.1`
+- react-dom: `^16.13.1`
+- @fluentui/react: `^7.121.0`
+- stream-http: `^3.1.1`
+- eventemitter3: `^4.0.4`
+- (typescript): `^3.7.5` → `^3.9.5`
+
 ## 3.0.0 (2020-06-16)
 
 Enhanced Docker, DVB support.
