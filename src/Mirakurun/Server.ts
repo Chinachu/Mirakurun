@@ -22,6 +22,7 @@ import * as openapi from "express-openapi";
 import * as morgan from "morgan";
 import * as bodyParser from "body-parser";
 import * as yaml from "js-yaml";
+import { OpenAPIV2 } from "openapi-types";
 import { sleep } from "./common";
 import * as log from "./log";
 import * as system from "./system";
@@ -132,7 +133,7 @@ class Server {
             app.get("/api/debug", (req, res) => res.redirect("/swagger-ui/?url=/api/docs"));
         }
 
-        const api = yaml.safeLoad(fs.readFileSync("api.yml", "utf8"));
+        const api = yaml.safeLoad(fs.readFileSync("api.yml", "utf8")) as OpenAPIV2.Document;
         api.info.version = pkg.version;
 
         openapi.initialize({

@@ -21,7 +21,7 @@ import { OpenAPIV2 } from "openapi-types";
 import * as apid from "../api";
 import { IncomingHttpHeaders } from "http";
 const pkg = require("../package.json");
-const spec: OpenAPIV2.Document = yaml.safeLoad(fs.readFileSync(__dirname + "/../api.yml", "utf8"));
+const spec = yaml.safeLoad(fs.readFileSync(__dirname + "/../api.yml", "utf8")) as OpenAPIV2.Document;
 
 export type RequestMethod = "GET" | "POST" | "PUT" | "DELETE";
 
