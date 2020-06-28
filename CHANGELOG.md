@@ -2,6 +2,25 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.1.1 (2020-06-29)
+
+- bug fix and update dependencies.
+
+### Server Changes
+
+- **server**: fix parsing wrong header (Origin).
+
+### Dependencies
+
+- @fluentui/react: `^7.121.0` → `^7.121.4`
+- js-yaml: `^3.13.1` → `^3.14.0`
+- morgan: `^1.9.1` → `1.10.0`
+- opencollective-postinstall: `^2.0.1` → `2.0.3`
+- semver: `^7.1.3` → `^7.3.2`
+- source-map-support: `^0.5.16` → `^0.5.19`
+- swagger-ui-dist: `^3.25.0` → `^3.27.0`
+- tail: `^2.0.3` → `^2.0.4`
+
 ## 3.1.0 (2020-06-24)
 
 UI added.
