@@ -96,7 +96,7 @@ class Server {
             }
 
             if (req.get("Origin") !== undefined) {
-                const origin = url.parse(req.get("Referer"));
+                const origin = url.parse(req.get("Origin"));
                 if (origin.hostname !== "localhost" && ip.isPrivate(origin.hostname) === false) {
                     res.status(403).end();
                     return;
