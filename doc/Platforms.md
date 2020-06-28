@@ -56,7 +56,6 @@ docker-compose down --rmi all
 cd ~/mirakurun/
 docker-compose down --rmi all
 docker-compose pull
-docker-compose run --rm -e SETUP=true mirakurun
 docker-compose up -d
 ```
 

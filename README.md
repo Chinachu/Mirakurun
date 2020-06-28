@@ -44,6 +44,7 @@ see: [doc/Platforms.md](doc/Platforms.md)
 * Supports most Tuner Devices (chardev, DVB / ISDB-T, ISDB-S, DVB-S2)
 * IPv6 Support
 * [Multiplexing Mirakuruns](doc/Mirakuruns.md)
+* Web UI
 
 #### Figure: Variety of the MPEG-2 TS Stream API
 
@@ -64,6 +65,16 @@ see: [doc/Platforms.md](doc/Platforms.md)
 
 see: [doc/Platforms.md](doc/Platforms.md)
 
+## Web UI
+
+```sh
+# Admin UI
+http://_your_mirakurun_ip_:40772/
+
+# Swagger UI
+http://_your_mirakurun_ip_:40772/api/debug
+```
+
 ## Munin Plugin
 
 **Required**
@@ -71,7 +82,7 @@ see: [doc/Platforms.md](doc/Platforms.md)
 
 ### Installation
 
-```
+```sh
 ln -s /usr/local/lib/node_modules/mirakurun/bin/munin-plugins/mirakurun_status.js /usr/share/munin/plugins/mirakurun_status
 ln -s /usr/share/munin/plugins/mirakurun_status /etc/munin/plugins/mirakurun_status
 # check
