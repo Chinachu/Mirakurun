@@ -2,6 +2,21 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.2.0 (2020-07-09)
+
+- bug fix and add `disableEITParsing` config.
+
+### Server Changes
+
+- **docker**: fix wrong filename - `services.yml` → `services.json`, `programs.yml` → `programs.json`.
+- **config**: add `disableEITParsing` (server). [#49](https://github.com/Chinachu/Mirakurun/issues/49)
+
+### Dependencies
+
+- @fluentui/react: `^7.121.4` → `^7.121.11`
+- swagger-ui-dist: `^3.27.0` → `^3.28.0`
+- (typescript): `^3.9.5` → `^3.9.6`
+
 ## 3.1.1 (2020-06-29)
 
 - bug fix and update dependencies.
