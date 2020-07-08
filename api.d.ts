@@ -176,6 +176,7 @@ export interface ConfigServer {
     programGCInterval?: number;
     epgGatheringInterval?: number;
     epgRetrievalTime?: number;
+    disableEITParsing?: boolean;
 }
 
 export enum LogLevel {

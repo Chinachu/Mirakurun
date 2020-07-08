@@ -25,6 +25,7 @@ eventEndTimeout: 1000 # integer (ms)
 programGCInterval: 900000 # integer (ms)
 epgGatheringInterval: 900000 # integer (ms)
 epgRetrievalTime: 600000 # integer (ms)
+disableEITParsing: false # boolean
 ```
 
 ### Environment Values (Docker)
@@ -39,6 +40,7 @@ EVENT_END_TIMEOUT
 PROGRAM_GC_INTERVAL
 EPG_GATHERING_INTERVAL
 EPG_RETRIEVAL_TIME
+DISABLE_EIT_PARSING
 ```
 
 ## tuners.yml

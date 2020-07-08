@@ -35,7 +35,8 @@ const {
     EVENT_END_TIMEOUT,
     PROGRAM_GC_INTERVAL,
     EPG_GATHERING_INTERVAL,
-    EPG_RETRIEVAL_TIME
+    EPG_RETRIEVAL_TIME,
+    DISABLE_EIT_PARSING
 } = process.env;
 
 const IS_DOCKER = DOCKER === "YES";
@@ -63,6 +64,7 @@ export interface Server {
     readonly programGCInterval?: number;
     readonly epgGatheringInterval?: number;
     readonly epgRetrievalTime?: number;
+    readonly disableEITParsing?: true;
 }
 
 export interface Tuner {
@@ -174,6 +176,9 @@ export function loadServer(): Server {
         }
         if (typeof EPG_RETRIEVAL_TIME !== "undefined" && /^[0-9]+$/.test(EPG_RETRIEVAL_TIME)) {
             config.epgRetrievalTime = parseInt(EPG_RETRIEVAL_TIME, 10);
+        }
+        if (DISABLE_EIT_PARSING === "true") {
+            config.disableEITParsing = true;
         }
 
         log.info("load server config (merged w/ env): %s", JSON.stringify(config));

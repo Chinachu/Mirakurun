@@ -42,7 +42,9 @@ export default class Channel {
 
         this._load();
 
-        setTimeout(this._epgGatherer.bind(this), 1000 * 60);
+        if (_.config.server.disableEITParsing !== true) {
+            setTimeout(this._epgGatherer.bind(this), 1000 * 60);
+        }
     }
 
     get items(): ChannelItem[] {

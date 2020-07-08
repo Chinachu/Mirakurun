@@ -405,6 +405,8 @@ definitions:
         type: integer
       epgRetrievalTime:
         type: integer
+      disableEITParsing:
+        type: boolean
 
   ConfigTuners:
     type: array

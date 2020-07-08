@@ -318,6 +318,10 @@ export default class Tuner {
 
         return new Promise<stream.Readable>((resolve, reject) => {
 
+            if (_.config.server.disableEITParsing === true) {
+                setting.parseEIT = false;
+            }
+
             const devices = this._getDevicesByType(setting.channel.type);
 
             let tryCount = 50;

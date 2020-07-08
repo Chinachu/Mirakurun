@@ -18,6 +18,7 @@ import * as React from "react";
 import { useState, useEffect, useRef } from "react";
 import {
     Stack,
+    Separator,
     Spinner,
     SpinnerSize,
     Dropdown,
@@ -108,6 +109,29 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                         offText="Disable"
                         onChange={(ev, checked) => {
                             setEditing({ ...editing, disableIPv6: checked === false });
+                        }}
+                    />
+                    <Separator alignContent="start">Advanced</Separator>
+                    <Toggle
+                        label={
+                            <Stack horizontal verticalAlign="end">
+                                <Label>EIT Parsing</Label>
+                                <TooltipHost content={
+                                    `If running in Docker, Env var \`DISABLE_EIT_PARSING\` is preferred.
+                                    ⚠️ If disabled, won't work some clients!`
+                                }>
+                                    <Icon
+                                        iconName="Info"
+                                        style={{ marginLeft: 4, marginBottom: 6 }}
+                                    />
+                                </TooltipHost>
+                            </Stack>
+                        }
+                        checked={(editing.disableEITParsing === undefined || editing.disableEITParsing === false)}
+                        onText="Enable"
+                        offText="Disable ⚠️"
+                        onChange={(ev, checked) => {
+                            setEditing({ ...editing, disableEITParsing: checked === false ? true : undefined })
                         }}
                     />
                     <Stack horizontal tokens={{ childrenGap: "0 8" }} style={{ marginTop: 16 }}>
