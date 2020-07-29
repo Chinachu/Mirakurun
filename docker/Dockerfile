@@ -1,4 +1,5 @@
-FROM node:14.4.0-buster AS build
+ARG ARCH=
+FROM ${ARCH}node:14.4.0-buster AS build
 WORKDIR /app
 ENV DOCKER=YES
 ADD . .
@@ -9,7 +10,7 @@ RUN apt-get update && \
     npm run build && \
     npm install -g --unsafe-perm --production
 
-FROM node:14.4.0-buster-slim
+FROM ${ARCH}node:14.4.0-buster-slim
 
 WORKDIR /app
 RUN apt-get update && \
