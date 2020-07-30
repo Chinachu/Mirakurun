@@ -1,0 +1,95 @@
+# Docker
+# Build a Docker image
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+  branches:
+    include:
+    - refs/tags/*.*.*
+
+resources:
+- repo: self
+
+variables:
+  tag: '$(Build.SourceBranchName)'
+
+stages:
+- stage: Build
+  displayName: Build image
+  jobs:
+  - job: Build
+    # See https://docs.microsoft.com/en-us/azure/devops/pipelines/yaml-schema?view=azure-devops&tabs=example%2Cparameter-schema#matrix
+    strategy:
+      matrix:
+        AMD64:
+          ARCH: 'amd64'
+          PLATFORM: 'linux/amd64'
+        ARMv7:
+          ARCH: 'arm32v7'
+          PLATFORM: 'linux/arm/v7'
+        ARMv8:
+          ARCH: 'arm64v8'
+          PLATFORM: 'linux/arm64/v8'
+      maxParallel: 3
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: Bash@3
+      # See https://docs.microsoft.com/en-us/azure/devops/pipelines/ecosystems/containers/build-image?view=azure-devops#how-to-build-linux-container-images-for-architectures-other-than-x64
+      # and https://github.com/multiarch/qemu-user-static#getting-started
+      displayName: Prepare binfmt_misc
+      inputs:
+        targetType: 'inline'
+        script: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+    - task: Docker@2
+      displayName: Build an image
+      inputs:
+        repository: '$(Build.Repository.Name)'
+        command: 'build'
+        Dockerfile: '$(Build.SourcesDirectory)/docker/Dockerfile'
+        buildContext: '$(Build.SourcesDirectory)'
+        tags: |
+          $(ARCH)-$(tag)
+          $(ARCH)-latest
+        arguments: '--build-arg ARCH=$(ARCH)/ --platform $(PLATFORM)'
+        addPipelineData: false
+    - task: Docker@2
+      displayName: Publish an image
+      inputs:
+        containerRegistry: 'Docker Hub'
+        repository: '$(Build.Repository.Name)'
+        command: 'push'
+        tags: |
+          $(ARCH)-$(tag)
+          $(ARCH)-latest
+  - job: Manifest
+    dependsOn: Build
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'Docker Hub'
+        command: 'login'
+    - task: Bash@3
+      # See https://docs.docker.com/engine/reference/commandline/manifest/#create-and-push-a-manifest-list
+      displayName: Publish manifest
+      inputs:
+        targetType: 'inline'
+        script: |
+          export REPOSITORY_NAME=`echo $(Build.Repository.Name) | tr [:upper:] [:lower:]`
+          export DOCKER_CLI_EXPERIMENTAL=enabled
+          docker manifest create $REPOSITORY_NAME:$(tag) \
+            $REPOSITORY_NAME:amd64-$(tag) \
+            $REPOSITORY_NAME:arm32v7-$(tag) \
+            $REPOSITORY_NAME:arm64v8-$(tag)
+          docker manifest push $REPOSITORY_NAME:$(tag)
+          docker manifest create $REPOSITORY_NAME:latest \
+            $REPOSITORY_NAME:amd64-latest \
+            $REPOSITORY_NAME:arm32v7-latest \
+            $REPOSITORY_NAME:arm64v8-latest
+          docker manifest push $REPOSITORY_NAME:latest
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'Docker Hub'
+        command: 'logout'
