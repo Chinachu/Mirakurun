@@ -34,6 +34,9 @@ stages:
     pool:
       vmImage: 'ubuntu-latest'
     steps:
+    - checkout: self
+      # https://docs.microsoft.com/en-us/azure/devops/pipelines/yaml-schema?view=azure-devops&tabs=schema%2Cparameter-schema#checkout
+      submodules: true
     - task: Bash@3
       # See https://docs.microsoft.com/en-us/azure/devops/pipelines/ecosystems/containers/build-image?view=azure-devops#how-to-build-linux-container-images-for-architectures-other-than-x64
       # and https://github.com/multiarch/qemu-user-static#getting-started
