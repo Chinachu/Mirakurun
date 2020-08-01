@@ -6,6 +6,8 @@ trigger:
   branches:
     include:
     - refs/tags/*.*.*
+# https://docs.microsoft.com/en-us/azure/devops/pipelines/repos/github?view=azure-devops&tabs=yaml#opting-out-of-pr-validation
+pr: none
 
 resources:
 - repo: self
