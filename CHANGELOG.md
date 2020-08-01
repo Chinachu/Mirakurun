@@ -2,6 +2,10 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.3.0 (2020-08-02)
+
+- **docker**: add arch `arm32v7`, `arm64v8`.
+
 ## 3.2.0 (2020-07-09)
 
 - bug fix and add `disableEITParsing` config.
