@@ -5,7 +5,7 @@
 .dockerignore
 .editorconfig
 .gitignore
-.travis.yml
+azure-pipelines.yml
 .env
 Dockerfile
 gulpfile.js

@@ -6,7 +6,7 @@ DVR Tuner Server Service for **[Chinachu](https://chinachu.moe/)** Air.
 
 [![npm version][npm-img]][npm-url]
 [![npm downloads][downloads-image]][downloads-url]
-[![Linux Build][travis-img]][travis-url]
+[![Linux Build][azure-pipelines-img]][azure-pipelines-url]
 [![Dependency Status][dep-img]][dep-url]
 [![devDependency Status][devdep-img]][devdep-url]
 [![tip for next commit](https://tip4commit.com/projects/43158.svg)](https://tip4commit.com/github/Chinachu/Mirakurun)
@@ -168,8 +168,8 @@ Support this project by becoming a sponsor. Your logo will show up here with a l
 [npm-url]: https://npmjs.org/package/mirakurun
 [downloads-image]: https://img.shields.io/npm/dm/mirakurun.svg?style=flat
 [downloads-url]: https://npmjs.org/package/mirakurun
-[travis-img]: https://img.shields.io/travis/Chinachu/Mirakurun.svg
-[travis-url]: https://travis-ci.org/Chinachu/Mirakurun
+[azure-pipelines-img]: https://dev.azure.com/chinachu/Mirakurun/_apis/build/status/Chinachu.Mirakurun?branchName=master
+[azure-pipelines-url]: hhttps://dev.azure.com/chinachu/Mirakurun/_build/latest?definitionId=1&branchName=master
 [dep-img]: https://david-dm.org/Chinachu/Mirakurun.svg
 [dep-url]: https://david-dm.org/Chinachu/Mirakurun
 [devdep-img]: https://david-dm.org/Chinachu/Mirakurun/dev-status.svg
