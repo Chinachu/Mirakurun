@@ -1,7 +1,5 @@
 #!/bin/bash
 
-export LOG_LEVEL=${LOG_LEVEL:-"2"}
-
 export SERVER_CONFIG_PATH=/app-config/server.yml
 export TUNERS_CONFIG_PATH=/app-config/tuners.yml
 export CHANNELS_CONFIG_PATH=/app-config/channels.yml
