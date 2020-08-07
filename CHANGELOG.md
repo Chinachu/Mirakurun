@@ -2,6 +2,13 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.3.1 (2020-08-08)
+
+- **docker**: fixed a bug the Log Level cannot be changed. [#78](https://github.com/Chinachu/Mirakurun/issues/78)
+- **docker**: improve pcscd reliability.
+  - now it will retry starting pcscd if not running correctly.
+- **docker**: update base image to `node:14.7.0-buster-slim`.
+
 ## 3.3.0 (2020-08-02)
 
 - **docker**: add arch `arm32v7`, `arm64v8`.
