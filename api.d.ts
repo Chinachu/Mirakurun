@@ -146,6 +146,20 @@ export interface TunerUser {
     id: string;
     priority: number;
     agent?: string;
+    url?: string;
+    disableDecoder?: boolean;
+    streamSetting?: StreamSetting;
+}
+
+interface StreamSetting {
+    channel: ConfigChannelsItem;
+    networkId?: number;
+    serviceId?: number;
+    eventId?: number;
+    noProvide?: boolean;
+    parseNIT?: boolean;
+    parseSDT?: boolean;
+    parseEIT?: boolean;
 }
 
 export interface TunerProcess {

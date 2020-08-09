@@ -328,6 +328,31 @@ definitions:
         minimum: -1
       agent:
         type: string
+      url:
+        type: string
+      disableDecoder:
+        type: boolean
+      streamSetting:
+        type: object
+        required:
+          - channel
+        properties:
+          channel:
+            $ref: '#/definitions/ConfigChannelsItem'
+          networkId:
+            type: integer
+          serviceId:
+            type: integer
+          eventId:
+            type: integer
+          noProvide:
+            type: boolean
+          parseNIT:
+            type: boolean
+          parseSDT:
+            type: boolean
+          parseEIT:
+            type: boolean
 
   TunerProcess:
     type: object

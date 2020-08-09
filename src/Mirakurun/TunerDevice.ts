@@ -25,6 +25,7 @@ import * as apid from "../../api";
 import status from "./status";
 import Event from "./Event";
 import ChannelItem from "./ChannelItem";
+import TSFilter from "./TSFilter";
 import Client, { ProgramsQuery } from "../client";
 
 interface User extends common.User {
@@ -64,7 +65,7 @@ export default class TunerDevice extends events.EventEmitter {
     constructor(private _index: number, private _config: config.Tuner) {
         super();
         this._isRemote = !!this._config.remoteMirakurunHost;
-        Event.emit("tuner", "create", this.export());
+        Event.emit("tuner", "create", this.toJSON());
         log.debug("TunerDevice#%d initialized", this._index);
     }
 
@@ -93,7 +94,10 @@ export default class TunerDevice extends events.EventEmitter {
             return {
                 id: user.id,
                 priority: user.priority,
-                agent: user.agent
+                agent: user.agent,
+                url: user.url,
+                disableDecoder: user.disableDecoder,
+                streamSetting: user.streamSetting
             };
         });
     }
@@ -135,7 +139,7 @@ export default class TunerDevice extends events.EventEmitter {
         return priority;
     }
 
-    export(): Status {
+    toJSON(): Status {
         return {
             index: this._index,
             name: this._config.name,
@@ -155,7 +159,7 @@ export default class TunerDevice extends events.EventEmitter {
         await this._kill(true);
     }
 
-    async startStream(user: User, stream: stream.Duplex, channel?: ChannelItem): Promise<void> {
+    async startStream(user: User, stream: TSFilter, channel?: ChannelItem): Promise<void> {
 
         log.debug("TunerDevice#%d start stream for user `%s` (priority=%d)...", this._index, user.id, user.priority);
 
@@ -456,6 +460,6 @@ export default class TunerDevice extends events.EventEmitter {
     }
 
     private _updated(): void {
-        Event.emit("tuner", "update", this.export());
+        Event.emit("tuner", "update", this.toJSON());
     }
 }

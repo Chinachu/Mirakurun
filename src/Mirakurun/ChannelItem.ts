@@ -71,7 +71,7 @@ export default class ChannelItem {
         return this._space;
     }
 
-    export(): config.Channel {
+    toJSON(): config.Channel {
         return {
             type: this._type,
             channel: this._channel,
