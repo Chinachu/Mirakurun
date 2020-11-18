@@ -34,6 +34,39 @@ const channelOrder = {
     SKY: 4
 };
 
+const range = (start, end) => Array.from({length: (end - start + 1)}, (v, index) => index + start);
+
+function generateChannels(type: string, startCh?: number, endCh?: number, startSubch?: number, endSubch?: number, bsSubchStyle?: boolean): string[] {
+    switch (type) {
+        case common.ChannelTypes.GR:
+            startCh = startCh === undefined ? 13 : startCh;
+            endCh = endCh === undefined ? 62 : endCh;
+            return range(startCh, endCh).map((v) => v.toString(10));
+        case common.ChannelTypes.BS:
+            if (bsSubchStyle) {
+                startCh = startCh === undefined ? 1 : startCh;
+                endCh = endCh === undefined ? 23 : endCh;
+                startSubch = startSubch === undefined ? 0 : startSubch;
+                endSubch = endSubch === undefined ? 2 : endSubch;
+
+                const channels = [];
+                for (const ch of range(startCh, endCh)) {
+                    for (const sCh of range(startSubch, endSubch)) {
+                        channels.push(`BS${("00" + ch).slice(-2)}_${sCh}`);
+                    }
+                }
+                return channels;
+            }
+            startCh = startCh === undefined ? 101 : startCh;
+            endCh = endCh === undefined ? 256 : endCh;
+            return range(startCh, endCh).map((v) => v.toString(10));
+        case common.ChannelTypes.CS:
+            startCh = startCh === undefined ? 2 : startCh;
+            endCh = endCh === undefined ? 24 : endCh;
+            return range(startCh, endCh).map((v) => `CS${v.toString(10)}`);
+    }
+}
+
 export const put: Operation = async (req, res) => {
 
     if (isScanning === true) {
@@ -45,6 +78,9 @@ export const put: Operation = async (req, res) => {
     const type = req.query.type as common.ChannelType;
     const min = req.query.min as any as number;
     const max = req.query.max as any as number;
+    const sMin = req.query.s_min as any as number;
+    const sMax = req.query.s_max as any as number;
+    const bsSubchStyle = req.query.bs_subch_style as any as boolean;
     const result: config.Channel[] = config.loadChannels().filter(channel => channel.type !== type);
     let count = 0;
 
@@ -52,8 +88,7 @@ export const put: Operation = async (req, res) => {
     res.status(200);
     res.write(`channel scanning... (type: "${type}")\n\n`);
 
-    for (let i = min; i <= max; i++) {
-        const channel = i.toString(10);
+    for (const channel of generateChannels(type, min, max, sMin, sMax, bsSubchStyle)) {
         res.write(`channel: "${channel}" ...\n`);
 
         let services: db.Service[];
@@ -75,32 +110,25 @@ export const put: Operation = async (req, res) => {
             continue;
         }
 
-        let name = services[0].name;
-
         for (const service of services) {
-            for (let i = 1; i < name.length && i < service.name.length; i++) {
-                if (name[i] !== service.name[i]) {
-                    name = name.slice(0, i);
-                    break;
-                }
+            let name = service.name;
+            name = name.trim();
+
+            if (name.length === 0) {
+                name = `${type}${channel}:${service.serviceId}`;
             }
+
+            const channelItem: config.Channel = {
+                name: name,
+                type: type,
+                channel: channel,
+                serviceId: service.serviceId
+            };
+            result.push(channelItem);
+            ++count;
+
+            res.write(`-> ${JSON.stringify(channelItem)}\n\n`);
         }
-
-        name = name.trim();
-
-        if (name.length === 0) {
-            name = services[0].name || `${type}${channel}`;
-        }
-
-        const channelItem: config.Channel = {
-            name: name,
-            type: type,
-            channel: channel
-        };
-        result.push(channelItem);
-        ++count;
-
-        res.write(`-> ${JSON.stringify(channelItem)}\n\n`);
     }
 
     result.sort((a, b) => {
@@ -123,6 +151,15 @@ export const put: Operation = async (req, res) => {
 };
 
 put.apiDoc = {
+    description: "Scan the receivable channels and rewrite the channel settings. \n\n\
+Note: \n\
+- Note that running a scan clears all original channel entries of the specified type. Other types of channel entries are unchanged. \n\
+- Only when scanning BS, you can specify the channel number in the subchannel style (e.g. BS01_0). To specify the channel number, use s_min and s_max in addition to min and max. \n\
+- The subchannel number parameters (s_min, s_max) are used only if the type is BS and are ignored otherwise. \n\
+- Subchannel style scans scan in the following range: \n\
+    From `BS${min}_${s_min}` to `BS${max}_${s_max}` \n\
+- In the subchannel style, min and max are zero padded to two digits. s_min and s_max are not padded. \n\
+- BS \"non\" subchannel style scans and GR scans are basically the same. Note that if you scan the wrong channel range, the GR channel will be registered as BS and the BS channel will be registered as GR. This problem does not occur because CS scan uses a character string with `CS` added as a channel number prefix.",
     tags: ["config"],
     operationId: "channelScan",
     produces: [
@@ -134,20 +171,41 @@ put.apiDoc = {
             in: "query",
             name: "type",
             type: "string",
-            enum: ["GR"],
-            default: "GR"
+            enum: [common.ChannelTypes.GR, common.ChannelTypes.BS, common.ChannelTypes.CS],
+            default: common.ChannelTypes.GR,
+            description: "Specifies the channel type to scan."
         },
         {
             in: "query",
             name: "min",
             type: "integer",
-            default: 13
+            description: "Specifies the minimum number of channel numbers to scan."
         },
         {
             in: "query",
             name: "max",
             type: "integer",
-            default: 52
+            description: "Specifies the maximum number of channel numbers to scan."
+        },
+        {
+            in: "query",
+            name: "s_min",
+            type: "integer",
+            description: "Specifies the minimum number of subchannel numbers to scan. This parameter is only used if the type is `BS` and the bs_subch_style is `true`."
+        },
+        {
+            in: "query",
+            name: "s_max",
+            type: "integer",
+            description: "Specifies the maximum number of subchannel numbers to scan. This parameter is only used if the type is `BS` and the bs_subch_style is `true`."
+        },
+        {
+            in: "query",
+            name: "bs_subch_style",
+            type: "boolean",
+            allowEmptyValue: true,
+            default: true,
+            description: "Specify true to specify the channel in the subchannel style. (e.g. BS01_0)"
         }
     ],
     responses: {
