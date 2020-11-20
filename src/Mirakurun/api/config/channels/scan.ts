@@ -34,16 +34,24 @@ const channelOrder = {
     SKY: 4
 };
 
+interface ScanConfig {
+    readonly channels: string[];
+    readonly isRegisterEachService: boolean;
+}
+
 const range = (start, end) => Array.from({length: (end - start + 1)}, (v, index) => index + start);
 
-function generateChannels(type: string, startCh?: number, endCh?: number, startSubch?: number, endSubch?: number, bsSubchStyle?: boolean): string[] {
+function generateScanConfig(type: string, startCh?: number, endCh?: number, startSubch?: number, endSubch?: number, isBsSubchStyle?: boolean, isRegisterEachService?: boolean): ScanConfig {
     switch (type) {
         case common.ChannelTypes.GR:
             startCh = startCh === undefined ? 13 : startCh;
             endCh = endCh === undefined ? 62 : endCh;
-            return range(startCh, endCh).map((v) => v.toString(10));
+            return {
+                channels: range(startCh, endCh).map((v) => v.toString(10)),
+                isRegisterEachService: (isRegisterEachService === undefined ? false : isRegisterEachService)
+            };
         case common.ChannelTypes.BS:
-            if (bsSubchStyle) {
+            if (isBsSubchStyle) {
                 startCh = startCh === undefined ? 1 : startCh;
                 endCh = endCh === undefined ? 23 : endCh;
                 startSubch = startSubch === undefined ? 0 : startSubch;
@@ -55,15 +63,24 @@ function generateChannels(type: string, startCh?: number, endCh?: number, startS
                         channels.push(`BS${("00" + ch).slice(-2)}_${sCh}`);
                     }
                 }
-                return channels;
+                return {
+                    channels: channels,
+                    isRegisterEachService: (isRegisterEachService === undefined ? true : isRegisterEachService)
+                };
             }
             startCh = startCh === undefined ? 101 : startCh;
             endCh = endCh === undefined ? 256 : endCh;
-            return range(startCh, endCh).map((v) => v.toString(10));
+            return {
+                channels: range(startCh, endCh).map((v) => v.toString(10)),
+                isRegisterEachService: (isRegisterEachService === undefined ? true : isRegisterEachService)
+            };
         case common.ChannelTypes.CS:
             startCh = startCh === undefined ? 2 : startCh;
             endCh = endCh === undefined ? 24 : endCh;
-            return range(startCh, endCh).map((v) => `CS${v.toString(10)}`);
+            return {
+                channels: range(startCh, endCh).map((v) => `CS${v.toString(10)}`),
+                isRegisterEachService: (isRegisterEachService === undefined ? true : isRegisterEachService)
+            };
     }
 }
 
@@ -80,7 +97,8 @@ export const put: Operation = async (req, res) => {
     const max = req.query.max as any as number;
     const sMin = req.query.s_min as any as number;
     const sMax = req.query.s_max as any as number;
-    const bsSubchStyle = req.query.bs_subch_style as any as boolean;
+    const isBsSubchStyle = req.query.bs_subch_style as any as boolean;
+    const isRegisterEachService = req.query.register_each_service as any as boolean;
     const result: config.Channel[] = config.loadChannels().filter(channel => channel.type !== type);
     let count = 0;
 
@@ -88,7 +106,9 @@ export const put: Operation = async (req, res) => {
     res.status(200);
     res.write(`channel scanning... (type: "${type}")\n\n`);
 
-    for (const channel of generateChannels(type, min, max, sMin, sMax, bsSubchStyle)) {
+    const scanConfig = generateScanConfig(type, min, max, sMin, sMax, isBsSubchStyle, isRegisterEachService);
+
+    for (const channel of scanConfig.channels) {
         res.write(`channel: "${channel}" ...\n`);
 
         let services: db.Service[];
@@ -110,25 +130,55 @@ export const put: Operation = async (req, res) => {
             continue;
         }
 
-        for (const service of services) {
-            let name = service.name;
-            name = name.trim();
+        if (scanConfig.isRegisterEachService) {
+            for (const service of services) {
+                let name = service.name;
+                name = name.trim();
 
-            if (name.length === 0) {
-                name = `${type}${channel}:${service.serviceId}`;
+                if (name.length === 0) {
+                    name = `${type}${channel}:${service.serviceId}`;
+                }
+
+                const channelItem: config.Channel = {
+                    name: name,
+                    type: type,
+                    channel: channel,
+                    serviceId: service.serviceId
+                };
+                result.push(channelItem);
+                ++count;
+
+                res.write(`-> ${JSON.stringify(channelItem)}\n\n`);
             }
-
-            const channelItem: config.Channel = {
-                name: name,
-                type: type,
-                channel: channel,
-                serviceId: service.serviceId
-            };
-            result.push(channelItem);
-            ++count;
-
-            res.write(`-> ${JSON.stringify(channelItem)}\n\n`);
+            continue;
         }
+
+        let name = services[0].name;
+
+        for (const service of services) {
+            for (let i = 1; i < name.length && i < service.name.length; i++) {
+                if (name[i] !== service.name[i]) {
+                    name = name.slice(0, i);
+                    break;
+                }
+            }
+        }
+
+        name = name.trim();
+
+        if (name.length === 0) {
+            name = services[0].name || `${type}${channel}`;
+        }
+
+        const channelItem: config.Channel = {
+            name: name,
+            type: type,
+            channel: channel
+        };
+        result.push(channelItem);
+        ++count;
+
+        res.write(`-> ${JSON.stringify(channelItem)}\n\n`);
     }
 
     result.sort((a, b) => {
@@ -206,6 +256,13 @@ Note: \n\
             allowEmptyValue: true,
             default: true,
             description: "Specify true to specify the channel in the subchannel style. (e.g. BS01_0)"
+        },
+        {
+            in: "query",
+            name: "register_each_service",
+            type: "boolean",
+            allowEmptyValue: true,
+            description: ""
         }
     ],
     responses: {
