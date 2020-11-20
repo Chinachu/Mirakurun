@@ -34,23 +34,28 @@ const channelOrder = {
     SKY: 4
 };
 
+enum RegisterMode {
+    Channel = "Channel",
+    Service = "Service"
+}
+
 interface ScanConfig {
     readonly channels: string[];
-    readonly isRegisterEachService: boolean;
+    readonly registerMode: RegisterMode;
 }
 
 function range(start: number, end: number): string[] {
     return Array.from({length: (end - start + 1)}, (v, index) => (index + start).toString(10));
 }
 
-function generateScanConfig(type: string, startCh?: number, endCh?: number, startSubCh?: number, endSubCh?: number, useSubCh?: boolean, isRegisterEachService?: boolean): ScanConfig {
+function generateScanConfig(type: string, startCh?: number, endCh?: number, startSubCh?: number, endSubCh?: number, useSubCh?: boolean, registerMode?: RegisterMode): ScanConfig {
     switch (type) {
         case common.ChannelTypes.GR:
             startCh = startCh === undefined ? 13 : startCh;
             endCh = endCh === undefined ? 62 : endCh;
             return {
                 channels: range(startCh, endCh).map((ch) => ch),
-                isRegisterEachService: (isRegisterEachService === undefined ? false : isRegisterEachService)
+                registerMode: (registerMode === undefined ? RegisterMode.Channel : registerMode)
             };
         case common.ChannelTypes.BS:
             if (useSubCh) {
@@ -67,21 +72,21 @@ function generateScanConfig(type: string, startCh?: number, endCh?: number, star
                 }
                 return {
                     channels: channels,
-                    isRegisterEachService: (isRegisterEachService === undefined ? true : isRegisterEachService)
+                    registerMode: (registerMode === undefined ? RegisterMode.Service : registerMode)
                 };
             }
             startCh = startCh === undefined ? 101 : startCh;
             endCh = endCh === undefined ? 256 : endCh;
             return {
                 channels: range(startCh, endCh).map((ch) => ch),
-                isRegisterEachService: (isRegisterEachService === undefined ? true : isRegisterEachService)
+                registerMode: (registerMode === undefined ? RegisterMode.Service : registerMode)
             };
         case common.ChannelTypes.CS:
             startCh = startCh === undefined ? 2 : startCh;
             endCh = endCh === undefined ? 24 : endCh;
             return {
                 channels: range(startCh, endCh).map((ch) => `CS${ch}`),
-                isRegisterEachService: (isRegisterEachService === undefined ? true : isRegisterEachService)
+                registerMode: (registerMode === undefined ? RegisterMode.Service : registerMode)
             };
     }
 }
@@ -100,7 +105,7 @@ export const put: Operation = async (req, res) => {
     const minSubCh = req.query.minSubCh as any as number;
     const maxSubCh = req.query.maxSubCh as any as number;
     const useSubCh = req.query.useSubCh as any as boolean;
-    const isRegisterEachService = req.query.registerEachService as any as boolean;
+    const registerMode = req.query.registerMode as any as RegisterMode;
     const result: config.Channel[] = config.loadChannels().filter(channel => channel.type !== type);
     let count = 0;
 
@@ -108,7 +113,7 @@ export const put: Operation = async (req, res) => {
     res.status(200);
     res.write(`channel scanning... (type: "${type}")\n\n`);
 
-    const scanConfig = generateScanConfig(type, minCh, maxCh, minSubCh, maxSubCh, useSubCh, isRegisterEachService);
+    const scanConfig = generateScanConfig(type, minCh, maxCh, minSubCh, maxSubCh, useSubCh, registerMode);
 
     for (const channel of scanConfig.channels) {
         res.write(`channel: "${channel}" ...\n`);
@@ -132,7 +137,7 @@ export const put: Operation = async (req, res) => {
             continue;
         }
 
-        if (scanConfig.isRegisterEachService) {
+        if (scanConfig.registerMode === RegisterMode.Service) {
             for (const service of services) {
                 let name = service.name;
                 name = name.trim();
@@ -261,10 +266,11 @@ Note: \n\
         },
         {
             in: "query",
-            name: "registerEachService",
-            type: "boolean",
-            allowEmptyValue: true,
-            description: ""
+            name: "registerMode",
+            type: "string",
+            enum: [RegisterMode.Channel, RegisterMode.Service],
+            description: "When you register the scanned channel information, specify whether you want to register it by channel or by service. \n\
+            Default: GR(Channel), BS/CS(Service)"
         }
     ],
     responses: {
