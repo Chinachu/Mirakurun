@@ -47,7 +47,7 @@ function generateScanConfig(type: string, startCh?: number, endCh?: number, star
             startCh = startCh === undefined ? 13 : startCh;
             endCh = endCh === undefined ? 62 : endCh;
             return {
-                channels: range(startCh, endCh).map((v) => v.toString(10)),
+                channels: range(startCh, endCh).map<string>((ch) => ch.toString(10)),
                 isRegisterEachService: (isRegisterEachService === undefined ? false : isRegisterEachService)
             };
         case common.ChannelTypes.BS:
@@ -57,10 +57,10 @@ function generateScanConfig(type: string, startCh?: number, endCh?: number, star
                 startSubch = startSubch === undefined ? 0 : startSubch;
                 endSubch = endSubch === undefined ? 2 : endSubch;
 
-                const channels = [];
+                const channels = new Array<string>();
                 for (const ch of range(startCh, endCh)) {
                     for (const sCh of range(startSubch, endSubch)) {
-                        channels.push(`BS${("00" + ch).slice(-2)}_${sCh}`);
+                        channels.push(`BS${ch.toString().padStart(2, "0")}_${sCh}`);
                     }
                 }
                 return {
@@ -71,14 +71,14 @@ function generateScanConfig(type: string, startCh?: number, endCh?: number, star
             startCh = startCh === undefined ? 101 : startCh;
             endCh = endCh === undefined ? 256 : endCh;
             return {
-                channels: range(startCh, endCh).map((v) => v.toString(10)),
+                channels: range(startCh, endCh).map<string>((ch) => ch.toString(10)),
                 isRegisterEachService: (isRegisterEachService === undefined ? true : isRegisterEachService)
             };
         case common.ChannelTypes.CS:
             startCh = startCh === undefined ? 2 : startCh;
             endCh = endCh === undefined ? 24 : endCh;
             return {
-                channels: range(startCh, endCh).map((v) => `CS${v.toString(10)}`),
+                channels: range(startCh, endCh).map<string>((ch) => `CS${ch}`),
                 isRegisterEachService: (isRegisterEachService === undefined ? true : isRegisterEachService)
             };
     }
