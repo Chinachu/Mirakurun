@@ -91,6 +91,58 @@ function generateScanConfig(type: string, startCh?: number, endCh?: number, star
     }
 }
 
+function generateChannelItemForService(type: common.ChannelType, channel: string, service: db.Service): config.Channel {
+
+    let name = service.name;
+    name = name.trim();
+    if (name.length === 0) {
+        name = `${type}${channel}:${service.serviceId}`;
+    }
+
+    return {
+        name: name,
+        type: type,
+        channel: channel,
+        serviceId: service.serviceId
+    };
+}
+
+function generateChannelItemForChannel(type: common.ChannelType, channel: string, services: db.Service[]): config.Channel {
+
+    let name = services[0].name;
+    for (const service of services) {
+        for (let i = 1; i < name.length && i < service.name.length; i++) {
+            if (name[i] !== service.name[i]) {
+                name = name.slice(0, i);
+                break;
+            }
+        }
+    }
+    name = name.trim();
+    if (name.length === 0) {
+        name = services[0].name || `${type}${channel}`;
+    }
+
+    return {
+        name: name,
+        type: type,
+        channel: channel
+    };
+}
+
+function generateChannelItems(type: common.ChannelType, channel: string, services: db.Service[], registerMode: RegisterMode): config.Channel[] {
+
+    if (registerMode === RegisterMode.Service) {
+        const channelItems: config.Channel[] = [];
+        for (const service of services) {
+            channelItems.push(generateChannelItemForService(type, channel, service));
+        }
+        return channelItems;
+    }
+
+    return [generateChannelItemForChannel(type, channel, services)];
+}
+
 export const put: Operation = async (req, res) => {
 
     if (isScanning === true) {
@@ -137,55 +189,13 @@ export const put: Operation = async (req, res) => {
             continue;
         }
 
-        if (scanConfig.registerMode === RegisterMode.Service) {
-            for (const service of services) {
-                let name = service.name;
-                name = name.trim();
+        const channelItems = generateChannelItems(type, channel, services, scanConfig.registerMode);
 
-                if (name.length === 0) {
-                    name = `${type}${channel}:${service.serviceId}`;
-                }
-
-                const channelItem: config.Channel = {
-                    name: name,
-                    type: type,
-                    channel: channel,
-                    serviceId: service.serviceId
-                };
-                result.push(channelItem);
-                ++count;
-
-                res.write(`-> ${JSON.stringify(channelItem)}\n\n`);
-            }
-            continue;
+        for (const channelItem of channelItems) {
+            result.push(channelItem);
+            ++count;
+            res.write(`-> ${JSON.stringify(channelItem)}\n\n`);
         }
-
-        let name = services[0].name;
-
-        for (const service of services) {
-            for (let i = 1; i < name.length && i < service.name.length; i++) {
-                if (name[i] !== service.name[i]) {
-                    name = name.slice(0, i);
-                    break;
-                }
-            }
-        }
-
-        name = name.trim();
-
-        if (name.length === 0) {
-            name = services[0].name || `${type}${channel}`;
-        }
-
-        const channelItem: config.Channel = {
-            name: name,
-            type: type,
-            channel: channel
-        };
-        result.push(channelItem);
-        ++count;
-
-        res.write(`-> ${JSON.stringify(channelItem)}\n\n`);
     }
 
     result.sort((a, b) => {
