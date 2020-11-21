@@ -39,6 +39,17 @@ enum RegisterMode {
     Service = "Service"
 }
 
+interface ChannelScanOption {
+    type: string;
+    startCh?: number;
+    endCh?: number;
+    startSubCh?: number;
+    endSubCh?: number;
+    useSubCh?: boolean;
+    registerMode?: RegisterMode;
+    registerOnDisabled?: boolean;
+}
+
 interface ScanConfig {
     readonly channels: string[];
     readonly registerMode: RegisterMode;
@@ -49,49 +60,49 @@ function range(start: number, end: number): string[] {
     return Array.from({length: (end - start + 1)}, (v, index) => (index + start).toString(10));
 }
 
-function generateScanConfig(type: string, startCh?: number, endCh?: number, startSubCh?: number, endSubCh?: number, useSubCh?: boolean, registerMode?: RegisterMode, registerOnDisabled?: boolean): ScanConfig {
-    switch (type) {
+function generateScanConfig(option: ChannelScanOption): ScanConfig {
+    switch (option.type) {
         case common.ChannelTypes.GR:
-            startCh = startCh === undefined ? 13 : startCh;
-            endCh = endCh === undefined ? 62 : endCh;
+            option.startCh = option.startCh === undefined ? 13 : option.startCh;
+            option.endCh = option.endCh === undefined ? 62 : option.endCh;
             return {
-                channels: range(startCh, endCh).map((ch) => ch),
-                registerMode: (registerMode === undefined ? RegisterMode.Channel : registerMode),
-                registerOnDisabled: (registerOnDisabled === undefined ? false : registerOnDisabled)
+                channels: range(option.startCh, option.endCh).map((ch) => ch),
+                registerMode: (option.registerMode === undefined ? RegisterMode.Channel : option.registerMode),
+                registerOnDisabled: (option.registerOnDisabled === undefined ? false : option.registerOnDisabled)
             };
         case common.ChannelTypes.BS:
-            if (useSubCh) {
-                startCh = startCh === undefined ? 1 : startCh;
-                endCh = endCh === undefined ? 23 : endCh;
-                startSubCh = startSubCh === undefined ? 0 : startSubCh;
-                endSubCh = endSubCh === undefined ? 2 : endSubCh;
+            if (option.useSubCh) {
+                option.startCh = option.startCh === undefined ? 1 : option.startCh;
+                option.endCh = option.endCh === undefined ? 23 : option.endCh;
+                option.startSubCh = option.startSubCh === undefined ? 0 : option.startSubCh;
+                option.endSubCh = option.endSubCh === undefined ? 2 : option.endSubCh;
 
                 const channels: string[] = [];
-                for (const ch of range(startCh, endCh)) {
-                    for (const subCh of range(startSubCh, endSubCh)) {
+                for (const ch of range(option.startCh, option.endCh)) {
+                    for (const subCh of range(option.startSubCh, option.endSubCh)) {
                         channels.push(`BS${ch.toString().padStart(2, "0")}_${subCh}`);
                     }
                 }
                 return {
                     channels: channels,
-                    registerMode: (registerMode === undefined ? RegisterMode.Service : registerMode),
-                    registerOnDisabled: (registerOnDisabled === undefined ? true : registerOnDisabled)
+                    registerMode: (option.registerMode === undefined ? RegisterMode.Service : option.registerMode),
+                    registerOnDisabled: (option.registerOnDisabled === undefined ? true : option.registerOnDisabled)
                 };
             }
-            startCh = startCh === undefined ? 101 : startCh;
-            endCh = endCh === undefined ? 256 : endCh;
+            option.startCh = option.startCh === undefined ? 101 : option.startCh;
+            option.endCh = option.endCh === undefined ? 256 : option.endCh;
             return {
-                channels: range(startCh, endCh).map((ch) => ch),
-                registerMode: (registerMode === undefined ? RegisterMode.Service : registerMode),
-                registerOnDisabled: (registerOnDisabled === undefined ? true : registerOnDisabled)
+                channels: range(option.startCh, option.endCh).map((ch) => ch),
+                registerMode: (option.registerMode === undefined ? RegisterMode.Service : option.registerMode),
+                registerOnDisabled: (option.registerOnDisabled === undefined ? true : option.registerOnDisabled)
             };
         case common.ChannelTypes.CS:
-            startCh = startCh === undefined ? 2 : startCh;
-            endCh = endCh === undefined ? 24 : endCh;
+            option.startCh = option.startCh === undefined ? 2 : option.startCh;
+            option.endCh = option.endCh === undefined ? 24 : option.endCh;
             return {
-                channels: range(startCh, endCh).map((ch) => `CS${ch}`),
-                registerMode: (registerMode === undefined ? RegisterMode.Service : registerMode),
-                registerOnDisabled: (registerOnDisabled === undefined ? true : registerOnDisabled)
+                channels: range(option.startCh, option.endCh).map((ch) => `CS${ch}`),
+                registerMode: (option.registerMode === undefined ? RegisterMode.Service : option.registerMode),
+                registerOnDisabled: (option.registerOnDisabled === undefined ? true : option.registerOnDisabled)
             };
     }
 }
@@ -173,7 +184,16 @@ export const put: Operation = async (req, res) => {
     res.status(200);
     res.write(`channel scanning... (type: "${type}")\n\n`);
 
-    const scanConfig = generateScanConfig(type, minCh, maxCh, minSubCh, maxSubCh, useSubCh, registerMode, registerOnDisabled);
+    const scanConfig = generateScanConfig({
+        type: type,
+        startCh: minCh,
+        endCh: maxCh,
+        startSubCh: minSubCh,
+        endSubCh: maxSubCh,
+        useSubCh: useSubCh,
+        registerMode: registerMode,
+        registerOnDisabled: registerOnDisabled
+    });
 
     for (const channel of scanConfig.channels) {
         res.write(`channel: "${channel}" ...\n`);
