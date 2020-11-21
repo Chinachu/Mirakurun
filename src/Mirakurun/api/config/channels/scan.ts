@@ -217,7 +217,7 @@ export const put: Operation = async (req, res) => {
             continue;
         }
 
-        const channelItems = generateChannelItems(type, channel, services, scanConfig.registerMode, registerOnDisabled);
+        const channelItems = generateChannelItems(type, channel, services, scanConfig.registerMode, scanConfig.registerOnDisabled);
 
         for (const channelItem of channelItems) {
             result.push(channelItem);
