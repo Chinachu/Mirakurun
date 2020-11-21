@@ -130,6 +130,10 @@ function generateChannelItemForChannel(type: common.ChannelType, channel: string
     for (const service of services) {
         for (let i = 1; i < name.length && i < service.name.length; i++) {
             if (name[i] !== service.name[i]) {
+                // If the first letter is different, the service does not perform summarization.
+                if (i === 1) {
+                    break;
+                }
                 name = name.slice(0, i);
                 break;
             }
@@ -137,7 +141,7 @@ function generateChannelItemForChannel(type: common.ChannelType, channel: string
     }
     name = name.trim();
     if (name.length === 0) {
-        name = services[0].name || `${type}${channel}`;
+        name = `${type}${channel}`;
     }
 
     return {
