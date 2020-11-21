@@ -42,20 +42,22 @@ enum RegisterMode {
 interface ScanConfig {
     readonly channels: string[];
     readonly registerMode: RegisterMode;
+    readonly registerOnDisabled: boolean;
 }
 
 function range(start: number, end: number): string[] {
     return Array.from({length: (end - start + 1)}, (v, index) => (index + start).toString(10));
 }
 
-function generateScanConfig(type: string, startCh?: number, endCh?: number, startSubCh?: number, endSubCh?: number, useSubCh?: boolean, registerMode?: RegisterMode): ScanConfig {
+function generateScanConfig(type: string, startCh?: number, endCh?: number, startSubCh?: number, endSubCh?: number, useSubCh?: boolean, registerMode?: RegisterMode, registerOnDisabled?: boolean): ScanConfig {
     switch (type) {
         case common.ChannelTypes.GR:
             startCh = startCh === undefined ? 13 : startCh;
             endCh = endCh === undefined ? 62 : endCh;
             return {
                 channels: range(startCh, endCh).map((ch) => ch),
-                registerMode: (registerMode === undefined ? RegisterMode.Channel : registerMode)
+                registerMode: (registerMode === undefined ? RegisterMode.Channel : registerMode),
+                registerOnDisabled: (registerOnDisabled === undefined ? false : registerOnDisabled)
             };
         case common.ChannelTypes.BS:
             if (useSubCh) {
@@ -72,26 +74,29 @@ function generateScanConfig(type: string, startCh?: number, endCh?: number, star
                 }
                 return {
                     channels: channels,
-                    registerMode: (registerMode === undefined ? RegisterMode.Service : registerMode)
+                    registerMode: (registerMode === undefined ? RegisterMode.Service : registerMode),
+                    registerOnDisabled: (registerOnDisabled === undefined ? true : registerOnDisabled)
                 };
             }
             startCh = startCh === undefined ? 101 : startCh;
             endCh = endCh === undefined ? 256 : endCh;
             return {
                 channels: range(startCh, endCh).map((ch) => ch),
-                registerMode: (registerMode === undefined ? RegisterMode.Service : registerMode)
+                registerMode: (registerMode === undefined ? RegisterMode.Service : registerMode),
+                registerOnDisabled: (registerOnDisabled === undefined ? true : registerOnDisabled)
             };
         case common.ChannelTypes.CS:
             startCh = startCh === undefined ? 2 : startCh;
             endCh = endCh === undefined ? 24 : endCh;
             return {
                 channels: range(startCh, endCh).map((ch) => `CS${ch}`),
-                registerMode: (registerMode === undefined ? RegisterMode.Service : registerMode)
+                registerMode: (registerMode === undefined ? RegisterMode.Service : registerMode),
+                registerOnDisabled: (registerOnDisabled === undefined ? true : registerOnDisabled)
             };
     }
 }
 
-function generateChannelItemForService(type: common.ChannelType, channel: string, service: db.Service): config.Channel {
+function generateChannelItemForService(type: common.ChannelType, channel: string, service: db.Service, registerOnDisabled: boolean): config.Channel {
 
     let name = service.name;
     name = name.trim();
@@ -103,11 +108,12 @@ function generateChannelItemForService(type: common.ChannelType, channel: string
         name: name,
         type: type,
         channel: channel,
-        serviceId: service.serviceId
+        serviceId: service.serviceId,
+        isDisabled: registerOnDisabled
     };
 }
 
-function generateChannelItemForChannel(type: common.ChannelType, channel: string, services: db.Service[]): config.Channel {
+function generateChannelItemForChannel(type: common.ChannelType, channel: string, services: db.Service[], registerOnDisabled: boolean): config.Channel {
 
     let name = services[0].name;
     for (const service of services) {
@@ -126,21 +132,22 @@ function generateChannelItemForChannel(type: common.ChannelType, channel: string
     return {
         name: name,
         type: type,
-        channel: channel
+        channel: channel,
+        isDisabled: registerOnDisabled
     };
 }
 
-function generateChannelItems(type: common.ChannelType, channel: string, services: db.Service[], registerMode: RegisterMode): config.Channel[] {
+function generateChannelItems(type: common.ChannelType, channel: string, services: db.Service[], registerMode: RegisterMode, registerOnDisabled: boolean): config.Channel[] {
 
     if (registerMode === RegisterMode.Service) {
         const channelItems: config.Channel[] = [];
         for (const service of services) {
-            channelItems.push(generateChannelItemForService(type, channel, service));
+            channelItems.push(generateChannelItemForService(type, channel, service, registerOnDisabled));
         }
         return channelItems;
     }
 
-    return [generateChannelItemForChannel(type, channel, services)];
+    return [generateChannelItemForChannel(type, channel, services, registerOnDisabled)];
 }
 
 export const put: Operation = async (req, res) => {
@@ -158,6 +165,7 @@ export const put: Operation = async (req, res) => {
     const maxSubCh = req.query.maxSubCh as any as number;
     const useSubCh = req.query.useSubCh as any as boolean;
     const registerMode = req.query.registerMode as any as RegisterMode;
+    const registerOnDisabled = req.query.registerOnDisabled as any as boolean;
     const result: config.Channel[] = config.loadChannels().filter(channel => channel.type !== type);
     let count = 0;
 
@@ -165,7 +173,7 @@ export const put: Operation = async (req, res) => {
     res.status(200);
     res.write(`channel scanning... (type: "${type}")\n\n`);
 
-    const scanConfig = generateScanConfig(type, minCh, maxCh, minSubCh, maxSubCh, useSubCh, registerMode);
+    const scanConfig = generateScanConfig(type, minCh, maxCh, minSubCh, maxSubCh, useSubCh, registerMode, registerOnDisabled);
 
     for (const channel of scanConfig.channels) {
         res.write(`channel: "${channel}" ...\n`);
@@ -189,7 +197,7 @@ export const put: Operation = async (req, res) => {
             continue;
         }
 
-        const channelItems = generateChannelItems(type, channel, services, scanConfig.registerMode);
+        const channelItems = generateChannelItems(type, channel, services, scanConfig.registerMode, registerOnDisabled);
 
         for (const channelItem of channelItems) {
             result.push(channelItem);
@@ -281,6 +289,14 @@ Note: \n\
             enum: [RegisterMode.Channel, RegisterMode.Service],
             description: "When you register the scanned channel information, specify whether you want to register it by channel or by service. \n\
             Default: GR(Channel), BS/CS(Service)"
+        },
+        {
+            in: "query",
+            name: "registerOnDisabled",
+            type: "boolean",
+            allowEmptyValue: true,
+            description: "Specify `true` to disable the channel setting during registration.\n\
+            Default: GR(false), BS/CS(true)"
         }
     ],
     responses: {
