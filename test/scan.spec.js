@@ -165,10 +165,6 @@ describe("Mirakurun/api/config/channel/scan : generateScanConfig", () => {
         });
     });
 
-
-
-
-
     it("BS: Type only", () => {
         const config = scan.generateScanConfig({
             type: "BS"
@@ -345,10 +341,6 @@ describe("Mirakurun/api/config/channel/scan : generateScanConfig", () => {
             registerOnDisabled: false
         });
     });
-
-
-
-
 
     it("CS: Type only", () => {
         const config = scan.generateScanConfig({
@@ -1662,14 +1654,4 @@ describe("Mirakurun/api/config/channel/scan : generateChannelItems", () => {
         });
         assert.strictEqual("serviceId" in channelItems[0], false);
     });
-});
-
-describe("Mirakurun/api/config/channel/scan : generateChannelItems Channel(and Other) mode", () => {
-});
-
-describe("Mirakurun/api/config/channel/scan : generateChannelItems Service mode - Multiple service", () => {
-
-});
-
-describe("Mirakurun/api/config/channel/scan : generateChannelItems Channel(and Other) mode with Takeover", () => {
 });
