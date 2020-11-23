@@ -126,19 +126,29 @@ function generateChannelItemForService(type: common.ChannelType, channel: string
 
 function generateChannelItemForChannel(type: common.ChannelType, channel: string, services: db.Service[], registerOnDisabled: boolean): config.Channel {
 
-    let name = services[0].name;
-    for (const service of services) {
-        for (let i = 1; i < name.length && i < service.name.length; i++) {
-            if (name[i] !== service.name[i]) {
-                // If the first letter is different, the service does not perform summarization.
-                if (i === 1) {
+    const baseName = services[0].name;
+    let matchIndex = baseName.length;
+
+    for (let servicesIndex = 1; servicesIndex < services.length; servicesIndex++) {
+        const service = services[servicesIndex];
+        for (let nameIndex = 0; nameIndex < baseName.length && nameIndex < service.name.length; nameIndex++) {
+            if (baseName[nameIndex] !== service.name[nameIndex]) {
+                if (nameIndex === 0) {
                     break;
                 }
-                name = name.slice(0, i);
+                if (nameIndex < matchIndex) {
+                    matchIndex = nameIndex;
+                }
+                break;
+            }
+            if (nameIndex + 1 >= service.name.length && service.name.length < matchIndex) {
+                matchIndex = service.name.length;
                 break;
             }
         }
     }
+
+    let name = baseName.slice(0, matchIndex);
     name = name.trim();
     if (name.length === 0) {
         name = `${type}${channel}`;
