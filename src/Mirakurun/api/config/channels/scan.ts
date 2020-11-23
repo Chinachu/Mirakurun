@@ -48,6 +48,7 @@ interface ChannelScanOption {
     useSubCh?: boolean;
     registerMode?: RegisterMode;
     registerOnDisabled?: boolean;
+    refresh?: boolean;
 }
 
 interface ScanConfig {
@@ -162,7 +163,7 @@ function generateChannelItemForChannel(type: common.ChannelType, channel: string
     };
 }
 
-function generateChannelItems(type: common.ChannelType, channel: string, services: db.Service[], registerMode: RegisterMode, registerOnDisabled: boolean): config.Channel[] {
+function generateChannelItems(registerMode: RegisterMode, type: common.ChannelType, channel: string, services: db.Service[], registerOnDisabled: boolean): config.Channel[] {
 
     if (registerMode === RegisterMode.Service) {
         const channelItems: config.Channel[] = [];
@@ -184,15 +185,11 @@ export const put: Operation = async (req, res) => {
 
     isScanning = true;
     const type = req.query.type as common.ChannelType;
-    const minCh = req.query.minCh as any as number;
-    const maxCh = req.query.maxCh as any as number;
-    const minSubCh = req.query.minSubCh as any as number;
-    const maxSubCh = req.query.maxSubCh as any as number;
-    const useSubCh = req.query.useSubCh as any as boolean;
-    const registerMode = req.query.registerMode as any as RegisterMode;
-    const registerOnDisabled = req.query.registerOnDisabled as any as boolean;
-    const result: config.Channel[] = config.loadChannels().filter(channel => channel.type !== type);
-    let count = 0;
+    const refresh = req.query.refresh as any as boolean;
+    const oldChannelItems = config.loadChannels();
+    const result: config.Channel[] = oldChannelItems.filter(channel => channel.type !== type);
+    let newCount = 0;
+    let takeoverCount = 0;
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.status(200);
@@ -200,17 +197,32 @@ export const put: Operation = async (req, res) => {
 
     const scanConfig = generateScanConfig({
         type: type,
-        startCh: minCh,
-        endCh: maxCh,
-        startSubCh: minSubCh,
-        endSubCh: maxSubCh,
-        useSubCh: useSubCh,
-        registerMode: registerMode,
-        registerOnDisabled: registerOnDisabled
+        startCh: req.query.minCh as any as number,
+        endCh: req.query.maxCh as any as number,
+        startSubCh: req.query.minSubCh as any as number,
+        endSubCh: req.query.maxSubCh as any as number,
+        useSubCh: req.query.useSubCh as any as boolean,
+        registerMode: req.query.registerMode as any as RegisterMode,
+        registerOnDisabled: req.query.registerOnDisabled as any as boolean
     });
 
     for (const channel of scanConfig.channels) {
         res.write(`channel: "${channel}" ...\n`);
+
+        if (!refresh) {
+            const takeoverChannelItems = oldChannelItems.filter(chItem => chItem.type === type && chItem.channel === channel && chItem.isDisabled === false);
+            if (takeoverChannelItems.length > 0) {
+                res.write(`-> Skip scan.\n`);
+                res.write(`-> ${takeoverChannelItems.length} existing settings were found.\n`);
+                for (const channelItem of takeoverChannelItems) {
+                    result.push(channelItem);
+                    ++takeoverCount;
+                    res.write(`-> ${JSON.stringify(channelItem)}\n`);
+                }
+                res.write(`*Notice* The scan was skipped to carry over the existing settings.\n\n`);
+                continue;
+            }
+        }
 
         let services: db.Service[];
         try {
@@ -231,13 +243,13 @@ export const put: Operation = async (req, res) => {
             continue;
         }
 
-        const channelItems = generateChannelItems(type, channel, services, scanConfig.registerMode, scanConfig.registerOnDisabled);
-
-        for (const channelItem of channelItems) {
-            result.push(channelItem);
-            ++count;
-            res.write(`-> ${JSON.stringify(channelItem)}\n\n`);
+        const scannedChannelItems = generateChannelItems(scanConfig.registerMode, type, channel, services, scanConfig.registerOnDisabled);
+        for (const scannedChannelItem of scannedChannelItems) {
+            result.push(scannedChannelItem);
+            ++newCount;
+            res.write(`-> ${JSON.stringify(scannedChannelItem)}\n`);
         }
+        res.write(`\n`);
     }
 
     result.sort((a, b) => {
@@ -249,7 +261,7 @@ export const put: Operation = async (req, res) => {
     });
     config.saveChannels(result);
 
-    res.write(`-> total ${count} channels found and ${result.length} channels stored.\n\n`);
+    res.write(`-> total ${newCount + takeoverCount} channels (of Takeover is ${takeoverCount}) found and ${result.length} channels stored.\n\n`);
 
     isScanning = false;
 
@@ -261,8 +273,13 @@ export const put: Operation = async (req, res) => {
 
 put.apiDoc = {
     description: "Scan the receivable channels and rewrite the channel settings. \n\n\
-Note: \n\
-- Note that running a scan clears all original channel entries of the specified type. Other types of channel entries are unchanged. \n\
+Entry rewriting specifications: \n\
+- The scan is performed on a range of channels of the specified type and the entries for those channels, if any, are saved in the configuration file.\n\
+- If the channel to be scanned is described in the configuration file and is enabled, the scan will not be performed for that channel and the entries described will remain intact. If you do not want to keep the entries, use the `refresh` option.\n\
+- All entries outside the channel range of the specified type will be deleted.\n\
+- All entries of a type other than the specified type will remain.\n\
+\n\
+About BS Subchannel Style: \n\
 - Only when scanning BS, you can specify the channel number in the subchannel style (e.g. BS01_0). To specify the channel number, use minSubCh and maxSubCh in addition to minCh and maxCh. \n\
 - The subchannel number parameters (minSubCh, maxSubCh) are used only if the type is BS and are ignored otherwise. \n\
 - Subchannel style scans scan in the following range: \n\
@@ -329,8 +346,17 @@ Note: \n\
             name: "registerOnDisabled",
             type: "boolean",
             allowEmptyValue: true,
-            description: "Specify `true` to disable the channel setting during registration.\n\
+            description: "If `true`, disable the channel setting during registration.\n\
             Default: GR(false), BS/CS(true)"
+        },
+        {
+            in: "query",
+            name: "refresh",
+            type: "boolean",
+            allowEmptyValue: true,
+            default: false,
+            description: "If `true`, update the existing settings without inheriting them.\n\
+            However, non-scanned types of channels will always be inherited."
         }
     ],
     responses: {
