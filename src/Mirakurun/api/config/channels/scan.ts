@@ -61,7 +61,7 @@ function range(start: number, end: number): string[] {
     return Array.from({length: (end - start + 1)}, (v, index) => (index + start).toString(10));
 }
 
-function generateScanConfig(option: ChannelScanOption): ScanConfig {
+export function generateScanConfig(option: ChannelScanOption): ScanConfig {
     switch (option.type) {
         case common.ChannelTypes.GR:
             option.startCh = option.startCh === undefined ? 13 : option.startCh;
@@ -108,7 +108,7 @@ function generateScanConfig(option: ChannelScanOption): ScanConfig {
     }
 }
 
-function generateChannelItemForService(type: common.ChannelType, channel: string, service: db.Service, registerOnDisabled: boolean): config.Channel {
+export function generateChannelItemForService(type: common.ChannelType, channel: string, service: db.Service, registerOnDisabled: boolean): config.Channel {
 
     let name = service.name;
     name = name.trim();
@@ -125,7 +125,7 @@ function generateChannelItemForService(type: common.ChannelType, channel: string
     };
 }
 
-function generateChannelItemForChannel(type: common.ChannelType, channel: string, services: db.Service[], registerOnDisabled: boolean): config.Channel {
+export function generateChannelItemForChannel(type: common.ChannelType, channel: string, services: db.Service[], registerOnDisabled: boolean): config.Channel {
 
     const baseName = services[0].name;
     let matchIndex = baseName.length;
@@ -163,7 +163,7 @@ function generateChannelItemForChannel(type: common.ChannelType, channel: string
     };
 }
 
-function generateChannelItems(registerMode: RegisterMode, type: common.ChannelType, channel: string, services: db.Service[], registerOnDisabled: boolean): config.Channel[] {
+export function generateChannelItems(registerMode: RegisterMode, type: common.ChannelType, channel: string, services: db.Service[], registerOnDisabled: boolean): config.Channel[] {
 
     if (registerMode === RegisterMode.Service) {
         const channelItems: config.Channel[] = [];
