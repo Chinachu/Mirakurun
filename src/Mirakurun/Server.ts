@@ -98,7 +98,7 @@ class Server {
 
             if (req.get("Origin") !== undefined) {
                 const origin = url.parse(req.get("Origin"));
-                if (origin.hostname !== "localhost" && ip.isPrivate(origin.hostname) === false) {
+                if (origin.hostname !== "localhost" && origin.hostname !== serverConfig.hostname && ip.isPrivate(origin.hostname) === false) {
                     res.status(403).end();
                     return;
                 }
@@ -106,7 +106,7 @@ class Server {
 
             if (req.get("Referer") !== undefined) {
                 const referer = url.parse(req.get("Referer"));
-                if (referer.hostname !== "localhost" && ip.isPrivate(referer.hostname) === false) {
+                if (referer.hostname !== "localhost" && referer.hostname !== serverConfig.hostname && ip.isPrivate(referer.hostname) === false) {
                     res.status(403).end();
                     return;
                 }

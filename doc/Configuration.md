@@ -17,6 +17,7 @@ logLevel: 2 # integer -1: FATAL to 3: DEBUG
 maxLogHistory: 1000 # integer (lines)
 path: /var/run/mirakurun.sock # string or ~ (null) *Ignored in Docker
 port: 40772 # integer or ~ (null) *Ignored in Docker
+hostname: localhost
 disableIPv6: false # boolean *Ignored in Docker
 highWaterMark: 25165824 # integer (bytes)
 overflowTimeLimit: 30000 # integer (ms)
@@ -31,6 +32,7 @@ disableEITParsing: false # boolean
 ### Environment Values (Docker)
 
 ```sh
+HOSTNAME
 LOG_LEVEL
 MAX_LOG_HISTORY
 HIGH_WATER_MARK

@@ -25,6 +25,7 @@ import {
     TooltipHost,
     Icon,
     Label,
+    TextField,
     PrimaryButton,
     DefaultButton,
     Toggle,
@@ -99,6 +100,14 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                         selectedKey={editing?.logLevel === undefined ? 2 : editing?.logLevel}
                         onChange={(ev, option: any) => {
                             setEditing({ ...editing, logLevel: option.key });
+                        }}
+                    />
+                    <TextField
+                        styles={{ fieldGroup: { "max-width": 200 } }}
+                        label="Hostname"
+                        value={editing.hostname}
+                        onChange={(ev, newValue) => {
+                            setEditing({ ...editing, hostname: newValue });
                         }}
                     />
                     <Toggle

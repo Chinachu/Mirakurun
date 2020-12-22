@@ -188,6 +188,7 @@ export type EventType = "create" | "update" | "redefine";
 export interface ConfigServer {
     path?: string;
     port?: number;
+    hostname?: string;
     disableIPv6?: boolean;
     logLevel?: LogLevel;
     maxLogHistory?: number;
