@@ -77,8 +77,14 @@ export interface ServicesQuery {
 
 export interface ChannelScanOption {
     type?: apid.ChannelType;
-    min?: number;
-    max?: number;
+    minCh?: number;
+    maxCh?: number;
+    minSubCh?: number;
+    maxSubCh?: number;
+    useSubCh?: boolean;
+    registerMode?: apid.ChannelRegisterMode;
+    registerOnDisabled?: boolean;
+    refresh?: boolean;
 }
 
 export default class Client {
