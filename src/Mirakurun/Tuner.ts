@@ -200,7 +200,7 @@ export default class Tuner {
 
             setTimeout(() => stream.emit("close"), 20000);
 
-            Promise.all([
+            Promise.all<void>([
                 new Promise((resolve, reject) => {
                     stream.once("network", _network => {
                         network = _network;
