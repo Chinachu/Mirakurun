@@ -97,7 +97,8 @@ export default class TunerDevice extends events.EventEmitter {
                 agent: user.agent,
                 url: user.url,
                 disableDecoder: user.disableDecoder,
-                streamSetting: user.streamSetting
+                streamSetting: user.streamSetting,
+                streamInfo: user.streamInfo
             };
         });
     }

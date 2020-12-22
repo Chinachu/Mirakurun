@@ -353,6 +353,18 @@ definitions:
             type: boolean
           parseEIT:
             type: boolean
+      streamInfo:
+        type: object
+        additionalProperties:
+          type: object
+          required:
+            - packet
+            - drop
+          properties:
+            packet:
+              type: integer
+            drop:
+              type: integer
 
   TunerProcess:
     type: object

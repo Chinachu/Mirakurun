@@ -149,6 +149,7 @@ export interface TunerUser {
     url?: string;
     disableDecoder?: boolean;
     streamSetting?: StreamSetting;
+    streamInfo?: StreamInfo;
 }
 
 interface StreamSetting {
@@ -160,6 +161,13 @@ interface StreamSetting {
     parseNIT?: boolean;
     parseSDT?: boolean;
     parseEIT?: boolean;
+}
+
+export interface StreamInfo {
+    [PID: string]: {
+        packet: number;
+        drop: number;
+    }
 }
 
 export interface TunerProcess {

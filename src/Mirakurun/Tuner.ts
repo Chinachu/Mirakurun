@@ -398,6 +398,10 @@ export default class Tuner {
                         parseEIT: setting.parseEIT
                     });
 
+                    Object.defineProperty(user, "streamInfo", {
+                        get: () => tsFilter.streamInfo
+                    });
+
                     device.startStream(user, tsFilter, setting.channel)
                         .then(() => {
                             if (user.disableDecoder === true || device.decoder === null) {

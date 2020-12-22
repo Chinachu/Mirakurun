@@ -22,6 +22,7 @@ export interface User {
     readonly url?: string;
     readonly disableDecoder?: boolean;
     readonly streamSetting?: StreamSetting;
+    readonly streamInfo?: StreamInfo;
 }
 
 export type UserRequest = Omit<User, "streamSetting">;
@@ -35,6 +36,13 @@ interface StreamSetting {
     parseNIT?: boolean;
     parseSDT?: boolean;
     parseEIT?: boolean;
+}
+
+export interface StreamInfo {
+    [PID: string]: {
+        packet: number;
+        drop: number;
+    };
 }
 
 export enum ChannelTypes {
