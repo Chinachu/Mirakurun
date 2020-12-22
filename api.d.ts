@@ -42,7 +42,7 @@ export interface Channel {
     type: ChannelType;
     channel: string;
     name?: string;
-    satelite?: string;
+    satellite?: string;
     space?: number;
     services?: Service[];
 }
@@ -239,7 +239,7 @@ export interface ConfigChannelsItem {
     type: ChannelType;
     /** passed to tuning command */
     channel: string;
-    satelite?: string;
+    satellite?: string;
     serviceId?: number;
     space?: number;
     isDisabled?: boolean;

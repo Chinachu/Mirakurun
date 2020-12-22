@@ -213,12 +213,12 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                         <TextField
                             style={{ width: 80 }}
                             label="Satelite:"
-                            value={ch.satelite || ""}
+                            value={ch.satellite || ""}
                             onChange={(ev, newValue) => {
                                 if (newValue === "") {
-                                    delete ch.satelite;
+                                    delete ch.satellite;
                                 } else {
-                                    ch.satelite = newValue;
+                                    ch.satellite = newValue;
                                 }
                                 setEditing([...editing]);
                             }}

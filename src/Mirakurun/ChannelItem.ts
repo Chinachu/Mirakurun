@@ -27,7 +27,7 @@ export default class ChannelItem {
     private _name: string;
     private _type: common.ChannelType;
     private _channel: string;
-    private _satelite: string;
+    private _satellite: string;
     private _space: number;
 
     constructor(config: config.Channel) {
@@ -35,7 +35,7 @@ export default class ChannelItem {
         this._name = config.name;
         this._type = config.type;
         this._channel = config.channel;
-        this._satelite = config.satelite;
+        this._satellite = config.satellite;
         this._space = config.space;
 
         if (config.serviceId) {
@@ -63,8 +63,8 @@ export default class ChannelItem {
         return this._channel;
     }
 
-    get satelite(): string {
-        return this._satelite;
+    get satellite(): string {
+        return this._satellite;
     }
 
     get space(): number {
@@ -76,7 +76,7 @@ export default class ChannelItem {
             type: this._type,
             channel: this._channel,
             name: this._name,
-            satelite: this._satelite,
+            satellite: this._satellite,
             space: this._space
         };
     }

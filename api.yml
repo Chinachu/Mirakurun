@@ -76,7 +76,7 @@ definitions:
         type: string
       name:
         type: string
-      satelite:
+      satellite:
         type: string
       space:
         type: number
@@ -497,7 +497,7 @@ definitions:
         type: string
       serviceId:
         $ref: '#/definitions/ServiceId'
-      satelite:
+      satellite:
         type: string
       space:
         type: number

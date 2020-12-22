@@ -273,8 +273,9 @@ export default class TunerDevice extends events.EventEmitter {
 
         cmd = cmd.replace("<channel>", ch.channel);
 
-        if (ch.satelite) {
-            cmd = cmd.replace("<satelite>", ch.satelite);
+        if (ch.satellite) {
+            cmd = cmd.replace("<satelite>", ch.satellite); // deprecated
+            cmd = cmd.replace("<satellite>", ch.satellite);
         }
 
         if (ch.space) {

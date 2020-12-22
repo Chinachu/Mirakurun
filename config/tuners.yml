@@ -31,7 +31,7 @@
 - name: TBS6922
   types:
     - SKY
-  command: szap-s2j -c /usr/local/etc/szap-s2j.conf -l <satelite> -S 1 -p -r -M 5 -C 35 <channel>
+  command: szap-s2j -c /usr/local/etc/szap-s2j.conf -l <satellite> -S 1 -p -r -M 5 -C 35 <channel>
   dvbDevicePath: /dev/dvb/adapter0/dvr0
   decoder: arib-b1-stream-test
   isDisabled: true

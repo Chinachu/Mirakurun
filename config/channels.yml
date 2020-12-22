@@ -141,19 +141,19 @@
   type: SKY
   channel: CH585
   serviceId: 33353
-  satelite: JCSAT3A
+  satellite: JCSAT3A
   isDisabled: true
 
 - name: AT-X HD
   type: SKY
   channel: ATXHD
   serviceId: 33435
-  satelite: JCSAT3A
+  satellite: JCSAT3A
   isDisabled: true
 
 - name: AXN HD
   type: SKY
   channel: AXNHD
   serviceId: 33418
-  satelite: JCSAT4A
+  satellite: JCSAT4A
   isDisabled: true
