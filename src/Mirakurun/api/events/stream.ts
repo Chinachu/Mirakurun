@@ -23,7 +23,7 @@ export const get: Operation = (req, res) => {
     res.status(200);
     res.write("[\n");
 
-    req.setTimeout(1000 * 60 * 60, () => { return; });
+    req.setTimeout(1000 * 60 * 60); // 60 minutes
     req.once("close", () => Event.removeListener(_listener));
 
     Event.onEvent(_listener);

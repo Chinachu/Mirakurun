@@ -52,7 +52,6 @@ export const get: Operation = (req, res) => {
 
     let requestAborted = false;
     req.once("close", () => requestAborted = true);
-    req.setTimeout(1000 * 60 * 10, () => { return; }); // 10 minites
 
     const userId = (req.ip || "unix") + ":" + (req.connection.remotePort || Date.now());
 
@@ -75,6 +74,8 @@ export const get: Operation = (req, res) => {
             res.setHeader("X-Mirakurun-Tuner-User-ID", userId);
             res.status(200);
             stream.pipe(res);
+
+            req.setTimeout(1000 * 60 * 10); // 10 minites
         })
         .catch((err) => api.responseStreamErrorHandler(res, err));
 };

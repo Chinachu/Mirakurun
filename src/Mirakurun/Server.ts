@@ -167,7 +167,7 @@ class Server {
 
             const server = http.createServer(app);
 
-            server.timeout = 1000 * 60 * 3; // 3 minutes
+            server.timeout = 1000 * 15; // 15 sec.
 
             if (regexp.unixDomainSocket.test(address) === true || regexp.windowsNamedPipe.test(address) === true) {
                 if (process.platform !== "win32" && fs.existsSync(address) === true) {
