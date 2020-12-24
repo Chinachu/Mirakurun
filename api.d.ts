@@ -49,6 +49,8 @@ export interface Channel {
 
 export type ChannelType = "GR" | "BS" | "CS" | "SKY";
 
+export type ChannelRegisterMode = "Channel" | "Service";
+
 export interface Service {
     id: ServiceItemId;
     serviceId: ServiceId;
