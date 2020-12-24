@@ -62,49 +62,73 @@ function range(start: number, end: number): string[] {
 }
 
 export function generateScanConfig(option: ChannelScanOption): ScanConfig {
-    switch (option.type) {
-        case common.ChannelTypes.GR:
-            option.startCh = option.startCh === undefined ? 13 : option.startCh;
-            option.endCh = option.endCh === undefined ? 62 : option.endCh;
-            return {
-                channels: range(option.startCh, option.endCh).map((ch) => ch),
-                registerMode: (option.registerMode === undefined ? RegisterMode.Channel : option.registerMode),
-                registerOnDisabled: (option.registerOnDisabled === undefined ? false : option.registerOnDisabled)
-            };
-        case common.ChannelTypes.BS:
-            if (option.useSubCh) {
-                option.startCh = option.startCh === undefined ? 1 : option.startCh;
-                option.endCh = option.endCh === undefined ? 23 : option.endCh;
-                option.startSubCh = option.startSubCh === undefined ? 0 : option.startSubCh;
-                option.endSubCh = option.endSubCh === undefined ? 2 : option.endSubCh;
 
-                const channels: string[] = [];
-                for (const ch of range(option.startCh, option.endCh)) {
-                    for (const subCh of range(option.startSubCh, option.endSubCh)) {
-                        channels.push(`BS${ch.toString().padStart(2, "0")}_${subCh}`);
-                    }
+    if (option.type === common.ChannelTypes.GR) {
+        option = Object.assign({
+            startCh: 13,
+            endCh: 62,
+            registerMode: RegisterMode.Channel,
+            registerOnDisabled: false
+        }, option);
+
+        return {
+            channels: range(option.startCh, option.endCh).map((ch) => ch),
+            registerMode: option.registerMode,
+            registerOnDisabled: option.registerOnDisabled
+        };
+    }
+
+    option = Object.assign({
+        registerMode: RegisterMode.Service,
+        registerOnDisabled: true
+    }, option);
+
+    if (option.type === common.ChannelTypes.BS) {
+        if (option.useSubCh) {
+            option = Object.assign({
+                startCh: 1,
+                endCh: 23,
+                startSubCh: 0,
+                endSubCh: 2
+            }, option);
+
+            const channels: string[] = [];
+            for (const ch of range(option.startCh, option.endCh)) {
+                for (const subCh of range(option.startSubCh, option.endSubCh)) {
+                    channels.push(`BS${ch.toString().padStart(2, "0")}_${subCh}`);
                 }
-                return {
-                    channels: channels,
-                    registerMode: (option.registerMode === undefined ? RegisterMode.Service : option.registerMode),
-                    registerOnDisabled: (option.registerOnDisabled === undefined ? true : option.registerOnDisabled)
-                };
             }
-            option.startCh = option.startCh === undefined ? 101 : option.startCh;
-            option.endCh = option.endCh === undefined ? 256 : option.endCh;
+
             return {
-                channels: range(option.startCh, option.endCh).map((ch) => ch),
-                registerMode: (option.registerMode === undefined ? RegisterMode.Service : option.registerMode),
-                registerOnDisabled: (option.registerOnDisabled === undefined ? true : option.registerOnDisabled)
+                channels: channels,
+                registerMode: option.registerMode,
+                registerOnDisabled: option.registerOnDisabled
             };
-        case common.ChannelTypes.CS:
-            option.startCh = option.startCh === undefined ? 2 : option.startCh;
-            option.endCh = option.endCh === undefined ? 24 : option.endCh;
-            return {
-                channels: range(option.startCh, option.endCh).map((ch) => `CS${ch}`),
-                registerMode: (option.registerMode === undefined ? RegisterMode.Service : option.registerMode),
-                registerOnDisabled: (option.registerOnDisabled === undefined ? true : option.registerOnDisabled)
-            };
+        }
+
+        option = Object.assign({
+            startCh: 101,
+            endCh: 256
+        }, option);
+
+        return {
+            channels: range(option.startCh, option.endCh).map((ch) => ch),
+            registerMode: option.registerMode,
+            registerOnDisabled: option.registerOnDisabled
+        };
+    }
+
+    if (option.type === common.ChannelTypes.CS) {
+        option = Object.assign({
+            startCh: 2,
+            endCh: 24
+        }, option);
+
+        return {
+            channels: range(option.startCh, option.endCh).map((ch) => `CS${ch}`),
+            registerMode: option.registerMode,
+            registerOnDisabled: option.registerOnDisabled
+        };
     }
 }
 
@@ -272,20 +296,20 @@ export const put: Operation = async (req, res) => {
 };
 
 put.apiDoc = {
-    description: "Scan the receivable channels and rewrite the channel settings. \n\n\
-Entry rewriting specifications: \n\
-- The scan is performed on a range of channels of the specified type and the entries for those channels, if any, are saved in the configuration file.\n\
-- If the channel to be scanned is described in the configuration file and is enabled, the scan will not be performed for that channel and the entries described will remain intact. If you do not want to keep the entries, use the `refresh` option.\n\
-- All entries outside the channel range of the specified type will be deleted.\n\
-- All entries of a type other than the specified type will remain.\n\
-\n\
-About BS Subchannel Style: \n\
-- Only when scanning BS, you can specify the channel number in the subchannel style (e.g. BS01_0). To specify the channel number, use minSubCh and maxSubCh in addition to minCh and maxCh. \n\
-- The subchannel number parameters (minSubCh, maxSubCh) are used only if the type is BS and are ignored otherwise. \n\
-- Subchannel style scans scan in the following range: \n\
-    From `BS${minCh}_${minSubCh}` to `BS${maxCh}_${maxSubCh}` \n\
-- In the subchannel style, minCh and maxCh are zero padded to two digits. minSubCh and maxSubCh are not padded. \n\
-- BS \"non\" subchannel style scans and GR scans are basically the same. Note that if you scan the wrong channel range, the GR channel will be registered as BS and the BS channel will be registered as GR. This problem does not occur because CS scan uses a character string with `CS` added as a channel number prefix.",
+    summary: "Scan the receivable channels and rewrite the channel settings.",
+    description: `Entry rewriting specifications:
+- The scan is performed on a range of channels of the specified type and the entries for those channels, if any, are saved in the configuration file.
+- If the channel to be scanned is described in the configuration file and is enabled, the scan will not be performed for that channel and the entries described will remain intact. If you do not want to keep the entries, use the \`refresh\` option.
+- All entries outside the channel range of the specified type will be deleted.
+- All entries of a type other than the specified type will remain.
+
+About BS Subchannel Style:
+- Only when scanning BS, you can specify the channel number in the subchannel style (e.g. BS01_0). To specify the channel number, use minSubCh and maxSubCh in addition to minCh and maxCh.
+- The subchannel number parameters (minSubCh, maxSubCh) are used only if the type is BS and are ignored otherwise.
+- Subchannel style scans scan in the following range:
+    From \`BS\${minCh}_\${minSubCh}\` to \`BS\${maxCh}_\${maxSubCh}\`
+- In the subchannel style, minCh and maxCh are zero padded to two digits. minSubCh and maxSubCh are not padded.
+- BS "non" subchannel style scans and GR scans are basically the same. Note that if you scan the wrong channel range, the GR channel will be registered as BS and the BS channel will be registered as GR. This problem does not occur because CS scan uses a character string with \`CS\` added as a channel number prefix.`,
     tags: ["config"],
     operationId: "channelScan",
     produces: [
@@ -338,16 +362,18 @@ About BS Subchannel Style: \n\
             name: "registerMode",
             type: "string",
             enum: [RegisterMode.Channel, RegisterMode.Service],
-            description: "When you register the scanned channel information, specify whether you want to register it by channel or by service. \n\
-            Default: GR(Channel), BS/CS(Service)"
+            description: "When you register the scanned channel information, specify whether you want to register it by channel or by service.\n\n" +
+                "_Default value (GR)_: Channel\n" +
+                "_Default value (BS/CS)_: Service"
         },
         {
             in: "query",
             name: "registerOnDisabled",
             type: "boolean",
             allowEmptyValue: true,
-            description: "If `true`, disable the channel setting during registration.\n\
-            Default: GR(false), BS/CS(true)"
+            description: "If `true`, disable the channel setting during registration.\n\n" +
+                "_Default value (GR)_: false\n" +
+                "_Default value (BS/CS)_: true"
         },
         {
             in: "query",
@@ -355,8 +381,8 @@ About BS Subchannel Style: \n\
             type: "boolean",
             allowEmptyValue: true,
             default: false,
-            description: "If `true`, update the existing settings without inheriting them.\n\
-            However, non-scanned types of channels will always be inherited."
+            description: "If `true`, update the existing settings without inheriting them.\n" +
+                "However, non-scanned types of channels will always be inherited."
         }
     ],
     responses: {
