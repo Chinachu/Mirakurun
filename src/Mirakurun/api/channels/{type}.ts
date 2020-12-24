@@ -33,7 +33,7 @@ export const get: Operation = (req, res) => {
 
     const channels = Channel.findByType(req.params.type as ChannelType).map(channel => {
 
-        const ch: any = channel.export();
+        const ch: any = channel.toJSON();
 
         ch.services = channel.getServices().map(service => ({
             id: service.id,

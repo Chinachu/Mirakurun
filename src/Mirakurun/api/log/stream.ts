@@ -21,7 +21,7 @@ export const get: Operation = (req, res) => {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.status(200);
 
-    req.setTimeout(1000 * 60 * 60, () => { return; });
+    req.setTimeout(1000 * 60 * 60); // 60 minutes
     req.once("close", () => {
         event.removeListener("data", _listener);
     });

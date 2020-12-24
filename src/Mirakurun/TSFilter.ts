@@ -14,6 +14,7 @@
    limitations under the License.
 */
 import * as stream from "stream";
+import { StreamInfo } from "./common";
 import * as log from "./log";
 import epg from "./epg";
 import status from "./status";
@@ -188,6 +189,25 @@ export default class TSFilter extends stream.Duplex {
         }
 
         ++status.streamCount.tsFilter;
+    }
+
+    get streamInfo(): StreamInfo {
+
+        if (!(<any> this._parser).info) {
+            return {};
+        }
+
+        const _info: StreamInfo = (<any> this._parser).info;
+        const info: StreamInfo = {};
+
+        for (const key in _info) {
+            info[key] = {
+                packet: _info[key].packet,
+                drop: _info[key].drop
+            };
+        }
+
+        return info;
     }
 
     _read(size: number) {

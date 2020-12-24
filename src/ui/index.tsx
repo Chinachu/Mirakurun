@@ -22,6 +22,7 @@ import {
     loadTheme,
     Fabric,
     Stack,
+    ActionButton,
     Pivot,
     PivotItem,
     Separator,
@@ -292,6 +293,12 @@ const Content = () => {
                     <Text variant="mediumPlus" nowrap block className={ColorClassNames.themePrimary}>{state.status?.version}</Text>
                     <Text variant="medium" nowrap block className={ColorClassNames.neutralTertiaryAlt}>({state.statusName})</Text>
                     <Stack.Item grow disableShrink>&nbsp;</Stack.Item>
+                    <ActionButton
+                        iconProps={{ iconName: "KnowledgeArticle" }}
+                        text="API Docs"
+                        target="_blank"
+                        href="/api/debug"
+                    />
                     <Restart uiStateEvents={uiStateEvents} />
                 </Stack>
 

@@ -34,6 +34,172 @@ const channelOrder = {
     SKY: 4
 };
 
+enum RegisterMode {
+    Channel = "Channel",
+    Service = "Service"
+}
+
+interface ChannelScanOption {
+    type: string;
+    startCh?: number;
+    endCh?: number;
+    startSubCh?: number;
+    endSubCh?: number;
+    useSubCh?: boolean;
+    registerMode?: RegisterMode;
+    registerOnDisabled?: boolean;
+    refresh?: boolean;
+}
+
+interface ScanConfig {
+    readonly channels: string[];
+    readonly registerMode: RegisterMode;
+    readonly registerOnDisabled: boolean;
+}
+
+function range(start: number, end: number): string[] {
+    return Array.from({length: (end - start + 1)}, (v, index) => (index + start).toString(10));
+}
+
+export function generateScanConfig(option: ChannelScanOption): ScanConfig {
+
+    if (option.type === common.ChannelTypes.GR) {
+        option = Object.assign({
+            startCh: 13,
+            endCh: 62,
+            registerMode: RegisterMode.Channel,
+            registerOnDisabled: false
+        }, option);
+
+        return {
+            channels: range(option.startCh, option.endCh).map((ch) => ch),
+            registerMode: option.registerMode,
+            registerOnDisabled: option.registerOnDisabled
+        };
+    }
+
+    option = Object.assign({
+        registerMode: RegisterMode.Service,
+        registerOnDisabled: true
+    }, option);
+
+    if (option.type === common.ChannelTypes.BS) {
+        if (option.useSubCh) {
+            option = Object.assign({
+                startCh: 1,
+                endCh: 23,
+                startSubCh: 0,
+                endSubCh: 2
+            }, option);
+
+            const channels: string[] = [];
+            for (const ch of range(option.startCh, option.endCh)) {
+                for (const subCh of range(option.startSubCh, option.endSubCh)) {
+                    channels.push(`BS${ch.toString().padStart(2, "0")}_${subCh}`);
+                }
+            }
+
+            return {
+                channels: channels,
+                registerMode: option.registerMode,
+                registerOnDisabled: option.registerOnDisabled
+            };
+        }
+
+        option = Object.assign({
+            startCh: 101,
+            endCh: 256
+        }, option);
+
+        return {
+            channels: range(option.startCh, option.endCh).map((ch) => ch),
+            registerMode: option.registerMode,
+            registerOnDisabled: option.registerOnDisabled
+        };
+    }
+
+    if (option.type === common.ChannelTypes.CS) {
+        option = Object.assign({
+            startCh: 2,
+            endCh: 24
+        }, option);
+
+        return {
+            channels: range(option.startCh, option.endCh).map((ch) => `CS${ch}`),
+            registerMode: option.registerMode,
+            registerOnDisabled: option.registerOnDisabled
+        };
+    }
+}
+
+export function generateChannelItemForService(type: common.ChannelType, channel: string, service: db.Service, registerOnDisabled: boolean): config.Channel {
+
+    let name = service.name;
+    name = name.trim();
+    if (name.length === 0) {
+        name = `${type}${channel}:${service.serviceId}`;
+    }
+
+    return {
+        name: name,
+        type: type,
+        channel: channel,
+        serviceId: service.serviceId,
+        isDisabled: registerOnDisabled
+    };
+}
+
+export function generateChannelItemForChannel(type: common.ChannelType, channel: string, services: db.Service[], registerOnDisabled: boolean): config.Channel {
+
+    const baseName = services[0].name;
+    let matchIndex = baseName.length;
+
+    for (let servicesIndex = 1; servicesIndex < services.length; servicesIndex++) {
+        const service = services[servicesIndex];
+        for (let nameIndex = 0; nameIndex < baseName.length && nameIndex < service.name.length; nameIndex++) {
+            if (baseName[nameIndex] !== service.name[nameIndex]) {
+                if (nameIndex === 0) {
+                    break;
+                }
+                if (nameIndex < matchIndex) {
+                    matchIndex = nameIndex;
+                }
+                break;
+            }
+            if (nameIndex + 1 >= service.name.length && service.name.length < matchIndex) {
+                matchIndex = service.name.length;
+                break;
+            }
+        }
+    }
+
+    let name = baseName.slice(0, matchIndex);
+    name = name.trim();
+    if (name.length === 0) {
+        name = `${type}${channel}`;
+    }
+
+    return {
+        name: name,
+        type: type,
+        channel: channel,
+        isDisabled: registerOnDisabled
+    };
+}
+
+export function generateChannelItems(registerMode: RegisterMode, type: common.ChannelType, channel: string, services: db.Service[], registerOnDisabled: boolean): config.Channel[] {
+
+    if (registerMode === RegisterMode.Service) {
+        const channelItems: config.Channel[] = [];
+        for (const service of services) {
+            channelItems.push(generateChannelItemForService(type, channel, service, registerOnDisabled));
+        }
+        return channelItems;
+    }
+
+    return [generateChannelItemForChannel(type, channel, services, registerOnDisabled)];
+}
+
 export const put: Operation = async (req, res) => {
 
     if (isScanning === true) {
@@ -43,18 +209,44 @@ export const put: Operation = async (req, res) => {
 
     isScanning = true;
     const type = req.query.type as common.ChannelType;
-    const min = req.query.min as any as number;
-    const max = req.query.max as any as number;
-    const result: config.Channel[] = config.loadChannels().filter(channel => channel.type !== type);
-    let count = 0;
+    const refresh = req.query.refresh as any as boolean;
+    const oldChannelItems = config.loadChannels();
+    const result: config.Channel[] = oldChannelItems.filter(channel => channel.type !== type);
+    let newCount = 0;
+    let takeoverCount = 0;
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.status(200);
     res.write(`channel scanning... (type: "${type}")\n\n`);
 
-    for (let i = min; i <= max; i++) {
-        const channel = i.toString(10);
+    const scanConfig = generateScanConfig({
+        type: type,
+        startCh: req.query.minCh as any as number,
+        endCh: req.query.maxCh as any as number,
+        startSubCh: req.query.minSubCh as any as number,
+        endSubCh: req.query.maxSubCh as any as number,
+        useSubCh: req.query.useSubCh as any as boolean,
+        registerMode: req.query.registerMode as any as RegisterMode,
+        registerOnDisabled: req.query.registerOnDisabled as any as boolean
+    });
+
+    for (const channel of scanConfig.channels) {
         res.write(`channel: "${channel}" ...\n`);
+
+        if (!refresh) {
+            const takeoverChannelItems = oldChannelItems.filter(chItem => chItem.type === type && chItem.channel === channel && chItem.isDisabled === false);
+            if (takeoverChannelItems.length > 0) {
+                res.write(`-> Skip scan.\n`);
+                res.write(`-> ${takeoverChannelItems.length} existing settings were found.\n`);
+                for (const channelItem of takeoverChannelItems) {
+                    result.push(channelItem);
+                    ++takeoverCount;
+                    res.write(`-> ${JSON.stringify(channelItem)}\n`);
+                }
+                res.write(`*Notice* The scan was skipped to carry over the existing settings.\n\n`);
+                continue;
+            }
+        }
 
         let services: db.Service[];
         try {
@@ -75,32 +267,13 @@ export const put: Operation = async (req, res) => {
             continue;
         }
 
-        let name = services[0].name;
-
-        for (const service of services) {
-            for (let i = 1; i < name.length && i < service.name.length; i++) {
-                if (name[i] !== service.name[i]) {
-                    name = name.slice(0, i);
-                    break;
-                }
-            }
+        const scannedChannelItems = generateChannelItems(scanConfig.registerMode, type, channel, services, scanConfig.registerOnDisabled);
+        for (const scannedChannelItem of scannedChannelItems) {
+            result.push(scannedChannelItem);
+            ++newCount;
+            res.write(`-> ${JSON.stringify(scannedChannelItem)}\n`);
         }
-
-        name = name.trim();
-
-        if (name.length === 0) {
-            name = services[0].name || `${type}${channel}`;
-        }
-
-        const channelItem: config.Channel = {
-            name: name,
-            type: type,
-            channel: channel
-        };
-        result.push(channelItem);
-        ++count;
-
-        res.write(`-> ${JSON.stringify(channelItem)}\n\n`);
+        res.write(`\n`);
     }
 
     result.sort((a, b) => {
@@ -112,7 +285,7 @@ export const put: Operation = async (req, res) => {
     });
     config.saveChannels(result);
 
-    res.write(`-> total ${count} channels found and ${result.length} channels stored.\n\n`);
+    res.write(`-> total ${newCount + takeoverCount} channels (of Takeover is ${takeoverCount}) found and ${result.length} channels stored.\n\n`);
 
     isScanning = false;
 
@@ -123,6 +296,20 @@ export const put: Operation = async (req, res) => {
 };
 
 put.apiDoc = {
+    summary: "Scan the receivable channels and rewrite the channel settings.",
+    description: `Entry rewriting specifications:
+- The scan is performed on a range of channels of the specified type and the entries for those channels, if any, are saved in the configuration file.
+- If the channel to be scanned is described in the configuration file and is enabled, the scan will not be performed for that channel and the entries described will remain intact. If you do not want to keep the entries, use the \`refresh\` option.
+- All entries outside the channel range of the specified type will be deleted.
+- All entries of a type other than the specified type will remain.
+
+About BS Subchannel Style:
+- Only when scanning BS, you can specify the channel number in the subchannel style (e.g. BS01_0). To specify the channel number, use minSubCh and maxSubCh in addition to minCh and maxCh.
+- The subchannel number parameters (minSubCh, maxSubCh) are used only if the type is BS and are ignored otherwise.
+- Subchannel style scans scan in the following range:
+    From \`BS\${minCh}_\${minSubCh}\` to \`BS\${maxCh}_\${maxSubCh}\`
+- In the subchannel style, minCh and maxCh are zero padded to two digits. minSubCh and maxSubCh are not padded.
+- BS "non" subchannel style scans and GR scans are basically the same. Note that if you scan the wrong channel range, the GR channel will be registered as BS and the BS channel will be registered as GR. This problem does not occur because CS scan uses a character string with \`CS\` added as a channel number prefix.`,
     tags: ["config"],
     operationId: "channelScan",
     produces: [
@@ -134,20 +321,68 @@ put.apiDoc = {
             in: "query",
             name: "type",
             type: "string",
-            enum: ["GR"],
-            default: "GR"
+            enum: [common.ChannelTypes.GR, common.ChannelTypes.BS, common.ChannelTypes.CS],
+            default: common.ChannelTypes.GR,
+            description: "Specifies the channel type to scan."
         },
         {
             in: "query",
-            name: "min",
+            name: "minCh",
             type: "integer",
-            default: 13
+            description: "Specifies the minimum number of channel numbers to scan."
         },
         {
             in: "query",
-            name: "max",
+            name: "maxCh",
             type: "integer",
-            default: 52
+            description: "Specifies the maximum number of channel numbers to scan."
+        },
+        {
+            in: "query",
+            name: "minSubCh",
+            type: "integer",
+            description: "Specifies the minimum number of subchannel numbers to scan. This parameter is only used if the type is `BS` and the bs_subch_style is `true`."
+        },
+        {
+            in: "query",
+            name: "maxSubCh",
+            type: "integer",
+            description: "Specifies the maximum number of subchannel numbers to scan. This parameter is only used if the type is `BS` and the bs_subch_style is `true`."
+        },
+        {
+            in: "query",
+            name: "useSubCh",
+            type: "boolean",
+            allowEmptyValue: true,
+            default: true,
+            description: "Specify true to specify the channel in the subchannel style. Only used for BS scans. (e.g. BS01_0)"
+        },
+        {
+            in: "query",
+            name: "registerMode",
+            type: "string",
+            enum: [RegisterMode.Channel, RegisterMode.Service],
+            description: "When you register the scanned channel information, specify whether you want to register it by channel or by service.\n\n" +
+                "_Default value (GR)_: Channel\n" +
+                "_Default value (BS/CS)_: Service"
+        },
+        {
+            in: "query",
+            name: "registerOnDisabled",
+            type: "boolean",
+            allowEmptyValue: true,
+            description: "If `true`, disable the channel setting during registration.\n\n" +
+                "_Default value (GR)_: false\n" +
+                "_Default value (BS/CS)_: true"
+        },
+        {
+            in: "query",
+            name: "refresh",
+            type: "boolean",
+            allowEmptyValue: true,
+            default: false,
+            description: "If `true`, update the existing settings without inheriting them.\n" +
+                "However, non-scanned types of channels will always be inherited."
         }
     ],
     responses: {

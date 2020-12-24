@@ -21,7 +21,7 @@ export const get: Operation = (req, res) => {
 
     api.responseJSON(
         res,
-        Tuner.all().map(device => device.export())
+        Tuner.all()
     );
 };
 

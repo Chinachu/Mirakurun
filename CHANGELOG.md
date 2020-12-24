@@ -2,6 +2,40 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.4.0 (2020-12-25)
+
+Happy Holidays.
+
+- **docker**: Update base image to `node:14.15.3-buster-slim`.
+
+### Server Changes
+
+- **server**: Add `hostname` config for allowing access with specific hostname.
+- **server**: Fix timing of request timeout.
+- **ui**: Add `hostname` config editor.
+- **ui**: Add link to API Docs (Swagger UI).
+- **api**: \[`config/channels/scan`\] Support BS/CS types. [#79](https://github.com/Chinachu/Mirakurun/pull/79)
+- **api**: \[`tuners`\] Add `url` property to each `User` state.
+- **api**: \[`tuners`\] Add `streamSetting` property to each `User` state.
+- **api**: \[`tuners`\] Add `streamInfo` property to each `User` state for checking packet drop count.
+- **api**: \[`channels/*/stream`, `services/*/stream`, `programs/*/stream`\] Add `X-Mirakurun-Tuner-User-ID` response header.
+- **misc**: Rename `satelite` → `satellite`.
+
+### Dependencies
+
+- @fluentui/react: `^7.121.11` → `^7.155.3`
+- eventemitter3: `^4.0.4` → `^4.0.7`
+- express-openapi: `^6.0.0` → `^7.2.0`
+- glob: `^7.1.6`
+- js-yaml: `^3.14.0` → `^3.14.1`
+- openapi-types: `^1.3.5` → `^7.0.1`
+- react: `^16.13.1` → `^16.14.0`
+- react-dom: `^16.13.1` → `^16.14.0`
+- semver: `^7.3.2` → `^7.3.4`
+- swagger-ui-dist: `^3.27.0` → `^3.28.0`
+- tail: `^2.0.4` → `^2.1.0`
+- (typescript): `^3.9.6` → `^4.1.3`
+
 ## 3.3.1 (2020-08-08)
 
 - **docker**: fixed a bug the Log Level cannot be changed. [#78](https://github.com/Chinachu/Mirakurun/issues/78)

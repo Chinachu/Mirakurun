@@ -52,12 +52,14 @@ export const get: Operation = (req, res) => {
 
     let requestAborted = false;
     req.once("close", () => requestAborted = true);
-    req.setTimeout(1000 * 60 * 10, () => { return; }); // 10 minites
+
+    const userId = (req.ip || "unix") + ":" + (req.connection.remotePort || Date.now());
 
     program.getStream({
-        id: (req.ip || "unix") + ":" + (req.connection.remotePort || Date.now()),
+        id: userId,
         priority: parseInt(req.get("X-Mirakurun-Priority"), 10) || 0,
         agent: req.get("User-Agent"),
+        url: req.url,
         disableDecoder: (<number> <any> req.query.decode === 0)
     })
         .then(stream => {
@@ -69,8 +71,11 @@ export const get: Operation = (req, res) => {
             req.once("close", () => stream.emit("close"));
 
             res.setHeader("Content-Type", "video/MP2T");
+            res.setHeader("X-Mirakurun-Tuner-User-ID", userId);
             res.status(200);
             stream.pipe(res);
+
+            req.setTimeout(1000 * 60 * 10); // 10 minites
         })
         .catch((err) => api.responseStreamErrorHandler(res, err));
 };
@@ -81,7 +86,12 @@ get.apiDoc = {
     produces: ["video/MP2T"],
     responses: {
         200: {
-            description: "OK"
+            description: "OK",
+            headers: {
+                "X-Mirakurun-Tuner-User-ID": {
+                    type: "string"
+                }
+            }
         },
         404: {
             description: "Not Found"

@@ -76,7 +76,7 @@ definitions:
         type: string
       name:
         type: string
-      satelite:
+      satellite:
         type: string
       space:
         type: number
@@ -328,6 +328,43 @@ definitions:
         minimum: -1
       agent:
         type: string
+      url:
+        type: string
+      disableDecoder:
+        type: boolean
+      streamSetting:
+        type: object
+        required:
+          - channel
+        properties:
+          channel:
+            $ref: '#/definitions/ConfigChannelsItem'
+          networkId:
+            type: integer
+          serviceId:
+            type: integer
+          eventId:
+            type: integer
+          noProvide:
+            type: boolean
+          parseNIT:
+            type: boolean
+          parseSDT:
+            type: boolean
+          parseEIT:
+            type: boolean
+      streamInfo:
+        type: object
+        additionalProperties:
+          type: object
+          required:
+            - packet
+            - drop
+          properties:
+            packet:
+              type: integer
+            drop:
+              type: integer
 
   TunerProcess:
     type: object
@@ -381,6 +418,8 @@ definitions:
         type: integer
         minimum: 1
         maximum: 65535
+      hostname:
+        type: string
       disableIPv6:
         type: boolean
       logLevel:
@@ -460,7 +499,7 @@ definitions:
         type: string
       serviceId:
         $ref: '#/definitions/ServiceId'
-      satelite:
+      satellite:
         type: string
       space:
         type: number

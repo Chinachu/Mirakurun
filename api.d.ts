@@ -42,12 +42,14 @@ export interface Channel {
     type: ChannelType;
     channel: string;
     name?: string;
-    satelite?: string;
+    satellite?: string;
     space?: number;
     services?: Service[];
 }
 
 export type ChannelType = "GR" | "BS" | "CS" | "SKY";
+
+export type ChannelRegisterMode = "Channel" | "Service";
 
 export interface Service {
     id: ServiceItemId;
@@ -146,6 +148,28 @@ export interface TunerUser {
     id: string;
     priority: number;
     agent?: string;
+    url?: string;
+    disableDecoder?: boolean;
+    streamSetting?: StreamSetting;
+    streamInfo?: StreamInfo;
+}
+
+interface StreamSetting {
+    channel: ConfigChannelsItem;
+    networkId?: number;
+    serviceId?: number;
+    eventId?: number;
+    noProvide?: boolean;
+    parseNIT?: boolean;
+    parseSDT?: boolean;
+    parseEIT?: boolean;
+}
+
+export interface StreamInfo {
+    [PID: string]: {
+        packet: number;
+        drop: number;
+    }
 }
 
 export interface TunerProcess {
@@ -166,6 +190,7 @@ export type EventType = "create" | "update" | "redefine";
 export interface ConfigServer {
     path?: string;
     port?: number;
+    hostname?: string;
     disableIPv6?: boolean;
     logLevel?: LogLevel;
     maxLogHistory?: number;
@@ -217,7 +242,7 @@ export interface ConfigChannelsItem {
     type: ChannelType;
     /** passed to tuning command */
     channel: string;
-    satelite?: string;
+    satellite?: string;
     serviceId?: number;
     space?: number;
     isDisabled?: boolean;

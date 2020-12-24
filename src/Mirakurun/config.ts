@@ -15,6 +15,7 @@
 */
 import { execSync } from "child_process";
 import { dirname } from "path";
+import { hostname } from "os";
 import * as fs from "fs";
 import * as yaml from "js-yaml";
 import * as common from "./common";
@@ -27,6 +28,7 @@ const {
     SERVER_CONFIG_PATH,
     TUNERS_CONFIG_PATH,
     CHANNELS_CONFIG_PATH,
+    HOSTNAME,
     LOG_LEVEL,
     MAX_LOG_HISTORY,
     HIGH_WATER_MARK,
@@ -47,6 +49,9 @@ export interface Server {
 
     // as Remote Server
     readonly port?: number;
+
+    // hostname
+    readonly hostname?: string;
 
     /** `true` to disable IPv6 listening */
     readonly disableIPv6?: boolean;
@@ -98,13 +103,16 @@ export interface Channel {
 
     // passed to tuning command
     readonly channel: string;
-    readonly satelite?: string;
+    readonly satellite?: string;
     readonly space?: number;
 
     // service id
     readonly serviceId?: number;
 
     readonly isDisabled?: boolean;
+
+    /** @deprecated */
+    readonly satelite?: string;
 }
 
 export function loadServer(): Server {
@@ -150,6 +158,9 @@ export function loadServer(): Server {
         config.port = 40772;
         config.disableIPv6 = true;
 
+        if (!config.hostname && typeof HOSTNAME !== "undefined" && HOSTNAME.trim().length > 0) {
+            config.hostname = HOSTNAME.trim();
+        }
         if (typeof LOG_LEVEL !== "undefined" && /^-?[0123]$/.test(LOG_LEVEL)) {
             config.logLevel = parseInt(LOG_LEVEL, 10);
         }
@@ -182,6 +193,11 @@ export function loadServer(): Server {
         }
 
         log.info("load server config (merged w/ env): %s", JSON.stringify(config));
+    }
+
+    if (!config.hostname) {
+        config.hostname = hostname();
+        log.info("detected hostname: %s", config.hostname);
     }
 
     return config as Readonly<Server>;

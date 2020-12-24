@@ -13,11 +13,36 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+import ChannelItem from "./ChannelItem";
+
 export interface User {
     readonly id: string;
     readonly priority: number;
     readonly agent?: string;
+    readonly url?: string;
     readonly disableDecoder?: boolean;
+    readonly streamSetting?: StreamSetting;
+    readonly streamInfo?: StreamInfo;
+}
+
+export type UserRequest = Omit<User, "streamSetting">;
+
+interface StreamSetting {
+    channel: ChannelItem;
+    networkId?: number;
+    serviceId?: number;
+    eventId?: number;
+    noProvide?: boolean;
+    parseNIT?: boolean;
+    parseSDT?: boolean;
+    parseEIT?: boolean;
+}
+
+export interface StreamInfo {
+    [PID: string]: {
+        packet: number;
+        drop: number;
+    };
 }
 
 export enum ChannelTypes {

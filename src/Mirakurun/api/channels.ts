@@ -23,7 +23,7 @@ export const get: Operation = (req, res) => {
 
     const channels = Channel.all().map(channel => {
 
-        const ch: any = channel.export();
+        const ch: any = channel.toJSON();
 
         ch.services = channel.getServices().map(service => ({
             id: service.id,

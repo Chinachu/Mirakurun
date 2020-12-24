@@ -155,8 +155,8 @@ export default class ServiceItem {
         return ret;
     }
 
-    getStream(user: common.User): Promise<stream.Readable> {
-        return _.tuner.getServiceStream(this, user);
+    getStream(userRequest: common.UserRequest): Promise<stream.Readable> {
+        return _.tuner.getServiceStream(this, userRequest);
     }
 
     private _updated(): void {
