@@ -2,6 +2,13 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.4.1 (2020-12-28)
+
+### Server Changes
+
+- **api**: \[`config/channels/scan`\] Fix a incorrect default parameters. [#82](https://github.com/Chinachu/Mirakurun/issues/82)
+- **api**: \[`config/channels/scan`\] Fix a timing of request timeout.
+
 ## 3.4.0 (2020-12-25)
 
 Happy Holidays.
