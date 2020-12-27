@@ -63,6 +63,9 @@ function range(start: number, end: number): string[] {
 
 export function generateScanConfig(option: ChannelScanOption): ScanConfig {
 
+    // delete undefined from option
+    Object.keys(option).forEach(key => option[key] === undefined && delete option[key]);
+
     if (option.type === common.ChannelTypes.GR) {
         option = Object.assign({
             startCh: 13,
@@ -206,6 +209,8 @@ export const put: Operation = async (req, res) => {
         api.responseError(res, 409, "Already Scanning");
         return;
     }
+
+    req.setTimeout(1000 * 60 * 3); // 3 minites
 
     isScanning = true;
     const type = req.query.type as common.ChannelType;
