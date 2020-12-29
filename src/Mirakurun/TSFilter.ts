@@ -24,7 +24,7 @@ import ServiceItem from "./ServiceItem";
 import * as aribts from "aribts";
 const calcCRC32: (buf: Buffer) => number = aribts.TsCrc32.calc;
 
-interface StreamOptions extends stream.DuplexOptions {
+interface StreamOptions extends stream.TransformOptions {
     readonly networkId?: number;
     readonly serviceId?: number;
     readonly eventId?: number;
@@ -67,7 +67,7 @@ interface FlagState {
     version_number: number;
 }
 
-export default class TSFilter extends stream.Duplex {
+export default class TSFilter extends stream.Transform {
 
     // options
     private _provideServiceId: number;
@@ -210,14 +210,7 @@ export default class TSFilter extends stream.Duplex {
         return info;
     }
 
-    _read(size: number) {
-
-        if (this._closed === true) {
-            this.push(null);
-        }
-    }
-
-    _write(chunk: Buffer, encoding: string, callback: Function) {
+    _transform(chunk: Buffer, encoding: string, callback: Function) {
 
         if (this._closed === true) {
             callback(new Error("TSFilter has closed already"));
