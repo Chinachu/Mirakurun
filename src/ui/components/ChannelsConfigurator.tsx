@@ -212,7 +212,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                         />
                         <TextField
                             style={{ width: 80 }}
-                            label="Satelite:"
+                            label="Satellite:"
                             value={ch.satellite || ""}
                             onChange={(ev, newValue) => {
                                 if (newValue === "") {
