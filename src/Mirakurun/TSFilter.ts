@@ -185,7 +185,7 @@ export default class TSFilter extends stream.Transform {
         log.info("TSFilter has created (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
 
         if (this._ready === false) {
-            log.debug("TSFilter is waiting for serviceId=%s, eventId=%s", this._provideServiceId, this._provideEventId);
+            log.info("TSFilter is waiting for serviceId=%s, eventId=%s", this._provideServiceId, this._provideEventId);
         }
 
         ++status.streamCount.tsFilter;
