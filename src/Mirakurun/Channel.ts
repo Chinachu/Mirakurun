@@ -122,6 +122,16 @@ export default class Channel {
                 return;
             }
 
+            if (channel.freq !== undefined && typeof channel.freq !== "number") {
+                log.error("invalid type of property `freq` in channel#%d (%s) configuration", i, channel.name);
+                return;
+            }
+
+            if (channel.polarity && channel.polarity !== "H" && channel.polarity !== "V") {
+                log.error("invalid type of property `polarity` in channel#%d (%s) configuration", i, channel.name);
+                return;
+            }
+
             if (channel.serviceId && typeof channel.serviceId !== "number") {
                 log.error("invalid type of property `serviceId` in channel#%d (%s) configuration", i, channel.name);
                 return;

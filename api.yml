@@ -79,7 +79,14 @@ definitions:
       satellite:
         type: string
       space:
+        type: integer
+      freq:
         type: number
+      polarity:
+        type: string
+        enum:
+          - H
+          - V
       services:
         type: array
         items:
@@ -502,7 +509,14 @@ definitions:
       satellite:
         type: string
       space:
+        type: integer
+      freq:
         type: number
+      polarity:
+        type: string
+        enum:
+          - H
+          - V
       isDisabled:
         type: boolean
 

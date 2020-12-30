@@ -29,6 +29,8 @@ export default class ChannelItem {
     private _channel: string;
     private _satellite: string;
     private _space: number;
+    private _freq: number;
+    private _polarity: "H" | "V";
 
     constructor(config: config.Channel) {
 
@@ -37,6 +39,8 @@ export default class ChannelItem {
         this._channel = config.channel;
         this._satellite = config.satellite;
         this._space = config.space;
+        this._freq = config.freq;
+        this._polarity = config.polarity;
 
         if (config.serviceId) {
             this.addService(config.serviceId);
@@ -71,13 +75,23 @@ export default class ChannelItem {
         return this._space;
     }
 
+    get freq(): number {
+        return this._freq;
+    }
+
+    get polarity(): "H" | "V" {
+        return this._polarity;
+    }
+
     toJSON(): config.Channel {
         return {
             type: this._type,
             channel: this._channel,
             name: this._name,
             satellite: this._satellite,
-            space: this._space
+            space: this._space,
+            freq: this._freq,
+            polarity: this._polarity
         };
     }
 

@@ -44,6 +44,8 @@ export interface Channel {
     name?: string;
     satellite?: string;
     space?: number;
+    freq?: number;
+    polarity?: "H" | "V";
     services?: Service[];
 }
 
@@ -245,6 +247,8 @@ export interface ConfigChannelsItem {
     satellite?: string;
     serviceId?: number;
     space?: number;
+    freq?: number;
+    polarity?: "H" | "V";
     isDisabled?: boolean;
 }
 

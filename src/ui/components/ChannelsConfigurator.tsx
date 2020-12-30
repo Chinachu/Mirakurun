@@ -240,6 +240,37 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                                 setEditing([...editing]);
                             }}
                         />
+                        <TextField
+                            style={{ width: 60 }}
+                            label="Freq:"
+                            value={`${ch.freq || ""}`}
+                            onChange={(ev, newValue) => {
+                                if (newValue === "") {
+                                    delete ch.freq;
+                                } else if (/^[0-9\.]+$/.test(newValue)) {
+                                    const freq = parseFloat(newValue);
+                                    ch.freq = freq;
+                                }
+                                setEditing([...editing]);
+                            }}
+                        />
+                        <Dropdown
+                            label="Polarity:"
+                            options={[
+                                { key: "-", text: "-" },
+                                { key: "H", text: "H" },
+                                { key: "V", text: "V" }
+                            ]}
+                            selectedKey={ch.polarity || "-"}
+                            onChange={(ev, option) => {
+                                if (option.key === "-") {
+                                    delete ch.polarity;
+                                } else {
+                                    ch.polarity = option.key as any;
+                                }
+                                setEditing([...editing]);
+                            }}
+                        />
                     </Stack>
                 </Stack>
             ),

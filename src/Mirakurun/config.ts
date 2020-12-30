@@ -105,6 +105,8 @@ export interface Channel {
     readonly channel: string;
     readonly satellite?: string;
     readonly space?: number;
+    readonly freq?: number;
+    readonly polarity?: "H" | "V";
 
     // service id
     readonly serviceId?: number;

@@ -106,8 +106,10 @@ sudo mirakurun config channels
   channel: '0' # string
   # below are optional
   serviceId: 1234 # integer
-  satellite: JCSAT4A # string for <satellite> in tuner command
+  satellite: JCSAT4A # string: <satellite> in tuner command
   space: 0 # integer: <space> as tuning space number in tuner command (default: 0)
+  freq: 12345 # number: <freq> in tuner command
+  polarity: H # enum [H|V]
   isDisabled: false # boolean
 ```
 
