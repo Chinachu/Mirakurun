@@ -183,7 +183,7 @@ class Server {
                 }
             } else {
                 server.listen(serverConfig.port, address, () => {
-                    if (address.indexOf(":") !== -1) {
+                    if (address.includes(":") === true) {
                         const [addr, iface] = address.split("%");
                         log.info("listening on http://[%s]:%d (%s)", addr, serverConfig.port, iface);
                     } else {

@@ -173,7 +173,7 @@ export default class TunerDevice extends events.EventEmitter {
         }
 
         if (channel) {
-            if (this._config.types.indexOf(channel.type) === -1) {
+            if (this._config.types.includes(channel.type) === false) {
                 throw new Error(util.format("TunerDevice#%d is not supported for channel type `%s`", this._index, channel.type));
             }
 

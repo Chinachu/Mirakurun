@@ -87,7 +87,7 @@ export default class Tuner {
 
         const l = this._devices.length;
         for (let i = 0; i < l; i++) {
-            if (this._devices[i].config.types.indexOf(type) !== -1) {
+            if (this._devices[i].config.types.includes(type) === true) {
                 return true;
             }
         }
@@ -436,7 +436,7 @@ export default class Tuner {
 
         const l = this._devices.length;
         for (let i = 0; i < l; i++) {
-            if (this._devices[i].config.types.indexOf(type) !== -1) {
+            if (this._devices[i].config.types.includes(type) === true) {
                 devices.push(this._devices[i]);
             }
         }
