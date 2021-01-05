@@ -282,12 +282,11 @@ export default class TSFilter extends stream.Transform {
 
         if (this._buffer.length !== 0) {
             if (this._ready === true) {
-                this.push(Buffer.concat(this._buffer));
-                this._buffer = [];
+                this.push(Buffer.concat(this._buffer.splice(0, 16732))); // { let bytes = 1024 * 1024 * 3; (bytes - bytes % 188) / 188; }
             } else {
-                this._buffer = [Buffer.concat(this._buffer)];
-                if (this._buffer[0].length > this._maxBufferBytesBeforeReady) {
-                    this._buffer[0] = this._buffer[0].slice(this._buffer[0].length - this._maxBufferBytesBeforeReady);
+                const head = this._buffer.length - (this._maxBufferBytesBeforeReady / PACKET_SIZE);
+                if (head > 0) {
+                    this._buffer.splice(0, head);
                 }
             }
         }
