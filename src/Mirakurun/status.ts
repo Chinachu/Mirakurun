@@ -24,6 +24,7 @@ interface Status {
         unhandledRejection: number;
         bufferOverflow: number;
         tunerDeviceRespawn: number;
+        decoderRespawn: number;
     };
     timerAccuracy: {
         last: number;
@@ -43,7 +44,8 @@ const status: Status = {
         uncaughtException: 0,
         unhandledRejection: 0,
         bufferOverflow: 0,
-        tunerDeviceRespawn: 0
+        tunerDeviceRespawn: 0,
+        decoderRespawn: 0
     },
     timerAccuracy: {
         last: 0,

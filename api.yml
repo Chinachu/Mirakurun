@@ -586,6 +586,8 @@ definitions:
             type: integer
           tunerDeviceRespawn:
             type: integer
+          decoderRespawn:
+            type: integer
       timerAccuracy:
         type: object
         properties:

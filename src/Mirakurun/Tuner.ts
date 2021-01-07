@@ -25,6 +25,7 @@ import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
 import ProgramItem from "./ProgramItem";
 import TSFilter from "./TSFilter";
+import TSDecoder from "./TSDecoder";
 
 export default class Tuner {
 
@@ -407,17 +408,13 @@ export default class Tuner {
                             if (user.disableDecoder === true || device.decoder === null) {
                                 resolve(tsFilter);
                             } else {
-                                const decoder = child_process.spawn(device.decoder);
-                                ++status.streamCount.decoder;
-                                decoder.stderr.pipe(process.stderr);
-                                decoder.stdout.once("close", () => {
-                                    tsFilter.emit("close");
-                                    --status.streamCount.decoder;
+                                const tsDecoder = new TSDecoder({
+                                    command: device.decoder
                                 });
-                                decoder.stdin.once("finish", () => decoder.kill("SIGKILL"));
-                                tsFilter.once("close", () => decoder.stdin.end());
-                                tsFilter.pipe(decoder.stdin);
-                                resolve(decoder.stdout);
+                                tsDecoder.once("close", () => tsFilter.emit("close"));
+                                tsFilter.once("close", () => tsDecoder.emit("close"));
+                                tsFilter.pipe(tsDecoder);
+                                resolve(tsDecoder);
                             }
                         })
                         .catch((err) => {

@@ -141,10 +141,17 @@ function finalize(status) {
             tunerDeviceRespawn.setMin("0");
             tunerDeviceRespawn.setValue(status.errorCount.tunerDeviceRespawn);
 
+            const decoderRespawn = new munin.Model.Default('decoder respawn')
+            decoderRespawn.setDraw("STACK");
+            decoderRespawn.setType("DERIVE");
+            decoderRespawn.setMin("0");
+            decoderRespawn.setValue(status.errorCount.decoderRespawn);
+
             g.add(uncaughtException);
             g.add(unhandledRejection);
             g.add(bufferOverflow);
             g.add(tunerDeviceRespawn);
+            g.add(decoderRespawn);
 
             return g;
         },

@@ -282,6 +282,7 @@ export interface Status {
         unhandledRejection: number;
         bufferOverflow: number;
         tunerDeviceRespawn: number;
+        decoderRespawn: number;
     };
     timerAccuracy: {
         last: number;
