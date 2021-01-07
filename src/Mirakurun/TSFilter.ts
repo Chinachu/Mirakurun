@@ -179,7 +179,6 @@ export default class TSFilter extends stream.Transform {
         this._parser.on("tot", this._onTOT.bind(this));
         this._parser.on("cdt", this._onCDT.bind(this));
 
-        this.once("finish", this._close.bind(this));
         this.once("close", this._close.bind(this));
 
         log.info("TSFilter has created (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
@@ -767,15 +766,13 @@ export default class TSFilter extends stream.Transform {
             status.epg[this._targetNetworkId] = false;
         }
 
-        // close
-        process.nextTick(() => {
-        this.emit("close");
-        this.emit("end");
-        });
+        --status.streamCount.tsFilter;
 
         log.info("TSFilter has closed (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
 
-        --status.streamCount.tsFilter;
+        // close
+        this.emit("close");
+        this.emit("end");
     }
 }
 
