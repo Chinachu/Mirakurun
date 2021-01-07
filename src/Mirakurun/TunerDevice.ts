@@ -29,7 +29,7 @@ import TSFilter from "./TSFilter";
 import Client, { ProgramsQuery } from "../client";
 
 interface User extends common.User {
-    _stream?: stream.Duplex;
+    _stream?: stream.Transform;
 }
 
 interface Status {
