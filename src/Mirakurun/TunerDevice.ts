@@ -455,12 +455,12 @@ export default class TunerDevice extends events.EventEmitter {
 
         this.emit("release");
 
-        log.debug("TunerDevice#%d released", this._index);
+        log.info("TunerDevice#%d released", this._index);
 
         this._updated();
 
         if (this._closing === false && this._users.length !== 0) {
-            log.debug("TunerDevice#%d respawning because request has not closed", this._index);
+            log.warn("TunerDevice#%d respawning because request has not closed", this._index);
             ++status.errorCount.tunerDeviceRespawn;
 
             this._spawn(this._channel);
