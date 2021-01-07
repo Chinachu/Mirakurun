@@ -81,11 +81,11 @@ export default class TSFilter extends stream.Transform {
     private _parser: stream.Transform = new aribts.TsStream();
 
     // buffer
-    private _packet: Buffer = Buffer.allocUnsafe(PACKET_SIZE);
+    private _packet: Buffer = Buffer.alloc(PACKET_SIZE);
     private _offset: number = -1;
     private _buffer: Buffer[] = [];
     private _parses: Buffer[] = [];
-    private _patsec: Buffer = Buffer.allocUnsafe(PACKET_SIZE - 4 - 1); // TS header, pointer_field
+    private _patsec: Buffer = Buffer.alloc(PACKET_SIZE - 4 - 1); // TS header, pointer_field
 
     // state
     private _closed: boolean = false;
