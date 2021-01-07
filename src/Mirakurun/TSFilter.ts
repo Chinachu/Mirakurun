@@ -90,12 +90,12 @@ export default class TSFilter extends stream.Transform {
     // state
     private _closed: boolean = false;
     private _ready: boolean = true;
-    private _providePids: number[] = null; // `null` to provides all
-    private _parsePids: number[] = [];
+    private _providePids: Set<number> = null; // `null` to provides all
+    private _parsePids: Set<number> = new Set();
     private _tsid: number = -1;
-    private _patCRC: Buffer = Buffer.allocUnsafe(0);
-    private _serviceIds: number[] = [];
-    private _parseServiceIds: number[] = [];
+    private _patCRC: Buffer = Buffer.alloc(4);
+    private _serviceIds: Set<number> = new Set();
+    private _parseServiceIds: Set<number> = new Set();
     private _pmtPid: number = -1;
     private _pmtTimer: NodeJS.Timer;
     private _streamTime: number = null;
@@ -129,7 +129,7 @@ export default class TSFilter extends stream.Transform {
         this._provideEventId = options.eventId || null;
 
         if (this._provideServiceId !== null) {
-            this._providePids = [...PROVIDE_PIDS];
+            this._providePids = new Set(PROVIDE_PIDS);
             this._ready = false;
         }
         if (this._provideEventId !== null) {
@@ -152,7 +152,7 @@ export default class TSFilter extends stream.Transform {
         if (options.noProvide === true) {
             this._provideServiceId = null;
             this._provideEventId = null;
-            this._providePids = [];
+            this._providePids = new Set();
             this._ready = false;
         }
         if (options.parseNIT === true) {
@@ -313,11 +313,11 @@ export default class TSFilter extends stream.Transform {
         // parse
         if (pid === 0 && this._patCRC.compare(packet.slice(packet[7] + 4, packet[7] + 8))) {
             this._patCRC = Buffer.from(packet.slice(packet[7] + 4, packet[7] + 8));
-            this._parses.push(packet);
+                this._parses.push(packet);
         } else if (
             ((pid === 0x12 || pid === 0x29) && (this._parseEIT === true || this._provideEventId !== null)) ||
             pid === 0x14 ||
-            this._parsePids.includes(pid) === true
+            this._parsePids.has(pid) === true
         ) {
             this._parses.push(packet);
         }
@@ -325,7 +325,7 @@ export default class TSFilter extends stream.Transform {
         if (this._ready === false && (pid === 0x12 || this._provideEventId === null)) {
             return;
         }
-        if (this._providePids !== null && this._providePids.includes(pid) === false) {
+        if (this._providePids !== null && this._providePids.has(pid) === false) {
             return;
         }
 
@@ -340,8 +340,8 @@ export default class TSFilter extends stream.Transform {
     private _onPAT(pid: number, data: any): void {
 
         this._tsid = data.transport_stream_id;
-        this._serviceIds = [];
-        this._parseServiceIds = [];
+        this._serviceIds = new Set();
+        this._parseServiceIds = new Set();
 
         const l = data.programs.length;
         for (let i = 0; i < l; i++) {
@@ -354,14 +354,14 @@ export default class TSFilter extends stream.Transform {
                 log.debug("TSFilter detected NIT PID=%d", NIT_PID);
 
                 if (this._parseNIT === true) {
-                    if (this._parsePids.includes(NIT_PID) === false) {
-                        this._parsePids.push(NIT_PID);
+                    if (this._parsePids.has(NIT_PID) === false) {
+                        this._parsePids.add(NIT_PID);
                     }
                 }
                 continue;
             }
 
-            this._serviceIds.push(id);
+            this._serviceIds.add(id);
             if (this._targetNetworkId === null) {
                 item = null;
             } else {
@@ -378,11 +378,11 @@ export default class TSFilter extends stream.Transform {
                 if (this._pmtPid !== data.programs[i].program_map_PID) {
                     this._pmtPid = data.programs[i].program_map_PID;
 
-                    if (this._providePids.includes(this._pmtPid) === false) {
-                        this._providePids.push(this._pmtPid);
+                    if (this._providePids.has(this._pmtPid) === false) {
+                        this._providePids.add(this._pmtPid);
                     }
-                    if (this._parsePids.includes(this._pmtPid) === false) {
-                        this._parsePids.push(this._pmtPid);
+                    if (this._parsePids.has(this._pmtPid) === false) {
+                        this._parsePids.add(this._pmtPid);
                     }
 
                     // edit PAT section
@@ -415,8 +415,8 @@ export default class TSFilter extends stream.Transform {
 
             if (this._parseEIT === true && item) {
                 _.service.findByNetworkId(this._targetNetworkId).forEach(service => {
-                    if (this._parseServiceIds.includes(service.serviceId) === false) {
-                        this._parseServiceIds.push(service.serviceId);
+                    if (this._parseServiceIds.has(service.serviceId) === false) {
+                        this._parseServiceIds.add(service.serviceId);
 
                         log.debug("TSFilter parsing serviceId=%d (%s)", service.serviceId, service.name);
                     }
@@ -425,8 +425,8 @@ export default class TSFilter extends stream.Transform {
         }
 
         if (this._parseSDT === true) {
-            if (this._parsePids.includes(0x11) === false) {
-                this._parsePids.push(0x11);
+            if (this._parsePids.has(0x11) === false) {
+                this._parsePids.add(0x11);
             }
         }
     }
@@ -440,29 +440,27 @@ export default class TSFilter extends stream.Transform {
         }
 
         if (data.program_info[0]) {
-            if (this._providePids.includes(data.program_info[0].CA_PID) === false) {
-                this._providePids.push(data.program_info[0].CA_PID);
+            if (this._providePids.has(data.program_info[0].CA_PID) === false) {
+                this._providePids.add(data.program_info[0].CA_PID);
             }
         }
 
-        if (this._providePids.includes(data.PCR_PID) === false) {
-            this._providePids.push(data.PCR_PID);
+        if (this._providePids.has(data.PCR_PID) === false) {
+            this._providePids.add(data.PCR_PID);
         }
 
         const l = data.streams.length;
         for (let i = 0; i < l; i++) {
-            if (this._providePids.includes(data.streams[i].elementary_PID) === false) {
-                this._providePids.push(data.streams[i].elementary_PID);
+            if (this._providePids.has(data.streams[i].elementary_PID) === false) {
+                this._providePids.add(data.streams[i].elementary_PID);
             }
         }
 
         // sleep
-        const index = this._parsePids.indexOf(pid);
-        if (index !== -1) {
-            this._parsePids.splice(index, 1);
-
+        if (this._parsePids.has(pid) === true) {
+            this._parsePids.delete(pid);
             this._pmtTimer = setTimeout(() => {
-                this._parsePids.push(pid);
+                this._parsePids.add(pid);
             }, 1000);
         }
     }
@@ -490,9 +488,8 @@ export default class TSFilter extends stream.Transform {
 
         this.emit("network", _network);
 
-        const index = this._parsePids.indexOf(pid);
-        if (index !== -1) {
-            this._parsePids.splice(index, 1);
+        if (this._parsePids.has(pid) === true) {
+            this._parsePids.delete(pid);
         }
     }
 
@@ -508,7 +505,7 @@ export default class TSFilter extends stream.Transform {
         for (let i = 0; i < l; i++) {
             const service = data.services[i];
 
-            if (this._serviceIds.includes(service.service_id) === false) {
+            if (this._serviceIds.has(service.service_id) === false) {
                 continue;
             }
 
@@ -545,9 +542,8 @@ export default class TSFilter extends stream.Transform {
 
         this.emit("services", _services);
 
-        const index = this._parsePids.indexOf(pid);
-        if (index !== -1) {
-            this._parsePids.splice(index, 1);
+        if (this._parsePids.has(pid) === true) {
+            this._parsePids.delete(pid);
         }
     }
 
@@ -585,7 +581,7 @@ export default class TSFilter extends stream.Transform {
         // write EPG stream and store result
         if (
             this._parseEIT === true &&
-            this._parseServiceIds.includes(data.service_id) === true &&
+            this._parseServiceIds.has(data.service_id) === true &&
             data.table_id !== 0x4E && data.table_id !== 0x4F
         ) {
             epg.write(data);
@@ -773,8 +769,8 @@ export default class TSFilter extends stream.Transform {
 
         // close
         process.nextTick(() => {
-            this.emit("close");
-            this.emit("end");
+        this.emit("close");
+        this.emit("end");
         });
 
         log.info("TSFilter has closed (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
