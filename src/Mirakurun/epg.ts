@@ -142,11 +142,11 @@ class EPG extends stream.Writable {
 
         const networkId = eit.original_network_id;
 
-        if (this._epg[networkId] === undefined) {
+        if (!this._epg[networkId]) {
             this._epg[networkId] = {};
         }
 
-        if (this._epg[networkId][eit.service_id] === undefined) {
+        if (!this._epg[networkId][eit.service_id]) {
             this._epg[networkId][eit.service_id] = {};
         }
 
@@ -157,7 +157,7 @@ class EPG extends stream.Writable {
             const e = eit.events[i];
             let state: EventState;
 
-            if (service[e.event_id] === undefined) {
+            if (!service[e.event_id]) {
                 const id = getProgramId(networkId, eit.service_id, e.event_id);
                 let programItem = _.program.get(id);
                 if (!programItem) {
@@ -218,8 +218,8 @@ class EPG extends stream.Writable {
             } else {
                 state = service[e.event_id];
 
-                if (isOutOfDate(state, eit) === true) {
-                    if (isBasicTable(eit.table_id) === true) {
+                if (isOutOfDate(state, eit)) {
+                    if (isBasicTable(eit.table_id)) {
                         state.version.basic = eit.version_number;
                     } else {
                         state.version.extended = eit.version_number;
@@ -270,16 +270,16 @@ class EPG extends stream.Writable {
                             state.extended.version = eit.version_number;
                             state.extended._descs = new Array(d.last_descriptor_number + 1);
                             state.extended._done = false;
-                        } else if (state.extended._done === true) {
+                        } else if (state.extended._done) {
                             break;
                         }
 
-                        if (state.extended._descs[d.descriptor_number] === undefined) {
+                        if (!state.extended._descs[d.descriptor_number]) {
                             state.extended._descs[d.descriptor_number] = d.items;
 
                             let comp = true;
                             for (const descs of state.extended._descs) {
-                                if (descs === undefined) {
+                                if (typeof descs === "undefined") {
                                     comp = false;
                                     break;
                                 }
@@ -298,10 +298,10 @@ class EPG extends stream.Writable {
                                                 : new TsChar(desc.item_description_char).decode();
                                     current = key;
 
-                                    if (extended[key] === undefined) {
-                                        extended[key] = Buffer.from(desc.item_char);
-                                    } else {
+                                    if (extended[key]) {
                                         extended[key] = Buffer.concat([extended[key], desc.item_char]);
+                                    } else {
+                                        extended[key] = Buffer.from(desc.item_char);
                                     }
                                 }
                             }
@@ -442,7 +442,7 @@ class EPG extends stream.Writable {
 
                         state.group._raw = d._raw;
 
-                        if (d.other_network_events === undefined) {
+                        if (!d.other_network_events) {
                             state.program.update({
                                 relatedItems: d.events.map(getRelatedProgramItem)
                             });
@@ -511,7 +511,7 @@ function isBasicTable(tableId: number): boolean {
 
 function isOutOfDate(state: EventState, eit: any): boolean {
 
-    if (isBasicTable(eit.table_id) === true) {
+    if (isBasicTable(eit.table_id)) {
         if (state.version.basic === eit.version_number) {
             return false;
         }
