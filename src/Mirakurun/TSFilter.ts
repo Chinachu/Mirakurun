@@ -307,6 +307,12 @@ export default class TSFilter extends stream.Transform {
             return;
         }
 
+        // transport_error_indicator
+        if ((packet[1] & 0x80) >> 7 === 1) {
+            // todo: drop count
+            return;
+        }
+
         packet = Buffer.from(packet);
 
         // parse
@@ -552,6 +558,7 @@ export default class TSFilter extends stream.Transform {
 
         // detect current event
         if (
+            this._pmtPid !== -1 &&
             data.events.length !== 0 &&
             this._provideEventId !== null && data.table_id === 0x4E && data.section_number === 0 &&
             this._provideServiceId === data.service_id
