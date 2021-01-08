@@ -310,9 +310,11 @@ export default class TSFilter extends stream.Transform {
         packet = Buffer.from(packet);
 
         // parse
-        if (pid === 0 && this._patCRC.compare(packet.slice(packet[7] + 4, packet[7] + 8))) {
-            this._patCRC = Buffer.from(packet.slice(packet[7] + 4, packet[7] + 8));
+        if (pid === 0) {
+            if (this._patCRC.compare(packet, packet[7] + 4, packet[7] + 8) !== 0) {
+                packet.copy(this._patCRC, 0, packet[7] + 4, packet[7] + 8);
                 this._parses.push(packet);
+            }
         } else if (
             ((pid === 0x12 || pid === 0x29) && (this._parseEIT === true || this._provideEventId !== null)) ||
             pid === 0x14 ||
