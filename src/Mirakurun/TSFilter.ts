@@ -194,7 +194,7 @@ export default class TSFilter extends stream.Transform {
 
     _transform(chunk: Buffer, encoding: string, callback: Function) {
 
-        if (this._closed === true) {
+        if (this._closed) {
             callback(new Error("TSFilter has closed already"));
             return;
         }
@@ -263,7 +263,7 @@ export default class TSFilter extends stream.Transform {
         }
 
         if (this._buffer.length !== 0) {
-            if (this._ready === true) {
+            if (this._ready) {
                 this.push(Buffer.concat(this._buffer.splice(0, 16732))); // { let bytes = 1024 * 1024 * 3; (bytes - bytes % 188) / 188; }
             } else {
                 const head = this._buffer.length - (this._maxBufferBytesBeforeReady / PACKET_SIZE);
@@ -307,9 +307,9 @@ export default class TSFilter extends stream.Transform {
                 this._parses.push(packet);
             }
         } else if (
-            ((pid === 0x12 || pid === 0x29) && (this._parseEIT === true || this._provideEventId !== null)) ||
+            ((pid === 0x12 || pid === 0x29) && (this._parseEIT || this._provideEventId !== null)) ||
             pid === 0x14 ||
-            this._parsePids.has(pid) === true
+            this._parsePids.has(pid)
         ) {
             this._parses.push(packet);
         }
@@ -354,7 +354,7 @@ export default class TSFilter extends stream.Transform {
 
                 log.debug("TSFilter detected NIT PID=%d", NIT_PID);
 
-                if (this._parseNIT === true) {
+                if (this._parseNIT) {
                     if (this._parsePids.has(NIT_PID) === false) {
                         this._parsePids.add(NIT_PID);
                     }
@@ -414,7 +414,7 @@ export default class TSFilter extends stream.Transform {
                 }
             }
 
-            if (this._parseEIT === true && item) {
+            if (this._parseEIT && item) {
                 _.service.findByNetworkId(this._targetNetworkId).forEach(service => {
                     if (this._parseServiceIds.has(service.serviceId) === false) {
                         this._parseServiceIds.add(service.serviceId);
@@ -425,7 +425,7 @@ export default class TSFilter extends stream.Transform {
             }
         }
 
-        if (this._parseSDT === true) {
+        if (this._parseSDT) {
             if (this._parsePids.has(0x11) === false) {
                 this._parsePids.add(0x11);
             }
@@ -458,7 +458,7 @@ export default class TSFilter extends stream.Transform {
         }
 
         // sleep
-        if (this._parsePids.has(pid) === true) {
+        if (this._parsePids.has(pid)) {
             this._parsePids.delete(pid);
             this._pmtTimer = setTimeout(() => {
                 this._parsePids.add(pid);
@@ -489,7 +489,7 @@ export default class TSFilter extends stream.Transform {
 
         this.emit("network", _network);
 
-        if (this._parsePids.has(pid) === true) {
+        if (this._parsePids.has(pid)) {
             this._parsePids.delete(pid);
         }
     }
@@ -543,7 +543,7 @@ export default class TSFilter extends stream.Transform {
 
         this.emit("services", _services);
 
-        if (this._parsePids.has(pid) === true) {
+        if (this._parsePids.has(pid)) {
             this._parsePids.delete(pid);
         }
     }
@@ -566,7 +566,7 @@ export default class TSFilter extends stream.Transform {
                     log.info("TSFilter is now ready for eventId=%d", this._provideEventId);
                 }
             } else {
-                if (this._ready === true) {
+                if (this._ready) {
                     log.info("TSFilter is closing because eventId=%d has ended...", this._provideEventId);
 
                     const eventId = this._provideEventId;
@@ -582,8 +582,8 @@ export default class TSFilter extends stream.Transform {
 
         // write EPG stream and store result
         if (
-            this._parseEIT === true &&
-            this._parseServiceIds.has(data.service_id) === true &&
+            this._parseEIT &&
+            this._parseServiceIds.has(data.service_id) &&
             data.table_id !== 0x4E && data.table_id !== 0x4F
         ) {
             epg.write(data);
@@ -641,11 +641,11 @@ export default class TSFilter extends stream.Transform {
         const serviceId = data.service_id;
         const versionNumber = data.version_number;
 
-        if (this._epgState[networkId] === undefined) {
+        if (!this._epgState[networkId]) {
             this._epgState[networkId] = {};
         }
 
-        if (this._epgState[networkId][serviceId] === undefined) {
+        if (!this._epgState[networkId][serviceId]) {
             this._epgState[networkId][serviceId] = {
                 basic: {
                     flags: [],
@@ -738,7 +738,7 @@ export default class TSFilter extends stream.Transform {
 
     private _close(): void {
 
-        if (this._closed === true) {
+        if (this._closed) {
             return;
         }
         this._closed = true;
@@ -768,7 +768,7 @@ export default class TSFilter extends stream.Transform {
         this.streamInfo = null;
 
         // update status
-        if (this._parseEIT === true && this._targetNetworkId !== null) {
+        if (this._parseEIT && this._targetNetworkId !== null) {
             status.epg[this._targetNetworkId] = false;
         }
 
