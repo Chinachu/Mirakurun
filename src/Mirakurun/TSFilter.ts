@@ -69,6 +69,8 @@ interface FlagState {
 
 export default class TSFilter extends stream.Transform {
 
+    streamInfo: StreamInfo = {};
+
     // options
     private _provideServiceId: number;
     private _provideEventId: number;
@@ -190,25 +192,6 @@ export default class TSFilter extends stream.Transform {
         ++status.streamCount.tsFilter;
     }
 
-    get streamInfo(): StreamInfo {
-
-        if (!(<any> this._parser).info) {
-            return {};
-        }
-
-        const _info: StreamInfo = (<any> this._parser).info;
-        const info: StreamInfo = {};
-
-        for (const key in _info) {
-            info[key] = {
-                packet: _info[key].packet,
-                drop: _info[key].drop
-            };
-        }
-
-        return info;
-    }
-
     _transform(chunk: Buffer, encoding: string, callback: Function) {
 
         if (this._closed === true) {
@@ -309,7 +292,9 @@ export default class TSFilter extends stream.Transform {
 
         // transport_error_indicator
         if ((packet[1] & 0x80) >> 7 === 1) {
-            // todo: drop count
+            if (this.streamInfo[pid]) {
+                ++this.streamInfo[pid].drop;
+            }
             return;
         }
 
@@ -340,6 +325,15 @@ export default class TSFilter extends stream.Transform {
         if (pid === 0 && this._pmtPid !== -1) {
             this._patsec.copy(packet, 5, 0);
         }
+
+        // packet counter
+        if (!this.streamInfo[pid]) {
+            this.streamInfo[pid] = {
+                packet: 0,
+                drop: 0
+            };
+        }
+        ++this.streamInfo[pid].packet;
 
         this._buffer.push(packet);
     }
@@ -769,6 +763,9 @@ export default class TSFilter extends stream.Transform {
         this._parser.removeAllListeners();
         this._parser.end();
         this._parser = null;
+
+        // clear streamInfo
+        this.streamInfo = null;
 
         // update status
         if (this._parseEIT === true && this._targetNetworkId !== null) {
