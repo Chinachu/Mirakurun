@@ -2,6 +2,29 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.5.0 (2021-01-11)
+
+This is **Important Update** for any devices.
+
+- ✅ Improved Performance
+- ✅ Improved Reliability
+- ✅ Fixed Critical Bug
+
+### Server Changes
+
+- **program**: Change timing of save to data file to 10 seconds for reduce I/O usage.
+- **ts-decoder**: Implemented `decoder` command auto-heal, path-through fallback. (new feature)
+- **ts-filter**: Use `stream.Transform` instead of `stream.Duplex`.
+- **ts-filter**: Make drop on error packet to fix broken TS output. (bug)
+- **ts-filter**: Fix high CPU usage on waiting.
+- **ts-filter**: Improve performance.
+- **tuner-device**: Add `<freq>` and `<polarity>` to tuner command. [#77](https://github.com/Chinachu/Mirakurun/issues/77)
+- **tuner-device**: Improve performance.
+
+### Docker Changes
+
+- Update base image to `node:14.15.4-buster-slim`.
+
 ## 3.4.1 (2020-12-28)
 
 ### Server Changes
