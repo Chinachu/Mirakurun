@@ -115,6 +115,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
             setTimeout(() => {
                 uiStateEvents.emit("notify:restart-required");
             }, 500);
+            setSaved(false);
             return;
         }
         (async () => {
@@ -127,9 +128,6 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                 console.error(e);
             }
         })();
-        return () => {
-            setSaved(false);
-        }
     }, [saved]);
 
     const items = [];

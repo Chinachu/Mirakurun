@@ -49,7 +49,7 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
             uiStateEvents.off("update:status", onStatusUpdate);
             uiStateEvents.off("update:tuners", onTunersUpdate);
         };
-    });
+    }, []);
 
     const statusItem: StatusItem[] = [];
 

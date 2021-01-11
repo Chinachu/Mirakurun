@@ -50,21 +50,19 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
             setTimeout(() => {
                 uiStateEvents.emit("notify:restart-required");
             }, 500);
+            setSaved(false);
             return;
         }
         (async () => {
             try {
                 const res = await (await fetch(configAPI)).json();
                 console.log("ServerConfigurator", "GET", configAPI, "->", res);
-                setEditing({...res});
-                setCurrent({...res});
+                setEditing({ ...res });
+                setCurrent({ ...res });
             } catch (e) {
                 console.error(e);
             }
         })();
-        return () => {
-            setSaved(false);
-        }
     }, [saved]);
 
     const docker = uiState.status.process.env.DOCKER === "YES";

@@ -42,7 +42,7 @@ const Restart: React.FC<{ uiStateEvents: EventEmitter }> = ({ uiStateEvents }) =
         return () => {
             uiStateEvents.off("notify:restart-required", onRestartRequired);
         };
-    });
+    }, []);
 
     return (
         <>
