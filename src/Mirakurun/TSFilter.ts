@@ -224,9 +224,9 @@ export default class TSFilter extends stream.Transform {
 
         if (this._offset > 0) {
             if (length >= PACKET_SIZE - this._offset) {
-                chunk.copy(this._packet, this._offset, 0, PACKET_SIZE - this._offset);
-                this._processPacket(this._packet);
                 offset = PACKET_SIZE - this._offset;
+                chunk.copy(this._packet, this._offset, 0, offset);
+                this._processPacket(this._packet);
                 this._offset = 0;
             } else {
                 chunk.copy(this._packet, this._offset);
