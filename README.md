@@ -110,7 +110,7 @@ You can use PM2 Plus to realtime monitoring if running by PM2.
 
 * [Rivarun](https://github.com/Chinachu/Rivarun)
 * [BonDriver_Mirakurun](https://github.com/Chinachu/BonDriver_Mirakurun)
-* Mirakurun Client ([Built-in](https://github.com/Chinachu/Mirakurun/blob/master/src/client.ts)
+* Mirakurun Client ([Built-in](https://github.com/Chinachu/Mirakurun/blob/master/src/client.ts))
   * [Chinachu γ](https://github.com/Chinachu/Chinachu/wiki/Gamma-Installation-V2)
   * [EPGStation](https://github.com/l3tnun/EPGStation)
 
