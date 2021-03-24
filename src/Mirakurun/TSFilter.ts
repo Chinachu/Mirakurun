@@ -321,7 +321,7 @@ export default class TSFilter extends stream.Transform {
 
             this._tsmfSlotCounter++;
 
-            if (this._tsmfRelativeStreamNumber[this._tsmfSlotCounter - 1] !== 1){
+            if (this._tsmfRelativeStreamNumber[this._tsmfSlotCounter - 1] !== this._tsmfTsNumber){
                 return;
             }
         }
