@@ -32,6 +32,7 @@ interface StreamOptions extends stream.TransformOptions {
     readonly parseNIT?: boolean;
     readonly parseSDT?: boolean;
     readonly parseEIT?: boolean;
+    readonly tsmfRelTs?: number;
 }
 
 const PACKET_SIZE = 188;
@@ -127,16 +128,16 @@ export default class TSFilter extends stream.Transform {
     // ReadableState in node/lib/_stream_readable.js
     private _readableState: any;
 
-    constructor(options: StreamOptions,tsmf: number) {
+    constructor(options: StreamOptions) {
         super({
             allowHalfOpen: false
         });
 
-        if(tsmf === 0){
+        if(options.tsmfRelTs === 0){
             this._tsmfEnableTsmfSplit = false;
         } else {
             this._tsmfEnableTsmfSplit = true;
-            this._tsmfTsNumber = tsmf;
+            this._tsmfTsNumber = options.tsmfRelTs;
         }
         this._targetNetworkId = options.networkId || null;
         this._provideServiceId = options.serviceId || null;

@@ -398,8 +398,9 @@ export default class Tuner {
                         noProvide: setting.noProvide,
                         parseNIT: setting.parseNIT,
                         parseSDT: setting.parseSDT,
-                        parseEIT: setting.parseEIT
-                    },tsmf);
+                        parseEIT: setting.parseEIT,
+                        tsmfRelTs: tsmf
+                    });
 
                     Object.defineProperty(user, "streamInfo", {
                         get: () => tsFilter.streamInfo
