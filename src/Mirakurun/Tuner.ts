@@ -389,6 +389,8 @@ export default class Tuner {
                         reject(new Error("no available tuners"));
                     }
                 } else {
+                    //tsmf
+                    const tsmf = setting.channel.polarity === "H";
                     const tsFilter = new TSFilter({
                         networkId: setting.networkId,
                         serviceId: setting.serviceId,
@@ -397,7 +399,7 @@ export default class Tuner {
                         parseNIT: setting.parseNIT,
                         parseSDT: setting.parseSDT,
                         parseEIT: setting.parseEIT
-                    });
+                    },tsmf);
 
                     Object.defineProperty(user, "streamInfo", {
                         get: () => tsFilter.streamInfo

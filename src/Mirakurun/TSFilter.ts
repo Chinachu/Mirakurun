@@ -80,7 +80,7 @@ export default class TSFilter extends stream.Transform {
     private _targetNetworkId: number;
 
     // tsmf
-    private _tsmfEnableTsmfSplit: boolean = true;
+    private _tsmfEnableTsmfSplit: boolean = false;
     private _tsmfSlotCounter:number = -1;
     private _tsmfRelativeStreamNumber:number[] = [];
     private _tsmfTsNumber: number = 1;
@@ -127,11 +127,12 @@ export default class TSFilter extends stream.Transform {
     // ReadableState in node/lib/_stream_readable.js
     private _readableState: any;
 
-    constructor(options: StreamOptions) {
+    constructor(options: StreamOptions,tsmf: boolean) {
         super({
             allowHalfOpen: false
         });
 
+        this._tsmfEnableTsmfSplit = tsmf;
         this._targetNetworkId = options.networkId || null;
         this._provideServiceId = options.serviceId || null;
         this._provideEventId = options.eventId || null;
