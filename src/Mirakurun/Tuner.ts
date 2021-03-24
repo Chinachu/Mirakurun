@@ -390,7 +390,7 @@ export default class Tuner {
                     }
                 } else {
                     //tsmf
-                    const tsmf = setting.channel.polarity === "H";
+                    const tsmf = setting.channel.tsmfRelTs || 0;
                     const tsFilter = new TSFilter({
                         networkId: setting.networkId,
                         serviceId: setting.serviceId,

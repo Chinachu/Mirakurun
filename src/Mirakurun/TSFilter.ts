@@ -127,12 +127,17 @@ export default class TSFilter extends stream.Transform {
     // ReadableState in node/lib/_stream_readable.js
     private _readableState: any;
 
-    constructor(options: StreamOptions,tsmf: boolean) {
+    constructor(options: StreamOptions,tsmf: number) {
         super({
             allowHalfOpen: false
         });
 
-        this._tsmfEnableTsmfSplit = tsmf;
+        if(tsmf === 0){
+            this._tsmfEnableTsmfSplit = false;
+        } else {
+            this._tsmfEnableTsmfSplit = true;
+            this._tsmfTsNumber = tsmf;
+        }
         this._targetNetworkId = options.networkId || null;
         this._provideServiceId = options.serviceId || null;
         this._provideEventId = options.eventId || null;

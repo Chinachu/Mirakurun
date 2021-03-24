@@ -108,6 +108,9 @@ export interface Channel {
     readonly freq?: number;
     readonly polarity?: "H" | "V";
 
+    //tsmf
+    readonly tsmfRelTs?: number;
+
     // service id
     readonly serviceId?: number;
 
