@@ -389,7 +389,7 @@ export default class Tuner {
                         reject(new Error("no available tuners"));
                     }
                 } else {
-                    //tsmf
+                    // tsmf
                     const tsmf = setting.channel.tsmfRelTs || 0;
                     const tsFilter = new TSFilter({
                         networkId: setting.networkId,

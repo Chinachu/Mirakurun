@@ -82,8 +82,8 @@ export default class TSFilter extends stream.Transform {
 
     // tsmf
     private _tsmfEnableTsmfSplit: boolean = false;
-    private _tsmfSlotCounter:number = -1;
-    private _tsmfRelativeStreamNumber:number[] = [];
+    private _tsmfSlotCounter: number = -1;
+    private _tsmfRelativeStreamNumber: number[] = [];
     private _tsmfTsNumber: number = 1;
 
     // aribts
@@ -133,7 +133,7 @@ export default class TSFilter extends stream.Transform {
             allowHalfOpen: false
         });
 
-        if(options.tsmfRelTs === 0){
+        if (options.tsmfRelTs === 0) {
             this._tsmfEnableTsmfSplit = false;
         } else {
             this._tsmfEnableTsmfSplit = true;
@@ -302,14 +302,14 @@ export default class TSFilter extends stream.Transform {
         if (this._tsmfEnableTsmfSplit) {
             if (pid === 0x002F ) {
                 const tsmfFlameSync = packet.readUInt16BE(4) & 0x1FFF;
-                if (tsmfFlameSync !== 0x1A86 && tsmfFlameSync !== 0x0579){
+                if (tsmfFlameSync !== 0x1A86 && tsmfFlameSync !== 0x0579) {
                     return;
                 }
 
                 this._tsmfRelativeStreamNumber = [];
                 for (let i = 0; i < 26; i++) {
-                    this._tsmfRelativeStreamNumber.push((packet[73+i] &0xf0) >> 4);
-                    this._tsmfRelativeStreamNumber.push(packet[73+i] &0x0f);
+                    this._tsmfRelativeStreamNumber.push((packet[73 + i] & 0xf0) >> 4);
+                    this._tsmfRelativeStreamNumber.push(packet[73 + i] & 0x0f);
                 }
 
                 this._tsmfSlotCounter = 0;
@@ -322,11 +322,10 @@ export default class TSFilter extends stream.Transform {
 
             this._tsmfSlotCounter++;
 
-            if (this._tsmfRelativeStreamNumber[this._tsmfSlotCounter - 1] !== this._tsmfTsNumber){
+            if (this._tsmfRelativeStreamNumber[this._tsmfSlotCounter - 1] !== this._tsmfTsNumber) {
                 return;
             }
         }
-
 
         // NULL
         if (pid === 0x1FFF) {
