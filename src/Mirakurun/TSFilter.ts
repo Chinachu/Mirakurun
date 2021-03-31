@@ -84,7 +84,7 @@ export default class TSFilter extends stream.Transform {
     private _tsmfEnableTsmfSplit: boolean = false;
     private _tsmfSlotCounter: number = -1;
     private _tsmfRelativeStreamNumber: number[] = [];
-    private _tsmfTsNumber: number = 1;
+    private _tsmfTsNumber: number = 0;
 
     // aribts
     private _parser: stream.Transform = new aribts.TsStream();
@@ -133,12 +133,12 @@ export default class TSFilter extends stream.Transform {
             allowHalfOpen: false
         });
 
-        if (options.tsmfRelTs === 0) {
-            this._tsmfEnableTsmfSplit = false;
-        } else {
-            this._tsmfEnableTsmfSplit = true;
-            this._tsmfTsNumber = options.tsmfRelTs;
+        const enabletsmf = options.tsmfRelTs || 0;
+        if (enabletsmf !== 0) {
+                this._tsmfEnableTsmfSplit = true;
+                this._tsmfTsNumber = options.tsmfRelTs;
         }
+
         this._targetNetworkId = options.networkId || null;
         this._provideServiceId = options.serviceId || null;
         this._provideEventId = options.eventId || null;
@@ -300,7 +300,7 @@ export default class TSFilter extends stream.Transform {
 
         // tsmf
         if (this._tsmfEnableTsmfSplit) {
-            if (pid === 0x002F ) {
+            if (pid === 0x002F) {
                 const tsmfFlameSync = packet.readUInt16BE(4) & 0x1FFF;
                 if (tsmfFlameSync !== 0x1A86 && tsmfFlameSync !== 0x0579) {
                     return;

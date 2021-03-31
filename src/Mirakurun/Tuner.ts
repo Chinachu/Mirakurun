@@ -390,7 +390,6 @@ export default class Tuner {
                     }
                 } else {
                     // tsmf
-                    const tsmf = setting.channel.tsmfRelTs || 0;
                     const tsFilter = new TSFilter({
                         networkId: setting.networkId,
                         serviceId: setting.serviceId,
@@ -399,7 +398,7 @@ export default class Tuner {
                         parseNIT: setting.parseNIT,
                         parseSDT: setting.parseSDT,
                         parseEIT: setting.parseEIT,
-                        tsmfRelTs: tsmf
+                        tsmfRelTs: setting.channel.tsmfRelTs
                     });
 
                     Object.defineProperty(user, "streamInfo", {
