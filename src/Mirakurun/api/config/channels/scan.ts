@@ -92,7 +92,7 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
                 startCh: 1,
                 endCh: 23,
                 startSubCh: 0,
-                endSubCh: 2
+                endSubCh: 3
             }, option);
 
             const channels: string[] = [];
