@@ -136,7 +136,7 @@ class Server {
             app.get("/api/debug", (req, res) => res.redirect("/swagger-ui/?url=/api/docs"));
         }
 
-        const api = yaml.safeLoad(fs.readFileSync("api.yml", "utf8")) as OpenAPIV2.Document;
+        const api = yaml.load(fs.readFileSync("api.yml", "utf8")) as OpenAPIV2.Document;
         api.info.version = pkg.version;
 
         openapi.initialize({

@@ -284,7 +284,7 @@ export function loadTuners(): Tuner[] {
         if (tuners.length > 0) {
             try {
                 log.info("writing auto generated tuners config to `%s`", path);
-                fs.writeFileSync(path, yaml.safeDump(tuners));
+                fs.writeFileSync(path, yaml.dump(tuners));
             } catch (e) {
                 log.fatal("failed to write tuners config to `%s`", path);
                 console.error(e);
@@ -366,7 +366,7 @@ function load(name: string, path: string) {
 
     log.info("load %s config `%s`", name, path);
 
-    return yaml.safeLoad(fs.readFileSync(path, "utf8"));
+    return yaml.load(fs.readFileSync(path, "utf8"));
 }
 
 function save(name: "server", path: string, data: Server): Promise<void>;
@@ -378,7 +378,7 @@ function save(name: string, path: string, data: object): Promise<void> {
 
     return new Promise<void>((resolve, reject) => {
 
-        fs.writeFile(path, yaml.safeDump(data), err => {
+        fs.writeFile(path, yaml.dump(data), err => {
 
             if (err) {
                 return reject(err);
