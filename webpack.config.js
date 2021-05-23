@@ -39,7 +39,8 @@ module.exports = {
         new CopyPlugin({
             patterns: [
                 {
-                    from: `${__dirname}/src/ui/**/*.{html,svg}`,
+                    // globby can't glob Windows-style(contain '\') path
+                    from: `${__dirname}/src/ui/**/*.{html,svg}`.replace(/\\/g, '/'),
                     to: `${__dirname}/lib/ui`,
                     context: `${__dirname}/src/ui`
                 }
