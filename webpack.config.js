@@ -58,6 +58,6 @@ module.exports = {
         "eventemitter3": "EventEmitter3",
         "react": "React",
         "react-dom": "ReactDOM",
-        "@fluentui/react": "Fabric"
+        "@fluentui/react": "FluentUIReact"
     }
 };

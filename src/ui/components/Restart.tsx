@@ -63,6 +63,7 @@ const Restart: React.FC<{ uiStateEvents: EventEmitter }> = ({ uiStateEvents }) =
                                 await fetch(`/api/restart`, { method: "PUT" });
                             })();
                             setHideDialog(true);
+                            setRestartRequired(false);
                         }}
                     />
                     <DefaultButton
@@ -80,7 +81,10 @@ const Restart: React.FC<{ uiStateEvents: EventEmitter }> = ({ uiStateEvents }) =
                         doNotLayer: false,
                     }}
                 >
-                    <TeachingBubbleContent>
+                    <TeachingBubbleContent
+                        hasCloseButton
+                        onDismiss={() => setRestartRequired(false)}
+                    >
                         Restart is required to apply configuration.
                     </TeachingBubbleContent>
                 </Coachmark>
