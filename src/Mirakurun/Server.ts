@@ -18,6 +18,7 @@ import * as http from "http";
 import * as url from "url";
 import * as ip from "ip";
 import * as express from "express";
+import * as cors from "cors";
 import * as openapi from "express-openapi";
 import * as morgan from "morgan";
 import * as bodyParser from "body-parser";
@@ -82,6 +83,8 @@ class Server {
         const app = express();
 
         app.disable("x-powered-by");
+
+        app.use(cors());
 
         app.use(morgan(":remote-addr :remote-user :method :url HTTP/:http-version :status :res[content-length] - :response-time ms :user-agent", {
             stream: log.event as any
