@@ -1,10 +1,11 @@
+const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
 
 module.exports = {
     mode: "development",
     devtool: "source-map",
     watchOptions: {
-        ignored: [/node_modules/]
+        ignored: /node_modules/
     },
     entry: {
         index: `${__dirname}/src/ui/index.tsx`
@@ -45,6 +46,12 @@ module.exports = {
                     context: `${__dirname}/src/ui`
                 }
             ]
+        }),
+        new webpack.ProvidePlugin({
+            Buffer: ["buffer", "Buffer"]
+        }),
+        new webpack.ProvidePlugin({
+            process: "process/browser"
         })
     ],
     externals: {
