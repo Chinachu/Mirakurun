@@ -137,6 +137,11 @@ export default class Channel {
                 return;
             }
 
+            if (channel.tsmfRelTs && typeof channel.tsmfRelTs !== "number") {
+                log.error("invalid type of property `tsmfRelTs` in channel#%d (%s) configuration", i, channel.name);
+                return;
+            }
+
             if (channel.isDisabled === true) {
                 return;
             }

@@ -87,6 +87,8 @@ definitions:
         enum:
           - H
           - V
+      tsmfRelTs:
+        type: integer
       services:
         type: array
         items:

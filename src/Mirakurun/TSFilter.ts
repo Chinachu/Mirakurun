@@ -32,6 +32,7 @@ interface StreamOptions extends stream.TransformOptions {
     readonly parseNIT?: boolean;
     readonly parseSDT?: boolean;
     readonly parseEIT?: boolean;
+    readonly tsmfRelTs?: number;
 }
 
 const PACKET_SIZE = 188;
@@ -79,6 +80,12 @@ export default class TSFilter extends stream.Transform {
     private _parseEIT: boolean = false;
     private _targetNetworkId: number;
 
+    // tsmf
+    private _tsmfEnableTsmfSplit: boolean = false;
+    private _tsmfSlotCounter: number = -1;
+    private _tsmfRelativeStreamNumber: number[] = [];
+    private _tsmfTsNumber: number = 0;
+
     // aribts
     private _parser: stream.Transform = new aribts.TsStream();
 
@@ -125,6 +132,12 @@ export default class TSFilter extends stream.Transform {
         super({
             allowHalfOpen: false
         });
+
+        const enabletsmf = options.tsmfRelTs || 0;
+        if (enabletsmf !== 0) {
+                this._tsmfEnableTsmfSplit = true;
+                this._tsmfTsNumber = options.tsmfRelTs;
+        }
 
         this._targetNetworkId = options.networkId || null;
         this._provideServiceId = options.serviceId || null;
@@ -284,6 +297,35 @@ export default class TSFilter extends stream.Transform {
     private _processPacket(packet: Buffer): void {
 
         const pid = packet.readUInt16BE(1) & 0x1FFF;
+
+        // tsmf
+        if (this._tsmfEnableTsmfSplit) {
+            if (pid === 0x002F) {
+                const tsmfFlameSync = packet.readUInt16BE(4) & 0x1FFF;
+                if (tsmfFlameSync !== 0x1A86 && tsmfFlameSync !== 0x0579) {
+                    return;
+                }
+
+                this._tsmfRelativeStreamNumber = [];
+                for (let i = 0; i < 26; i++) {
+                    this._tsmfRelativeStreamNumber.push((packet[73 + i] & 0xf0) >> 4);
+                    this._tsmfRelativeStreamNumber.push(packet[73 + i] & 0x0f);
+                }
+
+                this._tsmfSlotCounter = 0;
+                return;
+            }
+
+            if (this._tsmfSlotCounter < 0 || this._tsmfSlotCounter > 51) {
+                return;
+            }
+
+            this._tsmfSlotCounter++;
+
+            if (this._tsmfRelativeStreamNumber[this._tsmfSlotCounter - 1] !== this._tsmfTsNumber) {
+                return;
+            }
+        }
 
         // NULL
         if (pid === 0x1FFF) {

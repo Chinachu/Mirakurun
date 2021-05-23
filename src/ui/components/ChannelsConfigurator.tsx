@@ -269,6 +269,20 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                                 setEditing([...editing]);
                             }}
                         />
+                        <TextField
+                            style={{ width: 40 }}
+                            label="TsmfRelTs:"
+                            value={`${ch.tsmfRelTs || ""}`}
+                            onChange={(ev, newValue) => {
+                                if (newValue === "") {
+                                    delete ch.tsmfRelTs;
+                                } else if (/^[0-9]+$/.test(newValue)) {
+                                    const tsmfRelTs = parseInt(newValue, 10);
+                                    ch.tsmfRelTs = tsmfRelTs;
+                                }
+                                setEditing([...editing]);
+                            }}
+                        />
                     </Stack>
                 </Stack>
             ),

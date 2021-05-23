@@ -249,6 +249,7 @@ export interface ConfigChannelsItem {
     space?: number;
     freq?: number;
     polarity?: "H" | "V";
+    tsmfRelTs?: number;
     isDisabled?: boolean;
 }
 

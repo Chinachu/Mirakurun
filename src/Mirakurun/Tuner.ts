@@ -389,6 +389,7 @@ export default class Tuner {
                         reject(new Error("no available tuners"));
                     }
                 } else {
+                    // tsmf
                     const tsFilter = new TSFilter({
                         networkId: setting.networkId,
                         serviceId: setting.serviceId,
@@ -396,7 +397,8 @@ export default class Tuner {
                         noProvide: setting.noProvide,
                         parseNIT: setting.parseNIT,
                         parseSDT: setting.parseSDT,
-                        parseEIT: setting.parseEIT
+                        parseEIT: setting.parseEIT,
+                        tsmfRelTs: setting.channel.tsmfRelTs
                     });
 
                     Object.defineProperty(user, "streamInfo", {

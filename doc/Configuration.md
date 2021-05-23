@@ -110,6 +110,7 @@ sudo mirakurun config channels
   space: 0 # integer: <space> as tuning space number in tuner command (default: 0)
   freq: 12345 # number: <freq> in tuner command
   polarity: H # enum [H|V]
+  tsmfRelTs: 1 # number: 1~15
   isDisabled: false # boolean
 ```
 

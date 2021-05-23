@@ -31,6 +31,7 @@ export default class ChannelItem {
     private _space: number;
     private _freq: number;
     private _polarity: "H" | "V";
+    private _tsmfRelTs: number;
 
     constructor(config: config.Channel) {
 
@@ -41,6 +42,7 @@ export default class ChannelItem {
         this._space = config.space;
         this._freq = config.freq;
         this._polarity = config.polarity;
+        this._tsmfRelTs = config.tsmfRelTs;
 
         if (config.serviceId) {
             this.addService(config.serviceId);
@@ -83,6 +85,10 @@ export default class ChannelItem {
         return this._polarity;
     }
 
+    get tsmfRelTs(): number {
+        return this._tsmfRelTs;
+    }
+
     toJSON(): config.Channel {
         return {
             type: this._type,
@@ -91,7 +97,8 @@ export default class ChannelItem {
             satellite: this._satellite,
             space: this._space,
             freq: this._freq,
-            polarity: this._polarity
+            polarity: this._polarity,
+            tsmfRelTs: this._tsmfRelTs
         };
     }
 
