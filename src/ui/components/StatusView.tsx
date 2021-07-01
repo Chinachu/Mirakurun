@@ -81,7 +81,7 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
     }
 
     return (
-        <Stack tokens={{ childrenGap: "8 0" }} style={{ margin: "8px 0" }}>
+        <Stack tokens={{ childrenGap: "16 0" }} style={{ margin: "16px 0 8px" }}>
             <Stack>
                 <Separator alignContent="start">Status</Separator>
                 <div className="ms-Grid" dir="ltr">
