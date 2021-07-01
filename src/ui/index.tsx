@@ -304,16 +304,16 @@ const Content = () => {
                 </Stack>
 
                 <Pivot>
-                    <PivotItem headerText="Status / Tuners">
+                    <PivotItem itemIcon="GroupedList" headerText="Status / Tuners">
                         <StatusView uiState={uiState} uiStateEvents={uiStateEvents} />
                     </PivotItem>
-                    <PivotItem headerText="Events">
+                    <PivotItem itemIcon="EntitlementRedemption" headerText="Events">
                         <EventsView uiStateEvents={uiStateEvents} />
                     </PivotItem>
-                    <PivotItem headerText="Logs">
+                    <PivotItem itemIcon="ComplianceAudit" headerText="Logs">
                         <LogsView uiStateEvents={uiStateEvents} />
                     </PivotItem>
-                    <PivotItem headerText="Config">
+                    <PivotItem itemIcon="Settings" headerText="Config">
                         <ConfigView uiState={uiState} uiStateEvents={uiStateEvents} />
                     </PivotItem>
                     <PivotItem itemIcon="Heart" headerText="Special Thanks">
