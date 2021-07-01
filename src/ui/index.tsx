@@ -40,6 +40,7 @@ import StatusView from "./components/StatusView";
 import EventsView from "./components/EventsView";
 import LogsView from "./components/LogsView";
 import ConfigView from "./components/ConfigView";
+import HeartView from "./components/HeartView";
 import "./index.css";
 
 export interface UIState {
@@ -314,6 +315,9 @@ const Content = () => {
                     </PivotItem>
                     <PivotItem headerText="Config">
                         <ConfigView uiState={uiState} uiStateEvents={uiStateEvents} />
+                    </PivotItem>
+                    <PivotItem itemIcon="Heart" headerText="Special Thanks">
+                        <HeartView />
                     </PivotItem>
                 </Pivot>
 
