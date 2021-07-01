@@ -321,7 +321,7 @@ const Content = () => {
                     <Separator />
                     <Text>
                         <Link href="https://github.com/Chinachu/Mirakurun" target="_blank">Mirakurun</Link> {state.version}
-                        &nbsp;&copy; 2016-2020 <Link href="https://github.com/kanreisa" target="_blank">kanreisa</Link>.
+                        &nbsp;&copy; 2016- <Link href="https://github.com/kanreisa" target="_blank">kanreisa</Link>.
                     </Text>
                     <Text>
                         <Icon iconName="Heart" /> <Link href="https://chinachu.moe/" target="_blank">Chinachu Project</Link>

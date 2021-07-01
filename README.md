@@ -155,7 +155,7 @@ Support this project by becoming a sponsor. Your logo will show up here with a l
 
 ## Copyright / License
 
-&copy; 2016-2020 [kanreisa](https://github.com/kanreisa).
+&copy; 2016- [kanreisa](https://github.com/kanreisa).
 
 * Code: [Apache License, Version 2.0](LICENSE)
 * Docs: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
