@@ -7,6 +7,5 @@
     "files.trimTrailingWhitespace": true,
     "git.enabled": true,
     "git.autofetch": false,
-    "typescript.tsdk": "./node_modules/typescript/lib",
-    "terminal.integrated.shell.windows": "C:\\Windows\\System32\\bash.exe"
+    "typescript.tsdk": "./node_modules/typescript/lib"
 }
