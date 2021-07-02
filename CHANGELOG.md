@@ -2,6 +2,28 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.6.0 (2021-07-02)
+
+Performance improvements and new features.
+
+### Server Changes
+
+- **server**: Add support for processing multiple frames (TSMF). [#90](https://github.com/Chinachu/Mirakurun/pull/90)
+- **server**: Add support for Cross-Origin Resource Sharing (CORS).
+- **ts-filter**: Minor performance improvements.
+- **api**: \[`config/channels/scan`\] Add support 4 slots for transponders in BS. [#93](https://github.com/Chinachu/Mirakurun/pull/93)
+- **ui**: Add "Special Thanks" (heart).
+
+### Docker Changes
+
+- Update base image to `node:14.17.1-buster-slim`.
+
+### Other Changes
+
+- Remove deprecated Mirakurun-UI from Readme. [#85](https://github.com/Chinachu/Mirakurun/pull/85)
+- Fix webpack error on Windows. [#87](https://github.com/Chinachu/Mirakurun/pull/87)
+- Update dependencies.
+
 ## 3.5.0 (2021-01-11)
 
 This is **Important Update** for any devices.
