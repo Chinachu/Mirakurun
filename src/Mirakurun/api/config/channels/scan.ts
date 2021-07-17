@@ -34,7 +34,7 @@ const channelOrder = {
     SKY: 4
 };
 
-enum RegisterMode {
+enum ScanMode {
     Channel = "Channel",
     Service = "Service"
 }
@@ -46,14 +46,14 @@ interface ChannelScanOption {
     startSubCh?: number;
     endSubCh?: number;
     useSubCh?: boolean;
-    registerMode?: RegisterMode;
+    scanMode?: ScanMode;
     setDisabledOnAdd?: boolean;
     refresh?: boolean;
 }
 
 interface ScanConfig {
     readonly channels: string[];
-    readonly registerMode: RegisterMode;
+    readonly scanMode: ScanMode;
     readonly setDisabledOnAdd: boolean;
 }
 
@@ -70,19 +70,19 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
         option = Object.assign({
             startCh: 13,
             endCh: 62,
-            registerMode: RegisterMode.Channel,
+            scanMode: ScanMode.Channel,
             setDisabledOnAdd: false
         }, option);
 
         return {
             channels: range(option.startCh, option.endCh).map((ch) => ch),
-            registerMode: option.registerMode,
+            scanMode: option.scanMode,
             setDisabledOnAdd: option.setDisabledOnAdd
         };
     }
 
     option = Object.assign({
-        registerMode: RegisterMode.Service,
+        scanMode: ScanMode.Service,
         setDisabledOnAdd: true
     }, option);
 
@@ -104,7 +104,7 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
 
             return {
                 channels: channels,
-                registerMode: option.registerMode,
+                scanMode: option.scanMode,
                 setDisabledOnAdd: option.setDisabledOnAdd
             };
         }
@@ -116,7 +116,7 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
 
         return {
             channels: range(option.startCh, option.endCh).map((ch) => ch),
-            registerMode: option.registerMode,
+            scanMode: option.scanMode,
             setDisabledOnAdd: option.setDisabledOnAdd
         };
     }
@@ -129,7 +129,7 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
 
         return {
             channels: range(option.startCh, option.endCh).map((ch) => `CS${ch}`),
-            registerMode: option.registerMode,
+            scanMode: option.scanMode,
             setDisabledOnAdd: option.setDisabledOnAdd
         };
     }
@@ -190,9 +190,9 @@ export function generateChannelItemForChannel(type: common.ChannelType, channel:
     };
 }
 
-export function generateChannelItems(registerMode: RegisterMode, type: common.ChannelType, channel: string, services: db.Service[], setDisabledOnAdd: boolean): config.Channel[] {
+export function generateChannelItems(scanMode: ScanMode, type: common.ChannelType, channel: string, services: db.Service[], setDisabledOnAdd: boolean): config.Channel[] {
 
-    if (registerMode === RegisterMode.Service) {
+    if (scanMode === ScanMode.Service) {
         const channelItems: config.Channel[] = [];
         for (const service of services) {
             channelItems.push(generateChannelItemForService(type, channel, service, setDisabledOnAdd));
@@ -231,7 +231,7 @@ export const put: Operation = async (req, res) => {
         startSubCh: req.query.minSubCh as any as number,
         endSubCh: req.query.maxSubCh as any as number,
         useSubCh: req.query.useSubCh as any as boolean,
-        registerMode: req.query.registerMode as any as RegisterMode,
+        scanMode: req.query.scanMode as any as ScanMode,
         setDisabledOnAdd: req.query.setDisabledOnAdd as any as boolean
     });
 
@@ -272,7 +272,7 @@ export const put: Operation = async (req, res) => {
             continue;
         }
 
-        const scannedChannelItems = generateChannelItems(scanConfig.registerMode, type, channel, services, scanConfig.setDisabledOnAdd);
+        const scannedChannelItems = generateChannelItems(scanConfig.scanMode, type, channel, services, scanConfig.setDisabledOnAdd);
         for (const scannedChannelItem of scannedChannelItems) {
             result.push(scannedChannelItem);
             ++newCount;
@@ -364,10 +364,10 @@ About BS Subchannel Style:
         },
         {
             in: "query",
-            name: "registerMode",
+            name: "scanMode",
             type: "string",
-            enum: [RegisterMode.Channel, RegisterMode.Service],
-            description: "When you register the scanned channel information, specify whether you want to register it by channel or by service.\n\n" +
+            enum: [ScanMode.Channel, ScanMode.Service],
+            description: "To specify the service explictly, use the `Service` mode.\n\n" +
                 "_Default value (GR)_: Channel\n" +
                 "_Default value (BS/CS)_: Service"
         },
