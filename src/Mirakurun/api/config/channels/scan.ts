@@ -210,7 +210,7 @@ export const put: Operation = async (req, res) => {
         return;
     }
 
-    req.setTimeout(1000 * 60 * 3); // 3 minites
+    req.setTimeout(1000 * 60 * 10); // 10 minites
 
     isScanning = true;
     const type = req.query.type as common.ChannelType;
