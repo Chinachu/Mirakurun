@@ -47,14 +47,14 @@ interface ChannelScanOption {
     endSubCh?: number;
     useSubCh?: boolean;
     registerMode?: RegisterMode;
-    registerOnDisabled?: boolean;
+    setDisabledOnAdd?: boolean;
     refresh?: boolean;
 }
 
 interface ScanConfig {
     readonly channels: string[];
     readonly registerMode: RegisterMode;
-    readonly registerOnDisabled: boolean;
+    readonly setDisabledOnAdd: boolean;
 }
 
 function range(start: number, end: number): string[] {
@@ -71,19 +71,19 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
             startCh: 13,
             endCh: 62,
             registerMode: RegisterMode.Channel,
-            registerOnDisabled: false
+            setDisabledOnAdd: false
         }, option);
 
         return {
             channels: range(option.startCh, option.endCh).map((ch) => ch),
             registerMode: option.registerMode,
-            registerOnDisabled: option.registerOnDisabled
+            setDisabledOnAdd: option.setDisabledOnAdd
         };
     }
 
     option = Object.assign({
         registerMode: RegisterMode.Service,
-        registerOnDisabled: true
+        setDisabledOnAdd: true
     }, option);
 
     if (option.type === common.ChannelTypes.BS) {
@@ -105,7 +105,7 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
             return {
                 channels: channels,
                 registerMode: option.registerMode,
-                registerOnDisabled: option.registerOnDisabled
+                setDisabledOnAdd: option.setDisabledOnAdd
             };
         }
 
@@ -117,7 +117,7 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
         return {
             channels: range(option.startCh, option.endCh).map((ch) => ch),
             registerMode: option.registerMode,
-            registerOnDisabled: option.registerOnDisabled
+            setDisabledOnAdd: option.setDisabledOnAdd
         };
     }
 
@@ -130,12 +130,12 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
         return {
             channels: range(option.startCh, option.endCh).map((ch) => `CS${ch}`),
             registerMode: option.registerMode,
-            registerOnDisabled: option.registerOnDisabled
+            setDisabledOnAdd: option.setDisabledOnAdd
         };
     }
 }
 
-export function generateChannelItemForService(type: common.ChannelType, channel: string, service: db.Service, registerOnDisabled: boolean): config.Channel {
+export function generateChannelItemForService(type: common.ChannelType, channel: string, service: db.Service, setDisabledOnAdd: boolean): config.Channel {
 
     let name = service.name;
     name = name.trim();
@@ -148,11 +148,11 @@ export function generateChannelItemForService(type: common.ChannelType, channel:
         type: type,
         channel: channel,
         serviceId: service.serviceId,
-        isDisabled: registerOnDisabled
+        isDisabled: setDisabledOnAdd
     };
 }
 
-export function generateChannelItemForChannel(type: common.ChannelType, channel: string, services: db.Service[], registerOnDisabled: boolean): config.Channel {
+export function generateChannelItemForChannel(type: common.ChannelType, channel: string, services: db.Service[], setDisabledOnAdd: boolean): config.Channel {
 
     const baseName = services[0].name;
     let matchIndex = baseName.length;
@@ -186,21 +186,21 @@ export function generateChannelItemForChannel(type: common.ChannelType, channel:
         name: name,
         type: type,
         channel: channel,
-        isDisabled: registerOnDisabled
+        isDisabled: setDisabledOnAdd
     };
 }
 
-export function generateChannelItems(registerMode: RegisterMode, type: common.ChannelType, channel: string, services: db.Service[], registerOnDisabled: boolean): config.Channel[] {
+export function generateChannelItems(registerMode: RegisterMode, type: common.ChannelType, channel: string, services: db.Service[], setDisabledOnAdd: boolean): config.Channel[] {
 
     if (registerMode === RegisterMode.Service) {
         const channelItems: config.Channel[] = [];
         for (const service of services) {
-            channelItems.push(generateChannelItemForService(type, channel, service, registerOnDisabled));
+            channelItems.push(generateChannelItemForService(type, channel, service, setDisabledOnAdd));
         }
         return channelItems;
     }
 
-    return [generateChannelItemForChannel(type, channel, services, registerOnDisabled)];
+    return [generateChannelItemForChannel(type, channel, services, setDisabledOnAdd)];
 }
 
 export const put: Operation = async (req, res) => {
@@ -232,7 +232,7 @@ export const put: Operation = async (req, res) => {
         endSubCh: req.query.maxSubCh as any as number,
         useSubCh: req.query.useSubCh as any as boolean,
         registerMode: req.query.registerMode as any as RegisterMode,
-        registerOnDisabled: req.query.registerOnDisabled as any as boolean
+        setDisabledOnAdd: req.query.setDisabledOnAdd as any as boolean
     });
 
     for (const channel of scanConfig.channels) {
@@ -272,7 +272,7 @@ export const put: Operation = async (req, res) => {
             continue;
         }
 
-        const scannedChannelItems = generateChannelItems(scanConfig.registerMode, type, channel, services, scanConfig.registerOnDisabled);
+        const scannedChannelItems = generateChannelItems(scanConfig.registerMode, type, channel, services, scanConfig.setDisabledOnAdd);
         for (const scannedChannelItem of scannedChannelItems) {
             result.push(scannedChannelItem);
             ++newCount;
@@ -373,10 +373,10 @@ About BS Subchannel Style:
         },
         {
             in: "query",
-            name: "registerOnDisabled",
+            name: "setDisabledOnAdd",
             type: "boolean",
             allowEmptyValue: true,
-            description: "If `true`, disable the channel setting during registration.\n\n" +
+            description: "If `true`, set disable on add channel.\n\n" +
                 "_Default value (GR)_: false\n" +
                 "_Default value (BS/CS)_: true"
         },

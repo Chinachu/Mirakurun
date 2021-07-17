@@ -83,7 +83,7 @@ export interface ChannelScanOption {
     maxSubCh?: number;
     useSubCh?: boolean;
     registerMode?: apid.ChannelRegisterMode;
-    registerOnDisabled?: boolean;
+    setDisabledOnAdd?: boolean;
     refresh?: boolean;
 }
 
