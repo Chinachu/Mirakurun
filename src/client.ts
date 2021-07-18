@@ -76,6 +76,7 @@ export interface ServicesQuery {
 }
 
 export interface ChannelScanOption {
+    dryRun?: boolean;
     type?: apid.ChannelType;
     minCh?: number;
     maxCh?: number;
