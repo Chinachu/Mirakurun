@@ -209,10 +209,11 @@ export const put: Operation = async (req, res) => {
         api.responseError(res, 409, "Already Scanning");
         return;
     }
+    isScanning = true;
 
     req.setTimeout(1000 * 60 * 10); // 10 minites
 
-    isScanning = true;
+    const dryRun = req.query.dryRun as any as boolean;
     const type = req.query.type as common.ChannelType;
     const refresh = req.query.refresh as any as boolean;
     const oldChannelItems = config.loadChannels();
@@ -222,6 +223,9 @@ export const put: Operation = async (req, res) => {
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.status(200);
+    if (dryRun) {
+        res.write(`-- dry run --\n\n`);
+    }
     res.write(`channel scanning... (type: "${type}")\n\n`);
 
     const scanConfig = generateScanConfig({
@@ -288,14 +292,22 @@ export const put: Operation = async (req, res) => {
             return channelOrder[a.type] - channelOrder[b.type];
         }
     });
-        config.saveChannels(result);
 
-    res.write(`-> total ${newCount + takeoverCount} channels (of Takeover is ${takeoverCount}) found and ${result.length} channels stored.\n\n`);
+    res.write(`-> total ${newCount + takeoverCount} channels (of Takeover is ${takeoverCount}) found and ${result.length} channels will be stored.\n\n`);
+
+    if (!dryRun) {
+        config.saveChannels(result);
+    }
 
     isScanning = false;
 
+    if (dryRun) {
+        res.write(`channel scan has completed.\n`);
+        res.write(`-- dry run --\n`);
+    } else {
         res.write(`channel scan has completed and saved successfully.\n`);
         res.write(`**RESTART REQUIRED** to apply changes.\n`);
+    }
 
     res.end();
 };
@@ -322,6 +334,14 @@ About BS Subchannel Style:
         "application/json"
     ],
     parameters: [
+        {
+            in: "query",
+            name: "dryRun",
+            type: "boolean",
+            allowEmptyValue: true,
+            default: false,
+            description: "dry run. If `true`, the scanned result will not be saved."
+        },
         {
             in: "query",
             name: "type",
