@@ -239,7 +239,7 @@ export const put: Operation = async (req, res) => {
         res.write(`channel: "${channel}" ...\n`);
 
         if (!refresh) {
-            const takeoverChannelItems = oldChannelItems.filter(chItem => chItem.type === type && chItem.channel === channel && chItem.isDisabled === false);
+            const takeoverChannelItems = oldChannelItems.filter(chItem => chItem.type === type && chItem.channel === channel && !chItem.isDisabled);
             if (takeoverChannelItems.length > 0) {
                 res.write(`-> Skip scan.\n`);
                 res.write(`-> ${takeoverChannelItems.length} existing settings were found.\n`);
@@ -288,14 +288,14 @@ export const put: Operation = async (req, res) => {
             return channelOrder[a.type] - channelOrder[b.type];
         }
     });
-    config.saveChannels(result);
+        config.saveChannels(result);
 
     res.write(`-> total ${newCount + takeoverCount} channels (of Takeover is ${takeoverCount}) found and ${result.length} channels stored.\n\n`);
 
     isScanning = false;
 
-    res.write(`channel scan has completed and saved successfully.\n`);
-    res.write(`**RESTART REQUIRED** to apply changes.\n`);
+        res.write(`channel scan has completed and saved successfully.\n`);
+        res.write(`**RESTART REQUIRED** to apply changes.\n`);
 
     res.end();
 };
