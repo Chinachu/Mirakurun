@@ -224,7 +224,7 @@ export const put: Operation = async (req, res) => {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.status(200);
     if (dryRun) {
-        res.write(`-- dry run --\n\n`);
+        res.write("-- dry run --\n\n");
     }
     res.write(`channel scanning... (type: "${type}")\n\n`);
 
@@ -239,20 +239,22 @@ export const put: Operation = async (req, res) => {
         setDisabledOnAdd: req.query.setDisabledOnAdd as any as boolean
     });
 
-    for (const channel of scanConfig.channels) {
-        res.write(`channel: "${channel}" ...\n`);
+    const chLength = scanConfig.channels.length;
+    for (let i = 0; i < chLength; i++) {
+        const channel = scanConfig.channels[i];
+
+        res.write(`channel: "${channel}" (${i + 1}/${chLength}) [${Math.round((i + 1) / chLength * 100)}%] ...\n`);
 
         if (!refresh) {
             const takeoverChannelItems = oldChannelItems.filter(chItem => chItem.type === type && chItem.channel === channel && !chItem.isDisabled);
             if (takeoverChannelItems.length > 0) {
-                res.write(`-> Skip scan.\n`);
-                res.write(`-> ${takeoverChannelItems.length} existing settings were found.\n`);
+                res.write(`-> ${takeoverChannelItems.length} existing config found.\n`);
                 for (const channelItem of takeoverChannelItems) {
                     result.push(channelItem);
                     ++takeoverCount;
                     res.write(`-> ${JSON.stringify(channelItem)}\n`);
                 }
-                res.write(`*Notice* The scan was skipped to carry over the existing settings.\n\n`);
+                res.write(`# scan has skipped due to the "refresh = false" option because an existing config was found.\n\n`);
                 continue;
             }
         }
@@ -264,7 +266,11 @@ export const put: Operation = async (req, res) => {
                 channel: channel
             });
         } catch (e) {
-            res.write(`-> no signal. [${e}] \n\n`);
+            res.write("-> no signal.");
+            if (/stream has closed before get network/.test(e) === false) {
+                res.write(` [${e}]`);
+            }
+            res.write("\n\n");
             continue;
         }
 
@@ -272,7 +278,7 @@ export const put: Operation = async (req, res) => {
         res.write(`-> ${services.length} services found.\n`);
 
         if (services.length === 0) {
-            res.write(`\n`);
+            res.write("\n");
             continue;
         }
 
@@ -282,7 +288,7 @@ export const put: Operation = async (req, res) => {
             ++newCount;
             res.write(`-> ${JSON.stringify(scannedChannelItem)}\n`);
         }
-        res.write(`\n`);
+        res.write("\n");
     }
 
     result.sort((a, b) => {
@@ -293,7 +299,9 @@ export const put: Operation = async (req, res) => {
         }
     });
 
-    res.write(`-> total ${newCount + takeoverCount} channels (of Takeover is ${takeoverCount}) found and ${result.length} channels will be stored.\n\n`);
+    res.write(`-> new ${newCount} channels found.\n`);
+    res.write(`-> existing ${takeoverCount} channels merged.\n`);
+    res.write(`-> total ${newCount + takeoverCount}/${result.length} (${type}/Any) channels configured.\n\n`);
 
     if (!dryRun) {
         config.saveChannels(result);
@@ -302,11 +310,11 @@ export const put: Operation = async (req, res) => {
     isScanning = false;
 
     if (dryRun) {
-        res.write(`channel scan has completed.\n`);
-        res.write(`-- dry run --\n`);
+        res.write("channel scan has been completed.\n\n");
+        res.write("-- dry run --\n");
     } else {
-        res.write(`channel scan has completed and saved successfully.\n`);
-        res.write(`**RESTART REQUIRED** to apply changes.\n`);
+        res.write("channel scan has been completed and saved successfully.\n");
+        res.write("**RESTART REQUIRED** to apply changes.\n");
     }
 
     res.end();
