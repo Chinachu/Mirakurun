@@ -9,24 +9,23 @@
   * [Docker Compose](https://docs.docker.com/compose/install/) `>=1.22.0`
   * **x64**
   * **Ubuntu Server 20.04** / Debian 9 / CentOS 8.1
-  * Note: Desktop / VM is not supported.
+  * ⚠ Note: Desktop Environment / VM is not supported and unstable!
 * [Linux](#linux)
   * [PM2](http://pm2.keymetrics.io/) `>=2.4.0`
   * x86 / **x64** / ARMv7 / **ARMv8**
   * **Debian** / **Ubuntu Server** / CentOS / Gentoo
   * SystemV / OpenRC / **SystemD**
-  * Note: Desktop / VM is not supported.
-* [Win32](#win32) (Experimental)
+  * ⚠ Note: Desktop Environment / VM is not supported and unstable!
+* [Win32](#win32) (Experimental, Unstable, Not Recommended, Not Tested)
   * [winser](https://github.com/jfromaniello/winser) `>=1.0.3`
-  * Windows 10 RS3 `npm i winser@1.0.3 -g`
-  * Note: WSL / Linux VM is not supported.
+  * ⚠ Note: WSL / Linux VM is not supported!
 
 ## Docker on Linux
 
 **Note:**
 
-* Desktop / VM is not supported. lacking reliability by critical performance issue.
-* You must uninstall pcscd if installed.
+* ⚠ Any desktop environment / VM is not supported. lacking reliability by critical performance issue.
+* ⚠ You must **uninstall** `pcscd` if installed.
 * PT2/PT3/PX-* users: Use default DVB driver instead of chardev driver.
   * please uninstall chardev drivers then reboot before install.
 
@@ -125,6 +124,10 @@ $ vim /usr/local/mirakurun/config/tuners.yml
 
 ## Linux
 
+**Note:**
+
+* ⚠ Any desktop environment / VM is not supported. lacking reliability by critical performance issue.
+
 ### Node.js
 
 * **via Package Manager** (recommended)
@@ -210,6 +213,11 @@ mirakurun version
   * `mirakurun.stderr.log` - error log
 
 ## Win32
+
+**Note:**
+
+- ⚠ Experimental, Unstable, Not Recommended, Not Tested
+- ⚠ WSL / Linux VM is not supported!
 
 ### Node.js
 
