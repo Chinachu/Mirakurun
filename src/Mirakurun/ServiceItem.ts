@@ -159,6 +159,36 @@ export default class ServiceItem {
         return _.tuner.getServiceStream(this, userRequest);
     }
 
+    getOrder(): number {
+
+        let order: string;
+
+        switch (this._channel.type) {
+            case "GR":
+                order = "1";
+                break;
+            case "BS":
+                order = "2";
+                break;
+            case "CS":
+                order = "3";
+                break;
+            case "SKY":
+                order = "4";
+                break;
+        }
+
+        if (this._remoteControlKeyId) {
+            order += (100 + this._remoteControlKeyId).toString(10);
+        } else {
+            order += "200";
+        }
+
+        order += (10000 + this._serviceId).toString(10);
+
+        return parseInt(order, 10);
+    }
+
     private _updated(): void {
         Event.emit("service", "update", this.export());
     }
