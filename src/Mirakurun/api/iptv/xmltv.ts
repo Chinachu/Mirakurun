@@ -1,0 +1,83 @@
+/*
+   Copyright 2021 kanreisa
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+import { Operation } from "express-openapi";
+import Service from "../../Service";
+import Program from "../../Program";
+
+function escapeXMLSpecialChars(str: string): string {
+    return str.replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+}
+
+function getDateTime(time: number): string {
+    return new Date(time).toISOString()
+        .replace(/\..+$/, "")
+        .replace(/[-:T]/g, "");
+}
+
+export const get: Operation = (req, res) => {
+
+    const services = [...Service.all()]; // shallow copy
+    services.sort((a, b) => a.getOrder() - b.getOrder());
+
+    let x = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    x += `<!DOCTYPE tv SYSTEM "xmltv.dtd">\n`;
+    x += `<tv source-info-name="Mirakurun">\n`;
+
+    for (const service of services) {
+        if (service.type !== 1) {
+            continue;
+        }
+        x += `<channel id="${service.id}">\n`;
+        x += `<display-name>${escapeXMLSpecialChars(service.name)}</display-name>\n`;
+        x += `</channel>\n`;
+    }
+
+    for (const program of Program.all()) {
+        if (program.service === null) {
+            continue;
+        }
+        x += `<programme start="${getDateTime(program.data.startAt)}" stop="${getDateTime(program.data.startAt + program.data.duration)}" channel="${program.service.id}">\n`;
+        x += `<title>${escapeXMLSpecialChars(program.data.name || "")}</title>\n`;
+        x += `<desc>${escapeXMLSpecialChars(program.data.description || "")}</desc>\n`;
+        x += `</programme>\n`;
+    }
+
+    x += `</tv>`;
+
+    res.setHeader("Content-Type", "text/xml; charset=utf-8");
+    res.status(200);
+    res.end(x);
+};
+
+get.apiDoc = {
+    tags: ["iptv"],
+    produces: ["text/xml"],
+    responses: {
+        200: {
+            description: "OK"
+        },
+        default: {
+            description: "Unexpected Error",
+            schema: {
+                $ref: "#/definitions/Error"
+            }
+        }
+    }
+};
