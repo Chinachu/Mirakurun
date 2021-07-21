@@ -15,7 +15,6 @@
 */
 import * as os from "os";
 import * as ip from "ip";
-import regexp from "./regexp";
 
 export function getPrivateIPv4Addresses(): string[] {
 
