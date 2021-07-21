@@ -33,7 +33,7 @@ export const get: Operation = (req, res) => {
         if (service.hasLogoData) {
             m += ` tvg-logo="${apiRoot}/services/${service.id}/logo"`;
         }
-        m += ` group-title=${service.channel.type},${service.name}\n`;
+        m += ` group-title="${service.channel.type}",${service.name}\n`;
         m += `${apiRoot}/services/${service.id}/stream\n`;
     }
 
