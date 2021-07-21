@@ -18,10 +18,10 @@ import Service from "../../Service";
 
 export const get: Operation = (req, res) => {
 
+    const apiRoot = `${req.protocol}://${req.headers.host}/api`;
+
     const services = [...Service.all()]; // shallow copy
     services.sort((a, b) => a.getOrder() - b.getOrder());
-
-    const apiRoot = `${req.protocol}://${req.headers.host}/api`;
 
     let m = "#EXTM3U\n";
     for (const service of services) {
