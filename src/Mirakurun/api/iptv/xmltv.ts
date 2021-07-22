@@ -33,6 +33,8 @@ function getDateTime(time: number): string {
 
 export const get: Operation = (req, res) => {
 
+    const apiRoot = `${req.protocol}://${req.headers.host}/api`;
+
     const services = [...Service.all()]; // shallow copy
     services.sort((a, b) => a.getOrder() - b.getOrder());
 
@@ -40,12 +42,26 @@ export const get: Operation = (req, res) => {
     x += `<!DOCTYPE tv SYSTEM "xmltv.dtd">\n`;
     x += `<tv source-info-name="Mirakurun">\n`;
 
+    const countMap = new Map<number, number>();
     for (const service of services) {
         if (service.type !== 1) {
             continue;
         }
+
+        const mainNum = service.remoteControlKeyId || service.serviceId;
+        if (countMap.has(mainNum)) {
+            countMap.set(mainNum, countMap.get(mainNum) + 1);
+        } else {
+            countMap.set(mainNum, 1);
+        }
+        const subNum = countMap.get(mainNum);
+
         x += `<channel id="${service.id}">\n`;
         x += `<display-name>${escapeXMLSpecialChars(service.name)}</display-name>\n`;
+        x += `<display-name>${mainNum}.${subNum}</display-name>\n`;
+        if (service.hasLogoData) {
+            x += `<icon src="${apiRoot}/services/${service.id}/logo" />`;
+        }
         x += `</channel>\n`;
     }
 

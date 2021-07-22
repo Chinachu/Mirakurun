@@ -14,7 +14,15 @@
    limitations under the License.
 */
 import { Operation } from "express-openapi";
+import * as api from "../../api";
 import Service from "../../Service";
+
+interface HDHRChannel {
+    GuideNumber: string;
+    GuideName: string;
+    HD: 1;
+    URL: string;
+}
 
 export const get: Operation = (req, res) => {
 
@@ -23,28 +31,36 @@ export const get: Operation = (req, res) => {
     const services = [...Service.all()]; // shallow copy
     services.sort((a, b) => a.getOrder() - b.getOrder());
 
-    let m = `#EXTM3U url-tvg="${apiRoot}/iptv/xmltv"\n`;
+    const channels: HDHRChannel[] = [];
+
+    const countMap = new Map<number, number>();
     for (const service of services) {
         if (service.type !== 1) {
             continue;
         }
 
-        m += `#EXTINF:-1 tvg-id="${service.id}"`;
-        if (service.hasLogoData) {
-            m += ` tvg-logo="${apiRoot}/services/${service.id}/logo"`;
+        const mainNum = service.remoteControlKeyId || service.serviceId;
+        if (countMap.has(mainNum)) {
+            countMap.set(mainNum, countMap.get(mainNum) + 1);
+        } else {
+            countMap.set(mainNum, 1);
         }
-        m += ` group-title="${service.channel.type}",${service.name}\n`;
-        m += `${apiRoot}/services/${service.id}/stream\n`;
+        const subNum = countMap.get(mainNum);
+
+        channels.push({
+            GuideNumber: `${mainNum}.${subNum}`,
+            GuideName: service.name,
+            HD: 1,
+            URL: `${apiRoot}/services/${service.id}/stream`
+        });
     }
 
-    res.setHeader("Content-Type", "application/x-mpegURL; charset=utf-8");
-    res.status(200);
-    res.end(m);
+    api.responseJSON(res, channels);
 };
 
 get.apiDoc = {
     tags: ["iptv"],
-    produces: ["application/x-mpegURL"],
+    summary: "IPTV - Media Server Support",
     responses: {
         200: {
             description: "OK"

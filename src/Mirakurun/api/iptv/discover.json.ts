@@ -14,37 +14,30 @@
    limitations under the License.
 */
 import { Operation } from "express-openapi";
-import Service from "../../Service";
+import * as api from "../../api";
+import Tuner from "../../Tuner";
+const pkg = require("../../../../package.json");
 
 export const get: Operation = (req, res) => {
 
     const apiRoot = `${req.protocol}://${req.headers.host}/api`;
 
-    const services = [...Service.all()]; // shallow copy
-    services.sort((a, b) => a.getOrder() - b.getOrder());
-
-    let m = `#EXTM3U url-tvg="${apiRoot}/iptv/xmltv"\n`;
-    for (const service of services) {
-        if (service.type !== 1) {
-            continue;
-        }
-
-        m += `#EXTINF:-1 tvg-id="${service.id}"`;
-        if (service.hasLogoData) {
-            m += ` tvg-logo="${apiRoot}/services/${service.id}/logo"`;
-        }
-        m += ` group-title="${service.channel.type}",${service.name}\n`;
-        m += `${apiRoot}/services/${service.id}/stream\n`;
-    }
-
-    res.setHeader("Content-Type", "application/x-mpegURL; charset=utf-8");
-    res.status(200);
-    res.end(m);
+    api.responseJSON(res, {
+        FriendlyName: `Mirakurun`,
+        ModelNumber: `MIRAKURUN`,
+        FirmwareName: `mirakurun_${process.arch}_${process.platform}`,
+        FirmwareVersion: pkg.version,
+        DeviceID: "_DUMMY_",
+        DeviceAuth: "_DUMMY_",
+        TunerCount: Tuner.all().length,
+        BaseURL: `${apiRoot}`,
+        LineupURL: `${apiRoot}/iptv/lineup.json`
+    });
 };
 
 get.apiDoc = {
     tags: ["iptv"],
-    produces: ["application/x-mpegURL"],
+    summary: "IPTV - Media Server Support",
     responses: {
         200: {
             description: "OK"
