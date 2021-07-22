@@ -41,6 +41,7 @@ export const get: Operation = (req, res) => {
 
 get.apiDoc = {
     tags: ["tuners"],
+    summary: "Get Tuner Process Info",
     operationId: "getTunerProcess",
     responses: {
         200: {
@@ -80,6 +81,7 @@ export const del: Operation = (req, res) => {
 
 del.apiDoc = {
     tags: ["tuners"],
+    summary: "Kill Tuner Process",
     operationId: "killTunerProcess",
     responses: {
         200: {

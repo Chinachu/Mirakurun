@@ -321,7 +321,8 @@ export const put: Operation = async (req, res) => {
 };
 
 put.apiDoc = {
-    summary: "Scan the receivable channels and rewrite the channel settings.",
+    tags: ["config"],
+    summary: "Channel Scan",
     description: `Entry rewriting specifications:
 - The scan is performed on a range of channels of the specified type and the entries for those channels, if any, are saved in the configuration file.
 - If the channel to be scanned is described in the configuration file and is enabled, the scan will not be performed for that channel and the entries described will remain intact. If you do not want to keep the entries, use the \`refresh\` option.
@@ -335,7 +336,6 @@ About BS Subchannel Style:
     From \`BS\${minCh}_\${minSubCh}\` to \`BS\${maxCh}_\${maxSubCh}\`
 - In the subchannel style, minCh and maxCh are zero padded to two digits. minSubCh and maxSubCh are not padded.
 - BS "non" subchannel style scans and GR scans are basically the same. Note that if you scan the wrong channel range, the GR channel will be registered as BS and the BS channel will be registered as GR. This problem does not occur because CS scan uses a character string with \`CS\` added as a channel number prefix.`,
-    tags: ["config"],
     operationId: "channelScan",
     produces: [
         "text/plain",

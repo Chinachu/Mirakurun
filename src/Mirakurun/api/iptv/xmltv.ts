@@ -84,6 +84,7 @@ export const get: Operation = (req, res) => {
 
 get.apiDoc = {
     tags: ["iptv"],
+    summary: "IPTV - XMLTV EPG Data",
     produces: ["text/xml"],
     responses: {
         200: {

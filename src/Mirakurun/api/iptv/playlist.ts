@@ -44,6 +44,7 @@ export const get: Operation = (req, res) => {
 
 get.apiDoc = {
     tags: ["iptv"],
+    summary: "IPTV - M3U Playlist",
     produces: ["application/x-mpegURL"],
     responses: {
         200: {

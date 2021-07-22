@@ -90,6 +90,7 @@ export const get: Operation = (req, res) => {
 
 get.apiDoc = {
     tags: ["status"],
+    summary: "Get Status",
     operationId: "getStatus",
     responses: {
         200: {

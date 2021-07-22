@@ -50,6 +50,7 @@ export const put: Operation = (req, res) => {
 
 put.apiDoc = {
     tags: ["misc"],
+    summary: "Restart Mirakurun",
     operationId: "restart",
     produces: [
         "application/json"
