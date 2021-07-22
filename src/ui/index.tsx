@@ -34,6 +34,7 @@ import {
 import * as _http from "http";
 const http = require("stream-http") as typeof _http;
 import { TunerDevice, Status, Event } from "../../api";
+import ConnectionGuide from "./components/ConnectionGuide";
 import UpdateAlert from "./components/UpdateAlert";
 import Restart from "./components/Restart";
 import StatusView from "./components/StatusView";
@@ -294,6 +295,7 @@ const Content = () => {
                     <Text variant="mediumPlus" nowrap block className={ColorClassNames.themePrimary}>{state.status?.version}</Text>
                     <Text variant="medium" nowrap block className={ColorClassNames.neutralTertiaryAlt}>({state.statusName})</Text>
                     <Stack.Item grow disableShrink>&nbsp;</Stack.Item>
+                    <ConnectionGuide />
                     <ActionButton
                         iconProps={{ iconName: "KnowledgeArticle" }}
                         text="API Docs"

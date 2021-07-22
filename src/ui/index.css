@@ -21,6 +21,10 @@ body {
     color: #ebebeb;
 }
 
+.ms-layer {
+    display: none;
+}
+
 input::placeholder {
     color: #686b77 !important;
 }
