@@ -27,10 +27,11 @@ export const get: Operation = (req, res) => {
         ModelNumber: `MIRAKURUN`,
         FirmwareName: `mirakurun_${process.arch}_${process.platform}`,
         FirmwareVersion: pkg.version,
-        DeviceID: "_DUMMY_",
-        DeviceAuth: "_DUMMY_",
+        Manufacturer: "Chinachu Project",
+        DeviceID: req.headers.host.replace(/[\[\].:]/g, ""),
+        DeviceAuth: "MIRAKURUN",
         TunerCount: Tuner.all().length,
-        BaseURL: `${apiRoot}`,
+        BaseURL: `${apiRoot}/iptv`,
         LineupURL: `${apiRoot}/iptv/lineup.json`
     });
 };
