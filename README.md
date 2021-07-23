@@ -75,31 +75,6 @@ http://_your_mirakurun_ip_:40772/
 http://_your_mirakurun_ip_:40772/api/debug
 ```
 
-## Munin Plugin
-
-**Required**
-* [Munin](http://munin-monitoring.org/) `>=1.4.0`
-
-### Installation
-
-```sh
-ln -s /usr/local/lib/node_modules/mirakurun/bin/munin-plugins/mirakurun_status.js /usr/share/munin/plugins/mirakurun_status
-ln -s /usr/share/munin/plugins/mirakurun_status /etc/munin/plugins/mirakurun_status
-# check
-munin-run mirakurun_status
-# apply
-service munin-node restart
-```
-
-#### Workaround: `/usr/bin/env: node: No such file or directory`
-
-create `/etc/munin/plugin-conf.d/mirakurun.conf` like below:
-
-```
-[mirakurun_*]
-command /usr/local/bin/node %c
-```
-
 ## PM2 Plus (Keymetrics)
 
 You can use PM2 Plus to realtime monitoring if running by PM2.
