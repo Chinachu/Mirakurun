@@ -137,6 +137,19 @@ export default class Program {
         return items;
     }
 
+    findByNetworkIdAndTime(networkId: number, time: number): ProgramItem[] {
+
+        const items = [];
+
+        for (const item of this._itemIterator) {
+            if (item.data.networkId === networkId && item.data.startAt <= time && item.data.startAt + item.data.duration > time) {
+                items.push(item);
+            }
+        }
+
+        return items;
+    }
+
     findConflicts(networkId: number, serviceId: number, start: number, end: number): ProgramItem[] {
 
         const items = [];

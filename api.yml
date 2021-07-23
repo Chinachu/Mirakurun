@@ -126,6 +126,10 @@ definitions:
         type: boolean
       remoteControlKeyId:
         type: integer
+      epgReady:
+        type: boolean
+      epgUpdatedAt:
+        $ref: '#/definitions/UnixtimeMS'
       channel:
         $ref: '#/definitions/Channel'
 

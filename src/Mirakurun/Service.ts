@@ -181,7 +181,9 @@ export default class Service {
                     service.type,
                     service.logoId,
                     service.logoData,
-                    service.remoteControlKeyId
+                    service.remoteControlKeyId,
+                    service.epgReady,
+                    service.epgUpdatedAt
                 )
             );
         });

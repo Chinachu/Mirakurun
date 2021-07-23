@@ -61,6 +61,8 @@ export interface Service {
     logoId?: number;
     hasLogoData?: boolean;
     remoteControlKeyId?: number;
+    epgReady?: boolean;
+    epgUpdatedAt?: number;
     channel?: Channel;
 }
 

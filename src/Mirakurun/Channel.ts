@@ -177,6 +177,25 @@ export default class Channel {
                 if (services.length === 0) {
                     return;
                 }
+                const service = services[0];
+
+                if (service.epgReady === true) {
+                    const now = Date.now();
+                    if (now - service.epgUpdatedAt < this._epgGatheringInterval) {
+                        log.debug("Network#%d EPG gathering has skipped by `epgGatheringInterval`", networkId);
+                        return;
+                    }
+                    const programs = _.program.findByNetworkIdAndTime(networkId, now)
+                        .filter(program => !!program.data.name && program.data.name !== "放送休止");
+                    if (programs.length === 0) {
+                        log.debug("Network#%d EPG gathering has skipped because broadcast is off", networkId);
+                        return;
+                    }
+                    if (now - service.epgUpdatedAt > 1000 * 60 * 60 * 6) { // 6 hours
+                        log.debug("Network#%d EPG gathering is resuming forcibly because reached maximum pause time", networkId);
+                        service.epgReady = false;
+                    }
+                }
 
                 log.debug("Network#%d EPG gathering has queued", networkId);
 
@@ -185,7 +204,12 @@ export default class Channel {
                     log.info("Network#%d EPG gathering has started", networkId);
 
                     try {
-                        await Tuner.getEPG(services[0].channel);
+                        await Tuner.getEPG(service.channel);
+                        const now = Date.now();
+                        for (const service of services) {
+                            service.epgReady = true;
+                            service.epgUpdatedAt = now;
+                        }
                         log.info("Network#%d EPG gathering has finished", networkId);
                     } catch (e) {
                         log.warn("Network#%d EPG gathering has failed [%s]", networkId, e);

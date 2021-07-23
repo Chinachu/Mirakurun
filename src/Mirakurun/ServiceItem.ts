@@ -36,7 +36,9 @@ export default class ServiceItem {
         private _type?: number,
         private _logoId?: number,
         private _logoData?: string,
-        private _remoteControlKeyId?: number
+        private _remoteControlKeyId?: number,
+        private _epgReady: boolean = false,
+        private _epgUpdatedAt: number = 0
     ) {
 
         this._id = ServiceItem.getId(_networkId, _serviceId);
@@ -128,6 +130,34 @@ export default class ServiceItem {
         }
     }
 
+    get epgReady(): boolean {
+        return this._epgReady;
+    }
+
+    set epgReady(epgReady: boolean) {
+
+        if (this._epgReady !== epgReady) {
+            this._epgReady = epgReady;
+
+            _.service.save();
+            this._updated();
+        }
+    }
+
+    get epgUpdatedAt(): number {
+        return this._epgUpdatedAt;
+    }
+
+    set epgUpdatedAt(time: number) {
+
+        if (this._epgUpdatedAt !== time) {
+            this._epgUpdatedAt = time;
+
+            _.service.save();
+            this._updated();
+        }
+    }
+
     get channel(): ChannelItem {
         return this._channel;
     }
@@ -143,6 +173,8 @@ export default class ServiceItem {
             hasLogoData: !!this._logoData,
             logoId: this._logoId,
             remoteControlKeyId: this._remoteControlKeyId,
+            epgReady: this._epgReady,
+            epgUpdatedAt: this._epgUpdatedAt,
             channel: {
                 type: this._channel.type,
                 channel: this._channel.channel

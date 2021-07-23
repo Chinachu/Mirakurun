@@ -28,6 +28,8 @@ export interface Service {
     logoId: number;
     logoData?: string; // base64
     remoteControlKeyId?: number;
+    epgReady?: boolean;
+    epgUpdatedAt?: number;
     channel: Channel;
 }
 
