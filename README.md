@@ -42,9 +42,11 @@ see: [doc/Platforms.md](doc/Platforms.md)
 * Integrated MPEG-2 TS Parser, Filter
 * Realtime EPG Parser
 * Supports most Tuner Devices (chardev, DVB / ISDB-T, ISDB-S, DVB-S2)
+* Channel Scan
 * IPv6 Support
 * [Multiplexing Mirakuruns](doc/Mirakuruns.md)
 * Web UI
+* IPTV Server (M3U8 Playlist, XMLTV)
 
 #### Figure: Variety of the MPEG-2 TS Stream API
 
