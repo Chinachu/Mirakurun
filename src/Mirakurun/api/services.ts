@@ -24,12 +24,7 @@ export const get: Operation = (req, res) => {
     const services = [...Service.all()]; // shallow copy
     services.sort((a, b) => a.getOrder() - b.getOrder());
 
-    api.responseJSON(res, sift(req.query, services.map(service => {
-        return {
-            ...service.export(),
-            hasLogoData: service.hasLogoData
-        };
-    })));
+    api.responseJSON(res, sift(req.query, services.map(service => service.export())));
 };
 
 get.apiDoc = {

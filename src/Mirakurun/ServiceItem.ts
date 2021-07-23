@@ -140,6 +140,7 @@ export default class ServiceItem {
             networkId: this._networkId,
             name: this._name || "",
             type: this._type,
+            hasLogoData: !!this._logoData,
             logoId: this._logoId,
             remoteControlKeyId: this._remoteControlKeyId,
             channel: {

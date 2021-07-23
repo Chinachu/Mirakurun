@@ -36,10 +36,7 @@ export const get: Operation = (req, res) => {
         return;
     }
 
-    const ret: any = service.export();
-    ret.hasLogoData = service.hasLogoData;
-
-    res.json(ret);
+    res.json(service.export());
 };
 
 get.apiDoc = {

@@ -24,6 +24,7 @@ export interface Service {
     networkId: number;
     name: string;
     type: number;
+    hasLogoData?: boolean;
     logoId: number;
     logoData?: string; // base64
     remoteControlKeyId?: number;
