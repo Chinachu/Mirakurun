@@ -330,6 +330,9 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                                     isDisabled: true
                                 });
                                 setEditing([...editing]);
+                                setTimeout(() => {
+                                    listContainerRef.current.scrollTop = listContainerRef.current.scrollHeight;
+                                }, 0);
                             }}
                         />
                     </Stack.Item>
