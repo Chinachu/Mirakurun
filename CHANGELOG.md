@@ -2,6 +2,34 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.7.0 (2021-07-24)
+
+Added IPTV support and improved behavior regarding EPG refresh, improved UX, etc.
+
+### Server Changes
+
+- **epg**: Improved to perform refresh at an interval based on the previous refresh time when restarted.
+- **epg**: Improved to detects broadcast off. The system does not attempt to refresh the EPG when broadcast is off.
+- **api**: \[`services`\] Add `epgReady`, `epgUpdatedAt` properties.
+- **api**: \[`config/channels/scan`\] Renamed options.
+  - `registerOnDisabled` → `setDisabledOnAdd`
+  - `registerMode` → `scanMode`
+- **api**: \[`config/channels/scan`\] Fixed a bug that would change an enabled channel to disabled on `setDisabledOnAdd` is `true`.
+- **api**: \[`config/channels/scan`\] Add `dryRun` option.
+- **api**: \[`iptv`\] Implemented M3U playlist and XMLTV endpoints for IPTV.
+- **api**: \[`iptv`\] Implemented additional endpoints for Plex Media Server.
+- **ui**: Add "Connection Guide".
+- **ui**: Scroll to bottom when adding a new item.
+
+### Docker Changes
+
+- Update base image to `node:14.17.3-buster-slim`.
+
+### Other Changes
+
+- **munin-plugins**: Removed. please use [mirakurun-munin-plugins](https://github.com/Chinachu/mirakurun-munin-plugins) instead.
+- Update dependencies.
+
 ## 3.6.0 (2021-07-02)
 
 Performance improvements and new features.
