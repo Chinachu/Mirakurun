@@ -5,6 +5,7 @@ services:
       context: ../
       dockerfile: docker/Dockerfile
     image: chinachu/mirakurun:latest
+    container_name: mirakurun
     cap_add:
       - SYS_ADMIN
       - SYS_NICE
