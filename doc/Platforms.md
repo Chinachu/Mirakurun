@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Bold** is the recommended. also, **Node.js** `^10.15.0 < 11 || ^12 || ^14` needed.
+**Bold** is the recommended. also, **Node.js** `^12 || ^14 || ^16` needed.
 
 * [**Docker on Linux**](#docker-on-linux)
   * [Docker Engine](https://docs.docker.com/engine/install/) `>=18.06.0`
@@ -132,14 +132,14 @@ $ vim /usr/local/mirakurun/config/tuners.yml
 
 * **via Package Manager** (recommended)
   * [Debian / Ubuntu](https://github.com/nodesource/distributions/blob/master/README.md#deb) (deb)
-    * `curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -`
+    * `curl -sL https://deb.nodesource.com/setup_16.x | sudo -E bash -`
     * `sudo apt-get install -y nodejs`
   * [CentOS](https://github.com/nodesource/distributions/blob/master/README.md#rpm) (rpm)
-    * (root) `curl -sL https://rpm.nodesource.com/setup_14.x | bash -`
+    * (root) `curl -sL https://rpm.nodesource.com/setup_16.x | bash -`
   * [Gentoo](https://nodejs.org/en/download/package-manager/#gentoo)
     * `emerge nodejs`
 * [nave](https://github.com/isaacs/nave)
-  * `sudo /path/to/nave.sh usemain 14`
+  * `sudo /path/to/nave.sh usemain 16`
 
 ### Install / Update
 
