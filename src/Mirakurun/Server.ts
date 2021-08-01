@@ -21,7 +21,6 @@ import * as express from "express";
 import * as cors from "cors";
 import * as openapi from "express-openapi";
 import * as morgan from "morgan";
-import * as bodyParser from "body-parser";
 import * as yaml from "js-yaml";
 import { OpenAPIV2 } from "openapi-types";
 import { sleep } from "./common";
@@ -89,8 +88,8 @@ class Server {
         app.use(morgan(":remote-addr :remote-user :method :url HTTP/:http-version :status :res[content-length] - :response-time ms :user-agent", {
             stream: log.event as any
         }));
-        app.use(bodyParser.urlencoded({ extended: false }));
-        app.use(bodyParser.json());
+        app.use(express.urlencoded({ extended: false }));
+        app.use(express.json());
 
         app.use((req: express.Request, res: express.Response, next) => {
 
