@@ -24,12 +24,12 @@ stages:
   - job: Build
     strategy:
       matrix:
-        v10:
-          NODE_VERSION_SPEC: '10.15.0'
         v12:
           NODE_VERSION_SPEC: '12.x'
         v14:
           NODE_VERSION_SPEC: '14.x'
+        v16:
+          NODE_VERSION_SPEC: '16.x'
       maxParallel: 3
     pool:
       vmImage: 'ubuntu-latest'
