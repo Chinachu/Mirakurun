@@ -92,7 +92,7 @@
     "@types/ip": "^1.1.0",
     "@types/js-yaml": "^4.0.2",
     "@types/morgan": "^1.9.3",
-    "@types/node": "^10.17.60",
+    "@types/node": "^12.20.17",
     "@types/react": "^17.0.14",
     "@types/react-dom": "^17.0.9",
     "buffer": "^6.0.3",
@@ -110,7 +110,7 @@
     "webpack-cli": "^4.7.2"
   },
   "engines": {
-    "node": "^10.15.0 < 11 || ^12 || ^14"
+    "node": "^12 || ^14 || ^16"
   },
   "engineStrict": true,
   "os": [
