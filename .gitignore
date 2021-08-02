@@ -1,8 +1,11 @@
 /node_modules
 /lib
 /tmp
+/*.0x
 .env
+*.m2ts
 *.tar
 *.log
 *.swp
+*.tmp
 test.*

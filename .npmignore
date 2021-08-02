@@ -1,7 +1,9 @@
 /.vscode
 /node_modules
 /src
+/tmp
 /test
+/*.0x
 .dockerignore
 .editorconfig
 .gitignore
@@ -11,7 +13,10 @@ Dockerfile
 gulpfile.js
 tsconfig.json
 tslint.json
+webpack.config.js
 *.m2ts
+*.tar
 *.log
 *.swp
+*.tmp
 test.*
