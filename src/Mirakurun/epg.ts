@@ -465,7 +465,7 @@ class EPG extends stream.Writable {
 
     private _gc(): void {
 
-        log.info("EPG GC has queued");
+        log.debug("EPG GC has queued");
 
         queue.add(async () => {
 

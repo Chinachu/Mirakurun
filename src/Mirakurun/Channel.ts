@@ -182,11 +182,11 @@ export default class Channel {
                 if (service.epgReady === true) {
                     const now = Date.now();
                     if (now - service.epgUpdatedAt < this._epgGatheringInterval) {
-                        log.debug("Network#%d EPG gathering has skipped by `epgGatheringInterval`", networkId);
+                        log.info("Network#%d EPG gathering has skipped by `epgGatheringInterval`", networkId);
                         return;
                     }
                     if (now - service.epgUpdatedAt > 1000 * 60 * 60 * 6) { // 6 hours
-                        log.debug("Network#%d EPG gathering is resuming forcibly because reached maximum pause time", networkId);
+                        log.info("Network#%d EPG gathering is resuming forcibly because reached maximum pause time", networkId);
                         service.epgReady = false;
                     } else {
                         const currentPrograms = _.program.findByNetworkIdAndTime(networkId, now)
@@ -194,7 +194,7 @@ export default class Channel {
                         if (currentPrograms.length === 0) {
                             const networkPrograms = _.program.findByNetworkId(networkId);
                             if (networkPrograms.length > 0) {
-                                log.debug("Network#%d EPG gathering has skipped because broadcast is off", networkId);
+                                log.info("Network#%d EPG gathering has skipped because broadcast is off", networkId);
                                 return;
                             }
                             service.epgReady = false;
