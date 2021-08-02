@@ -13,13 +13,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-import * as child_process from "child_process";
 import * as stream from "stream";
 import * as common from "./common";
 import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
-import status from "./status";
 import TunerDevice from "./TunerDevice";
 import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";

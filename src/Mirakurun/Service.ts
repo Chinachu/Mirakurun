@@ -13,7 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-import * as stream from "stream";
 import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";

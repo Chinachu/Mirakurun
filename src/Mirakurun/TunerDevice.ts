@@ -16,7 +16,6 @@
 import * as events from "events";
 import * as child_process from "child_process";
 import * as stream from "stream";
-import * as fs from "fs";
 import * as util from "util";
 import * as common from "./common";
 import * as log from "./log";

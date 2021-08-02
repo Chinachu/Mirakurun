@@ -13,15 +13,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-import * as stream from "stream";
-import * as fs from "fs";
 import sift from "sift";
 import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
 import Event from "./Event";
 import queue from "./queue";
-import ServiceItem from "./ServiceItem";
 import ProgramItem from "./ProgramItem";
 
 export default class Program {

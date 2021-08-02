@@ -15,11 +15,9 @@
 */
 import * as stream from "stream";
 import * as common from "./common";
-import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
 import Event from "./Event";
-import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
 
 export default class ProgramItem {
