@@ -3,7 +3,7 @@
     {
       "name": "mirakurun-server",
       "script": "lib/server.js",
-      "node_args" : "-r source-map-support/register --max_old_space_size=512",
+      "node_args" : "-r source-map-support/register",
       "error_file": "/usr/local/var/log/mirakurun.stderr.log",
       "out_file": "/usr/local/var/log/mirakurun.stdout.log",
       "merge_logs": true,
