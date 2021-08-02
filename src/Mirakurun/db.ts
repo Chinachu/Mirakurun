@@ -14,6 +14,7 @@
    limitations under the License.
 */
 import { dirname } from "path";
+import { promises as fsPromises } from "fs";
 import * as fs from "fs";
 import * as common from "./common";
 import * as log from "./log";
@@ -119,16 +120,16 @@ export function loadServices(integrity: string): Service[] {
     return load(process.env.SERVICES_DB_PATH, integrity);
 }
 
-export function saveServices(data: Service[], integrity: string): Promise<void> {
-    return save(process.env.SERVICES_DB_PATH, data, integrity);
+export async function saveServices(data: Service[], integrity: string): Promise<void> {
+    return await save(process.env.SERVICES_DB_PATH, data, integrity);
 }
 
 export function loadPrograms(integrity: string): Program[] {
     return load(process.env.PROGRAMS_DB_PATH, integrity);
 }
 
-export function savePrograms(data: Program[], integrity: string): Promise<void> {
-    return save(process.env.PROGRAMS_DB_PATH, data, integrity);
+export async function savePrograms(data: Program[], integrity: string): Promise<void> {
+    return await save(process.env.PROGRAMS_DB_PATH, data, integrity);
 }
 
 function load(path: string, integrity: string) {
@@ -158,31 +159,28 @@ function load(path: string, integrity: string) {
     }
 }
 
-function save(path: string, data: any[], integrity: string): Promise<void> {
+async function save(path: string, data: any[], integrity: string, retrying = false): Promise<void> {
 
     log.info("save db `%s` w/ integirty (%s)", path, integrity);
 
     data.unshift({ __integrity__: integrity });
 
-    return new Promise<void>((resolve, reject) => {
-
-        // mkdir if not exists
-        const dirPath = dirname(path);
-        if (fs.existsSync(dirPath) === false) {
-            try {
-                fs.mkdirSync(dirPath, { recursive: true });
-            } catch (e) {
-                return reject(e);
+    try {
+        await fsPromises.writeFile(path, JSON.stringify(data));
+    } catch (e) {
+        if (retrying === false) {
+            // mkdir if not exists
+            const dirPath = dirname(path);
+            if (fs.existsSync(dirPath) === false) {
+                try {
+                    fs.mkdirSync(dirPath, { recursive: true });
+                } catch (e) {
+                    throw e;
+                }
+                // retry
+                return await save(path, data, integrity, true);
             }
         }
-
-        fs.writeFile(path, JSON.stringify(data), err => {
-
-            if (err) {
-                return reject(err);
-            }
-
-            resolve();
-        });
-    });
+        throw e;
+    }
 }
