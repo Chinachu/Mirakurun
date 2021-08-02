@@ -38,10 +38,6 @@ export default class Program {
         return _.program.findByQuery(query);
     }
 
-    static findByServiceId(serviceId: number): ProgramItem[] {
-        return _.program.findByServiceId(serviceId);
-    }
-
     static all(): ProgramItem[] {
         return _.program.items;
     }
@@ -124,12 +120,12 @@ export default class Program {
         return sift(query, this.items);
     }
 
-    findByServiceId(serviceId: number): ProgramItem[] {
+    findByNetworkId(networkId: number): ProgramItem[] {
 
         const items = [];
 
         for (const item of this._itemIterator) {
-            if (item.data.serviceId === serviceId) {
+            if (item.data.networkId === networkId) {
                 items.push(item);
             }
         }

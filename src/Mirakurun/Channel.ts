@@ -185,15 +185,20 @@ export default class Channel {
                         log.debug("Network#%d EPG gathering has skipped by `epgGatheringInterval`", networkId);
                         return;
                     }
-                    const programs = _.program.findByNetworkIdAndTime(networkId, now)
-                        .filter(program => !!program.data.name && program.data.name !== "放送休止");
-                    if (programs.length === 0) {
-                        log.debug("Network#%d EPG gathering has skipped because broadcast is off", networkId);
-                        return;
-                    }
                     if (now - service.epgUpdatedAt > 1000 * 60 * 60 * 6) { // 6 hours
                         log.debug("Network#%d EPG gathering is resuming forcibly because reached maximum pause time", networkId);
                         service.epgReady = false;
+                    } else {
+                        const currentPrograms = _.program.findByNetworkIdAndTime(networkId, now)
+                            .filter(program => !!program.data.name && program.data.name !== "放送休止");
+                        if (currentPrograms.length === 0) {
+                            const networkPrograms = _.program.findByNetworkId(networkId);
+                            if (networkPrograms.length > 0) {
+                                log.debug("Network#%d EPG gathering has skipped because broadcast is off", networkId);
+                                return;
+                            }
+                            service.epgReady = false;
+                        }
                     }
                 }
 
