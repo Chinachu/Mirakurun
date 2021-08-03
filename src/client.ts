@@ -224,9 +224,9 @@ export default class Client {
         }
 
         if (operation.tags.indexOf("stream") !== -1) {
-            return await this._requestStream(method, path, option);
+            return this._requestStream(method, path, option);
         }
-        return await this.request(method, path, option);
+        return this.request(method, path, option);
     }
 
     async getChannels(query?: ChannelsQuery): Promise<apid.Channel[]> {
@@ -261,12 +261,12 @@ export default class Client {
 
     async getServiceStreamByChannel(type: apid.ChannelType, channel: string, sid: apid.ServiceId, decode?: boolean, priority?: number): Promise<http.IncomingMessage> {
 
-        return await this.call("getServiceStreamByChannel", { type, channel, sid, "decode": decode ? 1 : 0, "X-Mirakurun-Priority": priority });
+        return this.call("getServiceStreamByChannel", { type, channel, sid, "decode": decode ? 1 : 0, "X-Mirakurun-Priority": priority });
     }
 
     async getChannelStream(type: apid.ChannelType, channel: string, decode?: boolean, priority?: number): Promise<http.IncomingMessage> {
 
-        return await this.call("getChannelStream", { type, channel, "decode": decode ? 1 : 0, "X-Mirakurun-Priority": priority });
+        return this.call("getChannelStream", { type, channel, "decode": decode ? 1 : 0, "X-Mirakurun-Priority": priority });
     }
 
     async getPrograms(query?: ProgramsQuery): Promise<apid.Program[]> {
@@ -283,7 +283,7 @@ export default class Client {
 
     async getProgramStream(id: apid.ProgramId, decode?: boolean, priority?: number): Promise<http.IncomingMessage> {
 
-        return await this.call("getProgramStream", { id, "decode": decode ? 1 : 0, "X-Mirakurun-Priority": priority });
+        return this.call("getProgramStream", { id, "decode": decode ? 1 : 0, "X-Mirakurun-Priority": priority });
     }
 
     async getServices(query?: ServicesQuery): Promise<apid.Service[]> {
@@ -306,7 +306,7 @@ export default class Client {
 
     async getServiceStream(id: apid.ServiceItemId, decode?: boolean, priority?: number): Promise<http.IncomingMessage> {
 
-        return await this.call("getServiceStream", { id, "decode": decode ? 1 : 0, "X-Mirakurun-Priority": priority });
+        return this.call("getServiceStream", { id, "decode": decode ? 1 : 0, "X-Mirakurun-Priority": priority });
     }
 
     async getTuners(): Promise<apid.TunerDevice[]> {
@@ -341,7 +341,7 @@ export default class Client {
 
     async getEventsStream(query?: EventsQuery): Promise<http.IncomingMessage> {
 
-        return await this.call("getEventsStream", query);
+        return this.call("getEventsStream", query);
     }
 
     async getChannelsConfig(): Promise<apid.ConfigChannels> {
@@ -358,7 +358,7 @@ export default class Client {
 
     async channelScan(option?: ChannelScanOption): Promise<http.IncomingMessage> {
 
-        return await this.call("channelScan", option);
+        return this.call("channelScan", option);
     }
 
     async getServerConfig(): Promise<apid.ConfigServer> {
@@ -393,7 +393,7 @@ export default class Client {
 
     async getLogStream(): Promise<http.IncomingMessage> {
 
-        return await this.call("getLogStream");
+        return this.call("getLogStream");
     }
 
     async checkVersion(): Promise<apid.Version> {
@@ -404,7 +404,7 @@ export default class Client {
 
     async updateVersion(force?: boolean): Promise<http.IncomingMessage> {
 
-        return await this.call("updateVersion", { force });
+        return this.call("updateVersion", { force });
     }
 
     async getStatus(): Promise<apid.Status> {
@@ -435,6 +435,7 @@ export default class Client {
             opt.port = this.port;
         }
 
+        // tslint:disable-next-line:prefer-conditional-expression
         if (this.userAgent === "") {
             opt.headers["User-Agent"] = this._userAgent;
         } else {

@@ -55,16 +55,13 @@ export enum ChannelTypes {
 export type ChannelType = keyof typeof ChannelTypes;
 
 export function extendObject<T, U>(b: T, a: U): T {
-
     for (const k in a) {
         (<any> b)[k] = a[k];
     }
-
     return b;
 }
 
 export function updateObject<T, U>(b: T, a: U): boolean {
-
     let updated = false;
 
     for (const k in a) {

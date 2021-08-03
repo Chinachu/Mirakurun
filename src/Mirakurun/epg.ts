@@ -297,12 +297,9 @@ class EPG extends stream.Writable {
                                                 ? current
                                                 : new TsChar(desc.item_description_char).decode();
                                     current = key;
-
-                                    if (extended[key]) {
-                                        extended[key] = Buffer.concat([extended[key], desc.item_char]);
-                                    } else {
-                                        extended[key] = Buffer.from(desc.item_char);
-                                    }
+                                    extended[key] = extended[key] ?
+                                        Buffer.concat([extended[key], desc.item_char]) :
+                                        Buffer.from(desc.item_char);
                                 }
                             }
                             for (const key of Object.keys(extended)) {

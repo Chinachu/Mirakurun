@@ -121,7 +121,7 @@ export function loadServices(integrity: string): Service[] {
 }
 
 export async function saveServices(data: Service[], integrity: string): Promise<void> {
-    return await save(process.env.SERVICES_DB_PATH, data, integrity);
+    return save(process.env.SERVICES_DB_PATH, data, integrity);
 }
 
 export function loadPrograms(integrity: string): Program[] {
@@ -129,7 +129,7 @@ export function loadPrograms(integrity: string): Program[] {
 }
 
 export async function savePrograms(data: Program[], integrity: string): Promise<void> {
-    return await save(process.env.PROGRAMS_DB_PATH, data, integrity);
+    return save(process.env.PROGRAMS_DB_PATH, data, integrity);
 }
 
 function load(path: string, integrity: string) {
@@ -178,7 +178,7 @@ async function save(path: string, data: any[], integrity: string, retrying = fal
                     throw e;
                 }
                 // retry
-                return await save(path, data, integrity, true);
+                return save(path, data, integrity, true);
             }
         }
         throw e;

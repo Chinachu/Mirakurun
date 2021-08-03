@@ -67,12 +67,13 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
     Object.keys(option).forEach(key => option[key] === undefined && delete option[key]);
 
     if (option.type === common.ChannelTypes.GR) {
-        option = Object.assign({
+        option = {
             startCh: 13,
             endCh: 62,
             scanMode: ScanMode.Channel,
-            setDisabledOnAdd: false
-        }, option);
+            setDisabledOnAdd: false,
+            ...option
+        };
 
         return {
             channels: range(option.startCh, option.endCh).map((ch) => ch),
@@ -81,19 +82,21 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
         };
     }
 
-    option = Object.assign({
+    option = {
         scanMode: ScanMode.Service,
-        setDisabledOnAdd: true
-    }, option);
+        setDisabledOnAdd: true,
+        ...option
+    };
 
     if (option.type === common.ChannelTypes.BS) {
         if (option.useSubCh) {
-            option = Object.assign({
+            option = {
                 startCh: 1,
                 endCh: 23,
                 startSubCh: 0,
-                endSubCh: 3
-            }, option);
+                endSubCh: 3,
+                ...option
+            };
 
             const channels: string[] = [];
             for (const ch of range(option.startCh, option.endCh)) {
@@ -109,10 +112,11 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
             };
         }
 
-        option = Object.assign({
+        option = {
             startCh: 101,
-            endCh: 256
-        }, option);
+            endCh: 256,
+            ...option
+        };
 
         return {
             channels: range(option.startCh, option.endCh).map((ch) => ch),
@@ -122,10 +126,11 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
     }
 
     if (option.type === common.ChannelTypes.CS) {
-        option = Object.assign({
+        option = {
             startCh: 2,
-            endCh: 24
-        }, option);
+            endCh: 24,
+            ...option
+        };
 
         return {
             channels: range(option.startCh, option.endCh).map((ch) => `CS${ch}`),

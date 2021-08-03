@@ -54,6 +54,12 @@
     "no-console": false,
     "no-construct": true,
     "no-debugger": true,
+    "no-duplicate-imports": [
+      "error",
+      {
+        "includeExports": true
+      }
+    ],
     "no-duplicate-super": true,
     "no-empty": {
       "severity": "warning"
@@ -165,5 +171,9 @@
       "check-typecast"
     ]
   },
-  "rulesDirectory": []
+  "rulesDirectory": [],
+  "extends": [
+    "tslint:latest",
+    "tslint-config-prettier"
+  ]
 }

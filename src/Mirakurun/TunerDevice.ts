@@ -269,6 +269,7 @@ export default class TunerDevice extends events.EventEmitter {
             cmd = cmd.replace("<satellite>", ch.satellite);
         }
 
+        // tslint:disable-next-line:prefer-conditional-expression
         if (ch.space) {
             cmd = cmd.replace("<space>", ch.space.toString(10));
         } else {

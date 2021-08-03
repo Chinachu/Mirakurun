@@ -388,7 +388,6 @@ export default class TSFilter extends stream.Transform {
 
         const l = data.programs.length;
         for (let i = 0; i < l; i++) {
-            let item: ServiceItem;
             const id = data.programs[i].program_number as number;
 
             if (id === 0) {
@@ -405,11 +404,8 @@ export default class TSFilter extends stream.Transform {
             }
 
             this._serviceIds.add(id);
-            if (this._targetNetworkId === null) {
-                item = null;
-            } else {
-                item = _.service.get(this._targetNetworkId, id);
-            }
+
+            const item = this._targetNetworkId === null ? null : _.service.get(this._targetNetworkId, id);
 
             log.debug(
                 "TSFilter detected PMT PID=%d as serviceId=%d (%s)",
@@ -457,13 +453,13 @@ export default class TSFilter extends stream.Transform {
             }
 
             if (this._parseEIT && item) {
-                _.service.findByNetworkId(this._targetNetworkId).forEach(service => {
+                for (const service of _.service.findByNetworkId(this._targetNetworkId)) {
                     if (this._parseServiceIds.has(service.serviceId) === false) {
                         this._parseServiceIds.add(service.serviceId);
 
                         log.debug("TSFilter parsing serviceId=%d (%s)", service.serviceId, service.name);
                     }
-                });
+                }
             }
         }
 
@@ -683,12 +679,11 @@ export default class TSFilter extends stream.Transform {
         const serviceId = data.service_id;
         const versionNumber = data.version_number;
 
-        if (!this._epgState[networkId]) {
-            this._epgState[networkId] = {};
-        }
+        const stateByNet = this._epgState[networkId] || (this._epgState[networkId] = {});
+        let stateBySrv = stateByNet[serviceId];
 
-        if (!this._epgState[networkId][serviceId]) {
-            this._epgState[networkId][serviceId] = {
+        if (!stateByNet[serviceId]) {
+            stateBySrv = stateByNet[serviceId] = {
                 basic: {
                     flags: [],
                     lastFlagsId: -1
@@ -700,13 +695,13 @@ export default class TSFilter extends stream.Transform {
             };
 
             for (let i = 0; i < 0x08; i++) {
-                [this._epgState[networkId][serviceId].basic, this._epgState[networkId][serviceId].extended].forEach(target => {
+                for (const target of [stateBySrv.basic, stateBySrv.extended]) {
                     target.flags.push({
                         flag: Buffer.alloc(32, 0x00),
                         ignore: Buffer.alloc(32, 0xFF),
                         version_number: -1
                     });
-                });
+                }
             }
         }
 
@@ -716,7 +711,7 @@ export default class TSFilter extends stream.Transform {
         const lastSegmentNumber = data.last_section_number >> 3;
         const sectionNumber = data.section_number & 0x07;
         const segmentLastSectionNumber = data.segment_last_section_number & 0x07;
-        const targetFlags = (data.table_id & 0x0F) < 0x08 ? this._epgState[networkId][serviceId].basic : this._epgState[networkId][serviceId].extended;
+        const targetFlags = (data.table_id & 0x0F) < 0x08 ? stateBySrv.basic : stateBySrv.extended;
         const targetFlag = targetFlags.flags[flagsId];
 
         if ((targetFlags.lastFlagsId !== lastFlagsId) ||

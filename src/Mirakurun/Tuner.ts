@@ -62,7 +62,6 @@ export default class Tuner {
     private _devices: TunerDevice[] = [];
 
     constructor() {
-
         this._load();
     }
 
@@ -106,8 +105,8 @@ export default class Tuner {
         return this._getStream({
             ...userReq,
             streamSetting: {
-                channel: channel,
-                networkId: networkId,
+                channel,
+                networkId,
                 parseEIT: true
             }
         });
@@ -146,7 +145,7 @@ export default class Tuner {
             time = _.config.server.epgRetrievalTime || 1000 * 60 * 10;
         }
 
-        let networkId;
+        let networkId: number;
 
         const services = channel.getServices();
         if (services.length !== 0) {
@@ -158,8 +157,8 @@ export default class Tuner {
             priority: -1,
             disableDecoder: true,
             streamSetting: {
-                channel: channel,
-                networkId: networkId,
+                channel,
+                networkId,
                 noProvide: true,
                 parseEIT: true
             }
@@ -182,7 +181,7 @@ export default class Tuner {
             priority: -1,
             disableDecoder: true,
             streamSetting: {
-                channel: channel,
+                channel,
                 noProvide: true,
                 parseNIT: true,
                 parseSDT: true

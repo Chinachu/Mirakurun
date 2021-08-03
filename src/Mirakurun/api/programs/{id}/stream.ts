@@ -63,7 +63,6 @@ export const get: Operation = (req, res) => {
         disableDecoder: (<number> <any> req.query.decode === 0)
     })
         .then(stream => {
-
             if (requestAborted === true) {
                 return stream.emit("close");
             }
