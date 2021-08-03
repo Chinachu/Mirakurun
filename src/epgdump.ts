@@ -101,7 +101,7 @@ function finalize() {
 
     console.log("programs:", programs.length, "(events)");
 
-    fs.writeFileSync(dest, JSON.stringify(programs.map(program => program.data), null, "  "));
+    fs.writeFileSync(dest, JSON.stringify(programs, null, "  "));
 
     console.log(`saved to "${dest}".`);
     process.exit(0);

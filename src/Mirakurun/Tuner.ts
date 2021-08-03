@@ -21,7 +21,6 @@ import _ from "./_";
 import TunerDevice from "./TunerDevice";
 import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
-import ProgramItem from "./ProgramItem";
 import TSFilter from "./TSFilter";
 import TSDecoder from "./TSDecoder";
 
@@ -47,7 +46,7 @@ export default class Tuner {
         return _.tuner.getServiceStream(service, user);
     }
 
-    static getProgramStream(program: ProgramItem, user: common.User): Promise<stream.Readable> {
+    static getProgramStream(program: db.Program, user: common.User): Promise<stream.Readable> {
         return _.tuner.getProgramStream(program, user);
     }
 
@@ -125,15 +124,15 @@ export default class Tuner {
         });
     }
 
-    getProgramStream(program: ProgramItem, userReq: common.UserRequest): Promise<stream.Readable> {
+    getProgramStream(program: db.Program, userReq: common.UserRequest): Promise<stream.Readable> {
 
         return this._getStream({
             ...userReq,
             streamSetting: {
-                channel: program.service.channel,
-                serviceId: program.data.serviceId,
-                eventId: program.data.eventId,
-                networkId: program.data.networkId,
+                channel: _.service.get(program.networkId, program.serviceId).channel,
+                serviceId: program.serviceId,
+                eventId: program.eventId,
+                networkId: program.networkId,
                 parseEIT: true
             }
         });

@@ -40,13 +40,13 @@ export interface Channel {
 }
 
 export interface Program {
-    id?: number;
-    eventId?: number;
-    serviceId?: number;
-    networkId?: number;
-    startAt?: number;
-    duration?: number;
-    isFree?: boolean;
+    id: number;
+    eventId: number;
+    serviceId: number;
+    networkId: number;
+    startAt: number;
+    duration: number;
+    isFree: boolean;
 
     name?: string;
     description?: string;

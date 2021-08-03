@@ -15,12 +15,12 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../api";
+import * as db from "../db";
 import Program from "../Program";
-import ProgramItem from "../ProgramItem";
 
 export const get: Operation = (req, res) => {
 
-    let programs: ProgramItem[];
+    let programs: db.Program[];
 
     if (Object.keys(req.query).length !== 0) {
         programs = Program.findByQuery({
@@ -30,7 +30,7 @@ export const get: Operation = (req, res) => {
         programs = Program.all();
     }
 
-    api.responseJSON(res, programs.map(program => program.data));
+    api.responseJSON(res, programs);
 };
 
 get.apiDoc = {

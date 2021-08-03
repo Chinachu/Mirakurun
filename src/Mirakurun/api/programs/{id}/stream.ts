@@ -16,6 +16,7 @@
 import { Operation } from "express-openapi";
 import * as api from "../../../api";
 import Program from "../../../Program";
+import Tuner from "../../../Tuner";
 
 export const parameters = [
     {
@@ -55,7 +56,7 @@ export const get: Operation = (req, res) => {
 
     const userId = (req.ip || "unix") + ":" + (req.connection.remotePort || Date.now());
 
-    program.getStream({
+    Tuner.getProgramStream(program, {
         id: userId,
         priority: parseInt(req.get("X-Mirakurun-Priority"), 10) || 0,
         agent: req.get("User-Agent"),

@@ -14,16 +14,20 @@
    limitations under the License.
 */
 import sift from "sift";
+import * as common from "./common";
 import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
 import Event from "./Event";
 import queue from "./queue";
-import ProgramItem from "./ProgramItem";
+
+export function getProgramItemId(networkId: number, serviceId: number, eventId: number): number {
+    return parseInt(`${networkId}${serviceId.toString(10).padStart(5, "0")}${eventId.toString(10).padStart(5, "0")}`, 10);
+}
 
 export default class Program {
 
-    static get(id: number): ProgramItem {
+    static get(id: number): db.Program {
         return _.program.get(id);
     }
 
@@ -31,35 +35,30 @@ export default class Program {
         return _.program.exists(id);
     }
 
-    static findByQuery(query: object): ProgramItem[] {
+    static findByQuery(query: object): db.Program[] {
         return _.program.findByQuery(query);
     }
 
-    static all(): ProgramItem[] {
+    static all(): db.Program[] {
         return _.program.items;
     }
 
-    private _itemMap: Map<number, ProgramItem> = new Map<number, ProgramItem>();
+    private _itemMap: Map<number, db.Program> = new Map<number, db.Program>();
     private _saveTimerId: NodeJS.Timer;
     private _programGCInterval: number = _.config.server.programGCInterval || 1000 * 60 * 15;
 
     constructor() {
-
         this._load();
 
         setTimeout(this._gc.bind(this), this._programGCInterval);
     }
 
     /** CAUTION: This getter method creates a new Array object every time. */
-    get items(): ProgramItem[] {
-        return Array.from(this._itemIterator);
+    get items(): db.Program[] {
+        return Array.from(this._itemMap.values());
     }
 
-    private get _itemIterator(): IterableIterator<ProgramItem> {
-        return this._itemMap.values();
-    }
-
-    add(item: ProgramItem, firstAdd: boolean = false): void {
+    add(item: db.Program, firstAdd: boolean = false): void {
 
         if (this.exists(item.id)) {
             return;
@@ -69,40 +68,45 @@ export default class Program {
 
         if (firstAdd === false) {
             _.program.findConflicts(
-                item.data.networkId,
-                item.data.serviceId,
-                item.data.startAt,
-                item.data.startAt + item.data.duration
+                item.networkId,
+                item.serviceId,
+                item.startAt,
+                item.startAt + item.duration
             ).forEach(conflictedItem => {
-
-                this.remove(conflictedItem);
+                this.remove(conflictedItem.id);
+                removedIds.push(conflictedItem.id);
 
                 log.debug(
                     "ProgramItem#%d (networkId=%d, eventId=%d) has removed for redefine to ProgramItem#%d (eventId=%d)",
-                    conflictedItem.data.id, conflictedItem.data.networkId, conflictedItem.data.eventId,
-                    item.data.id, item.data.eventId
+                    conflictedItem.id, conflictedItem.networkId, conflictedItem.eventId, item.id, item.eventId
                 );
-
-                removedIds.push(conflictedItem.data.id);
             });
         }
 
         this._itemMap.set(item.id, item);
 
         if (firstAdd === false) {
-            Event.emit("program", "create", item.data);
-            removedIds.forEach(id => Event.emit("program", "redefine", { from: id, to: item.data.id }));
+            Event.emit("program", "create", item);
+            removedIds.forEach(id => Event.emit("program", "redefine", { from: id, to: item.id }));
         }
 
         this.save();
     }
 
-    get(id: number): ProgramItem | null {
+    get(id: number): db.Program | null {
         return this._itemMap.get(id) || null;
     }
 
-    remove(item: ProgramItem): void {
-        if (this._itemMap.delete(item.id)) {
+    set(id: number, props: Partial<db.Program>): void {
+        const item = this.get(id);
+        if (item && common.updateObject(item, props) === true) {
+            this.save();
+            Event.emit("program", "update", item);
+        }
+    }
+
+    remove(id: number): void {
+        if (this._itemMap.delete(id)) {
             this.save();
         }
     }
@@ -111,18 +115,18 @@ export default class Program {
         return this._itemMap.has(id);
     }
 
-    findByQuery(query: object): ProgramItem[] {
+    findByQuery(query: object): db.Program[] {
         // Pass `this.items` instead of `this._itemIterator`.
         // Because IterableIterator<T> doesn't have the `filter()` method.
         return sift(query, this.items);
     }
 
-    findByNetworkId(networkId: number): ProgramItem[] {
+    findByNetworkId(networkId: number): db.Program[] {
 
         const items = [];
 
-        for (const item of this._itemIterator) {
-            if (item.data.networkId === networkId) {
+        for (const item of this._itemMap.values()) {
+            if (item.networkId === networkId) {
                 items.push(item);
             }
         }
@@ -130,12 +134,12 @@ export default class Program {
         return items;
     }
 
-    findByNetworkIdAndTime(networkId: number, time: number): ProgramItem[] {
+    findByNetworkIdAndTime(networkId: number, time: number): db.Program[] {
 
         const items = [];
 
-        for (const item of this._itemIterator) {
-            if (item.data.networkId === networkId && item.data.startAt <= time && item.data.startAt + item.data.duration > time) {
+        for (const item of this._itemMap.values()) {
+            if (item.networkId === networkId && item.startAt <= time && item.startAt + item.duration > time) {
                 items.push(item);
             }
         }
@@ -143,16 +147,16 @@ export default class Program {
         return items;
     }
 
-    findConflicts(networkId: number, serviceId: number, start: number, end: number): ProgramItem[] {
+    findConflicts(networkId: number, serviceId: number, start: number, end: number): db.Program[] {
 
         const items = [];
 
-        for (const item of this._itemIterator) {
+        for (const item of this._itemMap.values()) {
             if (
-                item.data.networkId === networkId &&
-                item.data.serviceId === serviceId &&
-                item.data.startAt >= start &&
-                item.data.startAt < end
+                item.networkId === networkId &&
+                item.serviceId === serviceId &&
+                item.startAt >= start &&
+                item.startAt < end
             ) {
                 items.push(item);
             }
@@ -169,16 +173,16 @@ export default class Program {
         // `this.items` returns a new Array object created from the original
         // data.
         for (const item of this.items.reverse()) {
-            if (item.data.networkId === networkId) {
+            if (item.networkId === networkId) {
                 // Calling `this.remove(item)` here is safe.  Because that never
                 // changes the Array object we're iterating here.
-                this.remove(item);
+                this.remove(item.id);
                 --count;
             }
         }
 
         for (const program of programs) {
-            this.add(new ProgramItem(program), true);
+            this.add(program, true);
             ++count;
         }
 
@@ -199,18 +203,18 @@ export default class Program {
         const now = Date.now();
         let dropped = false;
 
-        db.loadPrograms(_.configIntegrity.channels).forEach(program => {
+        db.loadPrograms(_.configIntegrity.channels).forEach(item => {
 
-            if (program.networkId === undefined) {
+            if (item.networkId === undefined) {
                 dropped = true;
                 return;
             }
-            if (now > (program.startAt + program.duration)) {
+            if (now > (item.startAt + item.duration)) {
                 dropped = true;
                 return;
             }
 
-            this.add(new ProgramItem(program), true);
+            this.add(item, true);
         });
 
         if (dropped) {
@@ -223,17 +227,9 @@ export default class Program {
         log.debug("saving programs...");
 
         db.savePrograms(
-            this._collectDBData(),
+            this.items,
             _.configIntegrity.channels
         );
-    }
-
-    private _collectDBData(): db.Program[] {
-        const results = [];
-        for (const item of this._itemIterator) {
-            results.push(item.data);
-        }
-        return results;
     }
 
     private _gc(): void {
@@ -245,10 +241,10 @@ export default class Program {
             const now = Date.now();
             let count = 0;
 
-            for (const program of this._itemIterator) {
-                if (now > (program.data.startAt + program.data.duration)) {
+            for (const item of this._itemMap.values()) {
+                if (now > (item.startAt + item.duration)) {
                     ++count;
-                    this.remove(program);
+                    this.remove(item.id);
                 }
             }
 

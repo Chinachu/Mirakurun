@@ -66,12 +66,13 @@ export const get: Operation = (req, res) => {
     }
 
     for (const program of Program.all()) {
-        if (program.service === null) {
+        const service = Service.get(program.networkId, program.serviceId);
+        if (service === null) {
             continue;
         }
-        x += `<programme start="${getDateTime(program.data.startAt)}" stop="${getDateTime(program.data.startAt + program.data.duration)}" channel="${program.service.id}">\n`;
-        x += `<title>${escapeXMLSpecialChars(program.data.name || "")}</title>\n`;
-        x += `<desc>${escapeXMLSpecialChars(program.data.description || "")}</desc>\n`;
+        x += `<programme start="${getDateTime(program.startAt)}" stop="${getDateTime(program.startAt + program.duration)}" channel="${service.id}">\n`;
+        x += `<title>${escapeXMLSpecialChars(program.name || "")}</title>\n`;
+        x += `<desc>${escapeXMLSpecialChars(program.description || "")}</desc>\n`;
         x += `</programme>\n`;
     }
 

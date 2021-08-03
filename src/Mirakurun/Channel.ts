@@ -189,7 +189,7 @@ export default class Channel {
                         service.epgReady = false;
                     } else {
                         const currentPrograms = _.program.findByNetworkIdAndTime(networkId, now)
-                            .filter(program => !!program.data.name && program.data.name !== "放送休止");
+                            .filter(program => !!program.name && program.name !== "放送休止");
                         if (currentPrograms.length === 0) {
                             const networkPrograms = _.program.findByNetworkId(networkId);
                             if (networkPrograms.length > 0) {

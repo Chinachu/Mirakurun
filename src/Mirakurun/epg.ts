@@ -14,12 +14,11 @@
    limitations under the License.
 */
 import * as stream from "stream";
+import { getProgramItemId } from "./Program";
 import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
 import queue from "./queue";
-import ProgramItem from "./ProgramItem";
-const getProgramId = ProgramItem.getId;
 import * as aribts from "aribts";
 const TsChar = aribts.TsChar;
 const TsDate = aribts.TsDate;
@@ -79,7 +78,7 @@ const SAMPLING_RATE = {
 
 interface EventState {
     version: VersionState;
-    program: ProgramItem;
+    program: db.Program;
 
     short: {
         version: number; // basic
@@ -158,19 +157,18 @@ class EPG extends stream.Writable {
             let state: EventState;
 
             if (!service[e.event_id]) {
-                const id = getProgramId(networkId, eit.service_id, e.event_id);
+                const id = getProgramItemId(networkId, eit.service_id, e.event_id);
                 let programItem = _.program.get(id);
                 if (!programItem) {
-                    programItem = new ProgramItem({
-                        id: id,
-
+                    programItem = {
+                        id,
                         eventId: e.event_id,
                         serviceId: eit.service_id,
                         networkId: networkId,
                         startAt: getTime(e.start_time),
                         duration: getTimeFromBCD24(e.duration),
                         isFree: e.free_CA_mode === 0
-                    });
+                    };
                     _.program.add(programItem);
                 }
 
@@ -225,7 +223,7 @@ class EPG extends stream.Writable {
                         state.version.extended = eit.version_number;
                     }
 
-                    state.program.update({
+                    _.program.set(state.program.id, {
                         startAt: getTime(e.start_time),
                         duration: getTimeFromBCD24(e.duration),
                         isFree: e.free_CA_mode === 0
@@ -257,7 +255,7 @@ class EPG extends stream.Writable {
                         state.short.event_name_char = d.event_name_char;
                         state.short.text_char = d.text_char;
 
-                        state.program.update({
+                        _.program.set(state.program.id, {
                             name: new TsChar(d.event_name_char).decode(),
                             description: new TsChar(d.text_char).decode()
                         });
@@ -306,7 +304,7 @@ class EPG extends stream.Writable {
                                 extended[key] = new TsChar(extended[key]).decode();
                             }
 
-                            state.program.update({
+                            _.program.set(state.program.id, {
                                 extended: extended
                             });
 
@@ -332,7 +330,7 @@ class EPG extends stream.Writable {
                         state.component.stream_content = d.stream_content;
                         state.component.component_type = d.component_type;
 
-                        state.program.update({
+                        _.program.set(state.program.id, {
                             video: {
                                 type: <db.ProgramVideoType> STREAM_CONTENT[d.stream_content] || null,
                                 resolution: <db.ProgramVideoResolution> COMPONENT_TYPE[d.component_type] || null,
@@ -360,7 +358,7 @@ class EPG extends stream.Writable {
 
                         state.content._raw = d._raw;
 
-                        state.program.update({
+                        _.program.set(state.program.id, {
                             genres: d.contents.map(getGenre)
                         });
 
@@ -382,7 +380,7 @@ class EPG extends stream.Writable {
 
                         state.audio._raw = d._raw;
 
-                        state.program.update({
+                        _.program.set(state.program.id, {
                             audio: {
                                 samplingRate: SAMPLING_RATE[d.sampling_rate],
                                 componentType: d.component_type
@@ -407,7 +405,7 @@ class EPG extends stream.Writable {
 
                         state.series._raw = d._raw;
 
-                        state.program.update({
+                        _.program.set(state.program.id, {
                             series: {
                                 id: d.series_id,
                                 repeat: d.repeat_label,
@@ -440,11 +438,11 @@ class EPG extends stream.Writable {
                         state.group._raw = d._raw;
 
                         if (!d.other_network_events) {
-                            state.program.update({
+                            _.program.set(state.program.id, {
                                 relatedItems: d.events.map(getRelatedProgramItem)
                             });
                         } else {
-                            state.program.update({
+                            _.program.set(state.program.id, {
                                 relatedItems: [
                                     ...d.events.map(getRelatedProgramItem),
                                     ...d.other_network_events.map(getRelatedProgramItem)
@@ -473,7 +471,7 @@ class EPG extends stream.Writable {
                 for (const sid in this._epg[nid]) {
                     for (const eid in this._epg[nid][sid]) {
                         const state = this._epg[nid][sid][eid];
-                        if (now > (state.program.data.startAt + state.program.data.duration)) {
+                        if (now > (state.program.startAt + state.program.duration)) {
                             ++count;
                             delete state.program;
                             delete this._epg[nid][sid][eid];

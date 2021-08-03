@@ -19,7 +19,7 @@ import * as log from "./log";
 import epg from "./epg";
 import status from "./status";
 import _ from "./_";
-import ProgramItem from "./ProgramItem";
+import { getProgramItemId } from "./Program";
 import ServiceItem from "./ServiceItem";
 import * as aribts from "aribts";
 const calcCRC32: (buf: Buffer) => number = aribts.TsCrc32.calc;
@@ -151,7 +151,7 @@ export default class TSFilter extends stream.Transform {
             this._ready = false;
 
             const program = _.program.get(
-                ProgramItem.getId(
+                getProgramItemId(
                     this._targetNetworkId,
                     this._provideServiceId,
                     this._provideEventId
@@ -160,7 +160,7 @@ export default class TSFilter extends stream.Transform {
             if (program) {
                 this._provideEventTimeout = setTimeout(
                     () => this._observeProvideEvent(),
-                    program.data.startAt + program.data.duration - Date.now()
+                    program.startAt + program.duration - Date.now()
                 );
             }
         }
