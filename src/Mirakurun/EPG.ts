@@ -13,12 +13,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-import * as stream from "stream";
 import { getProgramItemId } from "./Program";
-import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
-import queue from "./queue";
 import * as aribts from "aribts";
 const TsChar = aribts.TsChar;
 const TsDate = aribts.TsDate;
@@ -124,20 +121,11 @@ interface VersionState {
 }
 
 // forked from rndomhack/node-aribts/blob/1e7ef94bba3d6ac26aec764bf24dde2c2852bfcb/lib/epg.js
-class EPG extends stream.Writable {
+export default class EPG {
 
     private _epg: { [networkId: number]: { [serviceId: number]: { [eventId: number]: EventState } } } = {};
-    private _epgGCInterval: number = 1000 * 60 * 15;
 
-    constructor() {
-        super({
-            objectMode: true
-        });
-
-        setTimeout(this._gc.bind(this), this._epgGCInterval);
-    }
-
-    _write(eit: any, encoding: string, callback: Function) {
+    write(eit: any) {
 
         const networkId = eit.original_network_id;
 
@@ -454,36 +442,10 @@ class EPG extends stream.Writable {
                 }// <- switch
             }// <- for
         }// <- for
-
-        callback();
     }
 
-    private _gc(): void {
-
-        log.debug("EPG GC has queued");
-
-        queue.add(async () => {
-
-            const now = Date.now();
-            let count = 0;
-
-            for (const nid in this._epg) {
-                for (const sid in this._epg[nid]) {
-                    for (const eid in this._epg[nid][sid]) {
-                        const state = this._epg[nid][sid][eid];
-                        if (now > (state.program.startAt + state.program.duration)) {
-                            ++count;
-                            delete state.program;
-                            delete this._epg[nid][sid][eid];
-                        }
-                    }
-                }
-            }
-
-            setTimeout(this._gc.bind(this), this._epgGCInterval);
-
-            log.info("EPG GC has finished and removed %d events", count);
-        });
+    end() {
+        this._epg = null;
     }
 }
 
@@ -564,5 +526,3 @@ function getRelatedProgramItem(event: any): db.ProgramRelatedItem {
         eventId: event.event_id
     };
 }
-
-export default new EPG();

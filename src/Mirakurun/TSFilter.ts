@@ -16,7 +16,7 @@
 import * as stream from "stream";
 import { StreamInfo } from "./common";
 import * as log from "./log";
-import epg from "./epg";
+import EPG from "./EPG";
 import status from "./status";
 import _ from "./_";
 import { getProgramItemId } from "./Program";
@@ -88,6 +88,9 @@ export default class TSFilter extends stream.Transform {
 
     // aribts
     private _parser: stream.Transform = new aribts.TsStream();
+
+    // epg
+    private _epg: EPG;
 
     // buffer
     private _packet: Buffer = Buffer.alloc(PACKET_SIZE);
@@ -182,6 +185,7 @@ export default class TSFilter extends stream.Transform {
             } else if (status.epg[this._targetNetworkId] !== true) {
                 status.epg[this._targetNetworkId] = true;
                 this._parseEIT = true;
+                this._epg = new EPG();
             }
         }
 
@@ -624,7 +628,7 @@ export default class TSFilter extends stream.Transform {
             this._parseServiceIds.has(data.service_id) &&
             data.table_id !== 0x4E && data.table_id !== 0x4F
         ) {
-            epg.write(data);
+            this._epg.write(data);
 
             if (!this._epgReady) {
                 this._updateEpgState(data);
@@ -789,25 +793,27 @@ export default class TSFilter extends stream.Transform {
             this._readableState.buffer = [];
             this._readableState.length = 0;
             this._patsec.fill(0);
-            this._patsec = null;
+            delete this._patsec;
             this._packet.fill(0);
-            this._packet = null;
-            this._buffer = null;
-            this._parses = null;
+            delete this._packet;
+            delete this._buffer;
+            delete this._parses;
         });
 
-        // clear instance
+        // clear parser instance
         this._parser.removeAllListeners();
         this._parser.end();
-        this._parser = null;
+        delete this._parser;
+
+        // clear EPG instance & state
+        if (this._epg) {
+            this._epg.end();
+            delete this._epg;
+            status.epg[this._targetNetworkId] = false; // update status
+        }
 
         // clear streamInfo
-        this.streamInfo = null;
-
-        // update status
-        if (this._parseEIT && this._targetNetworkId !== null) {
-            status.epg[this._targetNetworkId] = false;
-        }
+        delete this.streamInfo;
 
         --status.streamCount.tsFilter;
 

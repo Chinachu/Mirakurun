@@ -46,7 +46,7 @@ import * as aribts from "aribts";
 import _ from "./Mirakurun/_";
 import Event from "./Mirakurun/Event";
 import Program from "./Mirakurun/Program";
-import epg from "./Mirakurun/epg";
+import EPG from "./Mirakurun/EPG";
 import * as config from "./Mirakurun/config";
 import * as log from "./Mirakurun/log";
 
@@ -54,6 +54,7 @@ import * as log from "./Mirakurun/log";
 _.config.server = config.loadServer();
 _.event = new Event();
 _.program = new Program();
+const epg = new EPG();
 
 const size = fs.statSync(src).size;
 let bytesRead = 0;
