@@ -37,9 +37,9 @@
   "main": "lib/client.js",
   "scripts": {
     "start": "node -r source-map-support/register lib/server.js",
-    "debug": "node -r source-map-support/register --inspect --debug-brk lib/server.js",
+    "debug": "node -r source-map-support/register --inspect=0.0.0.0:9229 lib/server.js",
     "start.win32": "node.exe -r source-map-support/register bin/init.win32.js",
-    "debug.win32": "node.exe -r source-map-support/register --inspect --debug-brk bin/init.win32.js",
+    "debug.win32": "node.exe -r source-map-support/register --inspect bin/init.win32.js",
     "build": "tslint --project . && tsc --declaration && webpack",
     "watch": "tsc -w --declaration",
     "watch-webpack": "webpack -w",
