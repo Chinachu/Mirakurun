@@ -9,6 +9,9 @@ export PROGRAMS_DB_PATH=/app-data/programs.json
 export PATH=/opt/bin:$PATH
 export DOCKER=YES
 
+# tweaks for glibc memory usage
+export MALLOC_ARENA_MAX=2
+
 if [ ! -e "/opt/bin" ]; then
   mkdir -pv /opt/bin
 fi
@@ -41,7 +44,7 @@ if [ -e "/etc/init.d/pcscd" ]; then
 fi
 
 if [ "$DEBUG" != "true" ]; then
-  npm run start
+  node -r source-map-support/register lib/server.js
 else
   npm run debug
 fi
