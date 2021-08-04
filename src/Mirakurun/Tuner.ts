@@ -385,7 +385,6 @@ export default class Tuner {
                         reject(new Error("no available tuners"));
                     }
                 } else {
-                    // tsmf
                     const tsFilter = new TSFilter({
                         networkId: setting.networkId,
                         serviceId: setting.serviceId,
