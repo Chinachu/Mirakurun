@@ -17,15 +17,20 @@
                 "NODE_ENV": "development",
                 "PORT": "8080"
             },
-            "externalConsole": false,
-            "sourceMaps": true,
-            "outDir": null
+            "sourceMaps": true
         },
         {
             "name": "Attach",
             "type": "node",
             "request": "attach",
             "port": 5858
-        }
+        },
+        {
+            "name": "Attach to localhost:9229",
+            "type": "node",
+            "request": "attach",
+            "address": "localhost", // <- remote address here
+            "port": 9229
+          }
     ]
 }
