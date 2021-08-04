@@ -22,10 +22,9 @@ export const get: Operation = (req, res) => {
 
     let programs: db.Program[];
 
+    // tslint:disable-next-line:prefer-conditional-expression
     if (Object.keys(req.query).length !== 0) {
-        programs = Program.findByQuery({
-            data: req.query
-        });
+        programs = Program.findByQuery(req.query);
     } else {
         programs = Program.all();
     }
