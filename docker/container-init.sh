@@ -44,6 +44,7 @@ if [ -e "/etc/init.d/pcscd" ]; then
 fi
 
 if [ "$DEBUG" != "true" ]; then
+  export NODE_ENV=production
   node -r source-map-support/register lib/server.js
 else
   npm run debug
