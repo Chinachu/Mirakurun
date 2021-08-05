@@ -2,6 +2,33 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.7.1 (2021-08-06)
+
+Bug fixes and improvements to memory usage, etc.
+
+### Server Changes
+
+- **node**: Removed `--max_old_space_size` flag.
+- **db**: Improved performance of the save (write).
+- **epg**: Fixed a bug where the EPG would not update if it was stopped for several days.
+- **epg**: Improved memory usage.
+- **epg**: Improved EPG gathering behavior.
+- **program**: Improved performance and memory usage.
+
+### Docker Changes
+
+- Update base image to `node:16.6.1-buster-slim`.
+- Set env `MALLOC_ARENA_MAX=2` by default.
+- **docker-compose**: Set container_name to `mirakurun`.
+- **docker-compose**: Set default network name to `mirakurun`.
+
+### Other Changes
+
+- **package**: Add engine support `node@16`.
+- **package**: Drop engine support `node@10`.
+- **package**: Update dependencies.
+- **tsconfig**: Change target `es2017` → `es2019`.
+
 ## 3.7.0 (2021-07-24)
 
 Added IPTV support and improved behavior regarding EPG refresh, improved UX, etc.
