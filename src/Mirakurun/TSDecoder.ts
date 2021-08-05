@@ -28,9 +28,9 @@ export default class TSDecoder extends stream.Transform {
 
     private _id: number;
     private _command: string;
-    private _process: child_process.ChildProcess = null;
-    private _readable: stream.Readable = null;
-    private _writable: stream.Writable = null;
+    private _process: child_process.ChildProcess;
+    private _readable: stream.Readable;
+    private _writable: stream.Writable;
 
     private _isNew: boolean = false;
     private _timeout: NodeJS.Timeout;
@@ -141,17 +141,17 @@ export default class TSDecoder extends stream.Transform {
 
         if (this._process) {
             this._process.kill("SIGKILL");
-            this._process = null;
+            delete this._process;
         }
 
         if (this._readable) {
             this._readable.destroy();
-            this._readable = null;
+            delete this._readable;
         }
 
         if (this._writable) {
             this._writable.destroy();
-            this._writable = null;
+            delete this._writable;
         }
     }
 
