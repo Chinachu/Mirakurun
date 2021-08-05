@@ -1,4 +1,4 @@
-[![Mirakurun](https://yabumi.cc/159e63f5c692b3b0dae47765.svg)](https://github.com/Chinachu/Mirakurun)
+[![Mirakurun](https://gist.githubusercontent.com/kanreisa/0ab27d7771e97edce5a24cc81b9b8ce6/raw/e50683f1c4e7d1a13e9ef468f8cc945b0dbc853c/logo-mirakurun.svg)](https://github.com/Chinachu/Mirakurun)
 
 # Mirakurun
 
@@ -50,11 +50,11 @@ see: [doc/Platforms.md](doc/Platforms.md)
 
 #### Figure: Variety of the MPEG-2 TS Stream API
 
-![](https://yabumi.cc/1689b554eb4aea9bad992068.svg)
+![](https://gist.githubusercontent.com/kanreisa/0ab27d7771e97edce5a24cc81b9b8ce6/raw/e50683f1c4e7d1a13e9ef468f8cc945b0dbc853c/mirakurun-fig-api-variety.svg)
 
 #### Figure: Stream Flow
 
-![](https://yabumi.cc/1689b5d310c654a770d44e7a.svg)
+![](https://gist.githubusercontent.com/kanreisa/0ab27d7771e97edce5a24cc81b9b8ce6/raw/e50683f1c4e7d1a13e9ef468f8cc945b0dbc853c/mirakurun-fig-flow-stream.svg)
 
 ## Requirements / Supported Platforms
 
