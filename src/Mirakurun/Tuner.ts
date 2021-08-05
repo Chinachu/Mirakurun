@@ -147,9 +147,11 @@ export default class Tuner {
         let networkId: number;
 
         const services = channel.getServices();
-        if (services.length !== 0) {
-            networkId = services[0].networkId;
+        if (services.length === 0) {
+            throw new Error("no available services in channel");
         }
+
+        networkId = services[0].networkId;
 
         const stream = await this._getStream({
             id: "Mirakurun:getEPG()",
@@ -163,7 +165,7 @@ export default class Tuner {
             }
         });
         if (stream === null) {
-            return Promise.resolve();
+            return;
         } else {
             return new Promise<void>((resolve) => {
                 setTimeout(() => stream.emit("close"), time);
