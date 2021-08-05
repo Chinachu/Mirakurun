@@ -93,7 +93,7 @@ You can use PM2 Plus to realtime monitoring if running by PM2.
 
 ## Contributing
 
-[CONTRIBUTING.md](.github/CONTRIBUTING.md)
+[CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Supporting
 
