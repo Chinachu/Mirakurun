@@ -20,7 +20,6 @@ import EPG from "./EPG";
 import status from "./status";
 import _ from "./_";
 import { getProgramItemId } from "./Program";
-import ServiceItem from "./ServiceItem";
 import * as aribts from "aribts";
 const calcCRC32: (buf: Buffer) => number = aribts.TsCrc32.calc;
 
@@ -180,13 +179,7 @@ export default class TSFilter extends stream.Transform {
             this._parseSDT = true;
         }
         if (options.parseEIT === true) {
-            if (this._targetNetworkId === null) {
-                this._parseEIT = true;
-            } else if (status.epg[this._targetNetworkId] !== true) {
-                status.epg[this._targetNetworkId] = true;
-                this._parseEIT = true;
-                this._epg = new EPG();
-            }
+            this._parseEIT = true;
         }
 
         this._parser.resume();
@@ -628,10 +621,17 @@ export default class TSFilter extends stream.Transform {
             this._parseServiceIds.has(data.service_id) &&
             data.table_id !== 0x4E && data.table_id !== 0x4F
         ) {
-            this._epg.write(data);
+            if (!this._epg && status.epg[this._targetNetworkId] !== true) {
+                status.epg[this._targetNetworkId] = true;
+                this._epg = new EPG();
+            }
 
-            if (!this._epgReady) {
-                this._updateEpgState(data);
+            if (this._epg) {
+                this._epg.write(data);
+
+                if (!this._epgReady) {
+                    this._updateEpgState(data);
+                }
             }
         }
     }
@@ -773,6 +773,10 @@ export default class TSFilter extends stream.Transform {
         });
 
         if (this._epgReady) {
+            for (const service of _.service.findByNetworkId(this._targetNetworkId)) {
+                service.epgReady = true;
+            }
+
             process.nextTick(() => this.emit("epgReady"));
         }
     }
@@ -810,6 +814,13 @@ export default class TSFilter extends stream.Transform {
             this._epg.end();
             delete this._epg;
             status.epg[this._targetNetworkId] = false; // update status
+
+            if (this._epgReady === true) {
+                const now = Date.now();
+                for (const service of _.service.findByNetworkId(this._targetNetworkId)) {
+                    service.epgUpdatedAt = now;
+                }
+            }
         }
 
         // clear streamInfo

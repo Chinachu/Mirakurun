@@ -16,6 +16,7 @@
 import * as common from "./common";
 import * as log from "./log";
 import _ from "./_";
+import status from "./status";
 import queue from "./queue";
 import ChannelItem from "./ChannelItem";
 import Tuner from "./Tuner";
@@ -178,47 +179,47 @@ export default class Channel {
                 }
                 const service = services[0];
 
-                if (service.epgReady === true) {
-                    const now = Date.now();
-                    if (now - service.epgUpdatedAt < this._epgGatheringInterval) {
-                        log.info("Network#%d EPG gathering has skipped by `epgGatheringInterval`", networkId);
-                        return;
-                    }
-                    if (now - service.epgUpdatedAt > 1000 * 60 * 60 * 6) { // 6 hours
-                        log.info("Network#%d EPG gathering is resuming forcibly because reached maximum pause time", networkId);
-                        service.epgReady = false;
-                    } else {
-                        const currentPrograms = _.program.findByNetworkIdAndTime(networkId, now)
-                            .filter(program => !!program.name && program.name !== "放送休止");
-                        if (currentPrograms.length === 0) {
-                            const networkPrograms = _.program.findByNetworkId(networkId);
-                            if (networkPrograms.length > 0) {
-                                log.info("Network#%d EPG gathering has skipped because broadcast is off", networkId);
-                                return;
-                            }
+                queue.add(async () => {
+
+                    if (service.epgReady === true) {
+                        const now = Date.now();
+                        if (now - service.epgUpdatedAt < this._epgGatheringInterval) {
+                            log.info("Network#%d EPG gathering has skipped by `epgGatheringInterval`", networkId);
+                            return;
+                        }
+                        if (now - service.epgUpdatedAt > 1000 * 60 * 60 * 6) { // 6 hours
+                            log.info("Network#%d EPG gathering is resuming forcibly because reached maximum pause time", networkId);
                             service.epgReady = false;
+                        } else {
+                            const currentPrograms = _.program.findByNetworkIdAndTime(networkId, now)
+                                .filter(program => !!program.name && program.name !== "放送休止");
+                            if (currentPrograms.length === 0) {
+                                const networkPrograms = _.program.findByNetworkId(networkId);
+                                if (networkPrograms.length > 0) {
+                                    log.info("Network#%d EPG gathering has skipped because broadcast is off", networkId);
+                                    return;
+                                }
+                                service.epgReady = false;
+                            }
                         }
                     }
-                }
 
-                log.debug("Network#%d EPG gathering has queued", networkId);
-
-                queue.add(async () => {
+                    if (status.epg[networkId] === true) {
+                        log.info("Network#%d EPG gathering is already in progress on another stream", networkId);
+                        return;
+                    }
 
                     log.info("Network#%d EPG gathering has started", networkId);
 
                     try {
                         await Tuner.getEPG(service.channel);
-                        const now = Date.now();
-                        for (const service of services) {
-                            service.epgReady = true;
-                            service.epgUpdatedAt = now;
-                        }
                         log.info("Network#%d EPG gathering has finished", networkId);
                     } catch (e) {
                         log.warn("Network#%d EPG gathering has failed [%s]", networkId, e);
                     }
                 });
+
+                log.debug("Network#%d EPG gathering has queued", networkId);
             });
 
             queue.add(async () => {
