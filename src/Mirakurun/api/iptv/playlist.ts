@@ -16,7 +16,7 @@
 import { Operation } from "express-openapi";
 import Service from "../../Service";
 
-export const get: Operation = (req, res) => {
+export const get: Operation = async (req, res) => {
 
     const apiRoot = `${req.protocol}://${req.headers.host}/api`;
 
@@ -30,7 +30,7 @@ export const get: Operation = (req, res) => {
         }
 
         m += `#EXTINF:-1 tvg-id="${service.id}"`;
-        if (service.hasLogoData) {
+        if (await Service.isLogoDataExists(service.networkId, service.logoId)) {
             m += ` tvg-logo="${apiRoot}/services/${service.id}/logo"`;
         }
         m += ` group-title="${service.channel.type}",${service.name}\n`;

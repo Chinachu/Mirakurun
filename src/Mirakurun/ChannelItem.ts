@@ -190,7 +190,6 @@ export default class ChannelItem {
                             service.name,
                             service.type,
                             service.logoId,
-                            undefined,
                             service.remoteControlKeyId
                         )
                     );

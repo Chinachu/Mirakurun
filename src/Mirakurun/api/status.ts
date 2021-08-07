@@ -41,7 +41,8 @@ export const get: Operation = (req, res) => {
                 TUNERS_CONFIG_PATH: process.env.TUNERS_CONFIG_PATH,
                 CHANNELS_CONFIG_PATH: process.env.CHANNELS_CONFIG_PATH,
                 SERVICES_DB_PATH: process.env.SERVICES_DB_PATH,
-                PROGRAMS_DB_PATH: process.env.PROGRAMS_DB_PATH
+                PROGRAMS_DB_PATH: process.env.PROGRAMS_DB_PATH,
+                LOGO_DATA_DIR_PATH: process.env.LOGO_DATA_DIR_PATH
             },
             pid: process.pid,
             memoryUsage: process.memoryUsage()

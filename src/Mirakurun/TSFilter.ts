@@ -21,6 +21,7 @@ import status from "./status";
 import _ from "./_";
 import { getProgramItemId } from "./Program";
 import * as aribts from "aribts";
+import Service from "./Service";
 const calcCRC32: (buf: Buffer) => number = aribts.TsCrc32.calc;
 
 interface StreamOptions extends stream.TransformOptions {
@@ -653,12 +654,7 @@ export default class TSFilter extends stream.Transform {
             log.debug("TSFilter detected CDT networkId=%d, logoId=%d", data.original_network_id, dataModule.logo_id);
 
             const logoData = new aribts.TsLogo(dataModule.data_byte).decode();
-
-            _.service.findByNetworkIdWithLogoId(data.original_network_id, dataModule.logo_id).forEach(service => {
-                service.logoData = logoData;
-
-                log.info("TSFilter updated serviceId=%d logo data", service.serviceId);
-            });
+            Service.saveLogoData(data.original_network_id, dataModule.logo_id, logoData);
         }
     }
 

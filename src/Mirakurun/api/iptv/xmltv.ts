@@ -31,7 +31,7 @@ function getDateTime(time: number): string {
         .replace(/[-:T]/g, "");
 }
 
-export const get: Operation = (req, res) => {
+export const get: Operation = async (req, res) => {
 
     const apiRoot = `${req.protocol}://${req.headers.host}/api`;
 
@@ -59,7 +59,7 @@ export const get: Operation = (req, res) => {
         x += `<channel id="${service.id}">\n`;
         x += `<display-name>${escapeXMLSpecialChars(service.name)}</display-name>\n`;
         x += `<display-name>${mainNum}.${subNum}</display-name>\n`;
-        if (service.hasLogoData) {
+        if (await Service.isLogoDataExists(service.networkId, service.logoId)) {
             x += `<icon src="${apiRoot}/services/${service.id}/logo" />`;
         }
         x += `</channel>\n`;

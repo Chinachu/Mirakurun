@@ -35,12 +35,10 @@ export default class ServiceItem {
         private _name?: string,
         private _type?: number,
         private _logoId?: number,
-        private _logoData?: string,
         private _remoteControlKeyId?: number,
         private _epgReady: boolean = false,
         private _epgUpdatedAt: number = 0
     ) {
-
         this._id = ServiceItem.getId(_networkId, _serviceId);
     }
 
@@ -98,24 +96,6 @@ export default class ServiceItem {
         }
     }
 
-    get logoData(): Buffer {
-        return Buffer.from(this._logoData, "base64");
-    }
-
-    set logoData(logo: Buffer) {
-
-        if (this._logoData !== logo.toString("base64")) {
-            this._logoData = logo.toString("base64");
-
-            _.service.save();
-            this._updated();
-        }
-    }
-
-    get hasLogoData(): boolean {
-        return !!this._logoData;
-    }
-
     get remoteControlKeyId(): number {
         return this._remoteControlKeyId;
     }
@@ -162,7 +142,7 @@ export default class ServiceItem {
         return this._channel;
     }
 
-    export(full: boolean = false): db.Service {
+    export(): db.Service {
 
         const ret: db.Service = {
             id: this._id,
@@ -170,7 +150,6 @@ export default class ServiceItem {
             networkId: this._networkId,
             name: this._name || "",
             type: this._type,
-            hasLogoData: !!this._logoData,
             logoId: this._logoId,
             remoteControlKeyId: this._remoteControlKeyId,
             epgReady: this._epgReady,
@@ -180,10 +159,6 @@ export default class ServiceItem {
                 channel: this._channel.channel
             }
         };
-
-        if (full === true) {
-            ret.logoData = this._logoData;
-        }
 
         return ret;
     }

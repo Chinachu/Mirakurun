@@ -26,7 +26,7 @@ export const parameters = [
     }
 ];
 
-export const get: Operation = (req, res) => {
+export const get: Operation = async (req, res) => {
 
     const service = Service.get(req.params.id as any as number);
 
@@ -36,15 +36,21 @@ export const get: Operation = (req, res) => {
         return;
     }
 
-    if (service.hasLogoData === false) {
+    if (typeof service.logoId !== "number" || service.logoId < 0) {
         res.writeHead(503, "Logo Data Unavailable");
         res.end();
         return;
     }
 
-    res.setHeader("Content-Type", "image/png");
-    res.status(200);
-    res.end(service.logoData);
+    const logoData = await Service.loadLogoData(service.networkId, service.logoId);
+    if (logoData) {
+        res.setHeader("Content-Type", "image/png");
+        res.status(200);
+        res.end(logoData);
+    } else {
+        res.writeHead(503, "Logo Data Unavailable");
+        res.end();
+    }
 };
 
 get.apiDoc = {

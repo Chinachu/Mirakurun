@@ -25,13 +25,14 @@ export interface Service {
     networkId: number;
     name: string;
     type: number;
-    hasLogoData?: boolean;
     logoId: number;
-    logoData?: string; // base64
     remoteControlKeyId?: number;
     epgReady?: boolean;
     epgUpdatedAt?: number;
     channel: Channel;
+
+    /** @deprecated */
+    logoData?: string; // base64
 }
 
 export interface Channel {

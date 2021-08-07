@@ -16,15 +16,25 @@
 import { Operation } from "express-openapi";
 import sift from "sift";
 import * as api from "../api";
+import * as apid from "../../../api";
 import Service from "../Service";
 import { ChannelTypes } from "../common";
 
-export const get: Operation = (req, res) => {
+export const get: Operation = async (req, res) => {
 
-    const services = [...Service.all()]; // shallow copy
-    services.sort((a, b) => a.getOrder() - b.getOrder());
+    const serviceItems = [...Service.all()]; // shallow copy
+    serviceItems.sort((a, b) => a.getOrder() - b.getOrder());
 
-    api.responseJSON(res, sift(req.query, services.map(service => service.export())));
+    const services: apid.Service[] = [];
+
+    for (const serviceItem of sift(req.query, serviceItems)) {
+        services.push({
+            ...serviceItem.export(),
+            hasLogoData: await Service.isLogoDataExists(serviceItem.networkId, serviceItem.logoId)
+        });
+    }
+
+    api.responseJSON(res, services);
 };
 
 get.apiDoc = {

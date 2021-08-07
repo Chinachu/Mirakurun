@@ -39,6 +39,7 @@ setEnv("TUNERS_CONFIG_PATH", path.join(configDir, "tuners.yml"));
 setEnv("CHANNELS_CONFIG_PATH", path.join(configDir, "channels.yml"));
 setEnv("SERVICES_DB_PATH", path.join(dataDir, "services.json"));
 setEnv("PROGRAMS_DB_PATH", path.join(dataDir, "programs.json"));
+setEnv("LOGO_DATA_DIR_PATH", path.join(dataDir, "logo-data"));
 
 require("../" + proc.script);
 
