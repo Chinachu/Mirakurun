@@ -178,9 +178,9 @@ async function save(path: string, data: any[], integrity: string, retrying = fal
                 } catch (e) {
                     throw e;
                 }
-                // retry
-                return save(path, data, integrity, true);
             }
+            // retry
+            return save(path, data, integrity, true);
         }
         throw e;
     }
