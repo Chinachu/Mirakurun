@@ -457,6 +457,8 @@ definitions:
         type: integer
       epgRetrievalTime:
         type: integer
+      logoDataInterval:
+        type: integer
       disableEITParsing:
         type: boolean
 

@@ -205,6 +205,7 @@ export interface ConfigServer {
     programGCInterval?: number;
     epgGatheringInterval?: number;
     epgRetrievalTime?: number;
+    logoDataInterval?: number;
     disableEITParsing?: boolean;
 }
 

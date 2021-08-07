@@ -347,7 +347,7 @@ export default class TSFilter extends stream.Transform {
                 this._parses.push(packet);
             }
         } else if (
-            ((pid === 0x12 || pid === 0x29) && (this._parseEIT || this._provideEventId !== null)) ||
+            (pid === 0x12 && (this._parseEIT || this._provideEventId !== null)) ||
             pid === 0x14 ||
             this._parsePids.has(pid)
         ) {
@@ -584,7 +584,7 @@ export default class TSFilter extends stream.Transform {
         }
     }
 
-    private _onEIT(pid: number, data: any): void {
+    private async _onEIT(pid: number, data: any): Promise<void> {
 
         // detect current event
         if (
@@ -625,6 +625,28 @@ export default class TSFilter extends stream.Transform {
             if (!this._epg && status.epg[this._targetNetworkId] !== true) {
                 status.epg[this._targetNetworkId] = true;
                 this._epg = new EPG();
+
+                // check logoDataInterval
+                const services = this._provideServiceId === null ?
+                    _.service.findByNetworkId(this._targetNetworkId) :
+                    [_.service.get(this._targetNetworkId, this._provideServiceId)];
+
+                const logoIdSet = new Set<number>();
+
+                for (const service of services) {
+                    if (typeof service.logoId === "number" && service.logoId >= 0) {
+                        logoIdSet.add(service.logoId);
+                    }
+                }
+
+                const now = Date.now();
+                const logoDataInterval = _.config.server.logoDataInterval || 1000 * 60 * 60 * 24; // 1 day
+                for (const logoId of logoIdSet) {
+                    if (now - await Service.getLogoDataMTime(this._targetNetworkId, logoId) > logoDataInterval) {
+                        this._parsePids.add(0x29); // CDT for Logo
+                        break;
+                    }
+                }
             }
 
             if (this._epg) {

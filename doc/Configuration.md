@@ -26,6 +26,7 @@ eventEndTimeout: 1000 # integer (ms)
 programGCInterval: 900000 # integer (ms)
 epgGatheringInterval: 900000 # integer (ms)
 epgRetrievalTime: 600000 # integer (ms)
+logoDataInterval: 86400000 # integer (ms)
 disableEITParsing: false # boolean
 ```
 
@@ -42,6 +43,7 @@ EVENT_END_TIMEOUT
 PROGRAM_GC_INTERVAL
 EPG_GATHERING_INTERVAL
 EPG_RETRIEVAL_TIME
+LOGO_DATA_INTERVAL
 DISABLE_EIT_PARSING
 ```
 
