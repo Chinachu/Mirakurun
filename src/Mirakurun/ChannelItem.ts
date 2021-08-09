@@ -179,7 +179,9 @@ export default class ChannelItem {
                 if (item !== null) {
                     item.name = service.name;
                     item.type = service.type;
-                    item.logoId = service.logoId;
+                    if (service.logoId > -1) {
+                        item.logoId = service.logoId;
+                    }
                     item.remoteControlKeyId = service.remoteControlKeyId;
                 } else if (add === true) {
                     _.service.add(

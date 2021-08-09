@@ -20,8 +20,9 @@ import EPG from "./EPG";
 import status from "./status";
 import _ from "./_";
 import { getProgramItemId } from "./Program";
-import * as aribts from "aribts";
+import aribts = require("aribts");
 import Service from "./Service";
+import ServiceItem from "./ServiceItem";
 const calcCRC32: (buf: Buffer) => number = aribts.TsCrc32.calc;
 
 interface StreamOptions extends stream.TransformOptions {
@@ -51,6 +52,11 @@ const PROVIDE_PIDS = [
     0x0029 // CDT
 ];
 
+const DSMCC_BLOCK_SIZE = 4066; // ARIB TR-B15
+
+const LOGO_DATA_NAME_BS = Buffer.from("LOGO-05"); // ARIB STD-B21, ARIB TR-B15
+const LOGO_DATA_NAME_CS = Buffer.from("CS_LOGO-05"); // ARIB STD-B21, ARIB TR-B15
+
 interface BasicExtState {
     basic: {
         flags: FlagState[];
@@ -68,6 +74,16 @@ interface FlagState {
     version_number: number;
 }
 
+interface DownloadData {
+    downloadId: number;
+    // blockSize: number; // 4066
+    moduleId: number;
+    moduleVersion: number;
+    moduleSize: number;
+    loadedBytes: number;
+    data?: Buffer;
+}
+
 export default class TSFilter extends stream.Transform {
 
     streamInfo: StreamInfo = {};
@@ -79,6 +95,8 @@ export default class TSFilter extends stream.Transform {
     private _parseSDT: boolean = false;
     private _parseEIT: boolean = false;
     private _targetNetworkId: number;
+    private _enableParseCDT: boolean = false;
+    private _enableParseDSMCC: boolean = false;
 
     // tsmf
     private _tsmfEnableTsmfSplit: boolean = false;
@@ -111,6 +129,10 @@ export default class TSFilter extends stream.Transform {
     private _pmtPid: number = -1;
     private _pmtTimer: NodeJS.Timer;
     private _streamTime: number = null;
+    private _essMap: Map<number, number> = new Map(); // <serviceId, pid>
+    private _essEsPids: Set<number> = new Set();
+    private _dlDataMap: Map<number, DownloadData> = new Map();
+    private _logoDataTimer: NodeJS.Timer;
     private _epgReady: boolean = false;
     private _epgState: { [networkId: number]: { [serviceId: number]: BasicExtState } } = {};
     private _overflowTimer: NodeJS.Timer = null;
@@ -183,6 +205,14 @@ export default class TSFilter extends stream.Transform {
             this._parseEIT = true;
         }
 
+        if (this._targetNetworkId) {
+            if (this._targetNetworkId === 4) { // ARIB TR-B15 (BS/CS)
+                this._enableParseDSMCC = true;
+            } else {
+                this._enableParseCDT = true;
+            }
+        }
+
         this._parser.resume();
         this._parser.on("pat", this._onPAT.bind(this));
         this._parser.on("pmt", this._onPMT.bind(this));
@@ -190,14 +220,13 @@ export default class TSFilter extends stream.Transform {
         this._parser.on("sdt", this._onSDT.bind(this));
         this._parser.on("eit", this._onEIT.bind(this));
         this._parser.on("tot", this._onTOT.bind(this));
-        this._parser.on("cdt", this._onCDT.bind(this));
 
         this.once("close", this._close.bind(this));
 
-        log.info("TSFilter has created (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
+        log.info("TSFilter: created (serviceId=%d, eventId=%d)", this._provideServiceId, this._provideEventId);
 
         if (this._ready === false) {
-            log.info("TSFilter is waiting for serviceId=%s, eventId=%s", this._provideServiceId, this._provideEventId);
+            log.info("TSFilter: waiting for serviceId=%d, eventId=%d", this._provideServiceId, this._provideEventId);
         }
 
         ++status.streamCount.tsFilter;
@@ -212,11 +241,11 @@ export default class TSFilter extends stream.Transform {
 
         // stringent safety measure
         if (this._readableState.length > this.highWaterMark) {
-            log.warn("TSFilter is overflowing the buffer...");
+            log.warn("TSFilter#_transform: overflowing the buffer...");
 
             if (this._overflowTimer === null) {
                 this._overflowTimer = setTimeout(() => {
-                    log.error("TSFilter will closing because reached time limit of overflowing the buffer...");
+                    log.error("TSFilter#_transform: will closing because reached time limit of overflowing the buffer...");
                     this._close();
                 }, this._overflowTimeLimit);
             }
@@ -384,36 +413,46 @@ export default class TSFilter extends stream.Transform {
         this._serviceIds = new Set();
         this._parseServiceIds = new Set();
 
-        const l = data.programs.length;
-        for (let i = 0; i < l; i++) {
-            const id = data.programs[i].program_number as number;
+        for (const program of data.programs) {
+            const serviceId = program.program_number as number;
 
-            if (id === 0) {
-                const NIT_PID = data.programs[i].network_PID;
+            if (serviceId === 0) {
+                const NIT_PID = program.network_PID;
 
-                log.debug("TSFilter detected NIT PID=%d", NIT_PID);
+                log.debug("TSFilter#_onPAT: detected NIT PID=%d", NIT_PID);
 
                 if (this._parseNIT) {
-                    if (this._parsePids.has(NIT_PID) === false) {
-                        this._parsePids.add(NIT_PID);
-                    }
+                    this._parsePids.add(NIT_PID);
                 }
                 continue;
             }
 
-            this._serviceIds.add(id);
+            // detect ESS PMT PID
+            if (
+                // for future use
+                // (this._targetNetworkId !== 4 && serviceId >= 0xFFF0 && serviceId <= 0xFFF5) || // ARIB TR-B14 (GR)
+                (this._targetNetworkId === 4 && serviceId === 929) // ARIB TR-B15 (BS/CS)
+            ) {
+                const essPmtPid = program.program_map_PID;
+                this._essMap.set(serviceId, essPmtPid);
 
-            const item = this._targetNetworkId === null ? null : _.service.get(this._targetNetworkId, id);
+                log.debug("TSFilter#_onPAT: detected ESS PMT PID=%d as serviceId=%d", essPmtPid, serviceId);
+                continue;
+            }
+
+            this._serviceIds.add(serviceId);
+
+            const item = this._targetNetworkId === null ? null : _.service.get(this._targetNetworkId, serviceId);
 
             log.debug(
-                "TSFilter detected PMT PID=%d as serviceId=%d (%s)",
-                data.programs[i].program_map_PID, id, item ? item.name : "unregistered"
+                "TSFilter#_onPAT: detected PMT PID=%d as serviceId=%d (%s)",
+                program.program_map_PID, serviceId, item ? item.name : "unregistered"
             );
 
             // detect PMT PID by specific service id
-            if (this._provideServiceId === id) {
-                if (this._pmtPid !== data.programs[i].program_map_PID) {
-                    this._pmtPid = data.programs[i].program_map_PID;
+            if (serviceId === this._provideServiceId) {
+                if (this._pmtPid !== program.program_map_PID) {
+                    this._pmtPid = program.program_map_PID;
 
                     if (this._providePids.has(this._pmtPid) === false) {
                         this._providePids.add(this._pmtPid);
@@ -436,8 +475,8 @@ export default class TSFilter extends stream.Transform {
                     this._patsec[11] = 16;
 
                     // program_number
-                    this._patsec[12] = id >> 8;
-                    this._patsec[13] = id & 255;
+                    this._patsec[12] = serviceId >> 8;
+                    this._patsec[13] = serviceId & 255;
                     // program_map_PID
                     this._patsec[14] = (this._pmtPid >> 8) + 224;
                     this._patsec[15] = this._pmtPid & 255;
@@ -455,7 +494,7 @@ export default class TSFilter extends stream.Transform {
                     if (this._parseServiceIds.has(service.serviceId) === false) {
                         this._parseServiceIds.add(service.serviceId);
 
-                        log.debug("TSFilter parsing serviceId=%d (%s)", service.serviceId, service.name);
+                        log.debug("TSFilter#_onPAT: parsing serviceId=%d (%s)", service.serviceId, service.name);
                     }
                 }
             }
@@ -470,27 +509,41 @@ export default class TSFilter extends stream.Transform {
 
     private _onPMT(pid: number, data: any): void {
 
+        if (this._essMap.has(data.program_number)) {
+            for (const stream of data.streams) {
+                for (const descriptor of stream.ES_info) {
+                    if (descriptor.descriptor_tag === 0x52) { // stream identifier descriptor
+                        if (
+                            descriptor.component_tag === 0x79 || // ARIB TR-B15 (BS)
+                            descriptor.component_tag === 0x7A // ...? (CS)
+                        ) {
+                            this._parsePids.add(stream.elementary_PID);
+                            this._essEsPids.add(stream.elementary_PID);
+
+                            log.debug("TSFilter#_onPMT: detected ESS ES PID=%d", stream.elementary_PID);
+                            break;
+                        }
+                    }
+                }
+            }
+            this._parsePids.delete(pid);
+            return;
+        }
+
         if (this._ready === false && this._provideServiceId !== null && this._provideEventId === null) {
             this._ready = true;
 
-            log.info("TSFilter is now ready for serviceId=%d", this._provideServiceId);
+            log.info("TSFilter#_onPMT: now ready for serviceId=%d", this._provideServiceId);
         }
 
         if (data.program_info[0]) {
-            if (this._providePids.has(data.program_info[0].CA_PID) === false) {
-                this._providePids.add(data.program_info[0].CA_PID);
-            }
+            this._providePids.add(data.program_info[0].CA_PID);
         }
 
-        if (this._providePids.has(data.PCR_PID) === false) {
-            this._providePids.add(data.PCR_PID);
-        }
+        this._providePids.add(data.PCR_PID);
 
-        const l = data.streams.length;
-        for (let i = 0; i < l; i++) {
-            if (this._providePids.has(data.streams[i].elementary_PID) === false) {
-                this._providePids.add(data.streams[i].elementary_PID);
-            }
+        for (const stream of data.streams) {
+            this._providePids.add(stream.elementary_PID);
         }
 
         // sleep
@@ -538,10 +591,7 @@ export default class TSFilter extends stream.Transform {
 
         const _services = [];
 
-        const l = data.services.length;
-        for (let i = 0; i < l; i++) {
-            const service = data.services[i];
-
+        for (const service of data.services) {
             if (this._serviceIds.has(service.service_id) === false) {
                 continue;
             }
@@ -584,7 +634,7 @@ export default class TSFilter extends stream.Transform {
         }
     }
 
-    private async _onEIT(pid: number, data: any): Promise<void> {
+    private _onEIT(pid: number, data: any): void {
 
         // detect current event
         if (
@@ -599,11 +649,11 @@ export default class TSFilter extends stream.Transform {
                 if (this._ready === false) {
                     this._ready = true;
 
-                    log.info("TSFilter is now ready for eventId=%d", this._provideEventId);
+                    log.info("TSFilter#_onEIT: now ready for eventId=%d", this._provideEventId);
                 }
             } else {
                 if (this._ready) {
-                    log.info("TSFilter is closing because eventId=%d has ended...", this._provideEventId);
+                    log.info("TSFilter#_onEIT: closing because eventId=%d has ended...", this._provideEventId);
 
                     const eventId = this._provideEventId;
                     this._provideEventId = null;
@@ -626,27 +676,8 @@ export default class TSFilter extends stream.Transform {
                 status.epg[this._targetNetworkId] = true;
                 this._epg = new EPG();
 
-                // check logoDataInterval
-                const services = this._provideServiceId === null ?
-                    _.service.findByNetworkId(this._targetNetworkId) :
-                    [_.service.get(this._targetNetworkId, this._provideServiceId)];
-
-                const logoIdSet = new Set<number>();
-
-                for (const service of services) {
-                    if (typeof service.logoId === "number" && service.logoId >= 0) {
-                        logoIdSet.add(service.logoId);
-                    }
-                }
-
-                const now = Date.now();
-                const logoDataInterval = _.config.server.logoDataInterval || 1000 * 60 * 60 * 24; // 1 day
-                for (const logoId of logoIdSet) {
-                    if (now - await Service.getLogoDataMTime(this._targetNetworkId, logoId) > logoDataInterval) {
-                        this._parsePids.add(0x29); // CDT for Logo
-                        break;
-                    }
-                }
+                // Logo
+                this._standbyLogoData();
             }
 
             if (this._epg) {
@@ -673,10 +704,100 @@ export default class TSFilter extends stream.Transform {
                 return;
             }
 
-            log.debug("TSFilter detected CDT networkId=%d, logoId=%d", data.original_network_id, dataModule.logo_id);
+            log.debug("TSFilter#_onCDT: received logo data (networkId=%d, logoId=%d)", data.original_network_id, dataModule.logo_id);
 
             const logoData = new aribts.TsLogo(dataModule.data_byte).decode();
             Service.saveLogoData(data.original_network_id, dataModule.logo_id, logoData);
+        }
+    }
+
+    private _onDSMCC(pid: number, data: any): void {
+
+        if (data.table_id === 0x3C) {
+            // DDB - Download Data Block (frequently than DII)
+            const ddb = data.message;
+
+            const downloadId: number = ddb.downloadId;
+            const moduleId: number = ddb.moduleId;
+
+            const dl = this._dlDataMap.get(downloadId);
+            if (!dl || dl.moduleId !== moduleId || !dl.data) {
+                return;
+            }
+
+            const moduleVersion: number = ddb.moduleVersion;
+            if (dl.moduleVersion !== moduleVersion) {
+                this._dlDataMap.delete(downloadId);
+                return;
+            }
+
+            const blockNumber: number = ddb.blockNumber;
+            const blockDataByte: Buffer = ddb.blockDataByte;
+
+            blockDataByte.copy(dl.data, DSMCC_BLOCK_SIZE * blockNumber);
+            dl.loadedBytes += blockDataByte.length;
+
+            log.debug("TSFilter#_onDSMCC: detected DDB and logo data downloading... (downloadId=%d, %d/%d bytes)", downloadId, dl.loadedBytes, dl.moduleSize);
+
+            if (dl.loadedBytes !== dl.moduleSize) {
+                return;
+            }
+
+            const dlData = dl.data;
+            delete dl.data;
+
+            const dataModule = new aribts.tsDataModule.TsDataModuleLogo(dlData).decode();
+            for (const logo of dataModule.logos) {
+                for (const logoService of logo.services) {
+                    const service = _.service.get(logoService.original_network_id, logoService.service_id);
+                    if (!service) {
+                        continue;
+                    }
+
+                    service.logoId = logo.logo_id;
+
+                    log.debug("TSFilter#_onDSMCC: received logo data (networkId=%d, logoId=%d)", service.networkId, service.logoId);
+
+                    const logoData = new aribts.TsLogo(logo.data_byte).decode(); // png
+                    Service.saveLogoData(service.networkId, service.logoId, logoData);
+                    break;
+                }
+            }
+        } else if (data.table_id === 0x3B) {
+            // DII - Download Info Indication
+            const dii = data.message;
+
+            if (this._dlDataMap.has(dii.downloadId)) {
+                return;
+            }
+
+            for (const module of dii.modules) {
+                for (const descriptor of module.moduleInfo) {
+                    // name
+                    if (descriptor.descriptor_tag !== 0x02) {
+                        continue;
+                    }
+                    // find LOGO-05 or CS_LOGO-05
+                    if (
+                        !LOGO_DATA_NAME_BS.equals(descriptor.text_char) &&
+                        !LOGO_DATA_NAME_CS.equals(descriptor.text_char)
+                    ) {
+                        continue;
+                    }
+                    this._dlDataMap.set(dii.downloadId, {
+                        downloadId: dii.downloadId,
+                        // blockSize: dii.blockSize, // 4066
+                        moduleId: module.moduleId,
+                        moduleVersion: module.moduleVersion,
+                        moduleSize: module.moduleSize,
+                        loadedBytes: 0,
+                        data: Buffer.alloc(module.moduleSize)
+                    });
+
+                    log.debug("TSFilter#_onDSMCC: detected DII and buffer allocated for logo data (downloadId=%d, %d bytes)", dii.downloadId, module.moduleSize);
+                    break;
+                }
+            }
         }
     }
 
@@ -691,8 +812,108 @@ export default class TSFilter extends stream.Transform {
             return;
         }
 
-        log.warn("TSFilter is closing because EIT p/f timed out for eventId=%d...", this._provideEventId);
+        log.warn("TSFilter#_observeProvideEvent: closing because EIT p/f timed out for eventId=%d...", this._provideEventId);
         this._close();
+    }
+
+    private async _standbyLogoData(): Promise<void> {
+
+        if (this._closed) {
+            return;
+        }
+        if (this._logoDataTimer) {
+            return;
+        }
+        if (this._enableParseDSMCC && this._essMap.size === 0) {
+            return;
+        }
+
+        // target service(s)
+        const targetServices: ServiceItem[] = [];
+        if (this._provideServiceId === null) {
+            targetServices.push(..._.service.findByNetworkId(this._targetNetworkId));
+        } else if (this._enableParseCDT) {
+            targetServices.push(_.service.get(this._targetNetworkId, this._provideServiceId));
+        } else if (this._enableParseDSMCC && this._targetNetworkId === 4) {
+            targetServices.push(
+                ..._.service.findByNetworkId(4),
+                ..._.service.findByNetworkId(6),
+                ..._.service.findByNetworkId(7)
+            );
+        }
+
+        const logoIdNetworkMap: { [networkId: number]: Set<number> } = {};
+
+        for (const service of targetServices) {
+            if (typeof service.logoId === "number") {
+                if (!logoIdNetworkMap[service.networkId]) {
+                    logoIdNetworkMap[service.networkId] = new Set();
+                }
+                logoIdNetworkMap[service.networkId].add(service.logoId);
+            }
+        }
+
+        const now = Date.now();
+        const logoDataInterval = _.config.server.logoDataInterval || 1000 * 60 * 60 * 24; // 1 day
+
+        for (const networkId in logoIdNetworkMap) {
+            for (const logoId of logoIdNetworkMap[networkId]) {
+                if (logoId === -1 && logoIdNetworkMap[networkId].size > 1) {
+                    continue;
+                }
+
+                // check logoDataInterval
+                if (now - await Service.getLogoDataMTime(this._targetNetworkId, logoId) > logoDataInterval) {
+                    if (this._closed) {
+                        return; // break all loops
+                    }
+
+                    if (this._enableParseCDT) {
+                        // for GR
+                        if (logoId >= 0) {
+                            this._parsePids.add(0x29); // CDT PID
+                        }
+
+                        // add listener
+                        this._parser.on("cdt", this._onCDT.bind(this));
+
+                        // add timer
+                        this._logoDataTimer = setTimeout(() => {
+                            this._parsePids.delete(0x29); // CDT
+                            this._parser.removeAllListeners("cdt");
+
+                            log.info("TSFilter#_standbyLogoData: stopped waiting for logo data (networkId=%d, logoId=%d)", this._targetNetworkId, logoId);
+                        }, 1000 * 60 * 30); // 30 mins
+
+                        log.info("TSFilter#_standbyLogoData: waiting for logo data for 30 minutes... (networkId=%d, logoId=%d)", this._targetNetworkId, logoId);
+                    } else if (this._enableParseDSMCC) {
+                        // for BS/CS
+                        for (const essPmtPid of this._essMap.values()) {
+                            this._parsePids.add(essPmtPid); // ESS PMT PID
+                        }
+
+                        // add listener
+                        this._parser.on("dsmcc", this._onDSMCC.bind(this));
+
+                        // add timer
+                        this._logoDataTimer = setTimeout(() => {
+                            delete this._logoDataTimer;
+
+                            for (const essEsPid of this._essEsPids.values()) {
+                                this._parsePids.delete(essEsPid);
+                            }
+                            this._parser.removeAllListeners("dsmcc");
+
+                            log.info("TSFilter#_standbyLogoData: stopped waiting for logo data (networkId=[4,6,7])");
+                        }, 1000 * 60 * 30); // 30 mins
+
+                        log.info("TSFilter#_standbyLogoData: waiting for logo data for 30 minutes... (networkId=[4,6,7])");
+                    }
+
+                    return; // break all loops
+                }
+            }
+        }
     }
 
     private _updateEpgState(data: any): void {
@@ -809,6 +1030,7 @@ export default class TSFilter extends stream.Transform {
         // clear timer
         clearTimeout(this._pmtTimer);
         clearTimeout(this._provideEventTimeout);
+        clearTimeout(this._logoDataTimer);
 
         // clear buffer
         setImmediate(() => {
@@ -846,7 +1068,7 @@ export default class TSFilter extends stream.Transform {
 
         --status.streamCount.tsFilter;
 
-        log.info("TSFilter has closed (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
+        log.info("TSFilter#_close: closed (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
 
         // close
         this.emit("close");
