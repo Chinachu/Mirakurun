@@ -2,6 +2,29 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.8.0 (2021-08-10)
+
+Logo support enhanced.
+
+### Server Changes
+
+- **config/server**: Add `logoDataInterval` to suppress parsing logo data frequently.
+- **service**: Save the each logo data to separate file instead of json db.
+- **ts-filter**: Add support for BS/CS logo. [#17](https://github.com/Chinachu/Mirakurun/issues/17)
+- **ui**: Add service list in "Status".
+
+### Client Changes
+
+- Add missing `type` definition in `Service`.
+
+### Docker Changes
+
+- Set env `NODE_ENV=production` by default.
+
+### Other Changes
+
+- **package**: Update dependencies.
+
 ## 3.7.1 (2021-08-06)
 
 Bug fixes and improvements to memory usage, etc.
