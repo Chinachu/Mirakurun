@@ -18,7 +18,11 @@ import * as React from "react";
 import { useState, useEffect } from "react";
 import {
     Stack,
-    Separator
+    Separator,
+    Icon,
+    TooltipHost,
+    ITooltipHostStyles,
+    ITooltipProps
 } from "@fluentui/react";
 import { UIState } from "../index";
 import TunersManager from "./TunersManager";
@@ -28,9 +32,24 @@ interface StatusItem {
     text: string;
 }
 
+const calloutProps = { gapSpace: 0 };
+const tooltipHostStyles: Partial<ITooltipHostStyles> = {
+    root: {
+        display: "inline-block",
+    }
+};
+const tooltipProps: Partial<ITooltipProps> = {
+    styles: {
+        content: {
+            whiteSpace: "pre"
+        }
+    }
+};
+
 const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = ({ uiState, uiStateEvents }) => {
 
     const [status, setStatus] = useState<UIState["status"]>(uiState.status);
+    const [services, setServices] = useState<UIState["services"]>(uiState.services);
     const [tuners, setTuners] = useState<UIState["tuners"]>(uiState.tuners);
 
     useEffect(() => {
@@ -40,6 +59,11 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
         };
         uiStateEvents.on("update:status", onStatusUpdate);
 
+        const onServicesUpdate = () => {
+            setServices([ ...uiState.services ]);
+        };
+        uiStateEvents.on("update:services", onServicesUpdate);
+
         const onTunersUpdate = () => {
             setTuners([ ...uiState.tuners ]);
         };
@@ -47,6 +71,7 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
 
         return () => {
             uiStateEvents.off("update:status", onStatusUpdate);
+            uiStateEvents.off("update:services", onServicesUpdate);
             uiStateEvents.off("update:tuners", onTunersUpdate);
         };
     }, []);
@@ -80,6 +105,54 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
         );
     }
 
+    const serviceList: JSX.Element[] = [];
+    for (let i = 0; i < services.length; i++) {
+        const service = services[i];
+        if (service.type !== 1) {
+            continue;
+        }
+        const tooltipId = `service-list-item#${i}-tooltip`;
+        serviceList.push(
+            <div key={`service-list-item${i}`} className="ms-Grid-col ms-sm6 ms-xl3 ms-xxl2">
+                <TooltipHost
+                    id={tooltipId}
+                    calloutProps={calloutProps}
+                    styles={tooltipHostStyles}
+                    tooltipProps={tooltipProps}
+                    content={(
+                        `#${service.id}\n` +
+                        `SID: 0x${service.serviceId.toString(16).toUpperCase()} (${service.serviceId})\n` +
+                        `NID: 0x${service.networkId.toString(16).toUpperCase()} (${service.networkId})\n` +
+                        `Channel: ${service.channel.type} / ${service.channel.channel}`
+                    )}
+                >
+                    <div className="ms-Grid" area-describeby={tooltipId} style={{ margin: 4 }}>
+                        <div className="ms-Grid-row" style={{
+                            padding: 1,
+                            height: 24,
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundImage: service.hasLogoData && `url(/api/services/${service.id}/logo)`
+                        }}>
+                            <div className="ms-Grid-col ms-sm12" style={{ paddingLeft: 50 }}>
+                                <span className="ms-fontWeight-semibold ms-fontSize-12">
+                                    {service.name}
+                                </span>
+                                <span style={{ marginLeft: 4, fontSize: 13, verticalAlign: "middle" }}>
+                                    {
+                                        status.epg.gatheringNetworks.includes(service.networkId) && <Icon iconName="Sync" style={{ color: "#f6ad49" }} /> ||
+                                        service.epgReady && <Icon iconName="CheckMark" style={{ color: "#c3d825" }} /> ||
+                                        <Icon iconName="Clock" style={{ color: "#777" }} />
+                                    }
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </TooltipHost>
+            </div>
+        );
+    }
+
     return (
         <Stack tokens={{ childrenGap: "16 0" }} style={{ margin: "16px 0 8px" }}>
             <Stack>
@@ -87,6 +160,14 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
                 <div className="ms-Grid" dir="ltr">
                     <div className="ms-Grid-row">
                         {statusList}
+                    </div>
+                </div>
+            </Stack>
+            <Stack>
+                <Separator alignContent="start">Services</Separator>
+                <div className="ms-Grid" dir="ltr" style={{ marginLeft: 8 }}>
+                    <div className="ms-Grid-row">
+                        {serviceList}
                     </div>
                 </div>
             </Stack>

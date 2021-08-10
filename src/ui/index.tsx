@@ -33,7 +33,7 @@ import {
 } from "@fluentui/react";
 import * as _http from "http";
 const http = require("stream-http") as typeof _http;
-import { TunerDevice, Status, Event } from "../../api";
+import { TunerDevice, Service, Status, Event } from "../../api";
 import ConnectionGuide from "./components/ConnectionGuide";
 import UpdateAlert from "./components/UpdateAlert";
 import Restart from "./components/Restart";
@@ -49,6 +49,7 @@ export interface UIState {
     statusName: string;
     statusIconName: string;
     tuners: TunerDevice[];
+    services: Service[];
     status: Status;
 }
 
@@ -57,6 +58,7 @@ const uiState: UIState = {
     statusName: "Loading",
     statusIconName: "offline",
     tuners: [],
+    services: [],
     status: null
 };
 
@@ -70,6 +72,7 @@ const iconSrcMap = {
 
 let reconnectTimer: any;
 let statusRefreshInterval: any;
+let servicesRefreshInterval: any;
 let eventsStreamReq: _http.ClientRequest;
 let logStreamReq: _http.ClientRequest;
 
@@ -122,8 +125,17 @@ async function connect() {
         uiStateEvents.emit("update:status");
     }, 1000 * 10);
 
+    servicesRefreshInterval = setInterval(async () => {
+        if (document.hidden) {
+            return;
+        }
+        uiState.services = await (await fetch("/api/services")).json();
+        uiStateEvents.emit("update:services");
+    }, 1000 * 30);
+
     try {
         uiState.status = await (await fetch("/api/status")).json();
+        uiState.services = await (await fetch("/api/services")).json();
         uiState.tuners = await (await fetch("/api/tuners")).json();
         eventsStreamReq = http.get("/api/events/stream", res => {
             console.log("eventsStreamReq", "statusCode", res.statusCode);
@@ -216,6 +228,7 @@ async function connect() {
 
     uiStateEvents.emit("update");
     uiStateEvents.emit("update:status");
+    uiStateEvents.emit("update:services");
     uiStateEvents.emit("update:tuners");
 
     console.log("connect()", "done.");
@@ -226,6 +239,7 @@ function disconnect() {
     console.log("disconnect()", "...");
 
     clearInterval(statusRefreshInterval);
+    clearInterval(servicesRefreshInterval);
 
     if (eventsStreamReq) {
         try {
@@ -306,7 +320,7 @@ const Content = () => {
                 </Stack>
 
                 <Pivot>
-                    <PivotItem itemIcon="GroupedList" headerText="Status / Tuners">
+                    <PivotItem itemIcon="GroupedList" headerText="Status">
                         <StatusView uiState={uiState} uiStateEvents={uiStateEvents} />
                     </PivotItem>
                     <PivotItem itemIcon="EntitlementRedemption" headerText="Events">
