@@ -58,6 +58,7 @@ export interface Service {
     serviceId: ServiceId;
     networkId: NetworkId;
     name: string;
+    type: number;
     logoId?: number;
     hasLogoData?: boolean;
     remoteControlKeyId?: number;

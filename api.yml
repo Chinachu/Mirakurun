@@ -111,6 +111,7 @@ definitions:
       - serviceId
       - networkId
       - name
+      - type
     properties:
       id:
         $ref: '#/definitions/ServiceItemId'
@@ -120,6 +121,8 @@ definitions:
         $ref: '#/definitions/NetworkId'
       name:
         type: string
+      type:
+        type: integer
       logoId:
         type: integer
       hasLogoData:
