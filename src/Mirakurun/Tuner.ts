@@ -335,6 +335,9 @@ export default class Tuner {
                                 .then(async programs => {
                                     await common.sleep(1000);
                                     _.program.findByNetworkIdAndReplace(setting.networkId, programs);
+                                    for (const service of _.service.findByNetworkId(setting.networkId)) {
+                                        service.epgReady = true;
+                                    }
                                     await common.sleep(1000);
                                 })
                                 .then(() => resolve(null))
