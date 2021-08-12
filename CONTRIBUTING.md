@@ -1,12 +1,13 @@
 # Contributing
 
-## Report an Issue
+## Report an Issue (問題の報告)
 
 * https://github.com/Chinachu/Mirakurun/issues
 
 When reporting an issue we also need as much information about your environment
-that you can include. We never know what information will be pertinent when
-trying narrow down the issue. **Please include least the following information**:
+that you can include. We never know what is your environment.<br>
+問題を報告するときは、できるだけ多くの環境情報を含めてください。
+多種多様な環境が存在する中で、我々は個々の環境情報を特定できません。
 
 * Platform you're running on (Debian jessie, CentOS 7.1, ...)
 * (if Mirakurun is working) http://_mirakurun-server-ip_:40772/api/status → https://gist.github.com/
