@@ -373,8 +373,16 @@ export default class TSFilter extends stream.Transform {
 
         // parse
         if (pid === 0) {
-            if (this._patCRC.compare(packet, packet[7] + 4, packet[7] + 8) !== 0) {
-                packet.copy(this._patCRC, 0, packet[7] + 4, packet[7] + 8);
+            const targetStart = packet[7] + 4;
+            if (targetStart + 4 > 188) {
+                // out of range. this packet is broken.
+                if (this.streamInfo[pid]) {
+                    ++this.streamInfo[pid].drop;
+                }
+                return; // drop
+            }
+            if (this._patCRC.compare(packet, targetStart, targetStart + 4) !== 0) {
+                packet.copy(this._patCRC, 0, targetStart, targetStart + 4);
                 this._parses.push(packet);
             }
         } else if (
