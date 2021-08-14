@@ -67,12 +67,12 @@ export default class Program {
         const removedIds = [];
 
         if (firstAdd === false) {
-            _.program.findConflicts(
+            for (const conflictedItem of this.findConflicts(
                 item.networkId,
                 item.serviceId,
                 item.startAt,
                 item.startAt + item.duration
-            ).forEach(conflictedItem => {
+            )) {
                 this.remove(conflictedItem.id);
                 removedIds.push(conflictedItem.id);
 
@@ -80,14 +80,16 @@ export default class Program {
                     "ProgramItem#%d (networkId=%d, eventId=%d) has removed for redefine to ProgramItem#%d (eventId=%d)",
                     conflictedItem.id, conflictedItem.networkId, conflictedItem.eventId, item.id, item.eventId
                 );
-            });
+            }
         }
 
         this._itemMap.set(item.id, item);
 
         if (firstAdd === false) {
             Event.emit("program", "create", item);
-            removedIds.forEach(id => Event.emit("program", "redefine", { from: id, to: item.id }));
+            for (const id of removedIds) {
+                Event.emit("program", "redefine", { from: id, to: item.id });
+            }
         }
 
         this.save();
@@ -155,8 +157,10 @@ export default class Program {
             if (
                 item.networkId === networkId &&
                 item.serviceId === serviceId &&
-                item.startAt >= start &&
-                item.startAt < end
+                (
+                    (item.startAt >= start && item.startAt < end) ||
+                    (item.startAt <= start && item.startAt + item.duration > start)
+                )
             ) {
                 items.push(item);
             }

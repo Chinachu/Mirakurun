@@ -73,8 +73,11 @@ const SAMPLING_RATE = {
     7: 48000
 };
 
+const UNKNOWN_START_TIME = Buffer.from([0xFF, 0xFF, 0xFF]);
+const UNKNOWN_DURATION = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+
 interface EventState {
-    version: VersionState;
+    version: { [tableId: number]: number };
     program: db.Program;
 
     short: {
@@ -110,14 +113,10 @@ interface EventState {
         _raw: Buffer;
     };
     group: {
-        version: number; // basic
-        _raw: Buffer;
+        versions: number[]; // basic
+        _raws: Buffer[];
+        _groups: db.ProgramRelatedItem[][];
     };
-}
-
-interface VersionState {
-    basic: number;
-    extended: number;
 }
 
 // forked from rndomhack/node-aribts/blob/1e7ef94bba3d6ac26aec764bf24dde2c2852bfcb/lib/epg.js
@@ -139,15 +138,19 @@ export default class EPG {
 
         const service = this._epg[networkId][eit.service_id];
 
-        const l = eit.events.length;
-        for (let i = 0; i < l; i++) {
-            const e = eit.events[i];
+        for (const e of eit.events) {
             let state: EventState;
 
             if (!service[e.event_id]) {
                 const id = getProgramItemId(networkId, eit.service_id, e.event_id);
                 let programItem = _.program.get(id);
                 if (!programItem) {
+                    if (
+                        UNKNOWN_START_TIME.compare(e.start_time) === 0 ||
+                        UNKNOWN_DURATION.compare(e.duration) === 0
+                    ) {
+                        continue;
+                    }
                     programItem = {
                         id,
                         eventId: e.event_id,
@@ -162,8 +165,7 @@ export default class EPG {
 
                 state = {
                     version: {
-                        basic: isBasicTable(eit.table_id) ? eit.version_number : -1,
-                        extended: isBasicTable(eit.table_id) ? -1 : eit.version_number
+                        [eit.table_id]: eit.version_number
                     },
                     program: programItem,
 
@@ -195,8 +197,9 @@ export default class EPG {
                         _raw: null
                     },
                     group: {
-                        version: -1,
-                        _raw: null
+                        versions: [-1, -1, -1, -1, -1],
+                        _raws: [null, null, null, null, null],
+                        _groups: [[], [], [], [], []]
                     }
                 };
 
@@ -205,17 +208,18 @@ export default class EPG {
                 state = service[e.event_id];
 
                 if (isOutOfDate(state, eit)) {
-                    if (isBasicTable(eit.table_id)) {
-                        state.version.basic = eit.version_number;
-                    } else {
-                        state.version.extended = eit.version_number;
-                    }
+                    state.version[eit.table_id] = eit.version_number;
 
-                    _.program.set(state.program.id, {
-                        startAt: getTime(e.start_time),
-                        duration: getTimeFromBCD24(e.duration),
-                        isFree: e.free_CA_mode === 0
-                    });
+                    if (
+                        UNKNOWN_START_TIME.compare(e.start_time) !== 0 &&
+                        UNKNOWN_DURATION.compare(e.duration) !== 0
+                    ) {
+                        _.program.set(state.program.id, {
+                            startAt: getTime(e.start_time),
+                            duration: getTimeFromBCD24(e.duration),
+                            isFree: e.free_CA_mode === 0
+                        });
+                    }
                 }
             }
 
@@ -411,32 +415,27 @@ export default class EPG {
 
                     // event_group
                     case 0xD6:
-                        if (state.group.version === eit.version_number) {
+                        if (state.group.versions[d.group_type] === eit.version_number) {
                             break;
                         }
-                        state.group.version = eit.version_number;
+                        state.group.versions[d.group_type] = eit.version_number;
 
                         if (
-                            state.group._raw !== null &&
-                            state.group._raw.compare(d._raw) === 0
+                            state.group._raws[d.group_type] !== null &&
+                            state.group._raws[d.group_type].compare(d._raw) === 0
                         ) {
                             break;
                         }
 
-                        state.group._raw = d._raw;
+                        state.group._raws[d.group_type] = d._raw;
 
-                        if (!d.other_network_events) {
-                            _.program.set(state.program.id, {
-                                relatedItems: d.events.map(getRelatedProgramItem)
-                            });
-                        } else {
-                            _.program.set(state.program.id, {
-                                relatedItems: [
-                                    ...d.events.map(getRelatedProgramItem),
-                                    ...d.other_network_events.map(getRelatedProgramItem)
-                                ]
-                            });
-                        }
+                        state.group._groups[d.group_type] = d.group_type < 4 ?
+                            d.events.map(getRelatedProgramItem.bind(d)) :
+                            d.other_network_events.map(getRelatedProgramItem.bind(d));
+
+                        _.program.set(state.program.id, {
+                            relatedItems: state.group._groups.flat()
+                        });
 
                         break;
                 }// <- switch
@@ -449,33 +448,10 @@ export default class EPG {
     }
 }
 
-function isBasicTable(tableId: number): boolean {
-
-    if (tableId < 0x60) {
-        if (tableId < 0x58) {
-            return true;
-        } else {
-            return false;
-        }
-    } else {
-        if (tableId < 0x68) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-}
-
 function isOutOfDate(state: EventState, eit: any): boolean {
 
-    if (isBasicTable(eit.table_id)) {
-        if (state.version.basic === eit.version_number) {
-            return false;
-        }
-    } else {
-        if (state.version.extended === eit.version_number) {
-            return false;
-        }
+    if (state.version[eit.table_id] === eit.version_number) {
+        return false;
     }
 
     return true;
@@ -521,6 +497,10 @@ function getGenre(content: any): db.ProgramGenre {
 
 function getRelatedProgramItem(event: any): db.ProgramRelatedItem {
     return {
+        type: (
+            this.group_type === 1 ? "shared" :
+                (this.group_type === 2 || this.group_type === 4) ? "relay" : "movement"
+        ),
         networkId: event.original_network_id,
         serviceId: event.service_id,
         eventId: event.event_id

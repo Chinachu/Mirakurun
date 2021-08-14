@@ -129,7 +129,10 @@ export interface ProgramSeries {
     name: string;
 }
 
+export type ProgramRelatedItemType = "shared" | "relay" | "movement";
+
 export interface ProgramRelatedItem {
+    type: ProgramRelatedItemType;
     networkId?: number;
     serviceId: number;
     eventId: number;

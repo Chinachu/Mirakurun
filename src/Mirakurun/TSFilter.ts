@@ -669,8 +669,7 @@ export default class TSFilter extends stream.Transform {
         // write EPG stream and store result
         if (
             this._parseEIT &&
-            this._parseServiceIds.has(data.service_id) &&
-            data.table_id !== 0x4E && data.table_id !== 0x4F
+            this._parseServiceIds.has(data.service_id)
         ) {
             if (!this._epg && status.epg[this._targetNetworkId] !== true) {
                 status.epg[this._targetNetworkId] = true;
@@ -683,7 +682,7 @@ export default class TSFilter extends stream.Transform {
             if (this._epg) {
                 this._epg.write(data);
 
-                if (!this._epgReady) {
+                if (!this._epgReady && data.table_id !== 0x4E && data.table_id !== 0x4F) {
                     this._updateEpgState(data);
                 }
             }

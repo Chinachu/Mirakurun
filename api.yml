@@ -281,6 +281,12 @@ definitions:
   RelatedItem:
     type: object
     properties:
+      type:
+        type: string
+        enum:
+          - shared
+          - relay
+          - movement
       networkId:
         type: integer
       serviceId:
