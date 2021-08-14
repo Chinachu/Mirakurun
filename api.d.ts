@@ -203,7 +203,6 @@ export interface ConfigServer {
     logLevel?: LogLevel;
     maxLogHistory?: number;
     highWaterMark?: number;
-    overflowTimeLimit?: number;
     maxBufferBytesBeforeReady?: number;
     eventEndTimeout?: number;
     programGCInterval?: number;

@@ -135,13 +135,9 @@ export default class TSFilter extends stream.Transform {
     private _logoDataTimer: NodeJS.Timer;
     private _epgReady: boolean = false;
     private _epgState: { [networkId: number]: { [serviceId: number]: BasicExtState } } = {};
-    private _overflowTimer: NodeJS.Timer = null;
     private _provideEventLastDetectedAt: number = -1;
     private _provideEventTimeout: NodeJS.Timer = null;
 
-    // stream options
-    private highWaterMark: number = _.config.server.highWaterMark || 1024 * 1024 * 24;
-    private _overflowTimeLimit: number = _.config.server.overflowTimeLimit || 1000 * 30;
     /** Number divisible by a multiple of 188 */
     private _maxBufferBytesBeforeReady: number = (() => {
         let bytes = _.config.server.maxBufferBytesBeforeReady || 1024 * 1024 * 8;
@@ -150,12 +146,10 @@ export default class TSFilter extends stream.Transform {
     })();
     private _eventEndTimeout: number = _.config.server.eventEndTimeout || 1000;
 
-    // ReadableState in node/lib/_stream_readable.js
-    private _readableState: any;
-
     constructor(options: StreamOptions) {
         super({
-            allowHalfOpen: false
+            allowHalfOpen: false,
+            highWaterMark: _.config.server.highWaterMark || 1024 * 1024 * 24 // 24 MB
         });
 
         const enabletsmf = options.tsmfRelTs || 0;
@@ -239,26 +233,6 @@ export default class TSFilter extends stream.Transform {
         if (this._closed) {
             callback(new Error("TSFilter has closed already"));
             return;
-        }
-
-        // stringent safety measure
-        if (this._readableState.length > this.highWaterMark) {
-            log.warn("TSFilter#_transform: overflowing the buffer...");
-
-            if (this._overflowTimer === null) {
-                this._overflowTimer = setTimeout(() => {
-                    log.error("TSFilter#_transform: will closing because reached time limit of overflowing the buffer...");
-                    this._close();
-                }, this._overflowTimeLimit);
-            }
-
-            callback();  // just drop the chunk
-            ++status.errorCount.bufferOverflow;
-            return;
-        }
-        if (this._overflowTimer !== null) {
-            clearTimeout(this._overflowTimer);
-            this._overflowTimer = null;
         }
 
         let offset = 0;
@@ -1043,8 +1017,6 @@ export default class TSFilter extends stream.Transform {
 
         // clear buffer
         setImmediate(() => {
-            this._readableState.buffer = [];
-            this._readableState.length = 0;
             this._patsec.fill(0);
             delete this._patsec;
             this._packet.fill(0);

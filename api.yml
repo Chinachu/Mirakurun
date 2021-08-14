@@ -453,8 +453,6 @@ definitions:
         minimum: 0
       highWaterMark:
         type: integer
-      overflowTimeLimit:
-        type: integer
       maxBufferBytesBeforeReady:
         type: integer
       eventEndTimeout:

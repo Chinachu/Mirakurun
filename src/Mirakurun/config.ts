@@ -62,8 +62,6 @@ export interface Server {
 
     /** Byte */
     readonly highWaterMark?: number;
-    /** Milliseconds */
-    readonly overflowTimeLimit?: number;
     readonly maxBufferBytesBeforeReady?: number;
     readonly eventEndTimeout?: number;
 
@@ -176,9 +174,6 @@ export function loadServer(): Server {
         }
         if (typeof HIGH_WATER_MARK !== "undefined" && /^[0-9]+$/.test(HIGH_WATER_MARK)) {
             config.highWaterMark = parseInt(HIGH_WATER_MARK, 10);
-        }
-        if (typeof OVERFLOW_TIME_LIMIT !== "undefined" && /^[0-9]+$/.test(OVERFLOW_TIME_LIMIT)) {
-            config.overflowTimeLimit = parseInt(OVERFLOW_TIME_LIMIT, 10);
         }
         if (typeof MAX_BUFFER_BYTES_BEFORE_READY !== "undefined" && /^[0-9]+$/.test(MAX_BUFFER_BYTES_BEFORE_READY)) {
             config.maxBufferBytesBeforeReady = parseInt(MAX_BUFFER_BYTES_BEFORE_READY, 10);
