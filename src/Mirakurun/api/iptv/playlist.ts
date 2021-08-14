@@ -29,6 +29,7 @@ export const get: Operation = async (req, res) => {
             continue;
         }
 
+        m += `#KODIPROP:mimetype=video/mp2t\n`;
         m += `#EXTINF:-1 tvg-id="${service.id}"`;
         if (await Service.isLogoDataExists(service.networkId, service.logoId)) {
             m += ` tvg-logo="${apiRoot}/services/${service.id}/logo"`;
