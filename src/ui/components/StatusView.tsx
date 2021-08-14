@@ -83,7 +83,7 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
         statusItem.push({ label: "Platform", text: `${status.process?.platform} (${status.process?.arch}) ${dockerStat}` });
         statusItem.push({ label: "Node.js Version", text: status.process?.versions?.node });
         statusItem.push({ label: "Memory (RSS)", text: `${Math.round(status.process?.memoryUsage?.rss / 1024 / 1024)} MB` });
-        statusItem.push({ label: "EPG Gathering Network IDs", text: status.epg.gatheringNetworks.map(id => `0x${id.toString(16)}`).join(", ") });
+        statusItem.push({ label: "EPG Gathering Network IDs", text: status.epg.gatheringNetworks.map(id => `0x${id.toString(16).toUpperCase()}`).join(", ") });
         statusItem.push({ label: "EPG Stored Events", text: `${status.epg.storedEvents} Events` });
         statusItem.push({ label: "TunerDevice Streams", text: `${status.streamCount.tunerDevice}` });
         statusItem.push({ label: "TSFilter Streams", text: `${status.streamCount.tsFilter}` });
