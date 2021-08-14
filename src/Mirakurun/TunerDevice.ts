@@ -13,10 +13,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-import * as events from "events";
 import * as child_process from "child_process";
 import * as stream from "stream";
 import * as util from "util";
+import EventEmitter = require("eventemitter3");
 import * as common from "./common";
 import * as log from "./log";
 import * as config from "./config";
@@ -45,7 +45,7 @@ interface Status {
     readonly isFault: boolean;
 }
 
-export default class TunerDevice extends events.EventEmitter {
+export default class TunerDevice extends EventEmitter {
 
     private _channel: ChannelItem = null;
     private _command: string = null;
