@@ -242,11 +242,12 @@ export default class Program {
 
         queue.add(async () => {
 
-            const now = Date.now();
+            const shortExp = Date.now() - 1000 * 60 * 60 * 1; // 1 hour
+            const longExp = Date.now() - 1000 * 60 * 60 * 24; // 24 hours
             let count = 0;
 
             for (const item of this._itemMap.values()) {
-                if (now > (item.startAt + item.duration)) {
+                if ((item.duration === 1 ? longExp : shortExp) > (item.startAt + item.duration)) {
                     ++count;
                     this.remove(item.id);
                 }

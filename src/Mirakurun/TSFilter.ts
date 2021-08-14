@@ -185,7 +185,9 @@ export default class TSFilter extends stream.Transform {
             if (program) {
                 this._provideEventTimeout = setTimeout(
                     () => this._observeProvideEvent(),
-                    program.startAt + program.duration - Date.now()
+                    program.duration === 1 ?
+                        program.startAt + (1000 * 60) - Date.now() :
+                        program.startAt + program.duration - Date.now()
                 );
             }
         }

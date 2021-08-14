@@ -145,10 +145,7 @@ export default class EPG {
                 const id = getProgramItemId(networkId, eit.service_id, e.event_id);
                 let programItem = _.program.get(id);
                 if (!programItem) {
-                    if (
-                        UNKNOWN_START_TIME.compare(e.start_time) === 0 ||
-                        UNKNOWN_DURATION.compare(e.duration) === 0
-                    ) {
+                    if (UNKNOWN_START_TIME.compare(e.start_time) === 0) {
                         continue;
                     }
                     programItem = {
@@ -157,7 +154,7 @@ export default class EPG {
                         serviceId: eit.service_id,
                         networkId: networkId,
                         startAt: getTime(e.start_time),
-                        duration: getTimeFromBCD24(e.duration),
+                        duration: UNKNOWN_DURATION.compare(e.duration) === 0 ? 1 : getTimeFromBCD24(e.duration),
                         isFree: e.free_CA_mode === 0
                     };
                     _.program.add(programItem);
@@ -210,13 +207,10 @@ export default class EPG {
                 if (isOutOfDate(state, eit)) {
                     state.version[eit.table_id] = eit.version_number;
 
-                    if (
-                        UNKNOWN_START_TIME.compare(e.start_time) !== 0 &&
-                        UNKNOWN_DURATION.compare(e.duration) !== 0
-                    ) {
+                    if (UNKNOWN_START_TIME.compare(e.start_time) !== 0) {
                         _.program.set(state.program.id, {
                             startAt: getTime(e.start_time),
-                            duration: getTimeFromBCD24(e.duration),
+                            duration: UNKNOWN_DURATION.compare(e.duration) === 0 ? 1 : getTimeFromBCD24(e.duration),
                             isFree: e.free_CA_mode === 0
                         });
                     }
