@@ -94,41 +94,37 @@ interface EventState {
     program: db.Program;
 
     short: {
-        version: number; // basic
-        event_name_char: Buffer;
-        text_char: Buffer;
+        version?: number; // basic
+        event_name_char?: Buffer;
+        text_char?: Buffer;
     };
     extended: {
-        version: number; // extended
-        _descs: {
+        version?: number; // extended
+        _descs?: {
             item_description_length: number;
             item_description_char: Buffer;
             item_length: number;
             item_char: Buffer;
         }[][];
-        _done: boolean;
+        _done?: boolean;
     };
     component: {
-        version: number; // basic
-        stream_content: number;
-        component_type: number;
+        version?: number; // basic
+        stream_content?: number;
+        component_type?: number;
     };
     content: {
-        version: number; // basic
-        _raw: Buffer;
+        version?: number; // basic
     };
     audio: {
         versions: { [componentTag: number]: number }; // basic
-        _raws: { [componentTag: number]: Buffer };
         _audios: { [componentTag: number]: db.ProgramAudio };
     };
     series: {
-        version: number; // basic
-        _raw: Buffer;
+        version?: number; // basic
     };
     group: {
         versions: number[]; // basic
-        _raws: Buffer[];
         _groups: db.ProgramRelatedItem[][];
     };
 }
@@ -176,43 +172,21 @@ export default class EPG {
                 }
 
                 state = {
-                    version: {
-                        [eit.table_id]: eit.version_number
-                    },
+                    version: {},
                     program: programItem,
 
-                    short: {
-                        version: -1,
-                        event_name_char: null,
-                        text_char: null
-                    },
-                    extended: {
-                        version: -1,
-                        _descs: null,
-                        _done: true
-                    },
-                    component: {
-                        version: -1,
-                        stream_content: -1,
-                        component_type: -1
-                    },
-                    content: {
-                        version: -1,
-                        _raw: null
-                    },
+                    short: {},
+                    extended: {},
+                    component: {},
+                    content: {},
                     audio: {
                         versions: {},
-                        _raws: {},
                         _audios: {}
                     },
-                    series: {
-                        version: -1,
-                        _raw: null
-                    },
+                    series: {},
                     group: {
-                        versions: [-1, -1, -1, -1, -1],
-                        _raws: [null, null, null, null, null],
-                        _groups: [[], [], [], [], []]
+                        versions: [],
+                        _groups: []
                     }
                 };
 
@@ -247,8 +221,8 @@ export default class EPG {
                         state.short.version = eit.version_number;
 
                         if (
-                            state.short.event_name_char !== null &&
-                            state.short.text_char !== null &&
+                            state.short.event_name_char &&
+                            state.short.text_char &&
                             state.short.event_name_char.compare(d.event_name_char) === 0 &&
                             state.short.text_char.compare(d.text_char) === 0
                         ) {
@@ -311,6 +285,7 @@ export default class EPG {
                                 extended: extended
                             });
 
+                            delete state.extended._descs;
                             state.extended._done = true; // done
                         }
 
@@ -352,15 +327,6 @@ export default class EPG {
                         }
                         state.content.version = eit.version_number;
 
-                        if (
-                            state.content._raw !== null &&
-                            state.content._raw.compare(d._raw) === 0
-                        ) {
-                            break;
-                        }
-
-                        state.content._raw = d._raw;
-
                         _.program.set(state.program.id, {
                             genres: d.contents.map(getGenre)
                         });
@@ -373,15 +339,6 @@ export default class EPG {
                             break;
                         }
                         state.audio.versions[d.component_tag] = eit.version_number;
-
-                        if (
-                            state.audio._raws[d.component_tag] &&
-                            state.audio._raws[d.component_tag].compare(d._raw) === 0
-                        ) {
-                            break;
-                        }
-
-                        state.audio._raws[d.component_tag] = d._raw;
 
                         const langs = [getLangCode(d.ISO_639_language_code)];
                         if (d.ISO_639_language_code_2) {
@@ -409,15 +366,6 @@ export default class EPG {
                         }
                         state.series.version = eit.version_number;
 
-                        if (
-                            state.series._raw !== null &&
-                            state.series._raw.compare(d._raw) === 0
-                        ) {
-                            break;
-                        }
-
-                        state.series._raw = d._raw;
-
                         _.program.set(state.program.id, {
                             series: {
                                 id: d.series_id,
@@ -440,15 +388,6 @@ export default class EPG {
                             break;
                         }
                         state.group.versions[d.group_type] = eit.version_number;
-
-                        if (
-                            state.group._raws[d.group_type] !== null &&
-                            state.group._raws[d.group_type].compare(d._raw) === 0
-                        ) {
-                            break;
-                        }
-
-                        state.group._raws[d.group_type] = d._raw;
 
                         state.group._groups[d.group_type] = d.group_type < 4 ?
                             d.events.map(getRelatedProgramItem.bind(d)) :
