@@ -76,6 +76,19 @@ const SAMPLING_RATE = {
 const UNKNOWN_START_TIME = Buffer.from([0xFF, 0xFF, 0xFF]);
 const UNKNOWN_DURATION = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 
+const ISO_639_LANG_CODE = {
+    jpn: Buffer.from("6A706E", "hex"),
+    eng: Buffer.from("656E67", "hex"),
+    deu: Buffer.from("646575", "hex"),
+    fra: Buffer.from("667261", "hex"),
+    ita: Buffer.from("697461", "hex"),
+    rus: Buffer.from("727573", "hex"),
+    zho: Buffer.from("7A686F", "hex"),
+    kor: Buffer.from("6B6F72", "hex"),
+    spa: Buffer.from("737061", "hex"),
+    etc: Buffer.from("657463", "hex")
+};
+
 interface EventState {
     version: { [tableId: number]: number };
     program: db.Program;
@@ -105,8 +118,9 @@ interface EventState {
         _raw: Buffer;
     };
     audio: {
-        version: number; // basic
-        _raw: Buffer;
+        versions: { [componentTag: number]: number }; // basic
+        _raws: { [componentTag: number]: Buffer };
+        _audios: { [componentTag: number]: db.ProgramAudio };
     };
     series: {
         version: number; // basic
@@ -186,8 +200,9 @@ export default class EPG {
                         _raw: null
                     },
                     audio: {
-                        version: -1,
-                        _raw: null
+                        versions: {},
+                        _raws: {},
+                        _audios: {}
                     },
                     series: {
                         version: -1,
@@ -352,25 +367,35 @@ export default class EPG {
 
                     // audio component
                     case 0xC4:
-                        if (state.audio.version === eit.version_number) {
+                        if (state.audio.versions[d.component_tag] === eit.version_number) {
                             break;
                         }
-                        state.audio.version = eit.version_number;
+                        state.audio.versions[d.component_tag] = eit.version_number;
 
                         if (
-                            state.audio._raw !== null &&
-                            state.audio._raw.compare(d._raw) === 0
+                            state.audio._raws[d.component_tag] &&
+                            state.audio._raws[d.component_tag].compare(d._raw) === 0
                         ) {
                             break;
                         }
 
-                        state.audio._raw = d._raw;
+                        state.audio._raws[d.component_tag] = d._raw;
+
+                        const langs = [getLangCode(d.ISO_639_language_code)];
+                        if (d.ISO_639_language_code_2) {
+                            langs.push(getLangCode(d.ISO_639_language_code_2));
+                        }
+
+                        state.audio._audios[d.component_tag] = {
+                            componentType: d.component_type,
+                            componentTag: d.component_tag,
+                            isMain: d.main_component_flag === 1,
+                            samplingRate: SAMPLING_RATE[d.sampling_rate],
+                            langs
+                        };
 
                         _.program.set(state.program.id, {
-                            audio: {
-                                samplingRate: SAMPLING_RATE[d.sampling_rate],
-                                componentType: d.component_type
-                            }
+                            audios: Object.values(state.audio._audios)
                         });
 
                         break;
@@ -477,6 +502,15 @@ function getGenre(content: any): db.ProgramGenre {
         un1: content.user_nibble_1,
         un2: content.user_nibble_2
     };
+}
+
+function getLangCode(buffer: Buffer): db.ProgramAudioLanguageCode {
+    for (const code in ISO_639_LANG_CODE) {
+        if (ISO_639_LANG_CODE[code].compare(buffer) === 0) {
+            return code as db.ProgramAudioLanguageCode;
+        }
+    }
+    return "etc";
 }
 
 function getRelatedProgramItem(event: any): db.ProgramRelatedItem {

@@ -186,13 +186,34 @@ definitions:
             type: integer
           componentType:
             type: integer
-      audio:
-        type: object
-        properties:
-          samplingRate:
-            $ref: '#/definitions/ProgramAudioSamplingRate'
-          componentType:
-            type: integer
+      audios:
+        type: array
+        items:
+          type: object
+          properties:
+            componentType:
+              type: integer
+            componentTag:
+              type: integer
+            isMain:
+              type: boolean
+            samplingRate:
+              $ref: '#/definitions/ProgramAudioSamplingRate'
+            langs:
+              type: array
+              items:
+                type: string
+                enum:
+                  - jpn
+                  - eng
+                  - deu
+                  - fra
+                  - ita
+                  - rus
+                  - zho
+                  - kor
+                  - spa
+                  - etc
       extended:
         type: object
       relatedItems:

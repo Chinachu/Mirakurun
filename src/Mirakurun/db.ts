@@ -53,7 +53,7 @@ export interface Program {
     description?: string;
     genres?: ProgramGenre[];
     video?: ProgramVideo;
-    audio?: ProgramAudio;
+    audios?: ProgramAudio[];
 
     extended?: {
         [description: string]: string;
@@ -87,9 +87,22 @@ export type ProgramVideoResolution = (
 );
 
 export interface ProgramAudio {
-    samplingRate: ProgramAudioSamplingRate;
-
+    /** component_type
+     * - 0x01 - 1/0 mode (single-mono)
+     * - 0x02 - 1/0 + 1/0 mode (dual-mono)
+     * - 0x03 - 2/0 mode (stereo)
+     * - 0x07 - 3/1 mode
+     * - 0x08 - 3/2 mode
+     * - 0x09 - 3/2 + LFE mode
+     */
     componentType: number;
+    componentTag: number;
+    isMain: boolean;
+    samplingRate: ProgramAudioSamplingRate;
+    /** ISO_639_language_code, ISO_639_language_code_2
+     * - this `#length` will `2` if dual-mono multi-lingual.
+     */
+    langs: ProgramAudioLanguageCode[];
 }
 
 export enum ProgramAudioSamplingRate {
@@ -100,6 +113,19 @@ export enum ProgramAudioSamplingRate {
     "44.1kHz" = 44100,
     "48kHz" = 48000
 }
+
+export type ProgramAudioLanguageCode = (
+    "jpn" |
+    "eng" |
+    "deu" |
+    "fra" |
+    "ita" |
+    "rus" |
+    "zho" |
+    "kor" |
+    "spa" |
+    "etc"
+);
 
 export interface ProgramSeries {
     id: number;
