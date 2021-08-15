@@ -73,8 +73,8 @@ const SAMPLING_RATE = {
     7: 48000
 };
 
-const UNKNOWN_START_TIME = Buffer.from([0xFF, 0xFF, 0xFF]);
-const UNKNOWN_DURATION = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+const UNKNOWN_START_TIME = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+const UNKNOWN_DURATION = Buffer.from([0xFF, 0xFF, 0xFF]);
 
 const ISO_639_LANG_CODE = {
     jpn: Buffer.from("6A706E", "hex"),
@@ -169,7 +169,8 @@ export default class EPG {
                         networkId: networkId,
                         startAt: getTime(e.start_time),
                         duration: UNKNOWN_DURATION.compare(e.duration) === 0 ? 1 : getTimeFromBCD24(e.duration),
-                        isFree: e.free_CA_mode === 0
+                        isFree: e.free_CA_mode === 0,
+                        _pf: eit.table_id === 0x4E || eit.table_id === 0x4F || undefined
                     };
                     _.program.add(programItem);
                 }
@@ -226,7 +227,8 @@ export default class EPG {
                         _.program.set(state.program.id, {
                             startAt: getTime(e.start_time),
                             duration: UNKNOWN_DURATION.compare(e.duration) === 0 ? 1 : getTimeFromBCD24(e.duration),
-                            isFree: e.free_CA_mode === 0
+                            isFree: e.free_CA_mode === 0,
+                            _pf: eit.table_id === 0x4E || eit.table_id === 0x4F || undefined
                         });
                     }
                 }
@@ -469,7 +471,10 @@ export default class EPG {
 
 function isOutOfDate(state: EventState, eit: any): boolean {
 
-    if (state.version[eit.table_id] === eit.version_number) {
+    if (
+        (state.program._pf && eit.table_id !== 0x4E && eit.table_id !== 0x4F) ||
+        state.version[eit.table_id] === eit.version_number
+    ) {
         return false;
     }
 

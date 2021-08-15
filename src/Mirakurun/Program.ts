@@ -71,7 +71,8 @@ export default class Program {
                 item.networkId,
                 item.serviceId,
                 item.startAt,
-                item.startAt + item.duration
+                item.startAt + item.duration,
+                item._pf
             )) {
                 this.remove(conflictedItem.id);
                 removedIds.push(conflictedItem.id);
@@ -149,7 +150,7 @@ export default class Program {
         return items;
     }
 
-    findConflicts(networkId: number, serviceId: number, start: number, end: number): db.Program[] {
+    findConflicts(networkId: number, serviceId: number, start: number, end: number, _pf?: true): db.Program[] {
 
         const items = [];
 
@@ -160,7 +161,8 @@ export default class Program {
                 (
                     (item.startAt >= start && item.startAt < end) ||
                     (item.startAt <= start && item.startAt + item.duration > start)
-                )
+                ) &&
+                (!item._pf || _pf)
             ) {
                 items.push(item);
             }
@@ -244,10 +246,14 @@ export default class Program {
 
             const shortExp = Date.now() - 1000 * 60 * 60 * 1; // 1 hour
             const longExp = Date.now() - 1000 * 60 * 60 * 24; // 24 hours
+            const maximum = Date.now() + 1000 * 60 * 60 * 24 * 9; // 9 days
             let count = 0;
 
             for (const item of this._itemMap.values()) {
-                if ((item.duration === 1 ? longExp : shortExp) > (item.startAt + item.duration)) {
+                if (
+                    (item.duration === 1 ? longExp : shortExp) > (item.startAt + item.duration) ||
+                    maximum < item.startAt
+                ) {
                     ++count;
                     this.remove(item.id);
                 }
