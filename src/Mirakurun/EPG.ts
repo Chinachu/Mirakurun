@@ -18,7 +18,6 @@ import * as db from "./db";
 import _ from "./_";
 import * as aribts from "aribts";
 const TsChar = aribts.TsChar;
-const TsDate = aribts.TsDate;
 
 const STREAM_CONTENT = {
     1: "mpeg2",
@@ -89,17 +88,19 @@ const ISO_639_LANG_CODE = {
     etc: Buffer.from("657463", "hex")
 };
 
+interface VersionDict<T = number> {
+    [tableId: number]: T;
+}
+
 interface EventState {
-    version: { [tableId: number]: number };
+    version: VersionDict;
     program: db.Program;
 
     short: {
-        version?: number; // basic
-        event_name_char?: Buffer;
-        text_char?: Buffer;
+        version: VersionDict; // basic
     };
     extended: {
-        version?: number; // extended
+        version: VersionDict; // extended
         _descs?: {
             item_description_length: number;
             item_description_char: Buffer;
@@ -109,22 +110,20 @@ interface EventState {
         _done?: boolean;
     };
     component: {
-        version?: number; // basic
-        stream_content?: number;
-        component_type?: number;
+        version: VersionDict; // basic
     };
     content: {
-        version?: number; // basic
+        version: VersionDict; // basic
     };
     audio: {
-        versions: { [componentTag: number]: number }; // basic
+        version: VersionDict<VersionDict>; // basic
         _audios: { [componentTag: number]: db.ProgramAudio };
     };
     series: {
-        version?: number; // basic
+        version: VersionDict; // basic
     };
     group: {
-        versions: number[]; // basic
+        version: VersionDict<VersionDict>; // basic
         _groups: db.ProgramRelatedItem[][];
     };
 }
@@ -175,17 +174,27 @@ export default class EPG {
                     version: {},
                     program: programItem,
 
-                    short: {},
-                    extended: {},
-                    component: {},
-                    content: {},
+                    short: {
+                        version: {}
+                    },
+                    extended: {
+                        version: {}
+                    },
+                    component: {
+                        version: {}
+                    },
+                    content: {
+                        version: {}
+                    },
                     audio: {
-                        versions: {},
+                        version: {},
                         _audios: {}
                     },
-                    series: {},
+                    series: {
+                        version: {}
+                    },
                     group: {
-                        versions: [],
+                        version: {},
                         _groups: []
                     }
                 };
@@ -194,7 +203,7 @@ export default class EPG {
             } else {
                 state = service[e.event_id];
 
-                if (isOutOfDate(state, eit)) {
+                if (isOutOfDate(eit, state.version)) {
                     state.version[eit.table_id] = eit.version_number;
 
                     if (UNKNOWN_START_TIME.compare(e.start_time) !== 0) {
@@ -208,29 +217,14 @@ export default class EPG {
                 }
             }
 
-            const m = e.descriptors.length;
-            for (let j = 0; j < m; j++) {
-                const d = e.descriptors[j];
-
+            for (const d of e.descriptors) {
                 switch (d.descriptor_tag) {
                     // short_event
                     case 0x4D:
-                        if (state.short.version === eit.version_number) {
+                        if (!isOutOfDate(eit, state.short.version)) {
                             break;
                         }
-                        state.short.version = eit.version_number;
-
-                        if (
-                            state.short.event_name_char &&
-                            state.short.text_char &&
-                            state.short.event_name_char.compare(d.event_name_char) === 0 &&
-                            state.short.text_char.compare(d.text_char) === 0
-                        ) {
-                            break;
-                        }
-
-                        state.short.event_name_char = d.event_name_char;
-                        state.short.text_char = d.text_char;
+                        state.short.version[eit.table_id] = eit.version_number;
 
                         _.program.set(state.program.id, {
                             name: new TsChar(d.event_name_char).decode(),
@@ -241,8 +235,8 @@ export default class EPG {
 
                     // extended_event
                     case 0x4E:
-                        if (state.extended.version !== eit.version_number) {
-                            state.extended.version = eit.version_number;
+                        if (isOutOfDate(eit, state.extended.version)) {
+                            state.extended.version[eit.table_id] = eit.version_number;
                             state.extended._descs = new Array(d.last_descriptor_number + 1);
                             state.extended._done = false;
                         } else if (state.extended._done) {
@@ -293,20 +287,10 @@ export default class EPG {
 
                     // component
                     case 0x50:
-                        if (state.component.version === eit.version_number) {
+                        if (!isOutOfDate(eit, state.component.version)) {
                             break;
                         }
-                        state.component.version = eit.version_number;
-
-                        if (
-                            state.component.stream_content === d.stream_content &&
-                            state.component.component_type === d.component_type
-                        ) {
-                            break;
-                        }
-
-                        state.component.stream_content = d.stream_content;
-                        state.component.component_type = d.component_type;
+                        state.component.version[eit.table_id] = eit.version_number;
 
                         _.program.set(state.program.id, {
                             video: {
@@ -322,10 +306,10 @@ export default class EPG {
 
                     // content
                     case 0x54:
-                        if (state.content.version === eit.version_number) {
+                        if (!isOutOfDate(eit, state.content.version)) {
                             break;
                         }
-                        state.content.version = eit.version_number;
+                        state.content.version[eit.table_id] = eit.version_number;
 
                         _.program.set(state.program.id, {
                             genres: d.contents.map(getGenre)
@@ -335,10 +319,10 @@ export default class EPG {
 
                     // audio component
                     case 0xC4:
-                        if (state.audio.versions[d.component_tag] === eit.version_number) {
+                        if (!isOutOfDateLv2(eit, state.audio.version, d.component_tag)) {
                             break;
                         }
-                        state.audio.versions[d.component_tag] = eit.version_number;
+                        state.audio.version[eit.table_id][d.component_tag] = eit.version_number;
 
                         const langs = [getLangCode(d.ISO_639_language_code)];
                         if (d.ISO_639_language_code_2) {
@@ -361,10 +345,10 @@ export default class EPG {
 
                     // series
                     case 0xD5:
-                        if (state.series.version === eit.version_number) {
+                        if (!isOutOfDate(eit, state.series.version)) {
                             break;
                         }
-                        state.series.version = eit.version_number;
+                        state.series.version[eit.table_id] = eit.version_number;
 
                         _.program.set(state.program.id, {
                             series: {
@@ -384,10 +368,10 @@ export default class EPG {
 
                     // event_group
                     case 0xD6:
-                        if (state.group.versions[d.group_type] === eit.version_number) {
+                        if (!isOutOfDateLv2(eit, state.group.version, d.group_type)) {
                             break;
                         }
-                        state.group.versions[d.group_type] = eit.version_number;
+                        state.group.version[eit.table_id][d.group_type] = eit.version_number;
 
                         state.group._groups[d.group_type] = d.group_type < 4 ?
                             d.events.map(getRelatedProgramItem.bind(d)) :
@@ -401,23 +385,33 @@ export default class EPG {
                 }// <- switch
             }// <- for
         }// <- for
-    }
-
-    end() {
-        this._epg = null;
-    }
 }
 
-function isOutOfDate(state: EventState, eit: any): boolean {
+function isOutOfDate(eit: any, versionDict: VersionDict): boolean {
 
     if (
-        (state.program._pf && eit.table_id !== 0x4E && eit.table_id !== 0x4F) ||
-        state.version[eit.table_id] === eit.version_number
+        (versionDict[0x4E] !== undefined || versionDict[0x4F] !== undefined) &&
+        (eit.table_id !== 0x4E && eit.table_id !== 0x4F)
     ) {
         return false;
     }
 
-    return true;
+    return versionDict[eit.table_id] !== eit.version_number;
+}
+
+function isOutOfDateLv2(eit: any, versionDict: VersionDict<VersionDict>, lv2: number): boolean {
+
+    if (versionDict[eit.table_id] === undefined) {
+        versionDict[eit.table_id] = {};
+    }
+    if (
+        (versionDict[0x4E] !== undefined || versionDict[0x4F] !== undefined) &&
+        (eit.table_id !== 0x4E && eit.table_id !== 0x4F)
+    ) {
+        return false;
+    }
+
+    return versionDict[eit.table_id][lv2] === eit.version_number;
 }
 
 function getTime(buffer: Buffer): number {
