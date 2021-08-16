@@ -43,9 +43,11 @@ export default class Program {
         return _.program.items;
     }
 
-    private _itemMap: Map<number, db.Program> = new Map<number, db.Program>();
+    private _itemMap = new Map<number, db.Program>();
     private _saveTimerId: NodeJS.Timer;
-    private _programGCInterval: number = _.config.server.programGCInterval || 1000 * 60 * 15;
+    private _emitTimerId: NodeJS.Timer;
+    private _updatedPrograms = new Set<db.Program>();
+    private _programGCInterval = _.config.server.programGCInterval || 1000 * 60 * 15;
 
     constructor() {
         this._load();
@@ -103,8 +105,8 @@ export default class Program {
     set(id: number, props: Partial<db.Program>): void {
         const item = this.get(id);
         if (item && common.updateObject(item, props) === true) {
+            this._updatedPrograms.add(item);
             this.save();
-            Event.emit("program", "update", item);
         }
     }
 
@@ -198,6 +200,8 @@ export default class Program {
     }
 
     save(): void {
+        clearTimeout(this._emitTimerId);
+        this._emitTimerId = setTimeout(() => this._emit(), 100);
         clearTimeout(this._saveTimerId);
         this._saveTimerId = setTimeout(() => this._save(), 1000 * 10);
     }
@@ -228,6 +232,16 @@ export default class Program {
         }
     }
 
+    private async _emit(): Promise<void> {
+
+        for (const item of this._updatedPrograms) {
+            this._updatedPrograms.delete(item);
+            Event.emit("program", "update", item);
+
+            await common.sleep(10);
+        }
+    }
+
     private _save(): void {
 
         log.debug("saving programs...");
@@ -244,7 +258,7 @@ export default class Program {
 
         queue.add(async () => {
 
-            const shortExp = Date.now() - 1000 * 60 * 60 * 1; // 1 hour
+            const shortExp = Date.now() - 1000 * 60 * 60 * 3; // 3 hour
             const longExp = Date.now() - 1000 * 60 * 60 * 24; // 24 hours
             const maximum = Date.now() + 1000 * 60 * 60 * 24 * 9; // 9 days
             let count = 0;
