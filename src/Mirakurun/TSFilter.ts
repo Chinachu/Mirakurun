@@ -982,19 +982,23 @@ export default class TSFilter extends stream.Transform {
         targetFlags.lastFlagsId = lastFlagsId;
         targetFlag.version_number = versionNumber;
 
-        this._epgReady = Object.keys(this._epgState).every(nid => {
-            return Object.keys(this._epgState[nid]).every(sid => {
-                return [this._epgState[nid][sid].basic, this._epgState[nid][sid].extended].every(target => {
-                    return target.flags.every(table => {
-                        return table.flag.every((segment, i) => {
-                            return (segment | table.ignore[i]) === 0xFF;
-                        });
-                    });
-                });
-            });
-        });
+        let ready = true;
+        isReady: for (const nid in this._epgState) {
+            for (const sid in this._epgState[nid]) {
+                for (const table of [...this._epgState[nid][sid].basic.flags, ...this._epgState[nid][sid].extended.flags]) {
+                    for (let i = 0; i < table.flag.length; i++) {
+                        if ((table.flag[i] | table.ignore[i]) !== 0xFF) {
+                            ready = false;
+                            break isReady;
+                        }
+                    }
+                }
+            }
+        }
 
-        if (this._epgReady) {
+        if (ready === true) {
+            this._epgReady = true;
+
             for (const service of _.service.findByNetworkId(this._targetNetworkId)) {
                 service.epgReady = true;
             }
