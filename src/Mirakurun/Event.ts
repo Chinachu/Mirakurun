@@ -16,10 +16,10 @@
 import EventEmitter = require("eventemitter3");
 import _ from "./_";
 
-export interface EventMessage {
+export interface EventMessage<T = any> {
     readonly resource: EventResource;
     readonly type: EventType;
-    readonly data: any;
+    readonly data: T;
     readonly time: number;
 }
 
