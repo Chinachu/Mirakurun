@@ -42,7 +42,7 @@ export const put: Operation = (req, res) => {
     } else if (process.env.DOCKER === "YES") {
         res.status(202);
         res.end(JSON.stringify({ _exit: 0 }));
-        setTimeout(() => process.exit(0), 0);
+        setTimeout(() => process.kill(parseInt(process.env.INIT_PID, 10), 1), 0);
     } else {
         api.responseError(res, 500);
     }
