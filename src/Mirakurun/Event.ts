@@ -14,6 +14,8 @@
    limitations under the License.
 */
 import EventEmitter = require("eventemitter3");
+import rfdc = require("rfdc");
+const clone = rfdc();
 import _ from "./_";
 
 export interface EventMessage<T = any> {
@@ -49,7 +51,7 @@ export default class Event extends EventEmitter {
         const message: EventMessage = {
             resource: resource,
             type: type,
-            data: data,
+            data: clone(data),
             time: Date.now()
         };
 
