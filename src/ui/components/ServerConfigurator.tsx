@@ -119,6 +119,24 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                         }}
                     />
                     <Separator alignContent="start">Advanced</Separator>
+                    <TextField
+                        styles={{ fieldGroup: { "max-width": 200 } }}
+                        label="EPG Gathering Interval"
+                        suffix="ms"
+                        placeholder="1800000"
+                        value={`${editing.epgGatheringInterval || ""}`}
+                        onChange={(ev, newValue) => {
+                            if (newValue === "") {
+                                delete editing.epgGatheringInterval;
+                            } else if (/^[0-9]+$/.test(newValue)) {
+                                const int = parseInt(newValue, 10);
+                                if (int <= 1000 * 60 * 60 * 24 * 3 && int > 0) {
+                                    editing.epgGatheringInterval = int;
+                                }
+                            }
+                            setEditing({ ...editing });
+                        }}
+                    />
                     <Toggle
                         label={
                             <Stack horizontal verticalAlign="end">
