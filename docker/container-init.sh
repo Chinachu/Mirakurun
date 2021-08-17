@@ -9,9 +9,21 @@ export LOGO_DATA_DIR_PATH=/app-data/logo-data
 
 export PATH=/opt/bin:$PATH
 export DOCKER=YES
+export INIT_PID=$$
 
 # tweaks for glibc memory usage
 export MALLOC_ARENA_MAX=2
+
+# trap
+function trap_exit() {
+  echo "stopping... $(jobs -p)"
+  kill $(jobs -p) > /dev/null 2>&1 || echo "already killed."
+  /etc/init.d/pcscd stop
+  sleep 1
+  echo "exit."
+}
+trap "exit 0" 2 3 15
+trap trap_exit 0
 
 if [ ! -e "/opt/bin" ]; then
   mkdir -pv /opt/bin
@@ -44,15 +56,23 @@ if [ -e "/etc/init.d/pcscd" ]; then
   done
 fi
 
-if [ "$DEBUG" != "true" ]; then
-  export NODE_ENV=production
-  node -r source-map-support/register lib/server.js
-else
-  npm run debug
-fi
+function start() {
+  if [ "$DEBUG" != "true" ]; then
+    export NODE_ENV=production
+    node -r source-map-support/register lib/server.js &
+  else
+    npm run debug &
+  fi
 
-if [ -e "/etc/init.d/pcscd" ]; then
-  echo "stopping pcscd..."
-  /etc/init.d/pcscd stop
+  wait
+}
+
+function restart() {
+  echo "restarting... $(jobs -p)"
+  kill $(jobs -p) > /dev/null 2>&1 || echo "already killed."
   sleep 1
-fi
+  start
+}
+trap restart 1
+
+start
