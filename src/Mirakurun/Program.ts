@@ -18,7 +18,7 @@ import * as common from "./common";
 import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
-import Event from "./Event";
+import Event, { EventType } from "./Event";
 import queue from "./queue";
 
 export function getProgramItemId(networkId: number, serviceId: number, eventId: number): number {
@@ -46,6 +46,8 @@ export default class Program {
     private _itemMap = new Map<number, db.Program>();
     private _saveTimerId: NodeJS.Timer;
     private _emitTimerId: NodeJS.Timer;
+    private _emitRunning = false;
+    private _emitPrograms = new Map<db.Program, EventType>();
     private _programGCInterval = _.config.server.programGCInterval || 1000 * 60 * 60; // 1 hour
 
     constructor() {
@@ -88,7 +90,7 @@ export default class Program {
         this._itemMap.set(item.id, item);
 
         if (firstAdd === false) {
-            Event.emit("program", "create", item);
+            this._emitPrograms.set(item, "create");
             for (const id of removedIds) {
                 Event.emit("program", "redefine", { from: id, to: item.id });
             }
@@ -104,7 +106,7 @@ export default class Program {
     set(id: number, props: Partial<db.Program>): void {
         const item = this.get(id);
         if (item && common.updateObject(item, props) === true) {
-            this._updatedPrograms.add(item);
+            this._emitPrograms.set(item, "update");
             this.save();
         }
     }
@@ -233,11 +235,21 @@ export default class Program {
 
     private async _emit(): Promise<void> {
 
-        for (const item of this._updatedPrograms) {
-            this._updatedPrograms.delete(item);
-            Event.emit("program", "update", item);
+        if (this._emitRunning) {
+            return;
+        }
+        this._emitRunning = true;
+
+        for (const [item, eventType] of this._emitPrograms) {
+            this._emitPrograms.delete(item);
+            Event.emit("program", eventType, item);
 
             await common.sleep(10);
+        }
+
+        this._emitRunning = false;
+        if (this._emitPrograms.size > 0) {
+            this._emit();
         }
     }
 
