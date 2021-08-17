@@ -46,8 +46,7 @@ export default class Program {
     private _itemMap = new Map<number, db.Program>();
     private _saveTimerId: NodeJS.Timer;
     private _emitTimerId: NodeJS.Timer;
-    private _updatedPrograms = new Set<db.Program>();
-    private _programGCInterval = _.config.server.programGCInterval || 1000 * 60 * 15;
+    private _programGCInterval = _.config.server.programGCInterval || 1000 * 60 * 60; // 1 hour
 
     constructor() {
         this._load();

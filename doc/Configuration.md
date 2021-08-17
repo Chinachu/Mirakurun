@@ -22,10 +22,10 @@ disableIPv6: false # boolean *Ignored in Docker
 highWaterMark: 25165824 # integer (bytes)
 maxBufferBytesBeforeReady: 8388608 # integer (bytes)
 eventEndTimeout: 1000 # integer (ms)
-programGCInterval: 900000 # integer (ms)
-epgGatheringInterval: 900000 # integer (ms)
+programGCInterval: 3600000 # integer (ms)
+epgGatheringInterval: 1800000 # integer (ms)
 epgRetrievalTime: 600000 # integer (ms)
-logoDataInterval: 86400000 # integer (ms)
+logoDataInterval: 604800000 # integer (ms)
 disableEITParsing: false # boolean
 ```
 

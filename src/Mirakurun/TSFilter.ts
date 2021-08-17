@@ -837,7 +837,7 @@ export default class TSFilter extends stream.Transform {
         }
 
         const now = Date.now();
-        const logoDataInterval = _.config.server.logoDataInterval || 1000 * 60 * 60 * 24; // 1 day
+        const logoDataInterval = _.config.server.logoDataInterval || 1000 * 60 * 60 * 24 * 7; // 7 days
 
         for (const networkId in logoIdNetworkMap) {
             for (const logoId of logoIdNetworkMap[networkId]) {
