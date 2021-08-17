@@ -63,11 +63,11 @@ export default class Event extends EventEmitter {
 
         this.on("event", message => {
 
-            this._log.unshift(message);
+            this._log.push(message);
 
             // testing
             if (this._log.length > 100) {
-                this._log.pop();
+                this._log.shift();
             }
         });
     }
