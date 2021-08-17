@@ -16,13 +16,15 @@
 import EventEmitter from "eventemitter3";
 import * as React from "react";
 import { useState, useEffect, useRef } from "react";
+import { Client as RPCClient } from "jsonrpc2-ws";
+import { JoinParams } from "../../../lib/Mirakurun/rpc.d";
 import "./Logs.css";
 
 let _itemId = 0;
 
 let logListCache: JSX.Element[] = [];
 
-const LogsView: React.FC<{ uiStateEvents: EventEmitter }> = ({ uiStateEvents }) => {
+const LogsView: React.FC<{ uiStateEvents: EventEmitter, rpc: RPCClient }> = ({ uiStateEvents, rpc }) => {
 
     const [logList, setLogList] = useState<JSX.Element[]>([]);
     const latestRef = useRef<HTMLDivElement>(null);
@@ -49,6 +51,12 @@ const LogsView: React.FC<{ uiStateEvents: EventEmitter }> = ({ uiStateEvents }) 
 
     useEffect(() => {
 
+        const join = () => {
+            rpc.call("join", { rooms: ["logs"] } as JoinParams);
+        };
+        rpc.on("connected", join);
+        join();
+
         (async () => {
             const lines: string = await (await fetch("/api/log")).text();
             onLogs(lines.trim().split("\n"), true);
@@ -57,6 +65,8 @@ const LogsView: React.FC<{ uiStateEvents: EventEmitter }> = ({ uiStateEvents }) 
         uiStateEvents.on("data:logs", onLogs);
 
         return () => {
+            rpc.off("connected", join);
+            rpc.call("leave", { rooms: ["logs"] } as JoinParams);
             uiStateEvents.off("data:logs", onLogs);
             logListCache = [];
         };

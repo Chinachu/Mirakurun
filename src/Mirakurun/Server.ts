@@ -22,18 +22,21 @@ import * as openapi from "express-openapi";
 import * as morgan from "morgan";
 import * as yaml from "js-yaml";
 import { OpenAPIV2 } from "openapi-types";
+import RPCServer from "jsonrpc2-ws/lib/server";
 import { sleep } from "./common";
 import * as log from "./log";
 import * as system from "./system";
 import regexp from "./regexp";
 import _ from "./_";
+import { createRPCServer, initRPCNotifier } from "./rpc";
 
 const pkg = require("../../package.json");
 
 class Server {
 
     private _isRunning = false;
-    private _servers: http.Server[] = [];
+    private _servers = new Set<http.Server>();
+    private _rpcs = new Set<RPCServer>();
 
     async init() {
 
@@ -82,7 +85,18 @@ class Server {
 
         app.disable("x-powered-by");
 
-        app.use(cors());
+        const corsOptions: cors.CorsOptions = {
+            origin: (origin, callback) => {
+                if (!origin) {
+                    return callback(null, true);
+                }
+                if (isPermittedHost(origin, serverConfig.hostname)) {
+                    return callback(null, true);
+                }
+                return callback(new Error("Not allowed by CORS"));
+            }
+        };
+        app.use(cors(corsOptions));
 
         app.use(morgan(":remote-addr :remote-user :method :url HTTP/:http-version :status :res[content-length] - :response-time ms :user-agent", {
             stream: log.event as any
@@ -144,6 +158,11 @@ class Server {
 
         app.use((err, req, res: express.Response, next) => {
 
+            if (err.message === "Not allowed by CORS") {
+                res.status(403).end();
+                return;
+            }
+
             log.error(JSON.stringify(err, null, "  "));
             console.error(err.stack);
 
@@ -191,8 +210,14 @@ class Server {
                 });
             }
 
-            this._servers.push(server);
+            this._servers.add(server);
+            this._rpcs.add(createRPCServer(server));
         });
+
+        // event notifications for RPC
+        initRPCNotifier(this._rpcs);
+
+        log.info("RPC interface is enabled");
     }
 }
 

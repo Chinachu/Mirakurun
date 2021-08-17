@@ -88,6 +88,7 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
         statusItem.push({ label: "TunerDevice Streams", text: `${status.streamCount.tunerDevice}` });
         statusItem.push({ label: "TSFilter Streams", text: `${status.streamCount.tsFilter}` });
         statusItem.push({ label: "Decoder Streams", text: `${status.streamCount.decoder}` });
+        statusItem.push({ label: "RPC Connections", text: `${status.rpcCount}` });
     }
 
     const statusList: JSX.Element[] = [];

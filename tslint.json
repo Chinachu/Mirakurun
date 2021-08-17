@@ -86,6 +86,7 @@
     "no-use-before-declare": false,
     "no-var-keyword": true,
     "no-var-requires": false,
+    "no-submodule-imports": false,
     "object-literal-key-quotes": [
       true,
       "consistent-as-needed"

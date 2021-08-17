@@ -306,6 +306,7 @@ export interface Status {
         gatheringNetworks: NetworkId[];
         storedEvents: number;
     };
+    rpcCount: number;
     streamCount: {
         tunerDevice: number;
         tsFilter: number;

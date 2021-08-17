@@ -602,6 +602,8 @@ definitions:
               $ref: '#/definitions/NetworkId'
           storedEvents:
             type: integer
+      rpcCount:
+        type: integer
       streamCount:
         type: object
         properties:

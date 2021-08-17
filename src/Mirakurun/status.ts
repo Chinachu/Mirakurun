@@ -15,6 +15,7 @@
 */
 interface Status {
     epg: { [networkId: number]: boolean };
+    rpcCount: number;
     streamCount: {
         tsFilter: number;
         decoder: number;
@@ -36,6 +37,7 @@ interface Status {
 
 const status: Status = {
     epg: {},
+    rpcCount: 0,
     streamCount: {
         tsFilter: 0,
         decoder: 0

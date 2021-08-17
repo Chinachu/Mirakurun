@@ -31,9 +31,10 @@ import {
     Icon,
     ColorClassNames
 } from "@fluentui/react";
-import * as _http from "http";
-const http = require("stream-http") as typeof _http;
-import { TunerDevice, Service, Status, Event } from "../../api";
+import { Client as RPCClient } from "jsonrpc2-ws";
+import { JoinParams, NotifyParams } from "../../lib/Mirakurun/rpc.d";
+import { EventMessage } from "../../lib/Mirakurun/Event.d";
+import { TunerDevice, Service, Status, Program } from "../../api.d";
 import ConnectionGuide from "./components/ConnectionGuide";
 import UpdateAlert from "./components/UpdateAlert";
 import Restart from "./components/Restart";
@@ -70,15 +71,10 @@ const iconSrcMap = {
     active: "icon-active.svg"
 };
 
-let reconnectTimer: any;
 let statusRefreshInterval: any;
 let servicesRefreshInterval: any;
-let eventsStreamReq: _http.ClientRequest;
-let logStreamReq: _http.ClientRequest;
 
 function idleStatusChecker(): boolean {
-
-    console.log("idleStatusChecker()", "...");
 
     let statusName = "Standby";
     let statusIconName = "normal";
@@ -97,180 +93,114 @@ function idleStatusChecker(): boolean {
     uiState.statusIconName = statusIconName;
     uiStateEvents.emit("update");
 
-    console.log("idleStatusChecker()", "done.");
     return true;
 }
 uiStateEvents.on("update:tuners", idleStatusChecker);
 
-async function connect() {
+const rpc = new RPCClient(`ws://${location.host}/rpc`, {
+    protocols: null
+});
 
-    console.log("connect()", "...");
+rpc.on("connecting", () => {
 
-    if (uiState.statusName === "Connecting") {
-        return;
-    }
+    console.log("rpc:connecting");
+
     uiState.statusName = "Connecting";
     uiStateEvents.emit("update");
+});
 
-    window.onunhandledrejection = (event: PromiseRejectionEvent) => {
-        console.warn(`UNHANDLED PROMISE REJECTION: ${event.reason}`);
-        reconnect();
-    };
+rpc.on("connected", async () => {
 
-    statusRefreshInterval = setInterval(async () => {
-        if (document.hidden) {
-            return;
-        }
-        uiState.status = await (await fetch("/api/status")).json();
-        uiStateEvents.emit("update:status");
-    }, 1000 * 10);
+    console.log("rpc:connected");
 
-    servicesRefreshInterval = setInterval(async () => {
-        if (document.hidden) {
-            return;
-        }
-        uiState.services = await (await fetch("/api/services")).json();
-        uiStateEvents.emit("update:services");
-    }, 1000 * 30);
+    status: {
+        uiState.status = await rpc.call("getStatus");
 
-    try {
-        uiState.status = await (await fetch("/api/status")).json();
-        uiState.services = await (await fetch("/api/services")).json();
-        uiState.tuners = await (await fetch("/api/tuners")).json();
-        eventsStreamReq = http.get("/api/events/stream", res => {
-            console.log("eventsStreamReq", "statusCode", res.statusCode);
-            if (res.statusCode !== 200) {
-                reconnect();
+        statusRefreshInterval = setInterval(async () => {
+            if (document.hidden) {
                 return;
             }
-            res.setEncoding("utf8");
-            let bufStr = "";
-            res.on("data", data => {
-                bufStr += data;
-                let re = /\n,/mg;
-                re.exec(bufStr);
-                if (re.lastIndex === 0) {
-                    return;
-                }
-                const events: Event[] = [];
-                while (re.lastIndex !== 0) {
-                    events.push(...JSON.parse("[" + bufStr.substr(0, re.lastIndex - 2).replace(/^\[?\n/, "") + "]"));
-                    bufStr = bufStr.substr(re.lastIndex);
-                    re = /\n,/mg;
-                    re.exec(bufStr);
-                }
-                let tunerUpdated = false;
-                for (const event of events) {
-                    if (event.resource === "tuner" && event.type === "update") {
-                        const tuner: TunerDevice = event.data;
-                        uiState.tuners[tuner.index] = tuner;
-                        tunerUpdated = true;
-                    }
-                }
-                if (tunerUpdated) {
-                    uiStateEvents.emit("update:tuners");
-                }
-                uiStateEvents.emit("data:events", events);
-            });
-            res.on("error", () => {
-                console.log("eventsStreamReq", "error.");
-                reconnect();
-            });
-            res.on("end", () => {
-                console.log("eventsStreamReq", "end.");
-                reconnect();
-            });
-        });
-        logStreamReq = http.get("/api/log/stream", res => {
-            console.log("logStreamReq", "statusCode", res.statusCode);
-            if (res.statusCode !== 200) {
-                reconnect();
+            uiState.status = await rpc.call("getStatus");
+            uiStateEvents.emit("update:status");
+        }, 1000 * 3);
+
+        if (uiState.version !== ".." && uiState.version !== uiState.status.version) {
+            location.reload();
+            return;
+        }
+        uiState.version = uiState.status.version;
+    }
+    services: {
+        uiState.services = await (await fetch("/api/services")).json();
+
+        servicesRefreshInterval = setInterval(async () => {
+            if (document.hidden) {
                 return;
             }
-            res.setEncoding("utf8");
-            let bufStr = "";
-            res.on("data", data => {
-                bufStr += data;
-                let re = /\n/mg;
-                re.exec(bufStr);
-                if (re.lastIndex === 0) {
-                    return;
-                }
-                const logs: string[] = [];
-                while (re.lastIndex !== 0) {
-                    logs.push(...bufStr.substr(0, re.lastIndex - 1).split("\n"));
-                    bufStr = bufStr.substr(re.lastIndex);
-                    re = /\n/mg;
-                    re.exec(bufStr);
-                }
-                uiStateEvents.emit("data:logs", logs);
-            });
-            res.on("error", () => {
-                console.log("logStreamReq", "error.");
-                reconnect();
-            });
-            res.on("end", () => {
-                console.log("logStreamReq", "end.");
-                reconnect();
-            });
-        });
-    } catch (e) {
-        console.warn(e);
-        reconnect();
-        return;
+            uiState.services = await (await fetch("/api/services")).json();
+            uiStateEvents.emit("update:services");
+        }, 1000 * 60);
     }
+    uiState.tuners = await (await fetch("/api/tuners")).json();
 
-    if (uiState.version !== ".." && uiState.version !== uiState.status.version) {
-        location.reload();
-        return;
-    }
-    uiState.version = uiState.status.version;
+    await rpc.call("join", {
+        rooms: ["events:tuner", "events:service"]
+    } as JoinParams);
 
     uiStateEvents.emit("update");
     uiStateEvents.emit("update:status");
     uiStateEvents.emit("update:services");
     uiStateEvents.emit("update:tuners");
+});
 
-    console.log("connect()", "done.");
-}
+rpc.on("disconnect", () => {
 
-function disconnect() {
-
-    console.log("disconnect()", "...");
+    console.log("rpc:disconnected");
 
     clearInterval(statusRefreshInterval);
     clearInterval(servicesRefreshInterval);
 
-    if (eventsStreamReq) {
-        try {
-            eventsStreamReq.abort();
-        } catch (e) {}
-    }
-    if (logStreamReq) {
-        try {
-            logStreamReq.abort();
-        } catch (e) {}
-    }
-
     uiState.statusName = "Disconnected";
     uiState.statusIconName = "offline";
     uiStateEvents.emit("update");
+});
 
-    console.log("disconnect()", "done.");
-}
+rpc.methods.set("events", async (socket, { array }: NotifyParams<EventMessage>) => {
 
-function reconnect() {
+    let reloadServiceRequired = false;
 
-    console.log("reconnect()", "...");
+    for (const event of array) {
+        if (event.resource === "service") {
+            const service: Service = event.data;
+            reloadServiceRequired = true;
 
-    clearTimeout(reconnectTimer);
-    disconnect();
-    reconnectTimer = setTimeout(connect, 5000);
+            for (const _service of uiState.services) {
+                if (_service.id === service.id) {
+                    Object.assign(_service, service);
+                    uiStateEvents.emit("update:services");
+                    reloadServiceRequired = false;
+                    break;
+                }
+            }
+        } else if (event.resource === "tuner") {
+            const tuner: TunerDevice = event.data;
 
-    console.log("reconnect()", "done.");
-}
+            uiState.tuners[tuner.index] = tuner;
+            uiStateEvents.emit("update:tuners");
+        }
+    }
 
-setTimeout(connect, 0);
+    if (reloadServiceRequired) {
+        uiState.services = await (await fetch("/api/services")).json();
+        uiStateEvents.emit("update:services");
+    }
+
+    uiStateEvents.emit("data:events", array);
+});
+
+rpc.methods.set("logs", (socket, { array }: NotifyParams<string> ) => {
+    uiStateEvents.emit("data:logs", array);
+});
 
 const Content = () => {
 
@@ -324,10 +254,10 @@ const Content = () => {
                         <StatusView uiState={uiState} uiStateEvents={uiStateEvents} />
                     </PivotItem>
                     <PivotItem itemIcon="EntitlementRedemption" headerText="Events">
-                        <EventsView uiStateEvents={uiStateEvents} />
+                        <EventsView uiStateEvents={uiStateEvents} rpc={rpc} />
                     </PivotItem>
                     <PivotItem itemIcon="ComplianceAudit" headerText="Logs">
-                        <LogsView uiStateEvents={uiStateEvents} />
+                        <LogsView uiStateEvents={uiStateEvents} rpc={rpc} />
                     </PivotItem>
                     <PivotItem itemIcon="Settings" headerText="Config">
                         <ConfigView uiState={uiState} uiStateEvents={uiStateEvents} />

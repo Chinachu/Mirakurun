@@ -16,6 +16,8 @@
 import EventEmitter from "eventemitter3";
 import * as React from "react";
 import { useState, useEffect, useRef } from "react";
+import { Client as RPCClient } from "jsonrpc2-ws";
+import { JoinParams } from "../../../lib/Mirakurun/rpc.d";
 import { Event } from "../../../api";
 import "./Logs.css";
 
@@ -23,7 +25,7 @@ let _itemId = 0;
 
 let eventsCache: JSX.Element[] = [];
 
-const EventsView: React.FC<{ uiStateEvents: EventEmitter }> = ({ uiStateEvents }) => {
+const EventsView: React.FC<{ uiStateEvents: EventEmitter, rpc: RPCClient }> = ({ uiStateEvents, rpc }) => {
 
     const [eventList, setEventList] = useState<JSX.Element[]>([]);
     const latestRef = useRef<HTMLDivElement>(null);
@@ -48,6 +50,12 @@ const EventsView: React.FC<{ uiStateEvents: EventEmitter }> = ({ uiStateEvents }
 
     useEffect(() => {
 
+        const join = () => {
+            rpc.call("join", { rooms: ["events:program"] } as JoinParams);
+        };
+        rpc.on("connected", join);
+        join();
+
         (async () => {
             const events: Event[] = await (await fetch("/api/events")).json();
             onEvents(events, true);
@@ -56,6 +64,8 @@ const EventsView: React.FC<{ uiStateEvents: EventEmitter }> = ({ uiStateEvents }
         uiStateEvents.on("data:events", onEvents);
 
         return () => {
+            rpc.off("connected", join);
+            rpc.call("leave", { rooms: ["events:program"] } as JoinParams);
             uiStateEvents.off("data:events", onEvents);
             eventsCache = [];
         };

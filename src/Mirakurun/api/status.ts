@@ -24,6 +24,34 @@ const pkg = require("../../../package.json");
 
 export const get: Operation = (req, res) => {
 
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.status(200);
+
+    res.end(JSON.stringify(getStatus(), null, 2));
+};
+
+get.apiDoc = {
+    tags: ["status"],
+    summary: "Get Status",
+    operationId: "getStatus",
+    responses: {
+        200: {
+            description: "OK",
+            schema: {
+                $ref: "#/definitions/Status"
+            }
+        },
+        default: {
+            description: "Unexpected Error",
+            schema: {
+                $ref: "#/definitions/Error"
+            }
+        }
+    }
+};
+
+export function getStatus(): Status {
+
     const ret: Status = {
         time: Date.now(),
         version: pkg.version,
@@ -51,6 +79,7 @@ export const get: Operation = (req, res) => {
             gatheringNetworks: [],
             storedEvents: Program.all().length
         },
+        rpcCount: status.rpcCount,
         streamCount: {
             tunerDevice: Tuner.all().filter(td => td.isUsing === true).length,
             tsFilter: status.streamCount.tsFilter,
@@ -84,27 +113,5 @@ export const get: Operation = (req, res) => {
         }
     }
 
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.status(200);
-    res.end(JSON.stringify(ret, null, 2));
-};
-
-get.apiDoc = {
-    tags: ["status"],
-    summary: "Get Status",
-    operationId: "getStatus",
-    responses: {
-        200: {
-            description: "OK",
-            schema: {
-                $ref: "#/definitions/Status"
-            }
-        },
-        default: {
-            description: "Unexpected Error",
-            schema: {
-                $ref: "#/definitions/Error"
-            }
-        }
-    }
-};
+    return ret;
+}
