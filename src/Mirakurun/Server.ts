@@ -15,7 +15,6 @@
 */
 import * as fs from "fs";
 import * as http from "http";
-import * as url from "url";
 import * as ip from "ip";
 import * as express from "express";
 import * as cors from "cors";
@@ -99,16 +98,14 @@ class Server {
             }
 
             if (req.get("Origin") !== undefined) {
-                const origin = url.parse(req.get("Origin"));
-                if (origin.hostname !== "localhost" && origin.hostname !== serverConfig.hostname && ip.isPrivate(origin.hostname) === false) {
+                if (!isPermittedHost(req.get("Origin"), serverConfig.hostname)) {
                     res.status(403).end();
                     return;
                 }
             }
 
             if (req.get("Referer") !== undefined) {
-                const referer = url.parse(req.get("Referer"));
-                if (referer.hostname !== "localhost" && referer.hostname !== serverConfig.hostname && ip.isPrivate(referer.hostname) === false) {
+                if (!isPermittedHost(req.get("Referer"), serverConfig.hostname)) {
                     res.status(403).end();
                     return;
                 }
@@ -197,6 +194,17 @@ class Server {
             this._servers.push(server);
         });
     }
+}
+
+export function isPermittedHost(url: string, allowedHostname?: string): boolean {
+
+    const u = new URL(url);
+
+    if (u.hostname === "localhost" || u.hostname === allowedHostname || ip.isPrivate(u.hostname) === true) {
+        return true;
+    }
+
+    return false;
 }
 
 export default Server;
