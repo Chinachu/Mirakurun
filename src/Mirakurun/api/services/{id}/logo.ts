@@ -45,6 +45,7 @@ export const get: Operation = async (req, res) => {
     const logoData = await Service.loadLogoData(service.networkId, service.logoId);
     if (logoData) {
         res.setHeader("Content-Type", "image/png");
+        res.setHeader("Cache-Control", "public, max-age=86400");
         res.status(200);
         res.end(logoData);
     } else {
