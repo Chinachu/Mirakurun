@@ -457,7 +457,7 @@ function isOutOfDateLv2(eit: any, versionDict: VersionDict<VersionDict>, lv2: nu
         return false;
     }
 
-    return versionDict[eit.table_id][lv2] === eit.version_number;
+    return versionDict[eit.table_id][lv2] !== eit.version_number;
 }
 
 function getTime(buffer: Buffer): number {
