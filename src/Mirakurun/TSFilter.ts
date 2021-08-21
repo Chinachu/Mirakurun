@@ -217,6 +217,8 @@ export default class TSFilter extends stream.Transform {
         this._parser.on("eit", this._onEIT.bind(this));
         this._parser.on("tot", this._onTOT.bind(this));
 
+        this.once("end", this._close.bind(this));
+        this.once("finish", this._close.bind(this));
         this.once("close", this._close.bind(this));
 
         log.info("TSFilter: created (serviceId=%d, eventId=%d)", this._provideServiceId, this._provideEventId);
