@@ -14,7 +14,7 @@
    limitations under the License.
 */
 import * as stream from "stream";
-import { StreamInfo } from "./common";
+import { StreamInfo, getTimeFromMJD } from "./common";
 import * as log from "./log";
 import EPG from "./EPG";
 import status from "./status";
@@ -677,7 +677,7 @@ export default class TSFilter extends stream.Transform {
 
     private _onTOT(pid: number, data: any): void {
 
-        this._streamTime = getTime(data.JST_time);
+        this._streamTime = getTimeFromMJD(data.JST_time);
     }
 
     private _onCDT(pid: number, data: any): void {
@@ -1061,24 +1061,4 @@ export default class TSFilter extends stream.Transform {
         this.emit("close");
         this.emit("end");
     }
-}
-
-function getTime(buffer: Buffer): number {
-
-    const mjd = (buffer[0] << 8) | buffer[1];
-
-    let y = (((mjd - 15078.2) / 365.25) | 0);
-    let m = (((mjd - 14956.1 - ((y * 365.25) | 0)) / 30.6001) | 0);
-    const d = mjd - 14956 - ((y * 365.25) | 0) - ((m * 30.6001) | 0);
-
-    const k = (m === 14 || m === 15) ? 1 : 0;
-
-    y = y + k + 1900;
-    m = m - 1 - k * 12;
-
-    const h = (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);
-    const i = (buffer[3] >> 4) * 10 + (buffer[3] & 0x0F);
-    const s = (buffer[4] >> 4) * 10 + (buffer[4] & 0x0F);
-
-    return new Date(y, m - 1, d, h, i, s).getTime();
 }

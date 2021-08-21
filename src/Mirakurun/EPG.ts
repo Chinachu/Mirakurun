@@ -14,7 +14,7 @@
    limitations under the License.
 */
 import { getProgramItemId } from "./Program";
-import { sleep } from "./common";
+import { sleep, getTimeFromMJD, getTimeFromBCD24 } from "./common";
 import * as db from "./db";
 import _ from "./_";
 import * as aribts from "aribts";
@@ -195,7 +195,7 @@ export default class EPG {
                         eventId: e.event_id,
                         serviceId: eit.service_id,
                         networkId: networkId,
-                        startAt: getTime(e.start_time),
+                        startAt: getTimeFromMJD(e.start_time),
                         duration: UNKNOWN_DURATION.compare(e.duration) === 0 ? 1 : getTimeFromBCD24(e.duration),
                         isFree: e.free_CA_mode === 0,
                         _pf: eit.table_id === 0x4E || eit.table_id === 0x4F || undefined
@@ -241,7 +241,7 @@ export default class EPG {
 
                     if (UNKNOWN_START_TIME.compare(e.start_time) !== 0) {
                         _.program.set(state.program.id, {
-                            startAt: getTime(e.start_time),
+                            startAt: getTimeFromMJD(e.start_time),
                             duration: UNKNOWN_DURATION.compare(e.duration) === 0 ? 1 : getTimeFromBCD24(e.duration),
                             isFree: e.free_CA_mode === 0,
                             _pf: eit.table_id === 0x4E || eit.table_id === 0x4F || undefined
@@ -389,7 +389,7 @@ export default class EPG {
                                 repeat: d.repeat_label,
                                 pattern: d.program_pattern,
                                 expiresAt: d.expire_date_valid_flag === 1 ?
-                                    getTime(Buffer.from(d.expire_date.toString(16), "hex")) :
+                                    getTimeFromMJD(Buffer.from(d.expire_date.toString(16), "hex")) :
                                     -1,
                                 episode: d.episode_number,
                                 lastEpisode: d.last_episode_number,
@@ -458,25 +458,6 @@ function isOutOfDateLv2(eit: any, versionDict: VersionDict<VersionDict>, lv2: nu
     }
 
     return versionDict[eit.table_id][lv2] !== eit.version_number;
-}
-
-function getTime(buffer: Buffer): number {
-
-    const mjd = (buffer[0] << 8) | buffer[1];
-    const h = (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);
-    const i = (buffer[3] >> 4) * 10 + (buffer[3] & 0x0F);
-    const s = (buffer[4] >> 4) * 10 + (buffer[4] & 0x0F);
-
-    return ((mjd - 40587) * 86400 + ((h - 9) * 60 * 60) + (i * 60) + s) * 1000;
-}
-
-function getTimeFromBCD24(buffer: Buffer): number {
-
-    let time = ((buffer[0] >> 4) * 10 + (buffer[0] & 0x0F)) * 3600;
-    time += ((buffer[1] >> 4) * 10 + (buffer[1] & 0x0F)) * 60;
-    time += (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);
-
-    return time * 1000;
 }
 
 function getGenre(content: any): db.ProgramGenre {
