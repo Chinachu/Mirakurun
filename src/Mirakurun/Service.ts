@@ -103,7 +103,7 @@ export default class Service {
         }
     }
 
-    static async saveLogoData(networkId: number, logoId: number, data: Buffer, retrying = false): Promise<void> {
+    static async saveLogoData(networkId: number, logoId: number, data: Uint8Array, retrying = false): Promise<void> {
 
         log.info("Service.saveLogoData(): saving... (networkId=%d logoId=%d)", networkId, logoId);
 
