@@ -15,6 +15,7 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 - **config/server**: Remove `overflowTimeLimit`.
 - **ts-filter**: Remove own overflow handling as it no longer makes sense.
 - **ts-filter**: Fix memory leak when comparing CRC of broken PAT packet processing. (bug)
+- **ts-filter**: Fix a problem in which the _close() function sometimes didn't call properly when the tuner was intercepted. (bug)
 - **ts-filter**: Change EIT\[p/f\] information to use in EPG.
 - **epg**: Add support for multiple EIT types.
 - **epg**: Fix wrong event group processing. (bug)
