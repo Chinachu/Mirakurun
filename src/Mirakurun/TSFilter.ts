@@ -141,7 +141,7 @@ export default class TSFilter extends stream.Transform {
     private _maxBufferBytesBeforeReady: number = (() => {
         let bytes = _.config.server.maxBufferBytesBeforeReady || 1024 * 1024 * 8;
         bytes = bytes - bytes % PACKET_SIZE;
-        return bytes;
+        return Math.max(bytes, PACKET_SIZE);
     })();
     private _eventEndTimeout: number = _.config.server.eventEndTimeout || 1000;
 
@@ -293,7 +293,7 @@ export default class TSFilter extends stream.Transform {
 
         if (this._parses.length !== 0) {
             this._parser.write(Buffer.concat(this._parses));
-            this._parses = [];
+            this._parses.length = 0;
         }
 
         callback();
@@ -382,7 +382,7 @@ export default class TSFilter extends stream.Transform {
         }
 
         // packet counter
-        if (!this.streamInfo[pid]) {
+        if (this.streamInfo[pid] === undefined) {
             this.streamInfo[pid] = {
                 packet: 0,
                 drop: 0
@@ -1023,9 +1023,7 @@ export default class TSFilter extends stream.Transform {
 
         // clear buffer
         setImmediate(() => {
-            this._patsec.fill(0);
             delete this._patsec;
-            this._packet.fill(0);
             delete this._packet;
             delete this._buffer;
             delete this._parses;
