@@ -418,7 +418,7 @@ export default class EPG {
                 }// <- switch
             }// <- for
 
-            await sleep(10);
+            await sleep(5);
         }// <- for
 
         this._running = false;
