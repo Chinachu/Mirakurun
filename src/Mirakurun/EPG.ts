@@ -17,8 +17,8 @@ import { getProgramItemId } from "./Program";
 import { sleep, getTimeFromMJD, getTimeFromBCD24 } from "./common";
 import * as db from "./db";
 import _ from "./_";
-import * as aribts from "aribts";
-const TsChar = aribts.TsChar;
+import { TsChar } from "@chinachu/aribts";
+import { EIT } from "@chinachu/aribts/lib/table/eit";
 
 const STREAM_CONTENT = {
     1: "mpeg2",
@@ -133,11 +133,11 @@ interface EventState {
 export default class EPG {
 
     private _epg: { [networkId: number]: { [serviceId: number]: { [eventId: number]: EventState } } } = {};
-    private _queue: any[] = [];
+    private _queue: EIT[] = [];
     private _running = false;
     private _end = false;
 
-    write(eit: any) {
+    write(eit: EIT) {
 
         if (!this._epg) {
             return;

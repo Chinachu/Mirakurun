@@ -14,16 +14,15 @@
    limitations under the License.
 */
 import * as stream from "stream";
+import { TsStreamLite, TsCrc32, TsChar, TsLogo, tsDataModule } from "@chinachu/aribts";
 import { StreamInfo, getTimeFromMJD } from "./common";
 import * as log from "./log";
 import EPG from "./EPG";
 import status from "./status";
 import _ from "./_";
 import { getProgramItemId } from "./Program";
-import aribts = require("aribts");
 import Service from "./Service";
 import ServiceItem from "./ServiceItem";
-const calcCRC32: (buf: Buffer) => number = aribts.TsCrc32.calc;
 
 interface StreamOptions extends stream.TransformOptions {
     readonly networkId?: number;
@@ -105,7 +104,7 @@ export default class TSFilter extends stream.Transform {
     private _tsmfTsNumber: number = 0;
 
     // aribts
-    private _parser: stream.Transform = new aribts.TsStream();
+    private _parser = new TsStreamLite();
 
     // epg
     private _epg: EPG;
@@ -211,7 +210,6 @@ export default class TSFilter extends stream.Transform {
             }
         }
 
-        this._parser.resume();
         this._parser.on("pat", this._onPAT.bind(this));
         this._parser.on("pmt", this._onPMT.bind(this));
         this._parser.on("nit", this._onNIT.bind(this));
@@ -470,7 +468,7 @@ export default class TSFilter extends stream.Transform {
                     this._patsec[15] = this._pmtPid & 255;
 
                     // calculate CRC32
-                    this._patsec.writeInt32BE(calcCRC32(this._patsec.slice(0, 16)), 16);
+                    this._patsec.writeInt32BE(TsCrc32.calc(this._patsec.slice(0, 16)), 16);
 
                     // padding
                     this._patsec.fill(0xff, 20);
@@ -591,7 +589,7 @@ export default class TSFilter extends stream.Transform {
             const m = service.descriptors.length;
             for (let j = 0; j < m; j++) {
                 if (service.descriptors[j].descriptor_tag === 0x48) {
-                    name = new aribts.TsChar(service.descriptors[j].service_name_char).decode();
+                    name = new TsChar(service.descriptors[j].service_name_char).decode();
                     type = service.descriptors[j].service_type;
                 }
 
@@ -686,14 +684,14 @@ export default class TSFilter extends stream.Transform {
 
         if (data.data_type === 0x01) {
             // Logo
-            const dataModule = new aribts.tsDataModule.TsDataModuleCdtLogo(data.data_module_byte).decode();
+            const dataModule = new tsDataModule.TsDataModuleCdtLogo(data.data_module_byte).decode();
             if (dataModule.logo_type !== 0x05) {
                 return;
             }
 
             log.debug("TSFilter#_onCDT: received logo data (networkId=%d, logoId=%d)", data.original_network_id, dataModule.logo_id);
 
-            const logoData = new aribts.TsLogo(dataModule.data_byte).decode();
+            const logoData = TsLogo.decode(dataModule.data_byte);
             Service.saveLogoData(data.original_network_id, dataModule.logo_id, logoData);
         }
     }
@@ -733,7 +731,7 @@ export default class TSFilter extends stream.Transform {
             const dlData = dl.data;
             delete dl.data;
 
-            const dataModule = new aribts.tsDataModule.TsDataModuleLogo(dlData).decode();
+            const dataModule = new tsDataModule.TsDataModuleLogo(dlData).decode();
             for (const logo of dataModule.logos) {
                 for (const logoService of logo.services) {
                     const service = _.service.get(logoService.original_network_id, logoService.service_id);
@@ -745,7 +743,7 @@ export default class TSFilter extends stream.Transform {
 
                     log.debug("TSFilter#_onDSMCC: received logo data (networkId=%d, logoId=%d)", service.networkId, service.logoId);
 
-                    const logoData = new aribts.TsLogo(logo.data_byte).decode(); // png
+                    const logoData = new TsLogo(logo.data_byte).decode(); // png
                     Service.saveLogoData(service.networkId, service.logoId, logoData);
                     break;
                 }
