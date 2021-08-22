@@ -301,7 +301,7 @@ export default class EPG {
                                     current = key;
                                     extended[key] = extended[key] ?
                                         Buffer.concat([extended[key], desc.item_char]) :
-                                        Buffer.from(desc.item_char);
+                                        desc.item_char;
                                 }
                             }
                             for (const key of Object.keys(extended)) {
