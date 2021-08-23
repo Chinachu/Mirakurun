@@ -1,5 +1,5 @@
 ARG ARCH=
-FROM ${ARCH}node:16.6.2-buster AS build
+FROM ${ARCH}node:16.7.0-buster AS build
 WORKDIR /app
 ENV DOCKER=YES
 ADD . .
@@ -10,7 +10,7 @@ RUN apt-get update && \
     npm run build && \
     npm install -g --unsafe-perm --production
 
-FROM ${ARCH}node:16.6.2-buster-slim
+FROM ${ARCH}node:16.7.0-buster-slim
 
 WORKDIR /app
 RUN apt-get update && \
