@@ -28,7 +28,7 @@ import TSFilter from "./TSFilter";
 import Client, { ProgramsQuery } from "../client";
 
 interface User extends common.User {
-    _stream?: stream.Transform;
+    _stream?: TSFilter;
 }
 
 interface Status {
