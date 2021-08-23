@@ -90,51 +90,51 @@ export default class TSFilter extends stream.Transform {
     // options
     private _provideServiceId: number;
     private _provideEventId: number;
-    private _parseNIT: boolean = false;
-    private _parseSDT: boolean = false;
-    private _parseEIT: boolean = false;
+    private _parseNIT = false;
+    private _parseSDT = false;
+    private _parseEIT = false;
     private _targetNetworkId: number;
-    private _enableParseCDT: boolean = false;
-    private _enableParseDSMCC: boolean = false;
+    private _enableParseCDT = false;
+    private _enableParseDSMCC = false;
 
     // tsmf
-    private _tsmfEnableTsmfSplit: boolean = false;
-    private _tsmfSlotCounter: number = -1;
+    private _tsmfEnableTsmfSplit = false;
+    private _tsmfSlotCounter = -1;
     private _tsmfRelativeStreamNumber: number[] = [];
-    private _tsmfTsNumber: number = 0;
+    private _tsmfTsNumber = 0;
 
     // aribts
     private _parser = new TsStreamLite();
 
     // epg
     private _epg: EPG;
+    private _epgReady = false;
+    private _epgState: { [networkId: number]: { [serviceId: number]: BasicExtState } } = {};
 
     // buffer
     private _packet: Buffer = Buffer.alloc(PACKET_SIZE);
-    private _offset: number = -1;
+    private _offset = -1;
     private _buffer: Buffer[] = [];
     private _parses: Buffer[] = [];
-    private _patsec: Buffer = Buffer.alloc(PACKET_SIZE - 4 - 1); // TS header, pointer_field
+    private _patsec = Buffer.alloc(PACKET_SIZE - 4 - 1); // TS header, pointer_field
+    private _patCRC = Buffer.alloc(4);
 
     // state
-    private _closed: boolean = false;
-    private _ready: boolean = true;
+    private _closed = false;
+    private _ready = true;
     private _providePids: Set<number> = null; // `null` to provides all
-    private _parsePids: Set<number> = new Set();
-    private _tsid: number = -1;
-    private _patCRC: Buffer = Buffer.alloc(4);
-    private _serviceIds: Set<number> = new Set();
-    private _parseServiceIds: Set<number> = new Set();
-    private _pmtPid: number = -1;
+    private _parsePids = new Set<number>();
+    private _tsid = -1;
+    private _serviceIds = new Set<number>();
+    private _parseServiceIds = new Set<number>();
+    private _pmtPid = -1;
     private _pmtTimer: NodeJS.Timer;
     private _streamTime: number = null;
-    private _essMap: Map<number, number> = new Map(); // <serviceId, pid>
-    private _essEsPids: Set<number> = new Set();
-    private _dlDataMap: Map<number, DownloadData> = new Map();
+    private _essMap = new Map<number, number>(); // <serviceId, pid>
+    private _essEsPids = new Set<number>();
+    private _dlDataMap = new Map<number, DownloadData>();
     private _logoDataTimer: NodeJS.Timer;
-    private _epgReady: boolean = false;
-    private _epgState: { [networkId: number]: { [serviceId: number]: BasicExtState } } = {};
-    private _provideEventLastDetectedAt: number = -1;
+    private _provideEventLastDetectedAt = -1;
     private _provideEventTimeout: NodeJS.Timer = null;
 
     /** Number divisible by a multiple of 188 */
@@ -143,7 +143,7 @@ export default class TSFilter extends stream.Transform {
         bytes = bytes - bytes % PACKET_SIZE;
         return Math.max(bytes, PACKET_SIZE);
     })();
-    private _eventEndTimeout: number = _.config.server.eventEndTimeout || 1000;
+    private _eventEndTimeout = _.config.server.eventEndTimeout || 1000;
 
     constructor(options: StreamOptions) {
         super({
@@ -1023,10 +1023,11 @@ export default class TSFilter extends stream.Transform {
 
         // clear buffer
         setImmediate(() => {
-            delete this._patsec;
             delete this._packet;
             delete this._buffer;
             delete this._parses;
+            delete this._patsec;
+            delete this._patCRC;
         });
 
         // clear parser instance
