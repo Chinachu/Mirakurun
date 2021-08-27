@@ -52,14 +52,14 @@ export default class TunerDevice extends EventEmitter {
     private _process: child_process.ChildProcess = null;
     private _stream: stream.Readable = null;
 
-    private _users: Set<User> = new Set();
+    private _users = new Set<User>();
 
-    private _isAvailable: boolean = true;
-    private _isRemote: boolean = false;
-    private _isFault: boolean = false;
-    private _fatalCount: number = 0;
-    private _exited: boolean = false;
-    private _closing: boolean = false;
+    private _isAvailable = true;
+    private _isRemote = false;
+    private _isFault = false;
+    private _fatalCount = 0;
+    private _exited = false;
+    private _closing = false;
 
     constructor(private _index: number, private _config: config.Tuner) {
         super();
