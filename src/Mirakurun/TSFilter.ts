@@ -112,12 +112,11 @@ export default class TSFilter extends stream.Transform {
     private _epgState: { [networkId: number]: { [serviceId: number]: BasicExtState } } = {};
 
     // buffer
-    private _packet: Buffer = Buffer.alloc(PACKET_SIZE);
+    private _packet = Buffer.allocUnsafe(PACKET_SIZE).fill(0);
     private _offset = -1;
     private _buffer: Buffer[] = [];
-    private _parses: Buffer[] = [];
-    private _patsec = Buffer.alloc(PACKET_SIZE - 4 - 1); // TS header, pointer_field
-    private _patCRC = Buffer.alloc(4);
+    private _patsec = Buffer.allocUnsafe(PACKET_SIZE - 4 - 1).fill(0); // TS header, pointer_field
+    private _patCRC = Buffer.allocUnsafe(4).fill(0);
 
     // state
     private _closed = false;
@@ -239,12 +238,15 @@ export default class TSFilter extends stream.Transform {
 
         let offset = 0;
         const length = chunk.length;
+        const packets: Buffer[] = [];
 
         if (this._offset > 0) {
             if (length >= PACKET_SIZE - this._offset) {
                 offset = PACKET_SIZE - this._offset;
-                chunk.copy(this._packet, this._offset, 0, offset);
-                this._processPacket(this._packet);
+                packets.push(Buffer.concat([
+                    this._packet.slice(0, this._offset),
+                    chunk.slice(0, offset)
+                ]));
                 this._offset = 0;
             } else {
                 chunk.copy(this._packet, this._offset);
@@ -253,14 +255,6 @@ export default class TSFilter extends stream.Transform {
                 // chunk drained
                 callback();
                 return;
-            }
-        } else {
-            for (; offset < length; offset++) {
-                // sync byte (0x47) searching
-                if (chunk[offset] === 71) {
-                    this._offset = 0;
-                    break;
-                }
             }
         }
 
@@ -272,17 +266,19 @@ export default class TSFilter extends stream.Transform {
             }
 
             if (length - offset >= PACKET_SIZE) {
-                this._processPacket(chunk.slice(offset, offset + PACKET_SIZE));
-                this._offset = 0;
+                packets.push(chunk.slice(offset, offset + PACKET_SIZE));
             } else {
                 chunk.copy(this._packet, 0, offset);
                 this._offset = length - offset;
             }
         }
 
+        this._processPackets(packets);
+
         if (this._buffer.length !== 0) {
             if (this._ready) {
-                this.push(Buffer.concat(this._buffer.splice(0, 16732))); // { let bytes = 1024 * 1024 * 3; (bytes - bytes % 188) / 188; }
+                this.push(Buffer.concat(this._buffer));
+                this._buffer.length = 0;
             } else {
                 const head = this._buffer.length - (this._maxBufferBytesBeforeReady / PACKET_SIZE);
                 if (head > 0) {
@@ -291,106 +287,107 @@ export default class TSFilter extends stream.Transform {
             }
         }
 
-        if (this._parses.length !== 0) {
-            this._parser.write(Buffer.concat(this._parses));
-            this._parses.length = 0;
-        }
-
         callback();
     }
 
-    private _processPacket(packet: Buffer): void {
+    private _processPackets(packets: Buffer[]): void {
 
-        const pid = packet.readUInt16BE(1) & 0x1FFF;
+        const parsingBuffers: Buffer[] = [];
 
-        // tsmf
-        if (this._tsmfEnableTsmfSplit) {
-            if (pid === 0x002F) {
-                const tsmfFlameSync = packet.readUInt16BE(4) & 0x1FFF;
-                if (tsmfFlameSync !== 0x1A86 && tsmfFlameSync !== 0x0579) {
-                    return;
+        for (const packet of packets) {
+            const pid = packet.readUInt16BE(1) & 0x1FFF;
+
+            // tsmf
+            if (this._tsmfEnableTsmfSplit) {
+                if (pid === 0x002F) {
+                    const tsmfFlameSync = packet.readUInt16BE(4) & 0x1FFF;
+                    if (tsmfFlameSync !== 0x1A86 && tsmfFlameSync !== 0x0579) {
+                        continue;
+                    }
+
+                    this._tsmfRelativeStreamNumber = [];
+                    for (let i = 0; i < 26; i++) {
+                        this._tsmfRelativeStreamNumber.push((packet[73 + i] & 0xf0) >> 4);
+                        this._tsmfRelativeStreamNumber.push(packet[73 + i] & 0x0f);
+                    }
+
+                    this._tsmfSlotCounter = 0;
+                    continue;
                 }
 
-                this._tsmfRelativeStreamNumber = [];
-                for (let i = 0; i < 26; i++) {
-                    this._tsmfRelativeStreamNumber.push((packet[73 + i] & 0xf0) >> 4);
-                    this._tsmfRelativeStreamNumber.push(packet[73 + i] & 0x0f);
+                if (this._tsmfSlotCounter < 0 || this._tsmfSlotCounter > 51) {
+                    continue;
                 }
 
-                this._tsmfSlotCounter = 0;
-                return;
+                this._tsmfSlotCounter++;
+
+                if (this._tsmfRelativeStreamNumber[this._tsmfSlotCounter - 1] !== this._tsmfTsNumber) {
+                    continue;
+                }
             }
 
-            if (this._tsmfSlotCounter < 0 || this._tsmfSlotCounter > 51) {
-                return;
+            // NULL
+            if (pid === 0x1FFF) {
+                continue;
             }
 
-            this._tsmfSlotCounter++;
-
-            if (this._tsmfRelativeStreamNumber[this._tsmfSlotCounter - 1] !== this._tsmfTsNumber) {
-                return;
-            }
-        }
-
-        // NULL
-        if (pid === 0x1FFF) {
-            return;
-        }
-
-        // transport_error_indicator
-        if ((packet[1] & 0x80) >> 7 === 1) {
-            if (this.streamInfo[pid]) {
-                ++this.streamInfo[pid].drop;
-            }
-            return;
-        }
-
-        packet = Buffer.from(packet);
-
-        // parse
-        if (pid === 0) {
-            const targetStart = packet[7] + 4;
-            if (targetStart + 4 > 188) {
-                // out of range. this packet is broken.
+            // transport_error_indicator
+            if ((packet[1] & 0x80) >> 7 === 1) {
                 if (this.streamInfo[pid]) {
                     ++this.streamInfo[pid].drop;
                 }
-                return; // drop
+                continue;
             }
-            if (this._patCRC.compare(packet, targetStart, targetStart + 4) !== 0) {
-                packet.copy(this._patCRC, 0, targetStart, targetStart + 4);
-                this._parses.push(packet);
+
+            // parse
+            if (pid === 0) {
+                const targetStart = packet[7] + 4;
+                if (targetStart + 4 > 188) {
+                    // out of range. this packet is broken.
+                    if (this.streamInfo[pid]) {
+                        ++this.streamInfo[pid].drop;
+                    }
+                    continue; // drop
+                }
+                if (this._patCRC.compare(packet, targetStart, targetStart + 4) !== 0) {
+                    packet.copy(this._patCRC, 0, targetStart, targetStart + 4);
+                    parsingBuffers.push(packet);
+                }
+            } else if (
+                (pid === 0x12 && (this._parseEIT || this._provideEventId !== null)) ||
+                pid === 0x14 ||
+                this._parsePids.has(pid)
+            ) {
+                parsingBuffers.push(packet);
             }
-        } else if (
-            (pid === 0x12 && (this._parseEIT || this._provideEventId !== null)) ||
-            pid === 0x14 ||
-            this._parsePids.has(pid)
-        ) {
-            this._parses.push(packet);
+
+            if (this._ready === false && (pid === 0x12 || this._provideEventId === null)) {
+                continue;
+            }
+            if (this._providePids !== null && this._providePids.has(pid) === false) {
+                continue;
+            }
+
+            // PAT (0) rewriting
+            if (pid === 0 && this._pmtPid !== -1) {
+                this._patsec.copy(packet, 5, 0);
+            }
+
+            // packet counter
+            if (this.streamInfo[pid] === undefined) {
+                this.streamInfo[pid] = {
+                    packet: 0,
+                    drop: 0
+                };
+            }
+            ++this.streamInfo[pid].packet;
+
+            this._buffer.push(packet);
         }
 
-        if (this._ready === false && (pid === 0x12 || this._provideEventId === null)) {
-            return;
+        if (parsingBuffers.length !== 0) {
+            this._parser.write(Buffer.concat(parsingBuffers));
         }
-        if (this._providePids !== null && this._providePids.has(pid) === false) {
-            return;
-        }
-
-        // PAT (0) rewriting
-        if (pid === 0 && this._pmtPid !== -1) {
-            this._patsec.copy(packet, 5, 0);
-        }
-
-        // packet counter
-        if (this.streamInfo[pid] === undefined) {
-            this.streamInfo[pid] = {
-                packet: 0,
-                drop: 0
-            };
-        }
-        ++this.streamInfo[pid].packet;
-
-        this._buffer.push(packet);
     }
 
     private _onPAT(pid: number, data: any): void {
@@ -776,7 +773,7 @@ export default class TSFilter extends stream.Transform {
                         moduleVersion: module.moduleVersion,
                         moduleSize: module.moduleSize,
                         loadedBytes: 0,
-                        data: Buffer.alloc(module.moduleSize)
+                        data: Buffer.allocUnsafe(module.moduleSize).fill(0)
                     });
 
                     log.debug("TSFilter#_onDSMCC: detected DII and buffer allocated for logo data (downloadId=%d, %d bytes)", dii.downloadId, module.moduleSize);
@@ -925,8 +922,8 @@ export default class TSFilter extends stream.Transform {
             for (let i = 0; i < 0x08; i++) {
                 for (const target of [stateBySrv.basic, stateBySrv.extended]) {
                     target.flags.push({
-                        flag: Buffer.alloc(32, 0x00),
-                        ignore: Buffer.alloc(32, 0xFF),
+                        flag: Buffer.allocUnsafe(32).fill(0x00),
+                        ignore: Buffer.allocUnsafe(32).fill(0xFF),
                         version_number: -1
                     });
                 }
@@ -1025,7 +1022,6 @@ export default class TSFilter extends stream.Transform {
         setImmediate(() => {
             delete this._packet;
             delete this._buffer;
-            delete this._parses;
             delete this._patsec;
             delete this._patCRC;
         });
