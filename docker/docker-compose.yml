@@ -18,7 +18,7 @@ services:
       # DEBUG: "true"
     ports:
       - 40772:40772
-      - 9229:9229
+      # - 9229:9229
     devices:
       - /dev/bus:/dev/bus
       - /dev/dvb:/dev/dvb
