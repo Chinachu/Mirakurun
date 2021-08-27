@@ -442,8 +442,8 @@ export default class TunerDevice extends EventEmitter {
         }
 
         this._fatalCount = 0;
-            this._channel = null;
-            this._users.clear();
+        this._channel = null;
+        this._users.clear();
 
         if (this._isFault === false) {
             this._isAvailable = true;
