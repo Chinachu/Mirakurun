@@ -37,7 +37,7 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 
 ### Docker Changes
 
-- Update base image to `node:16.6.2-buster-slim`.
+- Update base image to `node:16.7.0-buster-slim`.
 - Fixed the exit signal handling properly.
 - When a `SIGHUP` is received in a container, only the node process can be restarted quickly.
 
