@@ -433,10 +433,17 @@ export default class TunerDevice extends EventEmitter {
         this._process = null;
         this._stream = null;
 
-        if (this._closing === true) {
+        if (this._closing === false && this._users.size !== 0) {
+            log.warn("TunerDevice#%d respawning because request has not closed", this._index);
+            ++status.errorCount.tunerDeviceRespawn;
+
+            this._spawn(this._channel);
+            return;
+        }
+
+        this._fatalCount = 0;
             this._channel = null;
             this._users.clear();
-        }
 
         if (this._isFault === false) {
             this._isAvailable = true;
@@ -450,15 +457,6 @@ export default class TunerDevice extends EventEmitter {
         log.info("TunerDevice#%d released", this._index);
 
         this._updated();
-
-        if (this._closing === false && this._users.size !== 0) {
-            log.warn("TunerDevice#%d respawning because request has not closed", this._index);
-            ++status.errorCount.tunerDeviceRespawn;
-
-            this._spawn(this._channel);
-        } else {
-            this._fatalCount = 0;
-        }
     }
 
     private _updated(): void {
