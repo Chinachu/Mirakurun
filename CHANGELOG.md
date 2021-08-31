@@ -17,6 +17,7 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 - **ts-filter**: Fix memory leak when comparing CRC of broken PAT packet processing. (bug)
 - **ts-filter**: Fix a problem in which the _close() function sometimes didn't call properly when the tuner was intercepted. (bug)
 - **ts-filter**: Change EIT\[p/f\] information to use in EPG.
+- **tuner-device**: Fixed a problem which the command didn't respawn ​correctly when it terminated unexpectedly. (bug)
 - **epg**: Add support for multiple EIT types.
 - **epg**: Fix wrong event group processing. (bug)
 - **epg**: Add support for event relay.
@@ -37,13 +38,14 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 
 ### Docker Changes
 
-- Update base image to `node:16.7.0-buster-slim`.
+- Update base image to `node:16.8.0-buster-slim`.
 - Fixed the exit signal handling properly.
 - When a `SIGHUP` is received in a container, only the node process can be restarted quickly.
 
 ### Other Changes
 
 - **package**: Update dependencies.
+- Reimplemented certain processes in C++.
 
 ## 3.8.0 (2021-08-10)
 
