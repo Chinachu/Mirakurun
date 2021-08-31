@@ -386,7 +386,11 @@ export default class TSFilter extends stream.Transform {
         }
 
         if (parsingBuffers.length !== 0) {
-            this._parser.write(Buffer.concat(parsingBuffers));
+            setImmediate(() => {
+                if (this._closed) { return; }
+                this._parser.write(parsingBuffers);
+                parsingBuffers.length = 0;
+            });
         }
     }
 
