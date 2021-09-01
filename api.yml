@@ -487,6 +487,8 @@ definitions:
         type: integer
       disableEITParsing:
         type: boolean
+      disableWebUI:
+        type: boolean
 
   ConfigTuners:
     type: array

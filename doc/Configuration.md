@@ -26,6 +26,7 @@ epgGatheringInterval: 1800000 # integer (ms)
 epgRetrievalTime: 600000 # integer (ms)
 logoDataInterval: 604800000 # integer (ms)
 disableEITParsing: false # boolean
+disableWebUI: false # boolean
 ```
 
 ### Environment Values (Docker)
@@ -41,6 +42,7 @@ EPG_GATHERING_INTERVAL
 EPG_RETRIEVAL_TIME
 LOGO_DATA_INTERVAL
 DISABLE_EIT_PARSING
+DISABLE_WEB_UI
 ```
 
 ## tuners.yml

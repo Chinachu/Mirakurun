@@ -129,21 +129,23 @@ class Server {
             next();
         });
 
-        app.use(express.static("lib/ui", {
-            setHeaders: (res, path) => {
-                if ((<any> express.static.mime).lookup(path) === "image/svg+xml") {
-                    res.setHeader("Cache-Control", "public, max-age=86400");
+        if (!serverConfig.disableWebUI) {
+            app.use(express.static("lib/ui", {
+                setHeaders: (res, path) => {
+                    if ((<any> express.static.mime).lookup(path) === "image/svg+xml") {
+                        res.setHeader("Cache-Control", "public, max-age=86400");
+                    }
                 }
-            }
-        }));
-        app.use("/eventemitter3", express.static("node_modules/eventemitter3"));
-        app.use("/react", express.static("node_modules/react"));
-        app.use("/react-dom", express.static("node_modules/react-dom"));
-        app.use("/@fluentui/react", express.static("node_modules/@fluentui/react"));
+            }));
+            app.use("/eventemitter3", express.static("node_modules/eventemitter3"));
+            app.use("/react", express.static("node_modules/react"));
+            app.use("/react-dom", express.static("node_modules/react-dom"));
+            app.use("/@fluentui/react", express.static("node_modules/@fluentui/react"));
 
-        if (fs.existsSync("node_modules/swagger-ui-dist") === true) {
-            app.use("/swagger-ui", express.static("node_modules/swagger-ui-dist"));
-            app.get("/api/debug", (req, res) => res.redirect("/swagger-ui/?url=/api/docs"));
+            if (fs.existsSync("node_modules/swagger-ui-dist") === true) {
+                app.use("/swagger-ui", express.static("node_modules/swagger-ui-dist"));
+                app.get("/api/debug", (req, res) => res.redirect("/swagger-ui/?url=/api/docs"));
+            }
         }
 
         const api = yaml.load(fs.readFileSync("api.yml", "utf8")) as OpenAPIV2.Document;

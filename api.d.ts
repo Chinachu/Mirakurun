@@ -236,6 +236,7 @@ export interface ConfigServer {
     epgRetrievalTime?: number;
     logoDataInterval?: number;
     disableEITParsing?: boolean;
+    disableWebUI?: boolean;
 }
 
 export enum LogLevel {

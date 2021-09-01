@@ -37,7 +37,8 @@ const {
     EPG_GATHERING_INTERVAL,
     EPG_RETRIEVAL_TIME,
     LOGO_DATA_INTERVAL,
-    DISABLE_EIT_PARSING
+    DISABLE_EIT_PARSING,
+    DISABLE_WEB_UI
 } = process.env;
 
 const IS_DOCKER = DOCKER === "YES";
@@ -66,6 +67,7 @@ export interface Server {
     readonly epgRetrievalTime?: number;
     readonly logoDataInterval?: number;
     readonly disableEITParsing?: true;
+    readonly disableWebUI?: true;
 }
 
 export interface Tuner {
@@ -188,6 +190,9 @@ export function loadServer(): Server {
         }
         if (DISABLE_EIT_PARSING === "true") {
             config.disableEITParsing = true;
+        }
+        if (DISABLE_WEB_UI === "true") {
+            config.disableWebUI = true;
         }
 
         log.info("load server config (merged w/ env): %s", JSON.stringify(config));
