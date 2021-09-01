@@ -13,6 +13,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+.heart-view > div.consent {
+    margin: 16px 32px;
+    max-width: 450px;
+}
+
 .heart-view > .ms-Stack > span,
 .heart-view > .ms-Stack img {
     margin: 8px 16px;
