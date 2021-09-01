@@ -144,6 +144,9 @@ $ vim /usr/local/mirakurun/config/tuners.yml
 ### Install / Update
 
 ```sh
+# for building C++ addons (Debian / Ubuntu)
+sudo apt install build-essential
+
 # PM2 (Process Manager)
 sudo npm install pm2 -g
 
