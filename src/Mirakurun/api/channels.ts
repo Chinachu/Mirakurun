@@ -16,12 +16,12 @@
 import { Operation } from "express-openapi";
 import sift from "sift";
 import * as api from "../api";
-import Channel from "../Channel";
+import _ from "../_";
 import { ChannelTypes } from "../common";
 
 export const get: Operation = (req, res) => {
 
-    const channels = Channel.all().map(channel => {
+    const channels = _.channel.items.map(channel => {
 
         const ch: any = channel.toJSON();
 

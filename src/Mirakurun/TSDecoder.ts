@@ -74,6 +74,10 @@ export default class TSDecoder extends stream.Transform {
         callback();
     }
 
+    _flush() {
+        this._close();
+    }
+
     private _spawn(): void {
 
         if (this._closed === true || this._process) {

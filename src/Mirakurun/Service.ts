@@ -27,34 +27,6 @@ const { LOGO_DATA_DIR_PATH } = process.env;
 
 export default class Service {
 
-    static get(id: number): ServiceItem;
-    static get(networkId: number, serviceId: number): ServiceItem;
-    static get(id: number, serviceId?: number) {
-        return _.service.get(id, serviceId);
-    }
-
-    static exists(id: number): boolean;
-    static exists(networkId: number, serviceId: number): boolean;
-    static exists(id: number, serviceId?: number) {
-        return _.service.exists(id, serviceId);
-    }
-
-    static findByChannel(channel: ChannelItem): ServiceItem[] {
-        return _.service.findByChannel(channel);
-    }
-
-    static findByNetworkId(networkId: number): ServiceItem[] {
-        return _.service.findByNetworkId(networkId);
-    }
-
-    static findByNetworkIdWithLogoId(networkId: number, logoId: number): ServiceItem[] {
-        return _.service.findByNetworkIdWithLogoId(networkId, logoId);
-    }
-
-    static all(): ServiceItem[] {
-        return _.service.items;
-    }
-
     static getLogoDataPath(networkId: number, logoId: number) {
 
         if (typeof logoId !== "number" || logoId < 0) {

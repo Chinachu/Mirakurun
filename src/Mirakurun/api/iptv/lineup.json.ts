@@ -15,7 +15,7 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../../api";
-import Service from "../../Service";
+import _ from "../../_";
 
 interface HDHRChannel {
     GuideNumber: string;
@@ -28,7 +28,7 @@ export const get: Operation = (req, res) => {
 
     const apiRoot = `${req.protocol}://${req.headers.host}/api`;
 
-    const services = [...Service.all()]; // shallow copy
+    const services = [..._.service.items]; // shallow copy
     services.sort((a, b) => a.getOrder() - b.getOrder());
 
     const channels: HDHRChannel[] = [];

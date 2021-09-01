@@ -16,7 +16,7 @@
 import { Operation } from "express-openapi";
 import * as api from "../api";
 import * as db from "../db";
-import Program from "../Program";
+import _ from "../_";
 
 export const get: Operation = (req, res) => {
 
@@ -24,9 +24,9 @@ export const get: Operation = (req, res) => {
 
     // tslint:disable-next-line:prefer-conditional-expression
     if (Object.keys(req.query).length !== 0) {
-        programs = Program.findByQuery(req.query);
+        programs = _.program.findByQuery(req.query);
     } else {
-        programs = Program.all();
+        programs = Array.from(_.program.itemMap.values());
     }
 
     api.responseJSON(res, programs);

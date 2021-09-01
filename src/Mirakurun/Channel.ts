@@ -19,21 +19,8 @@ import _ from "./_";
 import status from "./status";
 import queue from "./queue";
 import ChannelItem from "./ChannelItem";
-import Tuner from "./Tuner";
 
 export default class Channel {
-
-    static get(type: common.ChannelType, channel: string): ChannelItem {
-        return _.channel.get(type, channel);
-    }
-
-    static findByType(type: common.ChannelType): ChannelItem[] {
-        return _.channel.findByType(type);
-    }
-
-    static all(): ChannelItem[] {
-        return _.channel.items;
-    }
 
     private _items: ChannelItem[] = [];
     private _epgGatheringInterval: number = _.config.server.epgGatheringInterval || 1000 * 60 * 30; // 30 mins
@@ -146,7 +133,7 @@ export default class Channel {
                 return;
             }
 
-            if (Tuner.typeExists(channel.type) === false) {
+            if (_.tuner.typeExists(channel.type) === false) {
                 return;
             }
 
@@ -212,7 +199,7 @@ export default class Channel {
                     log.info("Network#%d EPG gathering has started", networkId);
 
                     try {
-                        await Tuner.getEPG(service.channel);
+                        await _.tuner.getEPG(service.channel);
                         log.info("Network#%d EPG gathering has finished", networkId);
                     } catch (e) {
                         log.warn("Network#%d EPG gathering has failed [%s]", networkId, e);

@@ -18,7 +18,7 @@ import * as api from "../../../api";
 import * as common from "../../../common";
 import * as config from "../../../config";
 import * as db from "../../../db";
-import Tuner from "../../../Tuner";
+import _ from "../../../_";
 
 let isScanning = false;
 
@@ -266,7 +266,7 @@ export const put: Operation = async (req, res) => {
 
         let services: db.Service[];
         try {
-            services = await Tuner.getServices(<any> {
+            services = await _.tuner.getServices(<any> {
                 type: type,
                 channel: channel
             });

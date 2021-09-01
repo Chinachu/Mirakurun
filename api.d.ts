@@ -229,7 +229,6 @@ export interface ConfigServer {
     disableIPv6?: boolean;
     logLevel?: LogLevel;
     maxLogHistory?: number;
-    highWaterMark?: number;
     maxBufferBytesBeforeReady?: number;
     eventEndTimeout?: number;
     programGCInterval?: number;

@@ -17,8 +17,7 @@ import { Operation } from "express-openapi";
 import * as api from "../api";
 import { Status } from "../../../api";
 import status from "../status";
-import Program from "../Program";
-import Tuner from "../Tuner";
+import _ from "../_";
 
 const pkg = require("../../../package.json");
 
@@ -77,11 +76,11 @@ export function getStatus(): Status {
         },
         epg: {
             gatheringNetworks: [],
-            storedEvents: Program.all().length
+            storedEvents: _.program.itemMap.size
         },
         rpcCount: status.rpcCount,
         streamCount: {
-            tunerDevice: Tuner.all().filter(td => td.isUsing === true).length,
+            tunerDevice: _.tuner.devices.filter(td => td.isUsing === true).length,
             tsFilter: status.streamCount.tsFilter,
             decoder: status.streamCount.decoder
         },

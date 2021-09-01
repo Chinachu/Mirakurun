@@ -19,7 +19,6 @@ path: /var/run/mirakurun.sock # string or ~ (null) *Ignored in Docker
 port: 40772 # integer or ~ (null) *Ignored in Docker
 hostname: localhost
 disableIPv6: false # boolean *Ignored in Docker
-highWaterMark: 25165824 # integer (bytes)
 maxBufferBytesBeforeReady: 8388608 # integer (bytes)
 eventEndTimeout: 1000 # integer (ms)
 programGCInterval: 3600000 # integer (ms)
@@ -35,7 +34,6 @@ disableEITParsing: false # boolean
 HOSTNAME
 LOG_LEVEL
 MAX_LOG_HISTORY
-HIGH_WATER_MARK
 MAX_BUFFER_BYTES_BEFORE_READY
 EVENT_END_TIMEOUT
 PROGRAM_GC_INTERVAL

@@ -13,7 +13,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-import * as stream from "stream";
+import { Writable } from "stream";
+import EventEmitter = require("eventemitter3");
 import { TsStreamLite, TsCrc32, TsChar, TsLogo, tsDataModule } from "@chinachu/aribts";
 import { StreamInfo, getTimeFromMJD } from "./common";
 import * as log from "./log";
@@ -24,11 +25,12 @@ import { getProgramItemId } from "./Program";
 import Service from "./Service";
 import ServiceItem from "./ServiceItem";
 
-interface StreamOptions extends stream.TransformOptions {
+interface TSFilterOptions {
+    readonly output?: Writable;
+
     readonly networkId?: number;
     readonly serviceId?: number;
     readonly eventId?: number;
-    readonly noProvide?: boolean;
     readonly parseNIT?: boolean;
     readonly parseSDT?: boolean;
     readonly parseEIT?: boolean;
@@ -83,9 +85,12 @@ interface DownloadData {
     data?: Buffer;
 }
 
-export default class TSFilter extends stream.Transform {
+export default class TSFilter extends EventEmitter {
 
     streamInfo: StreamInfo = {};
+
+    // output
+    private _output: Writable;
 
     // options
     private _provideServiceId: number;
@@ -144,11 +149,8 @@ export default class TSFilter extends stream.Transform {
     })();
     private _eventEndTimeout = _.config.server.eventEndTimeout || 1000;
 
-    constructor(options: StreamOptions) {
-        super({
-            allowHalfOpen: false,
-            highWaterMark: _.config.server.highWaterMark || 1024 * 1024 * 24 // 24 MB
-        });
+    constructor(options: TSFilterOptions) {
+        super();
 
         const enabletsmf = options.tsmfRelTs || 0;
         if (enabletsmf !== 0) {
@@ -185,7 +187,11 @@ export default class TSFilter extends stream.Transform {
                 this._provideEventTimeout = setTimeout(() => this._observeProvideEvent(), timeout);
             }
         }
-        if (options.noProvide === true) {
+        if (options.output) {
+            this._output = options.output;
+            this._output.once("finish", this._close.bind(this));
+            this._output.once("close", this._close.bind(this));
+        } else {
             this._provideServiceId = null;
             this._provideEventId = null;
             this._providePids = new Set();
@@ -217,7 +223,6 @@ export default class TSFilter extends stream.Transform {
         this._parser.on("tot", this._onTOT.bind(this));
 
         this.once("end", this._close.bind(this));
-        this.once("finish", this._close.bind(this));
         this.once("close", this._close.bind(this));
 
         log.info("TSFilter: created (serviceId=%d, eventId=%d)", this._provideServiceId, this._provideEventId);
@@ -229,11 +234,10 @@ export default class TSFilter extends stream.Transform {
         ++status.streamCount.tsFilter;
     }
 
-    _transform(chunk: Buffer, encoding: string, callback: Function) {
+    write(chunk: Buffer): void {
 
         if (this._closed) {
-            callback(new Error("TSFilter has closed already"));
-            return;
+            throw new Error("TSFilter has closed already");
         }
 
         let offset = 0;
@@ -253,7 +257,6 @@ export default class TSFilter extends stream.Transform {
                 this._offset += length;
 
                 // chunk drained
-                callback();
                 return;
             }
         }
@@ -277,7 +280,7 @@ export default class TSFilter extends stream.Transform {
 
         if (this._buffer.length !== 0) {
             if (this._ready) {
-                this.push(Buffer.concat(this._buffer));
+                this._output.write(Buffer.concat(this._buffer));
                 this._buffer.length = 0;
             } else {
                 const head = this._buffer.length - (this._maxBufferBytesBeforeReady / PACKET_SIZE);
@@ -286,8 +289,14 @@ export default class TSFilter extends stream.Transform {
                 }
             }
         }
+    }
 
-        callback();
+    end(): void {
+        this._close();
+    }
+
+    close(): void {
+        this._close();
     }
 
     private _processPackets(packets: Buffer[]): void {
@@ -1047,6 +1056,15 @@ export default class TSFilter extends stream.Transform {
                     service.epgUpdatedAt = now;
                 }
             }
+        }
+
+        // clear output stream
+        if (this._output) {
+            if (this._output.writableEnded === false) {
+                this._output.end();
+            }
+            this._output.removeAllListeners();
+            delete this._output;
         }
 
         // clear streamInfo

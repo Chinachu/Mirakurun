@@ -92,13 +92,13 @@ transformStream.pipe(tsStream);
 
 tsStream.on("eit", (pid, data) => {
     epg.write(data);
-    events = _.program.items.length;
+    events = _.program.itemMap.size;
 });
 tsStream.resume();
 
 function finalize() {
 
-    const programs = _.program.items;
+    const programs = Array.from(_.program.itemMap.values());
 
     console.log("programs:", programs.length, "(events)");
 

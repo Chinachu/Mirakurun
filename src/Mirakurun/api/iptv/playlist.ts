@@ -14,13 +14,14 @@
    limitations under the License.
 */
 import { Operation } from "express-openapi";
+import _ from "../../_";
 import Service from "../../Service";
 
 export const get: Operation = async (req, res) => {
 
     const apiRoot = `${req.protocol}://${req.headers.host}/api`;
 
-    const services = [...Service.all()]; // shallow copy
+    const services = [..._.service.items]; // shallow copy
     services.sort((a, b) => a.getOrder() - b.getOrder());
 
     let m = `#EXTM3U url-tvg="${apiRoot}/iptv/xmltv"\n`;

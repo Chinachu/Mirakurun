@@ -27,22 +27,6 @@ export function getProgramItemId(networkId: number, serviceId: number, eventId: 
 
 export default class Program {
 
-    static get(id: number): db.Program {
-        return _.program.get(id);
-    }
-
-    static exists(id: number): boolean {
-        return _.program.exists(id);
-    }
-
-    static findByQuery(query: object): db.Program[] {
-        return _.program.findByQuery(query);
-    }
-
-    static all(): db.Program[] {
-        return _.program.items;
-    }
-
     private _itemMap = new Map<number, db.Program>();
     private _saveTimerId: NodeJS.Timer;
     private _emitTimerId: NodeJS.Timer;
@@ -56,9 +40,8 @@ export default class Program {
         setTimeout(this._gc.bind(this), this._programGCInterval);
     }
 
-    /** CAUTION: This getter method creates a new Array object every time. */
-    get items(): db.Program[] {
-        return Array.from(this._itemMap.values());
+    get itemMap(): Map<number, db.Program> {
+        return this._itemMap;
     }
 
     add(item: db.Program, firstAdd: boolean = false): void {
@@ -122,9 +105,7 @@ export default class Program {
     }
 
     findByQuery(query: object): db.Program[] {
-        // Pass `this.items` instead of `this._itemIterator`.
-        // Because IterableIterator<T> doesn't have the `filter()` method.
-        return sift(query, this.items);
+        return sift(query, Array.from(this._itemMap.values()));
     }
 
     findByNetworkId(networkId: number): db.Program[] {
@@ -178,10 +159,7 @@ export default class Program {
 
         let count = 0;
 
-        // The `reverse()` method never changes the original data.  Because
-        // `this.items` returns a new Array object created from the original
-        // data.
-        for (const item of this.items.reverse()) {
+        for (const item of [...this._itemMap.values()].reverse()) {
             if (item.networkId === networkId) {
                 // Calling `this.remove(item)` here is safe.  Because that never
                 // changes the Array object we're iterating here.
@@ -258,7 +236,7 @@ export default class Program {
         log.debug("saving programs...");
 
         db.savePrograms(
-            this.items,
+            Array.from(this._itemMap.values()),
             _.configIntegrity.channels
         );
     }

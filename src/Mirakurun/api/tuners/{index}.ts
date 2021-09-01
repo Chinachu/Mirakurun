@@ -15,7 +15,7 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../../api";
-import Tuner from "../../Tuner";
+import _ from "../../_";
 
 export const parameters = [
     {
@@ -29,7 +29,7 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
 
-    const tuner = Tuner.get(req.params.index as any as number);
+    const tuner = _.tuner.get(req.params.index as any as number);
 
     if (tuner === null) {
         api.responseError(res, 404);

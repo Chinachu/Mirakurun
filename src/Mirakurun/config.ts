@@ -31,7 +31,6 @@ const {
     HOSTNAME,
     LOG_LEVEL,
     MAX_LOG_HISTORY,
-    HIGH_WATER_MARK,
     MAX_BUFFER_BYTES_BEFORE_READY,
     EVENT_END_TIMEOUT,
     PROGRAM_GC_INTERVAL,
@@ -59,8 +58,6 @@ export interface Server {
     readonly logLevel?: log.LogLevel;
     readonly maxLogHistory?: number;
 
-    /** Byte */
-    readonly highWaterMark?: number;
     readonly maxBufferBytesBeforeReady?: number;
     readonly eventEndTimeout?: number;
 
@@ -170,9 +167,6 @@ export function loadServer(): Server {
         }
         if (typeof MAX_LOG_HISTORY !== "undefined" && /^[0-9]+$/.test(MAX_LOG_HISTORY)) {
             config.maxLogHistory = parseInt(MAX_LOG_HISTORY, 10);
-        }
-        if (typeof HIGH_WATER_MARK !== "undefined" && /^[0-9]+$/.test(HIGH_WATER_MARK)) {
-            config.highWaterMark = parseInt(HIGH_WATER_MARK, 10);
         }
         if (typeof MAX_BUFFER_BYTES_BEFORE_READY !== "undefined" && /^[0-9]+$/.test(MAX_BUFFER_BYTES_BEFORE_READY)) {
             config.maxBufferBytesBeforeReady = parseInt(MAX_BUFFER_BYTES_BEFORE_READY, 10);

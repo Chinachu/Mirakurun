@@ -16,6 +16,7 @@
 import { Operation } from "express-openapi";
 import * as api from "../../api";
 import * as apid from "../../../../api";
+import _ from "../../_";
 import Service from "../../Service";
 
 export const parameters = [
@@ -30,7 +31,7 @@ export const parameters = [
 
 export const get: Operation = async (req, res) => {
 
-    const serviceItem = Service.get(req.params.id as any as number);
+    const serviceItem = _.service.get(req.params.id as any as number);
 
     if (serviceItem === null || serviceItem === undefined) {
         api.responseError(res, 404);

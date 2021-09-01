@@ -17,12 +17,13 @@ import { Operation } from "express-openapi";
 import sift from "sift";
 import * as api from "../api";
 import * as apid from "../../../api";
+import _ from "../_";
 import Service from "../Service";
 import { ChannelTypes } from "../common";
 
 export const get: Operation = async (req, res) => {
 
-    const serviceItems = [...Service.all()]; // shallow copy
+    const serviceItems = [..._.service.items]; // shallow copy
     serviceItems.sort((a, b) => a.getOrder() - b.getOrder());
 
     const services: apid.Service[] = [];

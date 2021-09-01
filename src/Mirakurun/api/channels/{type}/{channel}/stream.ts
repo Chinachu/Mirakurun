@@ -15,7 +15,7 @@
 */
 import {Operation} from "express-openapi";
 import * as api from "../../../../api";
-import Channel from "../../../../Channel";
+import _ from "../../../../_";
 import { ChannelType, ChannelTypes } from "../../../../common";
 
 export const parameters = [
@@ -49,7 +49,7 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
 
-    const channel = Channel.get(req.params.type as ChannelType, req.params.channel);
+    const channel = _.channel.get(req.params.type as ChannelType, req.params.channel);
 
     if (channel === null) {
         api.responseError(res, 404);
@@ -67,18 +67,17 @@ export const get: Operation = (req, res) => {
         agent: req.get("User-Agent"),
         url: req.url,
         disableDecoder: (<number> <any> req.query.decode === 0)
-    })
-        .then(stream => {
+    }, res)
+        .then(tsFilter => {
             if (requestAborted === true) {
-                return stream.emit("close");
+                return tsFilter.close();
             }
 
-            req.once("close", () => stream.emit("close"));
+            req.once("close", () => tsFilter.close());
 
             res.setHeader("Content-Type", "video/MP2T");
             res.setHeader("X-Mirakurun-Tuner-User-ID", userId);
             res.status(200);
-            stream.pipe(res);
         })
         .catch((err) => api.responseStreamErrorHandler(res, err));
 };

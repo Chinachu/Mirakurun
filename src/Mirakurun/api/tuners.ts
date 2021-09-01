@@ -15,13 +15,13 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../api";
-import Tuner from "../Tuner";
+import _ from "../_";
 
 export const get: Operation = (req, res) => {
 
     api.responseJSON(
         res,
-        Tuner.all()
+        _.tuner.devices
     );
 };
 

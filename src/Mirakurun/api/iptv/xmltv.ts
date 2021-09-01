@@ -15,7 +15,7 @@
 */
 import { Operation } from "express-openapi";
 import Service from "../../Service";
-import Program from "../../Program";
+import _ from "../../_";
 
 function escapeXMLSpecialChars(str: string): string {
     return str.replace(/&/g, "&amp;")
@@ -35,7 +35,7 @@ export const get: Operation = async (req, res) => {
 
     const apiRoot = `${req.protocol}://${req.headers.host}/api`;
 
-    const services = [...Service.all()]; // shallow copy
+    const services = [..._.service.items]; // shallow copy
     services.sort((a, b) => a.getOrder() - b.getOrder());
 
     let x = `<?xml version="1.0" encoding="UTF-8"?>\n`;
@@ -65,8 +65,8 @@ export const get: Operation = async (req, res) => {
         x += `</channel>\n`;
     }
 
-    for (const program of Program.all()) {
-        const service = Service.get(program.networkId, program.serviceId);
+    for (const program of _.program.itemMap.values()) {
+        const service = _.service.get(program.networkId, program.serviceId);
         if (service === null) {
             continue;
         }

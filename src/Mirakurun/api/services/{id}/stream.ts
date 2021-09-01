@@ -15,7 +15,7 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../../../api";
-import Service from "../../../Service";
+import _ from "../../../_";
 
 export const parameters = [
     {
@@ -42,7 +42,7 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
 
-    const service = Service.get(req.params.id as any as number);
+    const service = _.service.get(req.params.id as any as number);
 
     if (service === null || service === undefined) {
         api.responseError(res, 404);
@@ -60,18 +60,17 @@ export const get: Operation = (req, res) => {
         agent: req.get("User-Agent"),
         url: req.url,
         disableDecoder: (<number> <any> req.query.decode === 0)
-    })
-        .then(stream => {
+    }, res)
+        .then(tsFilter => {
             if (requestAborted === true) {
-                return stream.emit("close");
+                return tsFilter.close();
             }
 
-            req.once("close", () => stream.emit("close"));
+            req.once("close", () => tsFilter.close());
 
             res.setHeader("Content-Type", "video/MP2T");
             res.setHeader("X-Mirakurun-Tuner-User-ID", userId);
             res.status(200);
-            stream.pipe(res);
         })
         .catch((err) => api.responseStreamErrorHandler(res, err));
 };

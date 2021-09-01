@@ -13,6 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+import { Writable } from "stream";
 import ChannelItem from "./ChannelItem";
 
 export interface User {
@@ -32,7 +33,6 @@ interface StreamSetting {
     networkId?: number;
     serviceId?: number;
     eventId?: number;
-    noProvide?: boolean;
     parseNIT?: boolean;
     parseSDT?: boolean;
     parseEIT?: boolean;

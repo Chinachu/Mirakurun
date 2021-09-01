@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-import * as stream from "stream";
+import { Writable } from "stream";
 import * as common from "./common";
 import * as log from "./log";
 import * as db from "./db";
@@ -25,38 +25,6 @@ import TSFilter from "./TSFilter";
 import TSDecoder from "./TSDecoder";
 
 export default class Tuner {
-
-    static all(): TunerDevice[] {
-        return _.tuner.devices;
-    }
-
-    static get(index: number): TunerDevice {
-        return _.tuner.get(index);
-    }
-
-    static typeExists(type: common.ChannelType): boolean {
-        return _.tuner.typeExists(type);
-    }
-
-    static getChannelStream(channel: ChannelItem, user: common.User): Promise<stream.Readable> {
-        return _.tuner.getChannelStream(channel, user);
-    }
-
-    static getServiceStream(service: ServiceItem, user: common.User): Promise<stream.Readable> {
-        return _.tuner.getServiceStream(service, user);
-    }
-
-    static getProgramStream(program: db.Program, user: common.User): Promise<stream.Readable> {
-        return _.tuner.getProgramStream(program, user);
-    }
-
-    static getEPG(channel: ChannelItem, time?: number): Promise<void> {
-        return _.tuner.getEPG(channel, time);
-    }
-
-    static getServices(channel: ChannelItem): Promise<db.Service[]> {
-        return _.tuner.getServices(channel);
-    }
 
     private _devices: TunerDevice[] = [];
 
@@ -92,7 +60,7 @@ export default class Tuner {
         return false;
     }
 
-    getChannelStream(channel: ChannelItem, userReq: common.UserRequest): Promise<stream.Readable> {
+    initChannelStream(channel: ChannelItem, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
 
         let networkId: number;
 
@@ -101,19 +69,19 @@ export default class Tuner {
             networkId = services[0].networkId;
         }
 
-        return this._getStream({
+        return this._initTS({
             ...userReq,
             streamSetting: {
                 channel,
                 networkId,
                 parseEIT: true
             }
-        });
+        }, output);
     }
 
-    getServiceStream(service: ServiceItem, userReq: common.UserRequest): Promise<stream.Readable> {
+    initServiceStream(service: ServiceItem, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
 
-        return this._getStream({
+        return this._initTS({
             ...userReq,
             streamSetting: {
                 channel: service.channel,
@@ -121,12 +89,12 @@ export default class Tuner {
                 networkId: service.networkId,
                 parseEIT: true
             }
-        });
+        }, output);
     }
 
-    getProgramStream(program: db.Program, userReq: common.UserRequest): Promise<stream.Readable> {
+    initProgramStream(program: db.Program, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
 
-        return this._getStream({
+        return this._initTS({
             ...userReq,
             streamSetting: {
                 channel: _.service.get(program.networkId, program.serviceId).channel,
@@ -135,11 +103,12 @@ export default class Tuner {
                 networkId: program.networkId,
                 parseEIT: true
             }
-        });
+        }, output);
     }
 
     async getEPG(channel: ChannelItem, time?: number): Promise<void> {
 
+        let timeout: NodeJS.Timer;
         if (!time) {
             time = _.config.server.epgRetrievalTime || 1000 * 60 * 10;
         }
@@ -153,37 +122,43 @@ export default class Tuner {
 
         networkId = services[0].networkId;
 
-        const stream = await this._getStream({
+        const tsFilter = await this._initTS({
             id: "Mirakurun:getEPG()",
             priority: -1,
             disableDecoder: true,
             streamSetting: {
                 channel,
                 networkId,
-                noProvide: true,
                 parseEIT: true
             }
         });
-        if (stream === null) {
+
+        if (tsFilter === null) {
             return;
-        } else {
-            return new Promise<void>((resolve) => {
-                setTimeout(() => stream.emit("close"), time);
-                stream.once("epgReady", () => stream.emit("close"));
-                stream.once("close", resolve);
-            });
         }
+
+        return new Promise<void>((resolve) => {
+            const fin = () => {
+                clearTimeout(timeout);
+                tsFilter.close();
+            };
+            timeout = setTimeout(fin, time);
+            tsFilter.once("epgReady", fin);
+            tsFilter.once("close", () => {
+                fin();
+                resolve();
+            });
+        });
     }
 
     async getServices(channel: ChannelItem): Promise<db.Service[]> {
 
-        const stream = await this._getStream({
+        const tsFilter = await this._initTS({
             id: "Mirakurun:getServices()",
             priority: -1,
             disableDecoder: true,
             streamSetting: {
                 channel,
-                noProvide: true,
                 parseNIT: true,
                 parseSDT: true
             }
@@ -197,27 +172,27 @@ export default class Tuner {
             };
             let services: db.Service[] = null;
 
-            setTimeout(() => stream.emit("close"), 20000);
+            setTimeout(() => tsFilter.close(), 20000);
 
             Promise.all<void>([
                 new Promise((resolve, reject) => {
-                    stream.once("network", _network => {
+                    tsFilter.once("network", _network => {
                         network = _network;
                         resolve();
                     });
                 }),
                 new Promise((resolve, reject) => {
-                    stream.once("services", _services => {
+                    tsFilter.once("services", _services => {
                         services = _services;
                         resolve();
                     });
                 })
-            ]).then(() => stream.emit("close"));
+            ]).then(() => tsFilter.close());
 
-            stream.once("close", () => {
+            tsFilter.once("close", () => {
 
-                stream.removeAllListeners("network");
-                stream.removeAllListeners("services");
+                tsFilter.removeAllListeners("network");
+                tsFilter.removeAllListeners("services");
 
                 if (network.networkId === -1) {
                     reject(new Error("stream has closed before get network"));
@@ -299,9 +274,9 @@ export default class Tuner {
         return this;
     }
 
-    private _getStream(user: common.User): Promise<stream.Readable> {
+    private _initTS(user: common.User, dest?: Writable): Promise<TSFilter> {
 
-        return new Promise<stream.Readable>((resolve, reject) => {
+        return new Promise<TSFilter>((resolve, reject) => {
 
             const setting = user.streamSetting;
 
@@ -327,7 +302,7 @@ export default class Tuner {
                 }
 
                 // x. use remote data
-                if (device === null && setting.noProvide === true) {
+                if (device === null && !dest) {
                     const remoteDevice = devices.find(device => device.isRemote);
                     if (remoteDevice) {
                         if (setting.networkId !== undefined && setting.parseEIT === true) {
@@ -390,11 +365,21 @@ export default class Tuner {
                         reject(new Error("no available tuners"));
                     }
                 } else {
+                    let output: Writable;
+                    if (user.disableDecoder === true || device.decoder === null) {
+                        output = dest;
+                    } else {
+                        output = new TSDecoder({
+                            command: device.decoder
+                        });
+                        output.pipe(dest);
+                    }
+
                     const tsFilter = new TSFilter({
+                        output,
                         networkId: setting.networkId,
                         serviceId: setting.serviceId,
                         eventId: setting.eventId,
-                        noProvide: setting.noProvide,
                         parseNIT: setting.parseNIT,
                         parseSDT: setting.parseSDT,
                         parseEIT: setting.parseEIT,
@@ -407,20 +392,10 @@ export default class Tuner {
 
                     device.startStream(user, tsFilter, setting.channel)
                         .then(() => {
-                            if (user.disableDecoder === true || device.decoder === null) {
-                                resolve(tsFilter);
-                            } else {
-                                const tsDecoder = new TSDecoder({
-                                    command: device.decoder
-                                });
-                                tsDecoder.once("close", () => tsFilter.emit("close"));
-                                tsFilter.once("close", () => tsDecoder.emit("close"));
-                                tsFilter.pipe(tsDecoder);
-                                resolve(tsDecoder);
-                            }
+                            resolve(tsFilter);
                         })
                         .catch((err) => {
-                            tsFilter.emit("close");
+                            tsFilter.end();
                             reject(err);
                         });
                 }

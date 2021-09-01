@@ -16,7 +16,7 @@
 import { Operation } from "express-openapi";
 import sift from "sift";
 import * as api from "../../api";
-import Channel from "../../Channel";
+import _ from "../../_";
 import { ChannelTypes, ChannelType } from "../../common";
 
 export const parameters = [
@@ -31,7 +31,7 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
 
-    const channels = Channel.findByType(req.params.type as ChannelType).map(channel => {
+    const channels = _.channel.findByType(req.params.type as ChannelType).map(channel => {
 
         const ch: any = channel.toJSON();
 

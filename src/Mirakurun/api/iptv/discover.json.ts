@@ -15,7 +15,7 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../../api";
-import Tuner from "../../Tuner";
+import _ from "../../_";
 const pkg = require("../../../../package.json");
 
 export const get: Operation = (req, res) => {
@@ -30,7 +30,7 @@ export const get: Operation = (req, res) => {
         Manufacturer: "Chinachu Project",
         DeviceID: req.headers.host.replace(/[\[\].:]/g, ""),
         DeviceAuth: "MIRAKURUN",
-        TunerCount: Tuner.all().length,
+        TunerCount: _.tuner.devices.length,
         BaseURL: `${apiRoot}/iptv`,
         LineupURL: `${apiRoot}/iptv/lineup.json`
     });

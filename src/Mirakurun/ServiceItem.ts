@@ -19,6 +19,7 @@ import _ from "./_";
 import * as db from "./db";
 import Event from "./Event";
 import ChannelItem from "./ChannelItem";
+import TSFilter from "./TSFilter";
 
 export default class ServiceItem {
 
@@ -163,8 +164,8 @@ export default class ServiceItem {
         return ret;
     }
 
-    getStream(userRequest: common.UserRequest): Promise<stream.Readable> {
-        return _.tuner.getServiceStream(this, userRequest);
+    getStream(userRequest: common.UserRequest, output: stream.Writable): Promise<TSFilter> {
+        return _.tuner.initServiceStream(this, userRequest, output);
     }
 
     getOrder(): number {

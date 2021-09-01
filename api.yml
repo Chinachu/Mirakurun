@@ -472,8 +472,6 @@ definitions:
       maxLogHistory:
         type: integer
         minimum: 0
-      highWaterMark:
-        type: integer
       maxBufferBytesBeforeReady:
         type: integer
       eventEndTimeout:

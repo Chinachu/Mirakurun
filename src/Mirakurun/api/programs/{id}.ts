@@ -15,7 +15,7 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../../api";
-import Program from "../../Program";
+import _ from "../../_";
 
 export const parameters = [
     {
@@ -30,7 +30,7 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
 
-    const program = Program.get(req.params.id as any as number);
+    const program = _.program.get(req.params.id as any as number);
 
     if (program === null) {
         api.responseError(res, 404);

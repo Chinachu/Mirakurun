@@ -14,6 +14,7 @@
    limitations under the License.
 */
 import { Operation } from "express-openapi";
+import _ from "../../../_";
 import Service from "../../../Service";
 
 export const parameters = [
@@ -28,7 +29,7 @@ export const parameters = [
 
 export const get: Operation = async (req, res) => {
 
-    const service = Service.get(req.params.id as any as number);
+    const service = _.service.get(req.params.id as any as number);
 
     if (service === null || service === undefined) {
         res.writeHead(404, "Not Found");
