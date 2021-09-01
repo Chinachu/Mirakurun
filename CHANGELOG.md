@@ -8,6 +8,7 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 
 ### Server Changes
 
+- **config/server**: Add `disableWebUI` (Env: `DISABLE_WEB_UI` for Docker) to disable Web UI.
 - **config/server**: Change several default values based on typical usage.
   - `programGCInterval`: `900000` (15 mins) → `3600000` (1 hour)
   - `epgGatheringInterval`: `900000` (15 mins) → `1800000` (30 mins)
@@ -33,8 +34,9 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 - **api/restart**: Improved the restart speed on Docker. (approx. 2 secs)
 - **rpc**: Added a WebSocket RPC interface. (experimental)
 - **ui**: Now using RPC interface.
-- **ui**: Fix "EPG Gathering Network IDs" hex strings to upper case.
-- **ui**: Add "EPG Gathering Interval" setting in Config/Server.
+- **ui/status**: Fix "EPG Gathering Network IDs" hex strings to upper case.
+- **ui/config**: Add "EPG Gathering Interval" setting in Config/Server.
+- **ui/heart**: Add confirmation before accessing opencollective. [#106](https://github.com/Chinachu/Mirakurun/issues/106)
 
 ### Docker Changes
 
