@@ -123,7 +123,7 @@ class NotifyManager<T> {
 
 function serverOnUpgrade(this: RPCServer["wss"], req: http.IncomingMessage, socket: net.Socket, head: Buffer): void {
 
-    if (!ip.isPrivate(req.socket.remoteAddress)) {
+    if (req.socket.remoteAddress && !ip.isPrivate(req.socket.remoteAddress)) {
         socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
         socket.destroy();
         return;
@@ -144,7 +144,7 @@ function rpcConnection(socket: Socket, req: http.IncomingMessage): void {
     // connected
     ++status.rpcCount;
 
-    const ip = req.socket.remoteAddress;
+    const ip = req.socket.remoteAddress || "unix";
     const ua = "" + req.headers["user-agent"];
 
     socket.data.set("ip", ip);
