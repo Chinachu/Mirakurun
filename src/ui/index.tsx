@@ -185,7 +185,7 @@ rpc.methods.set("events", async (socket, { array }: NotifyParams<EventMessage>) 
         } else if (event.resource === "tuner") {
             const tuner: TunerDevice = event.data;
 
-            uiState.tuners[tuner.index] = tuner;
+            uiState.tuners[uiState.tuners.findIndex(value => value.index === tuner.index)] = tuner;
             uiStateEvents.emit("update:tuners");
         }
     }
