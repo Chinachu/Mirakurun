@@ -132,7 +132,7 @@ class Server {
         if (!serverConfig.disableWebUI) {
             app.use(express.static("lib/ui", {
                 setHeaders: (res, path) => {
-                    if ((<any> express.static.mime).lookup(path) === "image/svg+xml") {
+                    if (express.static.mime.lookup(path) === "image/svg+xml") {
                         res.setHeader("Cache-Control", "public, max-age=86400");
                     }
                 }
