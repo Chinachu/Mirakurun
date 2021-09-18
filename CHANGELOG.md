@@ -35,12 +35,13 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 - **rpc**: Added a WebSocket RPC interface. (experimental)
 - **ui**: Now using RPC interface.
 - **ui/status**: Fix "EPG Gathering Network IDs" hex strings to upper case.
+- **ui/status**: Fix handle tuner updates to correctly. (bug) [#109](https://github.com/Chinachu/Mirakurun/pull/109)
 - **ui/config**: Add "EPG Gathering Interval" setting in Config/Server.
 - **ui/heart**: Add confirmation before accessing opencollective. [#106](https://github.com/Chinachu/Mirakurun/issues/106)
 
 ### Docker Changes
 
-- Update base image to `node:16.8.0-buster-slim`.
+- Update base image to `node:16.9.1-buster-slim`.
 - Fixed the exit signal handling properly.
 - When a `SIGHUP` is received in a container, only the node process can be restarted quickly.
 
