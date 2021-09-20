@@ -88,6 +88,17 @@ export interface ChannelScanOption {
     refresh?: boolean;
 }
 
+export class ErrorResponse implements ErrorResponse {
+    constructor(response: ErrorResponse) {
+        this.status = response.status;
+        this.statusText = response.statusText;
+        this.contentType = response.contentType;
+        this.headers = response.headers;
+        this.isSuccess = response.isSuccess;
+        this.body = response.body;
+    }
+}
+
 export default class Client {
 
     basePath = spec.basePath;
@@ -143,14 +154,14 @@ export default class Client {
                 },
                 err => {
 
-                    const ret: Response = {
+                    const ret = new ErrorResponse({
                         status: -1,
                         statusText: "Request Failure",
                         contentType: "",
                         headers: {},
                         isSuccess: false,
                         body: err
-                    };
+                    });
 
                     reject(ret);
                 }
