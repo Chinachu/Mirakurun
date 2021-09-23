@@ -303,7 +303,7 @@ export default class TSFilter extends EventEmitter {
 
         const parsingBuffers: Buffer[] = [];
 
-        for (const packet of packets) {
+        for (let packet of packets) {
             const pid = packet.readUInt16BE(1) & 0x1FFF;
 
             // tsmf
@@ -379,6 +379,7 @@ export default class TSFilter extends EventEmitter {
 
             // PAT (0) rewriting
             if (pid === 0 && this._pmtPid !== -1) {
+                packet = Buffer.from(packet);
                 this._patsec.copy(packet, 5, 0);
             }
 
