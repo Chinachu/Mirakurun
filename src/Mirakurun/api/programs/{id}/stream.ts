@@ -63,7 +63,7 @@ export const get: Operation = (req, res) => {
         disableDecoder: (<number> <any> req.query.decode === 0)
     }, res)
         .then(tsFilter => {
-            if (requestAborted === true) {
+            if (requestAborted === true || req.aborted === true) {
                 return tsFilter.close();
             }
 

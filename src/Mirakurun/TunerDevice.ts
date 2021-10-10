@@ -183,10 +183,10 @@ export default class TunerDevice extends EventEmitter {
                     }
 
                     await this._kill(true);
-                    await this._spawn(channel);
+                    this._spawn(channel);
                 }
             } else {
-                await this._spawn(channel);
+                this._spawn(channel);
             }
         }
 
@@ -194,7 +194,11 @@ export default class TunerDevice extends EventEmitter {
 
         user._stream = stream;
         this._users.add(user);
-        stream.once("close", () => this.endStream(user));
+        if (stream.closed === true) {
+            this.endStream(user);
+        } else {
+            stream.once("close", () => this.endStream(user));
+        }
 
         this._updated();
     }
@@ -239,7 +243,7 @@ export default class TunerDevice extends EventEmitter {
         return programs;
     }
 
-    private async _spawn(ch: ChannelItem): Promise<void> {
+    private _spawn(ch: ChannelItem): void {
 
         log.debug("TunerDevice#%d spawn...", this._index);
 

@@ -85,7 +85,7 @@ export const get: Operation = (req, res) => {
     }, res)
         .then(tsFilter => {
 
-            if (requestAborted === true) {
+            if (requestAborted === true || req.aborted === true) {
                 return tsFilter.close();
             }
 

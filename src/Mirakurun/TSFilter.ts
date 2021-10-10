@@ -234,6 +234,10 @@ export default class TSFilter extends EventEmitter {
         ++status.streamCount.tsFilter;
     }
 
+    get closed(): boolean {
+        return this._closed;
+    }
+
     write(chunk: Buffer): void {
 
         if (this._closed) {
