@@ -29,6 +29,8 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 - **program**: Fixed a problem in the implementation of conflict detection. (bug)
 - **program**: Reduced the frequent repeated update events.
 - **program**: Removed the `audio` property and added the `audios` property to support multi track audios. (**breaking change**)
+- **program**: Fix program overlapping when re-scheduled. (bug)
+- **program**: Removed the `redefine` event and added the `remove` event. (**breaking change**)
 - **api/iptv**: Fixed a problem with Kodi 19's IPTV feature that caused channel selection to take a long time. [#101](https://github.com/Chinachu/Mirakurun/pull/101)
 - **api/getLogoImage**: Add `Cache-Control` header to cache logo images.
 - **api/restart**: Improved the restart speed on Docker. (approx. 2 secs)
@@ -41,7 +43,7 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 
 ### Docker Changes
 
-- Update base image to `node:16.9.1-buster-slim`.
+- Update base image to `node:16.10.0-buster-slim`.
 - Fixed the exit signal handling properly.
 - When a `SIGHUP` is received in a container, only the node process can be restarted quickly.
 
