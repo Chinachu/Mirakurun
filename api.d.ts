@@ -220,7 +220,7 @@ export interface Event {
 
 export type EventResource = "program" | "service" | "tuner";
 
-export type EventType = "create" | "update" | "redefine";
+export type EventType = "create" | "update" | "remove";
 
 export interface ConfigServer {
     path?: string;

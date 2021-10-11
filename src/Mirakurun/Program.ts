@@ -50,33 +50,14 @@ export default class Program {
             return;
         }
 
-        const removedIds = [];
-
         if (firstAdd === false) {
-            for (const conflictedItem of this.findConflicts(
-                item.networkId,
-                item.serviceId,
-                item.startAt,
-                item.startAt + item.duration,
-                item._pf
-            )) {
-                this.remove(conflictedItem.id);
-                removedIds.push(conflictedItem.id);
-
-                log.debug(
-                    "ProgramItem#%d (networkId=%d, eventId=%d) has removed for redefine to ProgramItem#%d (eventId=%d)",
-                    conflictedItem.id, conflictedItem.networkId, conflictedItem.eventId, item.id, item.eventId
-                );
-            }
+            this._findAndRemoveConflicts(item);
         }
 
         this._itemMap.set(item.id, item);
 
         if (firstAdd === false) {
             this._emitPrograms.set(item, "create");
-            for (const id of removedIds) {
-                Event.emit("program", "redefine", { from: id, to: item.id });
-            }
         }
 
         this.save();
@@ -89,6 +70,9 @@ export default class Program {
     set(id: number, props: Partial<db.Program>): void {
         const item = this.get(id);
         if (item && common.updateObject(item, props) === true) {
+            if (props.startAt || props.duration) {
+                this._findAndRemoveConflicts(item);
+            }
             this._emitPrograms.set(item, "update");
             this.save();
         }
@@ -127,27 +111,6 @@ export default class Program {
 
         for (const item of this._itemMap.values()) {
             if (item.networkId === networkId && item.startAt <= time && item.startAt + item.duration > time) {
-                items.push(item);
-            }
-        }
-
-        return items;
-    }
-
-    findConflicts(networkId: number, serviceId: number, start: number, end: number, _pf?: true): db.Program[] {
-
-        const items = [];
-
-        for (const item of this._itemMap.values()) {
-            if (
-                item.networkId === networkId &&
-                item.serviceId === serviceId &&
-                (
-                    (item.startAt >= start && item.startAt < end) ||
-                    (item.startAt <= start && item.startAt + item.duration > start)
-                ) &&
-                (!item._pf || _pf)
-            ) {
                 items.push(item);
             }
         }
@@ -208,6 +171,30 @@ export default class Program {
 
         if (dropped) {
             this.save();
+        }
+    }
+
+    private _findAndRemoveConflicts(target: db.Program): void {
+
+        for (const item of this._itemMap.values()) {
+            if (
+                item.networkId === target.networkId &&
+                item.serviceId === target.serviceId &&
+                item.id !== target.id &&
+                (
+                    (item.startAt >= target.startAt && item.startAt < (target.startAt + target.duration)) ||
+                    (item.startAt <= target.startAt && (item.startAt + item.duration) > target.startAt)
+                ) &&
+                (!item._pf || target._pf)
+            ) {
+                this.remove(item.id);
+                Event.emit("program", "remove", { id: item.id });
+
+                log.debug(
+                    "ProgramItem#%d (networkId=%d, eventId=%d) has removed by overlapped ProgramItem#%d (eventId=%d)",
+                    item.id, item.networkId, item.eventId, target.id, target.eventId
+                );
+            }
         }
     }
 

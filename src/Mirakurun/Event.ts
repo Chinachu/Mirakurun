@@ -26,7 +26,7 @@ export interface EventMessage<T = any> {
 }
 
 export type EventResource = "program" | "service" | "tuner";
-export type EventType = "create" | "update" | "redefine";
+export type EventType = "create" | "update" | "remove";
 
 export default class Event extends EventEmitter {
 

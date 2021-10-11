@@ -57,7 +57,7 @@ div.logs > div.type-update {
 }
 
 div.logs > div.level-error,
-div.logs > div.type-redefine {
+div.logs > div.type-remove {
     color: #e95464;
 }
 

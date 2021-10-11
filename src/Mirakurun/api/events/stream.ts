@@ -56,7 +56,7 @@ get.apiDoc = {
             in: "query",
             name: "type",
             type: "string",
-            enum: ["create", "update", "redefine"],
+            enum: ["create", "update", "remove"],
             required: false
         }
     ],
