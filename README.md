@@ -58,7 +58,7 @@ see: [doc/Platforms.md](doc/Platforms.md)
 
 ## Requirements / Supported Platforms
 
-* [Node.js](http://nodejs.org/) 12, 14, 16
+* [Node.js](http://nodejs.org/) 14, 16
 * Linux w/ [PM2](http://pm2.keymetrics.io/) or [Docker](https://hub.docker.com/r/chinachu/mirakurun)
 
 see: [doc/Platforms.md](doc/Platforms.md)

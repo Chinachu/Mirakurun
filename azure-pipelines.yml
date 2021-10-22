@@ -24,8 +24,6 @@ stages:
   - job: Build
     strategy:
       matrix:
-        v12:
-          NODE_VERSION_SPEC: '12.x'
         v14:
           NODE_VERSION_SPEC: '14.x'
         v16:

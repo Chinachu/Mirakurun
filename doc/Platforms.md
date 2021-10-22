@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Bold** is the recommended. also, **Node.js** `^12 || ^14 || ^16` needed.
+**Bold** is the recommended. also, **Node.js** `^14.17.0 || ^16` needed.
 
 * [**Docker on Linux**](#docker-on-linux)
   * [Docker Engine](https://docs.docker.com/engine/install/) `>=18.06.0`
