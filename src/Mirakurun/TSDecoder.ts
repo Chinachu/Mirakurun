@@ -19,12 +19,16 @@ import * as log from "./log";
 import status from "./status";
 
 interface StreamOptions extends stream.TransformOptions {
+    readonly output: stream.Writable;
     readonly command: string;
 }
 
 let idCounter = 0;
 
-export default class TSDecoder extends stream.Transform {
+export default class TSDecoder extends stream.Writable {
+
+    // output
+    private _output: stream.Writable;
 
     private _id: number;
     private _command: string;
@@ -38,13 +42,21 @@ export default class TSDecoder extends stream.Transform {
     private _deadCount: number = 0;
 
     constructor(opts: StreamOptions) {
-        super({
-            ...opts,
-            allowHalfOpen: false
-        });
+        super();
 
         this._id = idCounter++;
         this._command = opts.command;
+
+        this._output = opts.output;
+        this._output.once("finish", this._close.bind(this));
+        this._output.once("close", this._close.bind(this));
+
+        Object.defineProperty(this, "writableLength", {
+            get() { return opts.output.writableLength; }
+        });
+        Object.defineProperty(this, "writableHighWaterMark", {
+            get() { return opts.output.writableHighWaterMark; }
+        });
 
         this.once("close", this._close.bind(this));
 
@@ -55,7 +67,7 @@ export default class TSDecoder extends stream.Transform {
         this._spawn();
     }
 
-    _transform(chunk: Buffer, encoding: string, callback: Function) {
+    _write(chunk: Buffer, encoding: string, callback: Function) {
 
         if (!this._writable) {
             callback();
@@ -74,7 +86,7 @@ export default class TSDecoder extends stream.Transform {
         callback();
     }
 
-    _flush() {
+    _final() {
         this._close();
     }
 
@@ -100,7 +112,7 @@ export default class TSDecoder extends stream.Transform {
 
         proc.stderr.pipe(process.stderr);
         proc.stdout.once("data", () => clearTimeout(this._timeout));
-        proc.stdout.on("data", chunk => this.push(chunk));
+        proc.stdout.on("data", chunk => this._output.write(chunk));
 
         this._readable = proc.stdout;
         this._writable = proc.stdin;
@@ -133,7 +145,7 @@ export default class TSDecoder extends stream.Transform {
 
         const passThrough = new stream.PassThrough({ allowHalfOpen: false });
 
-        passThrough.on("data", chunk => this.push(chunk));
+        passThrough.on("data", chunk => this._output.write(chunk));
 
         this._readable = passThrough;
         this._writable = passThrough;
@@ -167,6 +179,12 @@ export default class TSDecoder extends stream.Transform {
         this._closed = true;
 
         this._kill();
+
+        if (this._output.writableEnded === false) {
+            this._output.end();
+        }
+        this._output.removeAllListeners();
+        delete this._output;
 
         --status.streamCount.decoder;
 

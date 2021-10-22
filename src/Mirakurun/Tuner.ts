@@ -370,9 +370,9 @@ export default class Tuner {
                         output = dest;
                     } else {
                         output = new TSDecoder({
+                            output: dest,
                             command: device.decoder
                         });
-                        output.pipe(dest);
                     }
 
                     const tsFilter = new TSFilter({
