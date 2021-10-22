@@ -14,7 +14,7 @@
    limitations under the License.
 */
 import { getProgramItemId } from "./Program";
-import { getTimeFromMJD, getTimeFromBCD24 } from "./common";
+import { sleep, getTimeFromMJD, getTimeFromBCD24 } from "./common";
 import * as db from "./db";
 import _ from "./_";
 import { TsChar } from "@chinachu/aribts";
@@ -133,8 +133,40 @@ interface EventState {
 export default class EPG {
 
     private _epg: { [networkId: number]: { [serviceId: number]: { [eventId: number]: EventState } } } = {};
+    private _queue: EIT[] = [];
+    private _running = false;
+    private _end = false;
 
     write(eit: EIT) {
+
+        if (!this._epg) {
+            return;
+        }
+
+        this._queue.push(eit);
+
+        if (!this._running) {
+            this._run();
+        }
+    }
+
+    end() {
+
+        this._end = true;
+
+        if (this._epg && this._queue.length === 0 && this._running === false) {
+            delete this._epg;
+        }
+    }
+
+    private async _run() {
+
+        if (!this._epg || this._running || this._queue.length === 0) {
+            return;
+        }
+        this._running = true;
+
+        const eit = this._queue.shift();
 
         const networkId = eit.original_network_id;
 
@@ -385,12 +417,18 @@ export default class EPG {
                         break;
                 }// <- switch
             }// <- for
-        }// <- for
-    }
 
-    end() {
-        if (this._epg) {
-            delete this._epg;
+            await sleep(5);
+        }// <- for
+
+        this._running = false;
+
+        if (this._end && this._queue.length === 0) {
+            this.end();
+        }
+
+        if (this._queue.length > 0) {
+            this._run();
         }
     }
 }
