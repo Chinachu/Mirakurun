@@ -304,8 +304,8 @@ export default class Client {
             type,
             channel,
             sid,
-            "decode": decode ? 1 : 0,
-            "X-Mirakurun-Priority": priority
+            decode: decode ? 1 : 0,
+            priority
         }, signal);
     }
 
@@ -336,8 +336,8 @@ export default class Client {
         return this.call("getChannelStream", {
             type,
             channel,
-            "decode": decode ? 1 : 0,
-            "X-Mirakurun-Priority": priority
+            decode: decode ? 1 : 0,
+            priority
         }, signal);
     }
 
@@ -376,8 +376,8 @@ export default class Client {
 
         return this.call("getProgramStream", {
             id,
-            "decode": decode ? 1 : 0,
-            "X-Mirakurun-Priority": priority
+            decode: decode ? 1 : 0,
+            priority
         }, signal);
     }
 
@@ -422,8 +422,8 @@ export default class Client {
 
         return this.call("getServiceStream", {
             id,
-            "decode": decode ? 1 : 0,
-            "X-Mirakurun-Priority": priority
+            decode: decode ? 1 : 0,
+            priority
         }, signal);
     }
 
@@ -560,10 +560,12 @@ export default class Client {
             opt.headers["User-Agent"] = this.userAgent + " " + this._userAgent;
         }
 
-        if (option.priority === undefined) {
-            option.priority = this.priority;
+        if (opt.headers["X-Mirakurun-Priority"] === undefined) {
+            if (option.priority === undefined) {
+                option.priority = this.priority;
+            }
+            opt.headers["X-Mirakurun-Priority"] = option.priority.toString(10);
         }
-        opt.headers["X-Mirakurun-Priority"] = option.priority.toString(10);
 
         if (typeof option.query === "object") {
             opt.path += "?" + querystring.stringify(option.query);
