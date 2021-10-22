@@ -171,7 +171,7 @@ export default class Client {
         });
     }
 
-    async call(operationId: string, param: { [key: string]: any } = {}, signal?: AbortSignal): Promise<any|http.IncomingMessage> {
+    async call(operationId: string, param: { [key: string]: any } = {}, option: RequestOption = {}): Promise<any|http.IncomingMessage> {
 
         if (!this._docs) {
             await this._getDocs();
@@ -213,10 +213,10 @@ export default class Client {
             throw new Error(`operationId "${operationId}" is not found.`);
         }
 
-        const option: RequestOption = {
+        option = {
             headers: {},
             query: {},
-            signal
+            ...option
         };
 
         for (const p of parameters) {
@@ -304,9 +304,8 @@ export default class Client {
             type,
             channel,
             sid,
-            decode: decode ? 1 : 0,
-            priority
-        }, signal);
+            decode: decode ? 1 : 0
+        }, { priority, signal });
     }
 
     async getChannelStream(opt: { type: apid.ChannelType, channel: string, decode?: boolean, priority?: number, signal?: AbortSignal }): Promise<http.IncomingMessage>;
@@ -336,9 +335,8 @@ export default class Client {
         return this.call("getChannelStream", {
             type,
             channel,
-            decode: decode ? 1 : 0,
-            priority
-        }, signal);
+            decode: decode ? 1 : 0
+        }, { priority, signal });
     }
 
     async getPrograms(query?: ProgramsQuery): Promise<apid.Program[]> {
@@ -376,9 +374,8 @@ export default class Client {
 
         return this.call("getProgramStream", {
             id,
-            decode: decode ? 1 : 0,
-            priority
-        }, signal);
+            decode: decode ? 1 : 0
+        }, { priority, signal });
     }
 
     async getServices(query?: ServicesQuery): Promise<apid.Service[]> {
@@ -422,9 +419,8 @@ export default class Client {
 
         return this.call("getServiceStream", {
             id,
-            decode: decode ? 1 : 0,
-            priority
-        }, signal);
+            decode: decode ? 1 : 0
+        }, { priority, signal });
     }
 
     async getTuners(): Promise<apid.TunerDevice[]> {
