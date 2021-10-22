@@ -283,7 +283,7 @@ export default class TSFilter extends EventEmitter {
         this._processPackets(packets);
 
         if (this._buffer.length !== 0) {
-            if (this._ready) {
+            if (this._ready && this._output.writableLength < this._output.writableHighWaterMark) {
                 this._output.write(Buffer.concat(this._buffer));
                 this._buffer.length = 0;
             } else {
