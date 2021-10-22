@@ -41,14 +41,19 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 - **ui/config**: Add "EPG Gathering Interval" setting in Config/Server.
 - **ui/heart**: Add confirmation before accessing opencollective. [#106](https://github.com/Chinachu/Mirakurun/issues/106)
 
+### Client Changes
+
+- Add [AbortSignal](https://nodejs.org/api/globals.html#class-abortsignal) option for `getChannelStream()`, `getServiceStreamByChannel()` `getServiceStream()`, `getProgramStream()`.
+
 ### Docker Changes
 
-- Update base image to `node:16.10.0-buster-slim`.
+- Update base image to `node:16.12.0-buster-slim`.
 - Fixed the exit signal handling properly.
 - When a `SIGHUP` is received in a container, only the node process can be restarted quickly.
 
 ### Other Changes
 
+- **package**: Drop engine support `node@12`.
 - **package**: Update dependencies.
 - Reimplemented certain processes in C++.
 
