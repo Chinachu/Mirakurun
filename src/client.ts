@@ -573,6 +573,7 @@ export default class Client {
         }
 
         if (option.signal instanceof AbortSignal) {
+            // http.request() AbortSignal is not working expectedly on node@16.12.0
             (<any> opt).signal = option.signal;
         }
 
@@ -592,6 +593,15 @@ export default class Client {
 
                 resolve(res);
             });
+
+            if (option.signal instanceof AbortSignal) {
+                // workaround
+                option.signal.addEventListener("abort", () => {
+                    if (!req.destroyed) {
+                        req.destroy();
+                    }
+                }, { once: true });
+            }
 
             req.on("error", reject);
 
