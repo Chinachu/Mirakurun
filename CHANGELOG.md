@@ -24,7 +24,6 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 - **epg**: Add support for event relay.
 - **epg**: Add support for multi track audios.
 - **epg**: Improve performance of parsing start_time of events.
-- **epg**: Change to run asynchronously to reduce load.
 - **program**: Add event group type as `type` to `db.ProgramRelatedItem` of `db.Program`.
 - **program**: Fixed a problem in the implementation of conflict detection. (bug)
 - **program**: Reduced the frequent repeated update events.
@@ -44,6 +43,7 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 ### Client Changes
 
 - Add [AbortSignal](https://nodejs.org/api/globals.html#class-abortsignal) option for `getChannelStream()`, `getServiceStreamByChannel()` `getServiceStream()`, `getProgramStream()`.
+- Fix set priority correctly. (bug)
 
 ### Docker Changes
 
