@@ -65,6 +65,7 @@ export function createRPCServer(server: http.Server): RPCServer {
     rpc.methods.set("join", onJoin);
     rpc.methods.set("leave", onLeave);
     rpc.methods.set("getStatus", getStatus);
+    rpc.methods.set("getTuners", getTuners);
 
     return rpc;
 }
@@ -179,4 +180,8 @@ function onLeave(socket: Socket, params: JoinParams) {
     for (const room of params.rooms) {
         socket.leaveFrom(room);
     }
+}
+
+function getTuners() {
+    return _.tuner.devices;
 }
