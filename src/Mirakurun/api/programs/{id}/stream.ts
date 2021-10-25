@@ -53,6 +53,9 @@ export const get: Operation = (req, res) => {
     let requestAborted = false;
     req.once("close", () => requestAborted = true);
 
+    (<any> res.socket)._writableState.highWaterMark = Math.max(res.writableHighWaterMark, 1024 * 32);
+    res.socket.setNoDelay(true);
+
     const userId = (req.ip || "unix") + ":" + (req.socket.remotePort || Date.now());
 
     _.tuner.initProgramStream(program, {
