@@ -53,7 +53,7 @@ export const get: Operation = (req, res) => {
     let requestAborted = false;
     req.once("close", () => requestAborted = true);
 
-    const userId = (req.ip || "unix") + ":" + (req.connection.remotePort || Date.now());
+    const userId = (req.ip || "unix") + ":" + (req.socket.remotePort || Date.now());
 
     _.tuner.initProgramStream(program, {
         id: userId,
