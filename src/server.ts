@@ -13,6 +13,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+Buffer.poolSize = 0; // disable memory pool
+
 require("dotenv").config();
 import { execSync } from "child_process";
 import { createHash } from "crypto";
