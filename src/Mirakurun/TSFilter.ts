@@ -117,11 +117,11 @@ export default class TSFilter extends EventEmitter {
     private _epgState: { [networkId: number]: { [serviceId: number]: BasicExtState } } = {};
 
     // buffer
-    private _packet = Buffer.allocUnsafe(PACKET_SIZE).fill(0);
+    private _packet = Buffer.allocUnsafeSlow(PACKET_SIZE).fill(0);
     private _offset = -1;
     private _buffer: Buffer[] = [];
-    private _patsec = Buffer.allocUnsafe(PACKET_SIZE - 4 - 1).fill(0); // TS header, pointer_field
-    private _patCRC = Buffer.allocUnsafe(4).fill(0);
+    private _patsec = Buffer.allocUnsafeSlow(PACKET_SIZE - 4 - 1).fill(0); // TS header, pointer_field
+    private _patCRC = Buffer.allocUnsafeSlow(4).fill(0);
 
     // state
     private _closed = false;
@@ -791,7 +791,7 @@ export default class TSFilter extends EventEmitter {
                         moduleVersion: module.moduleVersion,
                         moduleSize: module.moduleSize,
                         loadedBytes: 0,
-                        data: Buffer.allocUnsafe(module.moduleSize).fill(0)
+                        data: Buffer.allocUnsafeSlow(module.moduleSize).fill(0)
                     });
 
                     log.debug("TSFilter#_onDSMCC: detected DII and buffer allocated for logo data (downloadId=%d, %d bytes)", dii.downloadId, module.moduleSize);
@@ -940,8 +940,8 @@ export default class TSFilter extends EventEmitter {
             for (let i = 0; i < 0x08; i++) {
                 for (const target of [stateBySrv.basic, stateBySrv.extended]) {
                     target.flags.push({
-                        flag: Buffer.allocUnsafe(32).fill(0x00),
-                        ignore: Buffer.allocUnsafe(32).fill(0xFF),
+                        flag: Buffer.allocUnsafeSlow(32).fill(0x00),
+                        ignore: Buffer.allocUnsafeSlow(32).fill(0xFF),
                         version_number: -1
                     });
                 }
@@ -1002,7 +1002,7 @@ export default class TSFilter extends EventEmitter {
         let ready = true;
         isReady: for (const nid in this._epgState) {
             for (const sid in this._epgState[nid]) {
-                for (const table of [...this._epgState[nid][sid].basic.flags, ...this._epgState[nid][sid].extended.flags]) {
+                for (const table of this._epgState[nid][sid].basic.flags.concat(this._epgState[nid][sid].extended.flags)) {
                     for (let i = 0; i < table.flag.length; i++) {
                         if ((table.flag[i] | table.ignore[i]) !== 0xFF) {
                             ready = false;
@@ -1015,12 +1015,24 @@ export default class TSFilter extends EventEmitter {
 
         if (ready === true) {
             this._epgReady = true;
+            this._clearEpgState();
 
             for (const service of _.service.findByNetworkId(this._targetNetworkId)) {
                 service.epgReady = true;
             }
 
             process.nextTick(() => this.emit("epgReady"));
+        }
+    }
+
+    private _clearEpgState() {
+
+        if (!this._epgState) {
+            return;
+        }
+
+        for (const nid in this._epgState) {
+            delete this._epgState[nid];
         }
     }
 
@@ -1061,6 +1073,9 @@ export default class TSFilter extends EventEmitter {
                     service.epgUpdatedAt = now;
                 }
             }
+
+            this._clearEpgState();
+            delete this._epgState;
         }
 
         // clear output stream
