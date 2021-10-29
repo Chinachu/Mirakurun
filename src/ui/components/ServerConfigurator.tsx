@@ -123,7 +123,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                         styles={{ fieldGroup: { "max-width": 200 } }}
                         label="EPG Gathering Interval"
                         suffix="ms"
-                        placeholder="1800000"
+                        placeholder="3600000"
                         value={`${editing.epgGatheringInterval || ""}`}
                         onChange={(ev, newValue) => {
                             if (newValue === "") {

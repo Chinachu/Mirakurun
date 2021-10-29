@@ -11,7 +11,7 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 - **config/server**: Add `disableWebUI` (Env: `DISABLE_WEB_UI` for Docker) to disable Web UI.
 - **config/server**: Change several default values based on typical usage.
   - `programGCInterval`: `900000` (15 mins) → `3600000` (1 hour)
-  - `epgGatheringInterval`: `900000` (15 mins) → `1800000` (30 mins)
+  - `epgGatheringInterval`: `900000` (15 mins) → `3600000` (30 mins)
   - `logoDataInterval`: `86400000` (1 day) → `604800000` (7 days)
 - **config/server**: Remove `overflowTimeLimit`.
 - **ts-filter**: Remove own overflow handling as it no longer makes sense.
