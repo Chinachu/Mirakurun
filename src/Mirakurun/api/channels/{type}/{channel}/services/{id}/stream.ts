@@ -74,7 +74,7 @@ export const get: Operation = (req, res) => {
     let requestAborted = false;
     req.once("close", () => requestAborted = true);
 
-    (<any> res.socket)._writableState.highWaterMark = Math.max(res.writableHighWaterMark, 1024 * 32);
+    (<any> res.socket)._writableState.highWaterMark = Math.max(res.writableHighWaterMark, 1024 * 1024 * 16);
     res.socket.setNoDelay(true);
 
     const userId = (req.ip || "unix") + ":" + (req.socket.remotePort || Date.now());
