@@ -14,6 +14,7 @@
    limitations under the License.
 */
 import { Operation } from "express-openapi";
+import { Program } from "../../db";
 import Service from "../../Service";
 import _ from "../../_";
 
@@ -193,31 +194,6 @@ const GENRE_UNCS: { [key: number]: string } = {
     0x1F: "その他"
 };
 
-function getGenreStrings(genres) {
-    let strGenre = "";
-    if (genres.lv1 === 14) {
-        if (genres.lv2 === 0) {
-            // BS 番組特性指示
-            strGenre = GENRE_UNBS[genres.un1 * 16 + genres.un2];
-        } else if (genres.lv2 === 1) {
-            // CS独自ジャンル
-            if (genres.un1 === 0) {
-                strGenre = "スポーツ(" + GENRE_UNCS[genres.un2] + ")";
-            } else if (genres.un1 === 1) {
-                strGenre = "洋画(" + GENRE_UNCS[16 + genres.un2] + ")";
-            } else if (genres.un1 === 2) {
-                strGenre = "邦画(" + GENRE_UNCS[16 + genres.un2] + ")";
-            } else {
-                // strGenre = "0x" + (genres.lv1 * 16 + genres.lv2).toString(16) + ", " + (genres.un1 * 16 + genres.un2).toString(16);
-            }
-        }
-    } else {
-      // BS/地デジ
-      strGenre = GENRE_LV1[genres.lv1] + "(" + GENRE_LV2[genres.lv1 * 16 + genres.lv2] + ")";
-    }
-    return strGenre;
-}
-
 function escapeXMLSpecialChars(str: string): string {
     return str.replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
@@ -230,6 +206,38 @@ function getDateTime(time: number): string {
     return new Date(time).toISOString()
         .replace(/\..+$/, "")
         .replace(/[-:T]/g, "");
+
+function getGenreStrings(genres: Program["genres"]) {
+
+    const stringSet = new Set<string>();
+
+    for (const genre of genres) {
+        if (genre.lv1 === 14) {
+            // 拡張
+            if (genre.lv2 === 0) {
+                // 番組特性指示
+                stringSet.add(GENRE_UNBS[genre.un1 * 0x10 + genre.un2]);
+            } else if (genre.lv2 === 1) {
+                // CS 独自ジャンル
+                if (genre.un1 === 0) {
+                    stringSet.add("スポーツ");
+                    stringSet.add(GENRE_UNCS[genre.un2]);
+                } else if (genre.un1 === 1) {
+                    stringSet.add("洋画");
+                    stringSet.add(GENRE_UNCS[0x10 + genre.un2]);
+                } else if (genre.un1 === 2) {
+                    stringSet.add("邦画");
+                    stringSet.add(GENRE_UNCS[0x10 + genre.un2]);
+                }
+            }
+        } else {
+            // 標準
+            stringSet.add(GENRE_LV1[genre.lv1]);
+            stringSet.add(GENRE_LV2[genre.lv1 * 0x10 + genre.lv2]);
+        }
+    }
+
+    return [...stringSet.values()];
 }
 
 export const get: Operation = async (req, res) => {
@@ -274,8 +282,11 @@ export const get: Operation = async (req, res) => {
         x += `<programme start="${getDateTime(program.startAt)}" stop="${getDateTime(program.startAt + program.duration)}" channel="${service.id}">\n`;
         x += `<title>${escapeXMLSpecialChars(program.name || "")}</title>\n`;
         x += `<desc>${escapeXMLSpecialChars(program.description || "")}</desc>\n`;
-        if ( "genres" in program ) {
-            x += `<category>${getGenreStrings(program.genres[0])}</category>`;
+        if (program.genres) {
+            const genreStrings = getGenreStrings(program.genres);
+            for (const genreString of genreStrings) {
+                x += `<category>${genreString}</category>\n`;
+            }
         }
         x += `</programme>\n`;
     }
