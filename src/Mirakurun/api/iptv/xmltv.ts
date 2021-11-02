@@ -205,7 +205,8 @@ function escapeXMLSpecialChars(str: string): string {
 function getDateTime(time: number): string {
     return new Date(time).toISOString()
         .replace(/\..+$/, "")
-        .replace(/[-:T]/g, "");
+        .replace(/[-:T]/g, "") + " +0000";
+}
 
 function getGenreStrings(genres: Program["genres"]) {
 
