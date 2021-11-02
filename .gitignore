@@ -9,3 +9,4 @@
 *.swp
 *.tmp
 test.*
+.DS_Store
