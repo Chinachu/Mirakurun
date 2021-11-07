@@ -32,6 +32,8 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 - **program**: Fix program overlapping when re-scheduled. (bug)
 - **program**: Removed the `redefine` event and added the `remove` event. (**breaking change**)
 - **api/iptv**: Fixed a problem with Kodi 19's IPTV feature that caused channel selection to take a long time. [#101](https://github.com/Chinachu/Mirakurun/pull/101)
+- **api/iptv**: Add category (genre) info.
+- **api/iptv**: Add timezone offset explicitly.
 - **api/getLogoImage**: Add `Cache-Control` header to cache logo images.
 - **api/restart**: Improved the restart speed on Docker. (approx. 2 secs)
 - **rpc**: Added a WebSocket RPC interface. (experimental)
