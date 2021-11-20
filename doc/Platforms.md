@@ -39,6 +39,10 @@ curl -sSL https://get.docker.com/ | CHANNEL=stable sh
 ### Install / Uninstall / Update
 
 ```sh
+# Create: /opt/mirakurun/
+sudo mv -vf /usr/local/mirakurun /opt/mirakurun
+sudo mkdir -p /opt/mirakurun/run /opt/mirakurun/opt /opt/mirakurun/config /opt/mirakurun/data
+
 # Install
 mkdir ~/mirakurun/
 cd ~/mirakurun/
@@ -80,9 +84,9 @@ docker-compose logs [-f]
 ### Config
 
 ```
-vim /usr/local/mirakurun/config/server.yml
-vim /usr/local/mirakurun/config/tuners.yml
-vim /usr/local/mirakurun/config/channels.yml
+vim /opt/mirakurun/config/server.yml
+vim /opt/mirakurun/config/tuners.yml
+vim /opt/mirakurun/config/channels.yml
 ```
 
 see: [Configuration.md](Configuration.md)
@@ -92,8 +96,8 @@ see: [Configuration.md](Configuration.md)
 ```sh
 $ which recpt1
 /usr/local/bin/recpt1
-$ cp /usr/local/bin/recpt1 /usr/local/mirakurun/opt/bin/
-$ vim /usr/local/mirakurun/config/tuners.yml
+$ cp /usr/local/bin/recpt1 /opt/mirakurun/opt/bin/
+$ vim /opt/mirakurun/config/tuners.yml
 ```
 
 ### 💡 Locations (Container)
@@ -111,15 +115,15 @@ $ vim /usr/local/mirakurun/config/tuners.yml
 
 ### 💡 Locations (Host)
 
-* Socket: `/usr/local/mirakurun/run/mirakurun.sock`
-* Config: `/usr/local/mirakurun/config/`
+* Socket: `/opt/mirakurun/run/mirakurun.sock`
+* Config: `/opt/mirakurun/config/`
   * `server.yml`
   * `tuners.yml`
   * `channels.yml`
-* Data: `/usr/local/mirakurun/data/`
+* Data: `/opt/mirakurun/data/`
   * `services.json`
   * `programs.json`
-* Opt: `/usr/local/mirakurun/opt/`
+* Opt: `/opt/mirakurun/opt/`
   * `bin/`
 
 ## Linux

@@ -53,6 +53,8 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 - Update base image to `node:16.12.0-buster-slim`.
 - Fixed the exit signal handling properly.
 - When a `SIGHUP` is received in a container, only the node process can be restarted quickly.
+- default `docker-compose.yml` volumes has been changed:
+  - `/usr/local/mirakurun/*` → `/opt/mirakurun/*`
 
 ### Other Changes
 

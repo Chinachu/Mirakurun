@@ -23,10 +23,24 @@ services:
       - /dev/bus:/dev/bus
       - /dev/dvb:/dev/dvb
     volumes:
-      - /usr/local/mirakurun/run/:/var/run/
-      - /usr/local/mirakurun/opt/:/opt/
-      - /usr/local/mirakurun/config/:/app-config/
-      - /usr/local/mirakurun/data/:/app-data/
+      # ** CAUTION **
+      # (default) `/usr/local/mirakurun/*` has been moved to `/opt/mirakurun/*`
+      # try:
+      #   sudo mv -vf /usr/local/mirakurun /opt/mirakurun
+      #   sudo mkdir -p /opt/mirakurun/run /opt/mirakurun/opt /opt/mirakurun/config /opt/mirakurun/data
+      # you can change to any location if required.
+      - type: bind
+        source: /opt/mirakurun/run/
+        target: /var/run/
+      - type: bind
+        source: /opt/mirakurun/opt/
+        target: /opt/
+      - type: bind
+        source: /opt/mirakurun/config/
+        target: /app-config/
+      - type: bind
+        source: /opt/mirakurun/data/
+        target: /app-data/
     restart: always
     logging:
       driver: json-file
