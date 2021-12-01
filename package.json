@@ -58,7 +58,7 @@
     "lib": "lib"
   },
   "dependencies": {
-    "@chinachu/aribts": "1.3.5-mirakurun.14",
+    "@chinachu/aribts": "1.3.5-mirakurun.15",
     "@fluentui/react": "^8.36.4",
     "colors": "^1.4.0",
     "cors": "^2.8.5",
