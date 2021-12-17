@@ -141,11 +141,8 @@ class Server {
             app.use("/react", express.static("node_modules/react"));
             app.use("/react-dom", express.static("node_modules/react-dom"));
             app.use("/@fluentui/react", express.static("node_modules/@fluentui/react"));
-
-            if (fs.existsSync("node_modules/swagger-ui-dist") === true) {
-                app.use("/swagger-ui", express.static("node_modules/swagger-ui-dist"));
-                app.get("/api/debug", (req, res) => res.redirect("/swagger-ui/?url=/api/docs"));
-            }
+            app.use("/swagger-ui", express.static("node_modules/swagger-ui-dist"));
+            app.use("/api/debug", express.static("lib/ui/swagger-ui.html"));
         }
 
         const api = yaml.load(fs.readFileSync("api.yml", "utf8")) as OpenAPIV2.Document;
