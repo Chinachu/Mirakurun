@@ -2,6 +2,11 @@
 
 ## Report an Issue (問題の報告)
 
+All issues that are not bugs or cannot be reproduced will be closed due to the limited moderating capacity at the moment.
+If you have any comments or requests, please send them to the Discord.<br>
+現在、管理体制が限定的なため、バグではないか、バグが再現できない Issue は全てクローズされます。
+ご意見・ご要望については、是非 Discord にお寄せください。
+
 * https://github.com/Chinachu/Mirakurun/issues
 
 When reporting an issue we also need as much information about your environment
