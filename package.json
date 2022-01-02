@@ -67,7 +67,7 @@
     "express": "^4.17.1",
     "express-openapi": "^8.0.0",
     "glob": "^7.1.7",
-    "ip": "^1.1.4",
+    "ip-num": "^1.3.4",
     "js-yaml": "^4.1.0",
     "jsonrpc2-ws": "^1.0.0-beta23",
     "latest-version": "^5.1.0",

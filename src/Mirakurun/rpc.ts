@@ -15,7 +15,6 @@
 */
 import * as net from "net";
 import * as http from "http";
-import * as ip from "ip";
 import RPCServer, { Socket } from "jsonrpc2-ws/lib/server";
 import * as log from "./log";
 import _ from "./_";
@@ -23,7 +22,7 @@ import status from "./status";
 import Event from "./Event";
 import { EventMessage } from "./Event";
 import { event as logEvent } from "./log";
-import { isPermittedHost } from "./Server";
+import { isPermittedHost, isPermittedIPAddress } from "./system";
 import { getStatus } from "./api/status";
 import { sleep } from "./common";
 
@@ -124,7 +123,7 @@ class NotifyManager<T> {
 
 function serverOnUpgrade(this: RPCServer["wss"], req: http.IncomingMessage, socket: net.Socket, head: Buffer): void {
 
-    if (req.socket.remoteAddress && !ip.isPrivate(req.socket.remoteAddress)) {
+    if (req.socket.remoteAddress && !isPermittedIPAddress(req.socket.remoteAddress)) {
         socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
         socket.destroy();
         return;

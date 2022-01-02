@@ -15,7 +15,6 @@
 */
 import * as fs from "fs";
 import * as http from "http";
-import * as ip from "ip";
 import * as express from "express";
 import * as cors from "cors";
 import * as openapi from "express-openapi";
@@ -56,7 +55,7 @@ class Server {
         if (serverConfig.port) {
             while (true) {
                 try {
-                    if (system.getPrivateIPv4Addresses().length > 0) {
+                    if (system.getIPv4AddressesForListen().length > 0) {
                         break;
                     }
                 } catch (e) {
@@ -68,14 +67,14 @@ class Server {
 
             addresses = [
                 ...addresses,
-                ...system.getPrivateIPv4Addresses(),
+                ...system.getIPv4AddressesForListen(),
                 "127.0.0.1"
             ];
 
             if (serverConfig.disableIPv6 !== true) {
                 addresses = [
                     ...addresses,
-                    ...system.getPrivateIPv6Addresses(),
+                    ...system.getIPv6AddressesForListen(),
                     "::1"
                 ];
             }
@@ -90,7 +89,7 @@ class Server {
                 if (!origin) {
                     return callback(null, true);
                 }
-                if (isPermittedHost(origin, serverConfig.hostname)) {
+                if (system.isPermittedHost(origin, serverConfig.hostname)) {
                     return callback(null, true);
                 }
                 return callback(new Error("Not allowed by CORS"));
@@ -106,20 +105,20 @@ class Server {
 
         app.use((req: express.Request, res: express.Response, next) => {
 
-            if (req.ip && ip.isPrivate(req.ip) === false) {
+            if (req.ip && system.isPermittedIPAddress(req.ip) === false) {
                 req.socket.end();
                 return;
             }
 
             if (req.get("Origin") !== undefined) {
-                if (!isPermittedHost(req.get("Origin"), serverConfig.hostname)) {
+                if (!system.isPermittedHost(req.get("Origin"), serverConfig.hostname)) {
                     res.status(403).end();
                     return;
                 }
             }
 
             if (req.get("Referer") !== undefined) {
-                if (!isPermittedHost(req.get("Referer"), serverConfig.hostname)) {
+                if (!system.isPermittedHost(req.get("Referer"), serverConfig.hostname)) {
                     res.status(403).end();
                     return;
                 }
@@ -218,17 +217,6 @@ class Server {
 
         log.info("RPC interface is enabled");
     }
-}
-
-export function isPermittedHost(url: string, allowedHostname?: string): boolean {
-
-    const u = new URL(url);
-
-    if (u.hostname === "localhost" || u.hostname === allowedHostname || ip.isPrivate(u.hostname) === true) {
-        return true;
-    }
-
-    return false;
 }
 
 export default Server;

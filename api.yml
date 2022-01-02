@@ -489,6 +489,14 @@ definitions:
         type: boolean
       disableWebUI:
         type: boolean
+      allowIPv4CidrRanges:
+        type: array
+        items:
+          type: string
+      allowIPv6CidrRanges:
+        type: array
+        items:
+          type: string
 
   ConfigTuners:
     type: array

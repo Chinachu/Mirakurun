@@ -159,6 +159,63 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                             setEditing({ ...editing, disableEITParsing: checked === false ? true : undefined })
                         }}
                     />
+
+                    <TextField
+                        styles={{ fieldGroup: { "max-width": 200 } }}
+                        label="Allow IPv4 CIDR Ranges"
+                        onRenderLabel={(props) => (
+                            <Stack horizontal verticalAlign="end">
+                                <Label>{props.label}</Label>
+                                <TooltipHost content={
+                                    `If running in Docker, Env var \`ALLOW_IPV4_CIDR_RANGES\` is preferred.
+                                    ⚠️ Maximum attention required!`
+                                }>
+                                    <Icon
+                                        iconName="Warning"
+                                        style={{ marginLeft: 4, marginBottom: 6 }}
+                                    />
+                                </TooltipHost>
+                            </Stack>
+                        )}
+                        multiline rows={3}
+                        value={(editing.allowIPv4CidrRanges || []).join("\n")}
+                        onChange={(ev, newValue) => {
+                            if (newValue.trim() === "") {
+                                setEditing({ ...editing, allowIPv4CidrRanges: null });
+                            } else {
+                                setEditing({ ...editing, allowIPv4CidrRanges: newValue.split("\n").map(range => range.trim()) })
+                            }
+                        }}
+                    />
+
+                    <TextField
+                        styles={{ fieldGroup: { "max-width": 380 } }}
+                        label="Allow IPv6 CIDR Ranges"
+                        onRenderLabel={(props) => (
+                            <Stack horizontal verticalAlign="end">
+                                <Label>{props.label}</Label>
+                                <TooltipHost content={
+                                    `If running in Docker, Env var \`ALLOW_IPV6_CIDR_RANGES\` is preferred.
+                                    ⚠️ Maximum attention required!`
+                                }>
+                                    <Icon
+                                        iconName="Warning"
+                                        style={{ marginLeft: 4, marginBottom: 6 }}
+                                    />
+                                </TooltipHost>
+                            </Stack>
+                        )}
+                        multiline rows={3}
+                        value={(editing.allowIPv6CidrRanges || []).join("\n")}
+                        onChange={(ev, newValue) => {
+                            if (newValue.trim() === "") {
+                                setEditing({ ...editing, allowIPv6CidrRanges: null });
+                            } else {
+                                setEditing({ ...editing, allowIPv6CidrRanges: newValue.split("\n").map(range => range.trim()) })
+                            }
+                        }}
+                    />
+
                     <Stack horizontal tokens={{ childrenGap: "0 8" }} style={{ marginTop: 16 }}>
                         <PrimaryButton text="Save" disabled={!changed} onClick={() => setShowSaveDialog(true)} />
                         <DefaultButton text="Cancel" disabled={!changed} onClick={() => setEditing({ ...current })} />

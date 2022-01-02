@@ -14,9 +14,13 @@
    limitations under the License.
 */
 import * as os from "os";
-import * as ip from "ip";
+import { Validator } from "ip-num/Validator";
+import { IPv4, IPv6 } from "ip-num/IPNumber";
+import { IPv4Prefix, IPv6Prefix } from "ip-num/Prefix";
+import { IPv4CidrRange, IPv6CidrRange } from "ip-num/IPRange";
+import _ from "./_";
 
-export function getPrivateIPv4Addresses(): string[] {
+export function getIPv4AddressesForListen(): string[] {
 
     const addresses = [];
 
@@ -27,7 +31,7 @@ export function getPrivateIPv4Addresses(): string[] {
                 return (
                     a.family === "IPv4" &&
                     a.internal === false &&
-                    ip.isPrivate(a.address) === true
+                    isPermittedIPAddress(a.address) === true
                 );
             })
             .forEach(a => addresses.push(a.address));
@@ -36,7 +40,7 @@ export function getPrivateIPv4Addresses(): string[] {
     return addresses;
 }
 
-export function getPrivateIPv6Addresses(): string[] {
+export function getIPv6AddressesForListen(): string[] {
 
     const addresses = [];
 
@@ -47,11 +51,47 @@ export function getPrivateIPv6Addresses(): string[] {
                 return (
                     a.family === "IPv6" &&
                     a.internal === false &&
-                    ip.isPrivate(a.address) === true
+                    isPermittedIPAddress(a.address) === true
                 );
             })
             .forEach(a => addresses.push(a.address + "%" + k));
     });
 
     return addresses;
+}
+
+export function isPermittedIPAddress(addr: string): boolean {
+
+    const [isIPv4] = Validator.isValidIPv4String(addr);
+    if (isIPv4) {
+        const ipv4 = new IPv4CidrRange(new IPv4(addr), new IPv4Prefix(32));
+        for (const rangeString of _.config.server.allowIPv4CidrRanges) {
+            if (ipv4.inside(IPv4CidrRange.fromCidr(rangeString))) {
+                return true;
+            }
+        }
+    }
+
+    const [isIPv6] = Validator.isValidIPv6String(addr);
+    if (isIPv6) {
+        const ipv6 = new IPv6CidrRange(new IPv6(addr), new IPv6Prefix(128));
+        for (const rangeString of _.config.server.allowIPv6CidrRanges) {
+            if (ipv6.inside(IPv6CidrRange.fromCidr(rangeString))) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+export function isPermittedHost(url: string, allowedHostname?: string): boolean {
+
+    const u = new URL(url);
+
+    if (u.hostname === "localhost" || u.hostname === allowedHostname || isPermittedIPAddress(u.hostname) === true) {
+        return true;
+    }
+
+    return false;
 }

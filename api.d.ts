@@ -237,6 +237,8 @@ export interface ConfigServer {
     logoDataInterval?: number;
     disableEITParsing?: boolean;
     disableWebUI?: boolean;
+    allowIPv4CidrRanges?: string[];
+    allowIPv6CidrRanges?: string[];
 }
 
 export enum LogLevel {
