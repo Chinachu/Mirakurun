@@ -425,6 +425,7 @@ export default class EPG {
 
         if (this._end && this._queue.length === 0) {
             this.end();
+            return;
         }
 
         if (this._queue.length > 0) {
