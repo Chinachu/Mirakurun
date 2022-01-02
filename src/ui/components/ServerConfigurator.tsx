@@ -66,6 +66,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
     }, [saved]);
 
     const docker = uiState.status.process.env.DOCKER === "YES";
+    const ipv6Ready = docker === false || uiState.status.process.env.DOCKER_NETWORK === "host";
     const changed = JSON.stringify(current) !== JSON.stringify(editing);
 
     return (
@@ -100,6 +101,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                             setEditing({ ...editing, logLevel: option.key });
                         }}
                     />
+
                     <TextField
                         styles={{ fieldGroup: { "max-width": 200 } }}
                         label="Hostname"
@@ -108,17 +110,20 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                             setEditing({ ...editing, hostname: newValue });
                         }}
                     />
+
                     <Toggle
                         label="IPv6"
-                        disabled={docker}
-                        checked={(docker === false && (editing.disableIPv6 === undefined || editing.disableIPv6 === false))}
+                        disabled={!ipv6Ready}
+                        checked={(ipv6Ready && (editing.disableIPv6 === undefined || editing.disableIPv6 === false))}
                         onText="Enable"
                         offText="Disable"
                         onChange={(ev, checked) => {
                             setEditing({ ...editing, disableIPv6: checked === false });
                         }}
                     />
+
                     <Separator alignContent="start">Advanced</Separator>
+
                     <TextField
                         styles={{ fieldGroup: { "max-width": 200 } }}
                         label="EPG Gathering Interval"
@@ -137,6 +142,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                             setEditing({ ...editing });
                         }}
                     />
+
                     <Toggle
                         label={
                             <Stack horizontal verticalAlign="end">

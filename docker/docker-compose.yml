@@ -1,7 +1,4 @@
 version: "3.7"
-networks:
-  default:
-    name: mirakurun
 services:
   mirakurun:
     build:
@@ -14,11 +11,10 @@ services:
       - SYS_NICE
     environment:
       TZ: Asia/Tokyo
+      DOCKER_NETWORK: host
       # LOG_LEVEL: "3"
       # DEBUG: "true"
-    ports:
-      - 40772:40772
-      # - 9229:9229
+    network_mode: host
     devices:
       - /dev/bus:/dev/bus
       - /dev/dvb:/dev/dvb

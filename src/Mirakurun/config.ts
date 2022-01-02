@@ -26,6 +26,7 @@ type Writable<T> = { -readonly [K in keyof T]: T[K] };
 
 const {
     DOCKER,
+    DOCKER_NETWORK,
     SERVER_CONFIG_PATH,
     TUNERS_CONFIG_PATH,
     CHANNELS_CONFIG_PATH,
@@ -171,8 +172,10 @@ export function loadServer(): Server {
     // Docker
     if (IS_DOCKER) {
         config.path = "/var/run/mirakurun.sock";
-        config.port = 40772;
-        config.disableIPv6 = true;
+        if (DOCKER_NETWORK !== "host") {
+            config.port = 40772;
+            config.disableIPv6 = true;
+        }
 
         if (!config.hostname && typeof HOSTNAME !== "undefined" && HOSTNAME.trim().length > 0) {
             config.hostname = HOSTNAME.trim();

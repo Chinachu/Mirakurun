@@ -61,6 +61,7 @@ export function getStatus(): Status {
             env: {
                 PATH: process.env.PATH,
                 DOCKER: process.env.DOCKER,
+                DOCKER_NETWORK: process.env.DOCKER_NETWORK,
                 pm_uptime: process.env.pm_uptime,
                 USING_WINSER: process.env.USING_WINSER,
                 NODE_ENV: process.env.NODE_ENV,
