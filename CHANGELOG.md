@@ -2,7 +2,7 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
-## 3.9.0 (2021-xx-xx)
+## 3.9.0 (2022-xx-xx)
 
 Performance improvements, fixes for memory leaks and bugs related to EPG processing, etc.
 
@@ -60,7 +60,6 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 
 - **package**: Drop engine support `node@12`.
 - **package**: Update dependencies.
-- Reimplemented certain processes in C++.
 
 ## 3.8.0 (2021-08-10)
 
