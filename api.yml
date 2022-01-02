@@ -2,10 +2,10 @@ swagger: '2.0'
 info:
   title: Mirakurun
   version: ~
-  description: DVR Tuner Server Service for Chinachu Air.
+  description: DVR Tuner Server for Japanese TV.
   contact:
-    name: kanreisa
-    url: https://github.com/kanreisa
+    name: Chinachu Project
+    url: https://chinachu.moe/
 basePath: /api
 consumes:
   - application/json
