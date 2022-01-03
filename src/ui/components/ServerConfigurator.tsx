@@ -33,6 +33,7 @@ import {
     DialogType,
     DialogFooter,
 } from "@fluentui/react";
+import { Validator as IPValidator } from "ip-num/Validator"
 import { UIState } from "../index";
 import { ConfigServer } from "../../../api";
 
@@ -68,6 +69,28 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
     const docker = uiState.status.process.env.DOCKER === "YES";
     const ipv6Ready = docker === false || uiState.status.process.env.DOCKER_NETWORK === "host";
     const changed = JSON.stringify(current) !== JSON.stringify(editing);
+
+    let invalid = false;
+    if (editing) {
+        if (editing.allowIPv4CidrRanges) {
+            for (const range of editing.allowIPv4CidrRanges) {
+                const [valid] = IPValidator.isValidIPv4CidrRange(range);
+                if (!valid) {
+                    invalid = true;
+                    break;
+                }
+            }
+        }
+        if (!invalid && editing.allowIPv6CidrRanges) {
+            for (const range of editing.allowIPv6CidrRanges) {
+                const [valid] = IPValidator.isValidIPv6CidrRange(range);
+                if (!valid) {
+                    invalid = true;
+                    break;
+                }
+            }
+        }
+    }
 
     return (
         <>
@@ -223,7 +246,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                     />
 
                     <Stack horizontal tokens={{ childrenGap: "0 8" }} style={{ marginTop: 16 }}>
-                        <PrimaryButton text="Save" disabled={!changed} onClick={() => setShowSaveDialog(true)} />
+                        <PrimaryButton text="Save" disabled={!changed || invalid} onClick={() => setShowSaveDialog(true)} />
                         <DefaultButton text="Cancel" disabled={!changed} onClick={() => setEditing({ ...current })} />
                     </Stack>
                 </Stack>
