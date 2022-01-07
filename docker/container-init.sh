@@ -37,6 +37,13 @@ if [ -f "/app-data/programs.yml" -a ! -f "$PROGRAMS_DB_PATH" ]; then
   cp -v "/app-data/programs.yml" "$PROGRAMS_DB_PATH"
 fi
 
+# custom startup script
+if [ -e "/opt/bin/startup" ]; then
+  echo "executing /opt/bin/startup..."
+  /opt/bin/startup
+  echo "done."
+fi
+
 # only for test purpose
 if !(type "arib-b25-stream-test" > /dev/null 2>&1); then
   npm --prefix /opt install arib-b25-stream-test

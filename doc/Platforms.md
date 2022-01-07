@@ -93,11 +93,41 @@ see: [Configuration.md](Configuration.md)
 
 ### 💡 How to Use: Non-DVB Devices
 
+#### option: **using custom startup script**
+
 ```sh
-$ which recpt1
-/usr/local/bin/recpt1
-$ cp /usr/local/bin/recpt1 /opt/mirakurun/opt/bin/
-$ vim /opt/mirakurun/config/tuners.yml
+mkdir -p /opt/mirakurun/opt/bin
+vim /opt/mirakurun/opt/bin/startup # example ↓
+chmod +x /opt/mirakurun/opt/bin/startup
+```
+```bash
+#!/bin/bash
+
+if !(type "recpt1" > /dev/null 2>&1); then
+  apt-get update
+  apt-get install -y --no-install-recommends git autoconf automake
+
+  cd /tmp
+  git clone https://github.com/stz2012/recpt1.git
+  cd recpt1/recpt1
+  ./autogen.sh
+  ./configure --prefix /opt
+  make
+  make install
+fi
+
+recpt1 -v
+```
+```sh
+docker-compose down
+docker-compose run --rm -e SETUP=true mirakurun
+docker-compose up -d
+```
+
+#### option: **using static build**
+
+```sh
+$ cp /usr/local/bin/something-static /opt/mirakurun/opt/bin/
 ```
 
 ### 💡 Locations (Container)
@@ -112,6 +142,7 @@ $ vim /opt/mirakurun/config/tuners.yml
   * `programs.json`
 * Opt: `/opt/`
   * `bin/`
+  * `bin/startup` - custom startup script (optional)
 
 ### 💡 Locations (Host)
 
@@ -125,6 +156,7 @@ $ vim /opt/mirakurun/config/tuners.yml
   * `programs.json`
 * Opt: `/opt/mirakurun/opt/`
   * `bin/`
+  * `bin/startup` - custom startup script (optional)
 
 ## Linux
 
