@@ -230,7 +230,7 @@ const Content = () => {
 
     return (
         <Fabric style={{ margin: "16px" }}>
-            <Stack tokens={{  childrenGap: "8 0" }}>
+            <Stack tokens={{ childrenGap: "8 0" }}>
                 <UpdateAlert />
 
                 <Stack horizontal verticalAlign="center" tokens={{ childrenGap: "0 8" }}>
