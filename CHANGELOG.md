@@ -9,6 +9,7 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 ### Server Changes
 
 - **config/server**: Add `disableWebUI` (Env: `DISABLE_WEB_UI` for Docker) to disable Web UI.
+- **config/server**: Add `allowIPv4CidrRanges`, `allowIPv6CidrRanges` (Env: `ALLOW_IPV4_CIDR_RANGES`, `ALLOW_IPV6_CIDR_RANGES` for Docker) to allow optional IP range.
 - **config/server**: Change several default values based on typical usage.
   - `programGCInterval`: `900000` (15 mins) → `3600000` (1 hour)
   - `epgGatheringInterval`: `900000` (15 mins) → `3600000` (30 mins)
@@ -41,6 +42,7 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 - **ui/status**: Fix "EPG Gathering Network IDs" hex strings to upper case.
 - **ui/status**: Fix handle tuner updates to correctly. (bug) [#109](https://github.com/Chinachu/Mirakurun/pull/109)
 - **ui/config**: Add "EPG Gathering Interval" setting in Config/Server.
+- **ui/config**: Add "Allow IPv4 CIDR Ranges", "Allow IPv6 CIDR Ranges" setting in Config/Server.
 - **ui/heart**: Add confirmation before accessing opencollective. [#106](https://github.com/Chinachu/Mirakurun/issues/106)
 
 ### Client Changes
@@ -53,13 +55,17 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 - Update base image to `node:16.13.1-buster-slim`.
 - Fixed the exit signal handling properly.
 - When a `SIGHUP` is received in a container, only the node process can be restarted quickly.
+- Add startup script (it runs `/opt/bin/startup`) support.
 - default `docker-compose.yml` volumes has been changed:
   - `/usr/local/mirakurun/*` → `/opt/mirakurun/*`
+- default `docker-compose.yml` network_mode has been changed to `host`.
+  - it enables IPv6 options.
 
 ### Other Changes
 
 - **package**: Drop engine support `node@12`.
 - **package**: Update dependencies.
+- remove `colors` package for urgent security reasons.
 
 ## 3.8.0 (2021-08-10)
 
