@@ -2,6 +2,10 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 3.8.1 (2022-01-10)
+
+- remove `colors` package for urgent security reasons.
+
 ## 3.8.0 (2021-08-10)
 
 Logo support enhanced.
