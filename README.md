@@ -144,5 +144,5 @@ Support this project by becoming a sponsor. Your logo will show up here with a l
 [downloads-image]: https://img.shields.io/npm/dm/mirakurun.svg?style=flat
 [downloads-url]: https://npmjs.org/package/mirakurun
 [azure-pipelines-img]: https://dev.azure.com/chinachu/Mirakurun/_apis/build/status/Chinachu.Mirakurun?branchName=master
-[azure-pipelines-url]: hhttps://dev.azure.com/chinachu/Mirakurun/_build/latest?definitionId=1&branchName=master
+[azure-pipelines-url]: https://dev.azure.com/chinachu/Mirakurun/_build/latest?definitionId=1&branchName=master
 [docker-url]: https://hub.docker.com/r/chinachu/mirakurun
