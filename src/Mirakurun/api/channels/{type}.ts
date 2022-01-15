@@ -43,9 +43,9 @@ export const get: Operation = (req, res) => {
         }));
 
         return ch;
-    });
+    }).filter(sift(req.query));
 
-    api.responseJSON(res, sift(req.query as any, channels));
+    api.responseJSON(res, channels);
 };
 
 get.apiDoc = {

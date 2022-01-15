@@ -28,7 +28,7 @@ export const get: Operation = async (req, res) => {
 
     const services: apid.Service[] = [];
 
-    for (const serviceItem of sift(req.query, serviceItems)) {
+    for (const serviceItem of serviceItems.filter(sift(req.query))) {
         services.push({
             ...serviceItem.export(),
             hasLogoData: await Service.isLogoDataExists(serviceItem.networkId, serviceItem.logoId)

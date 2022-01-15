@@ -89,7 +89,7 @@ export default class Program {
     }
 
     findByQuery(query: object): db.Program[] {
-        return sift(query, Array.from(this._itemMap.values()));
+        return Array.from(this._itemMap.values()).filter(sift(query));
     }
 
     findByNetworkId(networkId: number): db.Program[] {
