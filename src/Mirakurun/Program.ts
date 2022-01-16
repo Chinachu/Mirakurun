@@ -143,7 +143,7 @@ export default class Program {
 
     save(): void {
         clearTimeout(this._emitTimerId);
-        this._emitTimerId = setTimeout(() => this._emit(), 100);
+        this._emitTimerId = setTimeout(() => this._emit(), 1000);
         clearTimeout(this._saveTimerId);
         this._saveTimerId = setTimeout(() => this._save(), 1000 * 10);
     }
