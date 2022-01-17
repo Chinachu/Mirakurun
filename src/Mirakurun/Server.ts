@@ -83,6 +83,7 @@ class Server {
         const app = express();
 
         app.disable("x-powered-by");
+        app.disable("etag");
 
         const corsOptions: cors.CorsOptions = {
             origin: (origin, callback) => {
