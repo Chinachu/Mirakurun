@@ -15,7 +15,7 @@
 */
 "use strict";
 
-if (process.env["npm_config_global"] !== undefined && process.env["npm_config_global"] !== "true") {
+if (process.env["npm_config_global"] !== "true") {
     process.exit(0);
 }
 
