@@ -137,10 +137,6 @@ class Server {
                     }
                 }
             }));
-            app.use("/eventemitter3", express.static("node_modules/eventemitter3"));
-            app.use("/react", express.static("node_modules/react"));
-            app.use("/react-dom", express.static("node_modules/react-dom"));
-            app.use("/@fluentui/react", express.static("node_modules/@fluentui/react"));
             app.use("/swagger-ui", express.static("node_modules/swagger-ui-dist"));
             app.use("/api/debug", express.static("lib/ui/swagger-ui.html"));
         }

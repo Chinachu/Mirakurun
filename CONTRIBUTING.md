@@ -25,13 +25,14 @@ that you can include. We never know what is your environment.<br>
 git clone git@github.com:Chinachu/Mirakurun.git
 cd Mirakurun
 git checkout <branch>
+git submodule update --init
 ```
 
 ### Build
 
 ```sh
 # Docker on Linux
-npm run docker-build
+npm run docker:build
 
 # Linux / Win32
 npm install
@@ -42,7 +43,7 @@ npm run build
 
 ```sh
 # Docker on Linux
-npm run docker-run
+npm run docker:run
 
 # Linux
 sudo npm run start
@@ -55,7 +56,7 @@ npm run start.win32
 
 ```sh
 # Docker on Linux
-npm run docker-debug
+npm run docker:debug
 
 # Linux
 sudo npm run debug

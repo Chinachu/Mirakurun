@@ -31,6 +31,7 @@ import {
     Icon,
     ColorClassNames
 } from "@fluentui/react";
+import { initializeIcons } from "@fluentui/react/lib/Icons";
 import { Client as RPCClient } from "jsonrpc2-ws";
 import { JoinParams, NotifyParams } from "../../lib/Mirakurun/rpc.d";
 import { EventMessage } from "../../lib/Mirakurun/Event.d";
@@ -44,6 +45,8 @@ import LogsView from "./components/LogsView";
 import ConfigView from "./components/ConfigView";
 import HeartView from "./components/HeartView";
 import "./index.css";
+
+initializeIcons();
 
 export interface UIState {
     version: string;

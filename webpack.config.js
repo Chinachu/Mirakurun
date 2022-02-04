@@ -1,8 +1,9 @@
+const { NODE_ENV } = process.env;
 const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
 
 module.exports = {
-    mode: "development",
+    mode: NODE_ENV === "production" ? "production" : "development",
     devtool: "source-map",
     watchOptions: {
         ignored: /node_modules/
@@ -12,7 +13,7 @@ module.exports = {
     },
     output: {
         path: `${__dirname}/lib/ui`,
-        filename: "[name].js"
+        filename: "[name].bundle.js"
     },
     module: {
         rules: [
@@ -54,10 +55,16 @@ module.exports = {
             process: "process/browser"
         })
     ],
-    externals: {
-        "eventemitter3": "EventEmitter3",
-        "react": "React",
-        "react-dom": "ReactDOM",
-        "@fluentui/react": "FluentUIReact"
+    optimization: {
+        splitChunks: {
+            cacheGroups: {
+                vendors: {
+                    test: /node_modules/,
+                    name: "vendors",
+                    chunks: "all",
+                    enforce: true
+                }
+            }
+        }
     }
 };
