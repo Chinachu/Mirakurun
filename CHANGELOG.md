@@ -48,6 +48,7 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 
 - Add [AbortSignal](https://nodejs.org/api/globals.html#class-abortsignal) option for `getChannelStream()`, `getServiceStreamByChannel()` `getServiceStream()`, `getProgramStream()`.
 - Fix set priority correctly. (bug)
+- Fix unexpected `postinstall` execution on npm@7 and later. (bug) [#116](https://github.com/Chinachu/Mirakurun/issues/116)
 
 ### Docker Changes
 
