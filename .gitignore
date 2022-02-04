@@ -8,5 +8,6 @@
 *.log
 *.swp
 *.tmp
+*.tsbuildinfo
 test.*
 .DS_Store

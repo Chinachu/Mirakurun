@@ -10,6 +10,7 @@
     "removeComments": true,
     "module": "commonjs",
     "sourceMap": true,
+    "incremental": true,
     "outDir": "lib"
   },
   "exclude": [
