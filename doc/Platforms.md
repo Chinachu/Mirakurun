@@ -7,12 +7,12 @@
 * [**Docker on Linux**](#docker-on-linux)
   * [Docker Engine](https://docs.docker.com/engine/install/) `>=18.06.0`
   * [Docker Compose](https://docs.docker.com/compose/install/) `>=1.22.0`
-  * **x64**
+  * **x64** / arm32v7 / **arm64v8**
   * **Ubuntu Server 20.04** / Debian 9 / CentOS 8.1
   * ⚠ Note: Desktop Environment / VM is not supported and unstable!
 * [Linux](#linux)
   * [PM2](http://pm2.keymetrics.io/) `>=2.4.0`
-  * x86 / **x64** / ARMv7 / **ARMv8**
+  * x86 / x64 / arm64v8
   * **Debian** / **Ubuntu Server** / CentOS / Gentoo
   * SystemV / OpenRC / **SystemD**
   * ⚠ Note: Desktop Environment / VM is not supported and unstable!
@@ -187,7 +187,7 @@ sudo apt install build-essential
 sudo npm install pm2 -g
 
 # Quick
-sudo npm install mirakurun -g --unsafe-perm --production
+sudo npm install mirakurun -g --unsafe-perm --foreground-scripts --production
 
 # Advanced
 sudo npm install mirakurun -g --production
@@ -275,7 +275,7 @@ npm install winser@1.0.3 -g
 **use Windows PowerShell as Admin.**
 
 ```
-npm install mirakurun@latest -g --production
+npm install mirakurun@latest -g --foreground-scripts --production
 ```
 
 ### Uninstall
