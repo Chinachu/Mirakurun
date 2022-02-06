@@ -100,7 +100,7 @@ function idleStatusChecker(): boolean {
 }
 uiStateEvents.on("update:tuners", idleStatusChecker);
 
-const rpc = new RPCClient(`ws://${location.host}/rpc`, {
+const rpc = new RPCClient(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/rpc`, {
     protocols: null
 });
 
