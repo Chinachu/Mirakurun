@@ -89,19 +89,18 @@ const ISO_639_LANG_CODE = {
     etc: Buffer.from("657463", "hex")
 };
 
-interface VersionDict<T = number> {
-    [tableId: number]: T;
-}
+type TableId = number;
+type VersionRecord<T = number> = Record<TableId, T>;
 
 interface EventState {
-    version: VersionDict;
+    version: VersionRecord;
     programId: number;
 
     short: {
-        version: VersionDict; // basic
+        version: VersionRecord; // basic
     };
     extended: {
-        version: VersionDict; // extended
+        version: VersionRecord; // extended
         _descs?: {
             item_description_length: number;
             item_description_char: Buffer;
@@ -111,20 +110,20 @@ interface EventState {
         _done?: boolean;
     };
     component: {
-        version: VersionDict; // basic
+        version: VersionRecord; // basic
     };
     content: {
-        version: VersionDict; // basic
+        version: VersionRecord; // basic
     };
     audio: {
-        version: VersionDict<VersionDict>; // basic
+        version: VersionRecord<VersionRecord>; // basic
         _audios: { [componentTag: number]: db.ProgramAudio };
     };
     series: {
-        version: VersionDict; // basic
+        version: VersionRecord; // basic
     };
     group: {
-        version: VersionDict<VersionDict>; // basic
+        version: VersionRecord<VersionRecord>; // basic
         _groups: db.ProgramRelatedItem[][];
     };
 }
@@ -398,31 +397,31 @@ export default class EPG {
     }
 }
 
-function isOutOfDate(eit: any, versionDict: VersionDict): boolean {
+function isOutOfDate(eit: any, versionRecord: VersionRecord): boolean {
 
     if (
-        (versionDict[0x4E] !== undefined || versionDict[0x4F] !== undefined) &&
+        (versionRecord[0x4E] !== undefined || versionRecord[0x4F] !== undefined) &&
         (eit.table_id !== 0x4E && eit.table_id !== 0x4F)
     ) {
         return false;
     }
 
-    return versionDict[eit.table_id] !== eit.version_number;
+    return versionRecord[eit.table_id] !== eit.version_number;
 }
 
-function isOutOfDateLv2(eit: any, versionDict: VersionDict<VersionDict>, lv2: number): boolean {
+function isOutOfDateLv2(eit: any, versionRecord: VersionRecord<VersionRecord>, lv2: number): boolean {
 
-    if (versionDict[eit.table_id] === undefined) {
-        versionDict[eit.table_id] = {};
+    if (versionRecord[eit.table_id] === undefined) {
+        versionRecord[eit.table_id] = {};
     }
     if (
-        (versionDict[0x4E] !== undefined || versionDict[0x4F] !== undefined) &&
+        (versionRecord[0x4E] !== undefined || versionRecord[0x4F] !== undefined) &&
         (eit.table_id !== 0x4E && eit.table_id !== 0x4F)
     ) {
         return false;
     }
 
-    return versionDict[eit.table_id][lv2] !== eit.version_number;
+    return versionRecord[eit.table_id][lv2] !== eit.version_number;
 }
 
 function getGenre(content: any): db.ProgramGenre {
