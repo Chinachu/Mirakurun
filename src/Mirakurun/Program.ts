@@ -174,26 +174,31 @@ export default class Program {
         }
     }
 
-    private _findAndRemoveConflicts(target: db.Program): void {
+    private _findAndRemoveConflicts(added: db.Program): void {
+
+        const addedEndAt = added.startAt + added.duration;
 
         for (const item of this._itemMap.values()) {
             if (
-                item.networkId === target.networkId &&
-                item.serviceId === target.serviceId &&
-                item.id !== target.id &&
-                (
-                    (item.startAt >= target.startAt && item.startAt < (target.startAt + target.duration)) ||
-                    (item.startAt <= target.startAt && (item.startAt + item.duration) > target.startAt)
-                ) &&
-                (!item._pf || target._pf)
+                item.networkId === added.networkId &&
+                item.serviceId === added.serviceId &&
+                item.id !== added.id
             ) {
-                this.remove(item.id);
-                Event.emit("program", "remove", { id: item.id });
+                const itemEndAt = item.startAt + item.duration;
+                if ((
+                        (added.startAt <= item.startAt && item.startAt < addedEndAt) ||
+                        (item.startAt <= added.startAt && added.startAt < itemEndAt)
+                    ) &&
+                    (!item._pf || added._pf)
+                ) {
+                    this.remove(item.id);
+                    Event.emit("program", "remove", { id: item.id });
 
-                log.debug(
-                    "ProgramItem#%d (networkId=%d, eventId=%d) has removed by overlapped ProgramItem#%d (eventId=%d)",
-                    item.id, item.networkId, item.eventId, target.id, target.eventId
-                );
+                    log.debug(
+                        "ProgramItem#%d (networkId=%d, serviceId=%d, eventId=%d) has removed by overlapped ProgramItem#%d (eventId=%d)",
+                        item.id, item.networkId, item.serviceId, item.eventId, added.id, added.eventId
+                    );
+                }
             }
         }
     }
