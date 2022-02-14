@@ -12,7 +12,7 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 - **config/server**: Add `allowIPv4CidrRanges`, `allowIPv6CidrRanges` (Env: `ALLOW_IPV4_CIDR_RANGES`, `ALLOW_IPV6_CIDR_RANGES` for Docker) to allow optional IP range.
 - **config/server**: Change several default values based on typical usage.
   - `programGCInterval`: `900000` (15 mins) → `3600000` (1 hour)
-  - `epgGatheringInterval`: `900000` (15 mins) → `3600000` (30 mins)
+  - `epgGatheringInterval`: `900000` (15 mins) → `1800000` (30 mins)
   - `logoDataInterval`: `86400000` (1 day) → `604800000` (7 days)
 - **config/server**: Remove `overflowTimeLimit`.
 - **ts-filter**: Remove own overflow handling as it no longer makes sense.
