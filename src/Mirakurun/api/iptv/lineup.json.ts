@@ -35,7 +35,7 @@ export const get: Operation = (req, res) => {
 
     const countMap = new Map<number, number>();
     for (const service of services) {
-        if (service.type !== 1) {
+        if (service.type !== 1 && service.type !== 173) {
             continue;
         }
 

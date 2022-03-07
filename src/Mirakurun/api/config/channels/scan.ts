@@ -279,7 +279,7 @@ export const put: Operation = async (req, res) => {
             continue;
         }
 
-        services = services.filter(service => service.type === 1);
+        services = services.filter(service => service.type === 1 || service.type === 173);
         res.write(`-> ${services.length} services found.\n`);
 
         if (services.length === 0) {
