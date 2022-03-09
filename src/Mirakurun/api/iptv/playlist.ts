@@ -26,7 +26,7 @@ export const get: Operation = async (req, res) => {
 
     let m = `#EXTM3U url-tvg="${apiRoot}/iptv/xmltv"\n`;
     for (const service of services) {
-        if (service.type !== 1) {
+        if (service.type !== 1 && service.type !== 173) {
             continue;
         }
 

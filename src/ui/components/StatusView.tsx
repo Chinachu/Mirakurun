@@ -109,7 +109,7 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
     const serviceList: JSX.Element[] = [];
     for (let i = 0; i < services.length; i++) {
         const service = services[i];
-        if (service.type !== 1) {
+        if (service.type !== 1 && service.type !== 173) {
             continue;
         }
         const tooltipId = `service-list-item#${i}-tooltip`;
