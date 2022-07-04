@@ -21,8 +21,12 @@ import { createHash } from "crypto";
 
 if (process.platform === "linux") {
     if (process.getuid() === 0) {
-        execSync(`renice -n -10 -p ${ process.pid }`);
-        execSync(`ionice -c 1 -n 7 -p ${ process.pid }`);
+        try {
+            execSync(`renice -n -10 -p ${ process.pid }`);
+            execSync(`ionice -c 1 -n 7 -p ${ process.pid }`);
+        } catch (e) {
+            console.warn("error on modify nice: " + (e as Error).message);
+        }
     } else {
         console.warn("running in not root!");
     }
