@@ -168,14 +168,14 @@ $ cp /usr/local/bin/something-static /opt/mirakurun/opt/bin/
 
 * **via Package Manager** (recommended)
   * [Debian / Ubuntu](https://github.com/nodesource/distributions/blob/master/README.md#deb) (deb)
-    * `curl -sL https://deb.nodesource.com/setup_16.x | sudo -E bash -`
+    * `curl -sL https://deb.nodesource.com/setup_18.x | sudo -E bash -`
     * `sudo apt-get install -y nodejs`
   * [CentOS](https://github.com/nodesource/distributions/blob/master/README.md#rpm) (rpm)
-    * (root) `curl -sL https://rpm.nodesource.com/setup_16.x | bash -`
+    * (root) `curl -sL https://rpm.nodesource.com/setup_18.x | bash -`
   * [Gentoo](https://nodejs.org/en/download/package-manager/#gentoo)
     * `emerge nodejs`
 * [nave](https://github.com/isaacs/nave)
-  * `sudo /path/to/nave.sh usemain 16`
+  * `sudo /path/to/nave.sh usemain 18`
 
 ### Install / Update
 

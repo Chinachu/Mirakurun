@@ -2,7 +2,7 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
-## 3.9.0 (2022-xx-xx)
+## 3.9.0 (2023-xx-xx)
 
 Performance improvements, fixes for memory leaks and bugs related to EPG processing, etc.
 
@@ -52,7 +52,7 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 
 ### Docker Changes
 
-- Update base image to `node:16.13.1-buster-slim`.
+- Update base image to `node:18.15.0-buster-slim`.
 - Fixed the exit signal handling properly.
 - When a `SIGHUP` is received in a container, only the node process can be restarted quickly.
 - Add startup script (it runs `/opt/bin/startup`) support.
@@ -63,6 +63,7 @@ Performance improvements, fixes for memory leaks and bugs related to EPG process
 
 ### Other Changes
 
+- **package**: Add engine support `node@18`.
 - **package**: Drop engine support `node@12`.
 - **package**: Update dependencies.
 - remove `colors` package for urgent security reasons.

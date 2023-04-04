@@ -28,6 +28,8 @@ stages:
           NODE_VERSION_SPEC: '14.x'
         v16:
           NODE_VERSION_SPEC: '16.x'
+        v18:
+          NODE_VERSION_SPEC: '18.x'
       maxParallel: 3
     pool:
       vmImage: 'ubuntu-latest'

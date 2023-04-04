@@ -52,10 +52,10 @@
     "preinstall": "node bin/preinstall.js",
     "postinstall": "node bin/postinstall.js",
     "preuninstall": "node bin/preuninstall.js",
-    "docker:build": "docker-compose -f docker/docker-compose.yml build",
-    "docker:run": "docker-compose -f docker/docker-compose.yml run --rm --service-ports mirakurun",
-    "docker:up": "docker-compose -f docker/docker-compose.yml up -d",
-    "docker:debug": "docker-compose -f docker/docker-compose.yml run --rm --service-ports -e DEBUG=true mirakurun"
+    "docker:build": "docker compose -f docker/docker-compose.yml build",
+    "docker:run": "docker compose -f docker/docker-compose.yml run --rm --service-ports mirakurun",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:debug": "docker compose -f docker/docker-compose.yml run --rm --service-ports -e DEBUG=true mirakurun"
   },
   "directories": {
     "doc": "doc",
@@ -113,7 +113,7 @@
     "webpack-cli": "^4.9.2"
   },
   "engines": {
-    "node": "^14.17.0 || ^16"
+    "node": "^14.17.0 || ^16 || ^18"
   },
   "engineStrict": true,
   "os": [
