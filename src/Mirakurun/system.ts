@@ -18,6 +18,7 @@ import { Validator } from "ip-num/Validator";
 import { IPv4, IPv6 } from "ip-num/IPNumber";
 import { IPv4Prefix, IPv6Prefix } from "ip-num/Prefix";
 import { IPv4CidrRange, IPv6CidrRange } from "ip-num/IPRange";
+import { execSync } from "child_process";
 import _ from "./_";
 
 export function getIPv4AddressesForListen(): string[] {
@@ -94,4 +95,13 @@ export function isPermittedHost(url: string, allowedHostname?: string): boolean 
     }
 
     return false;
+}
+
+export function getLatestVersion(): string {
+
+    const latestVersion = execSync("npm view mirakurun version", {
+        encoding: "utf8"
+    }).trim();
+
+    return latestVersion;
 }

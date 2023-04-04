@@ -15,7 +15,7 @@
 */
 import { spawn, ChildProcess } from "child_process";
 import { openSync } from "fs";
-import * as latestVersion from "latest-version";
+import { getLatestVersion } from "./Mirakurun/system";
 const pkg = require("../package.json");
 
 if (process.env.DOCKER === "YES") {
@@ -36,7 +36,7 @@ if (!pkg._resolved) {
     const current = pkg.version as string;
     console.log("current:", current);
 
-    const latest = await latestVersion("mirakurun");
+    const latest = getLatestVersion();
     console.log("latest:", latest);
 
     if (current === latest) {

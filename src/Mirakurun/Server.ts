@@ -17,6 +17,7 @@ import * as fs from "fs";
 import * as http from "http";
 import * as express from "express";
 import * as cors from "cors";
+import * as mime from "mime";
 import * as openapi from "express-openapi";
 import * as morgan from "morgan";
 import * as yaml from "js-yaml";
@@ -132,7 +133,7 @@ class Server {
         if (!serverConfig.disableWebUI) {
             app.use(express.static("lib/ui", {
                 setHeaders: (res, path) => {
-                    if (express.static.mime.lookup(path) === "image/svg+xml") {
+                    if (mime.getType(path) === "image/svg+xml") {
                         res.setHeader("Cache-Control", "public, max-age=86400");
                     }
                 }

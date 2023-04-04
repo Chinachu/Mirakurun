@@ -14,16 +14,16 @@
    limitations under the License.
 */
 import { Operation } from "express-openapi";
-import * as latestVersion from "latest-version";
 import * as api from "../api";
 import { Version } from "../../../api";
+import { getLatestVersion } from "../system";
 const pkg = require("../../../package.json");
 
 export const get: Operation = async (req, res) => {
 
     const version: Version = {
         current: pkg.version,
-        latest: await latestVersion("mirakurun")
+        latest: getLatestVersion()
     };
 
     api.responseJSON(res, version);

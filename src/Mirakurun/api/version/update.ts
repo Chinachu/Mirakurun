@@ -18,8 +18,8 @@ import { join } from "path";
 import { spawn } from "child_process";
 import { tmpdir } from "os";
 import { Tail } from "tail";
-import * as latestVersion from "latest-version";
 import * as api from "../../api";
+import { getLatestVersion } from "../../system";
 const current = require("../../../../package.json").version as string;
 
 export const put: Operation = async (req, res) => {
@@ -29,7 +29,7 @@ export const put: Operation = async (req, res) => {
         return;
     }
 
-    const latest = await latestVersion("mirakurun");
+    const latest = getLatestVersion();
 
     if (!req.query.force && current === latest) {
         api.responseError(res, 409, "Update Nothing");
