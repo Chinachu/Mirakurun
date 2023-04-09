@@ -6,6 +6,16 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
 
 Performance improvements, fixes for memory leaks and bugs related to EPG processing, etc.
 
+**Note:** The experimental Win32 support has been deprecated for the following complex reasons, and it may be completely removed in the next minor version:
+- There are no maintainers for Win32
+- The current performance is not meeting the expected standards, and there is no prospect for improvement in the foreseeable future
+- Many users are using it for purposes not intended by the developers, causing a burden on development
+- As part of the project roadmap cleanup, resources are being focused on Linux support
+
+Originally, Mirakurun was developed for Linux, and it is essential to avoid compromising the quality of the Linux version for Win32 support. This has led to the current conclusion.
+However, developers who still require Win32 support can fork the project and maintain the necessary code themselves.
+Thank you for your understanding.
+
 ### Server Changes
 
 - **config/server**: Add `disableWebUI` (Env: `DISABLE_WEB_UI` for Docker) to disable Web UI.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Bold** is the recommended. also, **Node.js** `^14.17.0 || ^16` needed.
+**Bold** is the recommended. also, **Node.js** `^14.17.0 || ^16 || ^18` needed.
 
 * [**Docker on Linux**](#docker-on-linux)
   * [Docker Engine](https://docs.docker.com/engine/install/) `>=18.06.0`
@@ -16,7 +16,7 @@
   * **Debian** / **Ubuntu Server** / CentOS / Gentoo
   * SystemV / OpenRC / **SystemD**
   * ⚠ Note: Desktop Environment / VM is not supported and unstable!
-* [Win32](#win32) (Experimental, Unstable, Not Recommended, Not Tested)
+* [Win32](#win32) (Experimental, Unstable, Not Recommended, Not Tested) **- DEPRECATED**
   * [winser](https://github.com/jfromaniello/winser) `>=1.0.3`
   * ⚠ Note: WSL / Linux VM is not supported!
 
@@ -251,7 +251,7 @@ mirakurun version
   * `mirakurun.stdout.log` - normal log
   * `mirakurun.stderr.log` - error log
 
-## Win32
+## Win32  **- DEPRECATED**
 
 **Note:**
 
