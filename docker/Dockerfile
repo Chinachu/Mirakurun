@@ -1,5 +1,5 @@
 ARG ARCH=
-FROM --platform=$BUILDPLATFORM ${ARCH}node:18.15.0-buster AS build
+FROM ${ARCH}node:18.15.0-buster AS build
 WORKDIR /app
 ENV DOCKER=YES NODE_ENV=production
 ADD . .
