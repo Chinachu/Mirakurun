@@ -64,7 +64,9 @@ export interface Program {
     relatedItems?: ProgramRelatedItem[];
 
     /** (internal) indicates EIT[p/f] received */
-    _pf?: true;
+    _pf?: true;     // for compatibility
+    _isPresent?: true;
+    _isFollowing?: true;
 }
 
 export interface ProgramGenre {
