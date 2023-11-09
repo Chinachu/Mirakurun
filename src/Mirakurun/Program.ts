@@ -83,7 +83,7 @@ export default class Program {
                 this.save();
 
                 log.debug(
-                    "ProgramItem#%d (networkId=%d, serviceId=%d, eventId=%d) has recoved from the logically-deleted store",
+                    "ProgramItem#%d (networkId=%d, serviceId=%d, eventId=%d) has recovered from the logically-deleted store",
                     item.id, item.networkId, item.serviceId, item.eventId
                 );
             }
