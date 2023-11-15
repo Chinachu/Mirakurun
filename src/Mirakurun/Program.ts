@@ -79,7 +79,7 @@ export default class Program {
             if (item) {
                 this._itemMap.set(item.id, item);
                 this._itemMapDeleted.delete(item.id);
-                this._emitPrograms.set(item, "update");
+                this._emitPrograms.set(item, "create");
                 this.save();
 
                 log.debug(
