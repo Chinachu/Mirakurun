@@ -128,7 +128,7 @@ interface EventState {
     };
 
     present?: true;
-    follow?: true;
+    following?: true;
 }
 
 // forked from rndomhack/node-aribts/blob/1e7ef94bba3d6ac26aec764bf24dde2c2852bfcb/lib/epg.js
@@ -215,7 +215,7 @@ export default class EPG {
                         _groups: []
                     },
                     present: isP || undefined,
-                    follow: isF || undefined
+                    following: isF || undefined
                 };
 
                 state.version[eit.table_id] = eit.version_number;
@@ -223,7 +223,7 @@ export default class EPG {
             } else {
                 state = service[e.event_id];
 
-                if ((!state.present && isP) || (!state.follow && isF) || isOutOfDate(eit, state.version)) {
+                if ((!state.present && isP) || (!state.following && isF) || isOutOfDate(eit, state.version)) {
                     state.version[eit.table_id] = eit.version_number;
 
                     if (UNKNOWN_START_TIME.compare(e.start_time) !== 0) {
@@ -238,7 +238,7 @@ export default class EPG {
                     }
 
                     state.present = isP || undefined;
-                    state.follow = isF || undefined;
+                    state.following = isF || undefined;
                 }
             }
 
