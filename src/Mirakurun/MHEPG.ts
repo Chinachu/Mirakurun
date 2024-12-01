@@ -25,7 +25,7 @@ import { decodeUTF8 } from "./common";
 const VIDEO_RESOLUTION = {
     5: "1080p",
     6: "2160p",
-    7: "4320p",
+    7: "4320p"
 };
 
 const SAMPLING_RATE = {
@@ -197,7 +197,7 @@ export default class EPG {
 
                         _.program.set(state.programId, {
                             name: decodeUTF8(d.eventName),
-                            description: decodeUTF8(d.text),
+                            description: decodeUTF8(d.text)
                         });
 
                         break;
@@ -226,7 +226,7 @@ export default class EPG {
                             }
 
                             _.program.set(state.programId, {
-                                extended: Object.fromEntries(state.extended._descs.flat().map(x => [decodeUTF8(x.itemDescription), decodeUTF8(x.item)])),
+                                extended: Object.fromEntries(state.extended._descs.flat().map(x => [decodeUTF8(x.itemDescription), decodeUTF8(x.item)]))
                             });
 
                             delete state.extended._descs;
@@ -246,7 +246,7 @@ export default class EPG {
                                 type: null,
                                 resolution: <db.ProgramVideoResolution> VIDEO_RESOLUTION[d.videoResolution] || null,
                                 streamContent: null,
-                                componentType: null,
+                                componentType: null
                             }
                         });
 
@@ -301,11 +301,11 @@ export default class EPG {
                                 repeat: d.repeatLabel,
                                 pattern: d.programPattern,
                                 expiresAt: d.expireDate != null ?
-                                    mjdBCDToUnixEpoch(d.expireDate) * 1000:
+                                    mjdBCDToUnixEpoch(d.expireDate) * 1000 :
                                     -1,
                                 episode: d.episodeNumber,
                                 lastEpisode: d.lastEpisodeNumber,
-                                name: decodeUTF8(d.seriesName),
+                                name: decodeUTF8(d.seriesName)
                             }
                         });
 

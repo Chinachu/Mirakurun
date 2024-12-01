@@ -32,7 +32,7 @@ import {
     mmtPackageIdToServiceId,
     MHCommonDataTable,
     MH_CDT_DATA_TYPE_LOGO_DATA,
-    MH_CDT_LOGO_TYPE_LARGE,
+    MH_CDT_LOGO_TYPE_LARGE
 } from "arib-mmt-tlv-ts/mmt-si.js";
 import { TLVNetworkInformationTable } from "arib-mmt-tlv-ts/tlv-si.js";
 import MHEPG from "./MHEPG";
@@ -123,6 +123,15 @@ export default class TLVFilter extends EventEmitter {
     private _eventEndTimeout = _.config.server.eventEndTimeout || 1000;
 
     private _channel: string;
+
+    private _remoteControlKeyIdMap?: Map<number, number>;
+    private _logoTransmissions: Map<number, {
+        startSectionNumber: number;
+        numberOfSections: number;
+        logoVersion: number;
+        receivedSections: number;
+        data: Uint8Array[];
+    }> = new Map();
 
     constructor(options: TLVFilterOptions) {
         super();
@@ -274,7 +283,6 @@ export default class TLVFilter extends EventEmitter {
         }
     }
 
-    _remoteControlKeyIdMap?: Map<number, number>;
     private _onNIT(nit: TLVNetworkInformationTable): void {
 
         if (this._remoteControlKeyIdMap != null) {
@@ -299,14 +307,6 @@ export default class TLVFilter extends EventEmitter {
 
         this.emit("network", _network);
     }
-
-    _logoTransmissions: Map<number, {
-        startSectionNumber: number;
-        numberOfSections: number;
-        logoVersion: number;
-        receivedSections: number;
-        data: Uint8Array[];
-    }> = new Map();
 
     private _onSDT(sdt: MHServiceDescriptionTable): void {
 
@@ -366,7 +366,7 @@ export default class TLVFilter extends EventEmitter {
                     name,
                     type,
                     logoId,
-                    remoteControlKeyId: this._remoteControlKeyIdMap.get(service.serviceId),
+                    remoteControlKeyId: this._remoteControlKeyIdMap.get(service.serviceId)
                 });
             }
         }
@@ -441,7 +441,7 @@ export default class TLVFilter extends EventEmitter {
             return;
         }
 
-        const trans = this._logoTransmissions.get(cdt.dataModule.logoId)
+        const trans = this._logoTransmissions.get(cdt.dataModule.logoId);
         if (trans == null || cdt.dataModule.logoVersion !== trans.logoVersion || trans.receivedSections === trans.numberOfSections) {
             return;
         }
