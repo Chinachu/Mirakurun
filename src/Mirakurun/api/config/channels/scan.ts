@@ -31,7 +31,8 @@ const channelOrder = {
     GR: 1,
     BS: 2,
     CS: 3,
-    SKY: 4
+    SKY: 4,
+    BS4K: 5,
 };
 
 enum ScanMode {

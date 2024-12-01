@@ -79,7 +79,7 @@ export interface Server {
 export interface Tuner {
     readonly name: string;
 
-    // GR / BS / CS / SKY
+    // GR / BS / CS / SKY / BS4K
     readonly types: common.ChannelType[];
 
     // for chardev / dvb
@@ -95,6 +95,7 @@ export interface Tuner {
 
     // decoder
     readonly decoder?: string;
+    readonly tlvDecoder?: string;
 
     readonly isDisabled?: boolean;
 }
@@ -102,7 +103,7 @@ export interface Tuner {
 export interface Channel {
     readonly name: string;
 
-    // GR / BS / CS / SKY
+    // GR / BS / CS / SKY / BS4K
     readonly type: common.ChannelType;
 
     // passed to tuning command

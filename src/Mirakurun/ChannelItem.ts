@@ -21,7 +21,7 @@ import * as log from "./log";
 import * as common from "./common";
 import * as config from "./config";
 import ServiceItem from "./ServiceItem";
-import TSFilter from "./TSFilter";
+import { StreamFilter } from "./StreamFilter";
 
 export default class ChannelItem {
 
@@ -150,7 +150,7 @@ export default class ChannelItem {
         return _.service.findByChannel(this);
     }
 
-    getStream(user: common.User, output: stream.Writable): Promise<TSFilter> {
+    getStream(user: common.User, output: stream.Writable): Promise<StreamFilter> {
         return _.tuner.initChannelStream(this, user, output);
     }
 

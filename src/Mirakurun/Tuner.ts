@@ -23,6 +23,8 @@ import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
 import TSFilter from "./TSFilter";
 import TSDecoder from "./TSDecoder";
+import TLVFilter from "./TLVFilter";
+import { StreamFilter } from "./StreamFilter";
 
 export default class Tuner {
 
@@ -60,7 +62,7 @@ export default class Tuner {
         return false;
     }
 
-    initChannelStream(channel: ChannelItem, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
+    initChannelStream(channel: ChannelItem, userReq: common.UserRequest, output: Writable): Promise<StreamFilter> {
 
         let networkId: number;
 
@@ -79,7 +81,7 @@ export default class Tuner {
         }, output);
     }
 
-    initServiceStream(service: ServiceItem, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
+    initServiceStream(service: ServiceItem, userReq: common.UserRequest, output: Writable): Promise<StreamFilter> {
 
         return this._initTS({
             ...userReq,
@@ -92,7 +94,7 @@ export default class Tuner {
         }, output);
     }
 
-    initProgramStream(program: db.Program, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
+    initProgramStream(program: db.Program, userReq: common.UserRequest, output: Writable): Promise<StreamFilter> {
 
         return this._initTS({
             ...userReq,
@@ -274,9 +276,9 @@ export default class Tuner {
         return this;
     }
 
-    private _initTS(user: common.User, dest?: Writable): Promise<TSFilter> {
+    private _initTS(user: common.User, dest?: Writable): Promise<StreamFilter> {
 
-        return new Promise<TSFilter>((resolve, reject) => {
+        return new Promise<StreamFilter>((resolve, reject) => {
 
             const setting = user.streamSetting;
 
@@ -366,25 +368,48 @@ export default class Tuner {
                     }
                 } else {
                     let output: Writable;
-                    if (user.disableDecoder === true || device.decoder === null) {
-                        output = dest;
+
+                    let tsFilter: StreamFilter;
+                    if (setting.channel.type === "BS4K") {
+                        if (user.disableDecoder === true || device.tlvDecoder === null) {
+                            output = dest;
+                        } else {
+                            output = new TSDecoder({
+                                output: dest,
+                                command: device.tlvDecoder
+                            });
+                        }
+                        tsFilter = new TLVFilter({
+                            output,
+                            networkId: setting.networkId,
+                            serviceId: setting.serviceId,
+                            eventId: setting.eventId,
+                            parseNIT: setting.parseNIT,
+                            parseSDT: setting.parseSDT,
+                            parseEIT: setting.parseEIT,
+                            tsmfRelTs: setting.channel.tsmfRelTs,
+                            channel: setting.channel.channel
+                        });
                     } else {
-                        output = new TSDecoder({
-                            output: dest,
-                            command: device.decoder
+                        if (user.disableDecoder === true || device.decoder === null) {
+                            output = dest;
+                        } else {
+                            output = new TSDecoder({
+                                output: dest,
+                                command: device.decoder
+                            });
+                        }
+                        tsFilter = new TSFilter({
+                            output,
+                            networkId: setting.networkId,
+                            serviceId: setting.serviceId,
+                            eventId: setting.eventId,
+                            parseNIT: setting.parseNIT,
+                            parseSDT: setting.parseSDT,
+                            parseEIT: setting.parseEIT,
+                            tsmfRelTs: setting.channel.tsmfRelTs
                         });
                     }
-
-                    const tsFilter = new TSFilter({
-                        output,
-                        networkId: setting.networkId,
-                        serviceId: setting.serviceId,
-                        eventId: setting.eventId,
-                        parseNIT: setting.parseNIT,
-                        parseSDT: setting.parseSDT,
-                        parseEIT: setting.parseEIT,
-                        tsmfRelTs: setting.channel.tsmfRelTs
-                    });
 
                     Object.defineProperty(user, "streamInfo", {
                         get: () => tsFilter.streamInfo

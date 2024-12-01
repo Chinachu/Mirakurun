@@ -101,6 +101,7 @@ definitions:
       - BS
       - CS
       - SKY
+      - BS4K
 
   # service -------------------------------------------------------------------
 
@@ -527,6 +528,8 @@ definitions:
         type: boolean
       decoder:
         type: string
+      tlvDecoder:
+        type: string
       isDisabled:
         type: boolean
 
@@ -608,6 +611,10 @@ definitions:
             type: array
             items:
               $ref: '#/definitions/NetworkId'
+          gatheringChannels:
+            type: array
+            items:
+              type: string
           storedEvents:
             type: integer
       rpcCount:
@@ -618,6 +625,8 @@ definitions:
           tunerDevice:
             type: integer
           tsFilter:
+            type: integer
+          tlvFilter:
             type: integer
           decoder:
             type: integer
