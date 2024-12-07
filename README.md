@@ -11,6 +11,61 @@ DVR Tuner Server for Japanese TV which designed for the "Air" (in development co
 [![Backers on Open Collective](https://opencollective.com/Mirakurun/backers/badge.svg)](#backers)
 [![Sponsors on Open Collective](https://opencollective.com/Mirakurun/sponsors/badge.svg)](#sponsors)
 
+## このforkについて
+
+MMT/TLV対応のforkであり、EPGの収集、チャンネルスキャン、ロゴ収集、イベントid指定のストリーミングなどに対応しています。
+サービス別のストリームについては現在1TLV1サービスで運用されており必要がないため実装しておらず、どのAPIでも無加工のTLVストリームが出力されます。
+チャンネル種別には`BS4K`が追加されています。
+
+MMT/TLVの解析は<https://github.com/otya128/arib-mmt-tlv-ts>を用いて実装しています。
+
+### 設定
+
+Linux上で<https://github.com/otya128/tbs6812_drv>と<https://github.com/otya128/recdvb>で動作を確認しています。
+
+`dvbv5-zap`と`dvbDevicePath`の設定でも動作しますが、設定の管理が二重になりチャンネルスキャンもできないため推奨しません。
+
+Windowsでは`BonRecTest`で動く可能性はありますが動作は確認していません。
+
+`tuners.yml`の設定例:
+```yml
+- name: adapter0
+  types:
+    - GR
+    - BS
+    - CS
+    - BS4K
+  command: recdvb --dev 0 <channel> - -
+- name: adapter1
+  types:
+    - GR
+    - BS
+    - CS
+    - BS4K
+  command: recdvb --dev 1 <channel> - -
+```
+
+複数のDVBデバイスを用いる場合は全てのモジュールパラメータに`adapter_nr=<n>`を指定してアダプタ番号が固定されるようにすることを推奨します。
+
+起動後次のコマンドでチャンネルスキャンできます。
+左旋を無効にする設定は未実装なため、受信できない場合は手動で無効にしてください。 (`4518x`, `4528x`)
+
+```
+curl -X PUT "http://localhost:40772/api/config/channels/scan?type=BS4K&refresh=true"
+```
+
+### 追加機能
+
+`useTSId: true`を`server.yml`に設定すると相対TS番号の代わりにTSIDとデフォルトTSを使うようになるためBSとCSのチャンネルスキャンがすぐに終わるようになります。
+
+TSIDによる指定に対応しているDVBデバイスと併用する場合は問題ありませんが、chardevチューナーと併用する場合はTSID指定に対応しているドライバと対応している`recpt1`を用いる必要があります。
+
+* ドライバ
+  * <https://github.com/otya128/px4_drv>
+  * <https://github.com/tsukumijima/px4_drv>
+* recpt1
+  * <https://github.com/otya128/recpt1>
+
 ## Docker
 
 [![dockeri.co](https://dockeri.co/image/chinachu/mirakurun)][docker-url]
