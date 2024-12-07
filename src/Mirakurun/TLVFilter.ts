@@ -285,6 +285,16 @@ export default class TLVFilter extends EventEmitter {
 
     private _onNIT(nit: TLVNetworkInformationTable): void {
 
+        if (nit.tableId !== "TLV-NIT[actual]") {
+            return;
+        }
+
+        const streamIdList = nit.tlvStreams.map(s => s.tlvStreamId);
+        const channels: db.Channel[] = streamIdList.map(s => ({
+            type: "BS4K",
+            channel: `${s}`
+        }));
+        this.emit("networkStreams", channels);
         if (this._remoteControlKeyIdMap != null) {
             return;
         }

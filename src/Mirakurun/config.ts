@@ -74,6 +74,8 @@ export interface Server {
     readonly disableWebUI?: true;
     readonly allowIPv4CidrRanges?: string[];
     readonly allowIPv6CidrRanges?: string[];
+    readonly useTSId?: boolean;
+    readonly useStreamId?: boolean;
 }
 
 export interface Tuner {
@@ -168,6 +170,13 @@ export function loadServer(): Server {
     }
     if (!config.allowIPv6CidrRanges) {
         config.allowIPv6CidrRanges = ["fc00::/7"];
+    }
+
+    if (typeof config.useTSId !== "boolean") {
+        config.useTSId = false;
+    }
+    if (typeof config.useStreamId !== "boolean") {
+        config.useStreamId = true;
     }
 
     // Docker

@@ -498,6 +498,10 @@ definitions:
         type: array
         items:
           type: string
+      useTSId:
+        type: boolean
+      useStreamId:
+        type: boolean
 
   ConfigTuners:
     type: array

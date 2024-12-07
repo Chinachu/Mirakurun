@@ -50,6 +50,7 @@ interface ChannelScanOption {
     scanMode?: ScanMode;
     setDisabledOnAdd?: boolean;
     refresh?: boolean;
+    useNIT?: boolean;
 }
 
 interface ScanConfig {
@@ -89,6 +90,27 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
         ...option
     };
 
+    if (option.type === common.ChannelTypes.BS4K) {
+        return {
+            channels: ["45328"], // default TLV
+            scanMode: option.scanMode,
+            setDisabledOnAdd: option.setDisabledOnAdd
+        };
+    }
+    if (option.useNIT && option.type === common.ChannelTypes.BS) {
+        return {
+            channels: ["16625"], // default TS
+            scanMode: option.scanMode,
+            setDisabledOnAdd: option.setDisabledOnAdd
+        };
+    }
+    if (option.useNIT && option.type === common.ChannelTypes.CS) {
+        return {
+            channels: ["24608", "28736"], // default TS
+            scanMode: option.scanMode,
+            setDisabledOnAdd: option.setDisabledOnAdd
+        };
+    }
     if (option.type === common.ChannelTypes.BS) {
         if (option.useSubCh) {
             option = {
@@ -224,6 +246,7 @@ export const put: Operation = async (req, res) => {
     const refresh = req.query.refresh as any as boolean;
     const oldChannelItems = config.loadChannels();
     const result: config.Channel[] = oldChannelItems.filter(channel => channel.type !== type);
+    const useNIT = type === "BS4K" ? !!_.config.server.useStreamId : (type === "BS" || type === "CS" ? !!_.config.server.useTSId : false);
     let newCount = 0;
     let takeoverCount = 0;
 
@@ -242,7 +265,8 @@ export const put: Operation = async (req, res) => {
         endSubCh: req.query.maxSubCh as any as number,
         useSubCh: req.query.useSubCh as any as boolean,
         scanMode: req.query.scanMode as any as ScanMode,
-        setDisabledOnAdd: req.query.setDisabledOnAdd as any as boolean
+        setDisabledOnAdd: req.query.setDisabledOnAdd as any as boolean,
+        useNIT
     });
 
     const chLength = scanConfig.channels.length;
@@ -266,17 +290,37 @@ export const put: Operation = async (req, res) => {
         }
 
         let services: db.Service[];
+        let channels: db.Channel[];
         try {
-            services = await _.tuner.getServices(<any> {
+            const r = await _.tuner.getServices(<any> {
                 type: type,
                 channel: channel
             });
+            services = r.services;
+            channels = r.channels;
         } catch (e) {
             res.write("-> no signal.");
             if (/stream has closed before get network/.test(e) === false) {
                 res.write(` [${e}]`);
             }
             res.write("\n\n");
+            continue;
+        }
+
+        if (useNIT) {
+            res.write(`-> ${channels.length} streams found.\n`);
+            for (const c of channels) {
+                if (result.some(x => x.channel === c.channel)) {
+                    continue;
+                }
+                res.write(`-> ${JSON.stringify(c)}\n`);
+                result.push({
+                    name: c.channel,
+                    type,
+                    channel: c.channel,
+                });
+                ++newCount;
+            }
             continue;
         }
 
@@ -360,7 +404,7 @@ About BS Subchannel Style:
             in: "query",
             name: "type",
             type: "string",
-            enum: [common.ChannelTypes.GR, common.ChannelTypes.BS, common.ChannelTypes.CS],
+            enum: [common.ChannelTypes.GR, common.ChannelTypes.BS, common.ChannelTypes.CS, common.ChannelTypes.BS4K],
             default: common.ChannelTypes.GR,
             description: "Specifies the channel type to scan."
         },

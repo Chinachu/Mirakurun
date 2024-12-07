@@ -153,7 +153,7 @@ export default class Tuner {
         });
     }
 
-    async getServices(channel: ChannelItem): Promise<db.Service[]> {
+    async getServices(channel: ChannelItem): Promise<{ services: db.Service[], channels: db.Channel[] }> {
 
         const tsFilter = await this._initTS({
             id: "Mirakurun:getServices()",
@@ -165,7 +165,7 @@ export default class Tuner {
                 parseSDT: true
             }
         });
-        return new Promise<db.Service[]>((resolve, reject) => {
+        return new Promise<{ services: db.Service[], channels: db.Channel[] }>((resolve, reject) => {
 
             let network = {
                 networkId: -1,
@@ -173,6 +173,7 @@ export default class Tuner {
                 remoteControlKeyId: -1
             };
             let services: db.Service[] = null;
+            let networkStreams: db.Channel[] = [];
 
             setTimeout(() => tsFilter.close(), 20000);
 
@@ -180,6 +181,12 @@ export default class Tuner {
                 new Promise((resolve, reject) => {
                     tsFilter.once("network", _network => {
                         network = _network;
+                        resolve();
+                    });
+                }),
+                new Promise((resolve, reject) => {
+                    tsFilter.once("networkStreams", _networkStreams => {
+                        networkStreams = _networkStreams;
                         resolve();
                     });
                 }),
@@ -207,7 +214,7 @@ export default class Tuner {
                         });
                     }
 
-                    resolve(services);
+                    resolve({ services, channels: networkStreams });
                 }
             });
         });

@@ -164,7 +164,8 @@ export default class ChannelItem {
 
             let services: db.Service[];
             try {
-                services = await _.tuner.getServices(this);
+                const r = await _.tuner.getServices(this);
+                services = r.services;
             } catch (e) {
                 log.warn("ChannelItem#'%s' service scan has failed [%s]", this._name, e);
 
