@@ -19,9 +19,6 @@ if (process.env["npm_config_global"] !== "true") {
     process.exit(0);
 }
 
-const fs = require("fs");
-const path = require("path");
-const child_process = require("child_process");
 const semver = require("semver");
 const pkg = require("../package.json");
 
