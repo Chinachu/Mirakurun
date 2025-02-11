@@ -403,12 +403,7 @@ export default class TunerDevice extends EventEmitter {
 
             this.once("release", resolve);
 
-            if (process.platform === "win32") {
-                const timer = setTimeout(() => this._process.kill(), 3000);
-                this._process.once("exit", () => clearTimeout(timer));
-
-                this._process.stdin.write("\n");
-            } else if (/^dvbv5-zap /.test(this._command) === true) {
+            if (/^dvbv5-zap /.test(this._command) === true) {
                 this._process.kill("SIGKILL");
             } else {
                 const timer = setTimeout(() => {

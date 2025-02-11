@@ -38,9 +38,7 @@
   "scripts": {
     "start": "node -r source-map-support/register lib/server.js",
     "debug": "node -r source-map-support/register --inspect=0.0.0.0:9229 lib/server.js",
-    "start.win32": "node.exe -r source-map-support/register bin/init.win32.js",
-    "debug.win32": "node.exe -r source-map-support/register --inspect bin/init.win32.js",
-    "build": "npm run build:server && npm run build:webpack",
+        "build": "npm run build:server && npm run build:webpack",
     "build:server": "tslint --project . && tsc --declaration",
     "build:webpack": "webpack",
     "watch": "concurrently -n w: npm:watch:*",
@@ -119,8 +117,7 @@
   "engineStrict": true,
   "os": [
     "linux",
-    "darwin",
-    "win32"
+    "darwin"
   ],
   "funding": {
     "type": "opencollective",

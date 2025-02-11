@@ -183,8 +183,8 @@ class Server {
 
             server.timeout = 1000 * 15; // 15 sec.
 
-            if (regexp.unixDomainSocket.test(address) === true || regexp.windowsNamedPipe.test(address) === true) {
-                if (process.platform !== "win32" && fs.existsSync(address) === true) {
+            if (regexp.unixDomainSocket.test(address) === true) {
+                if (fs.existsSync(address) === true) {
                     fs.unlinkSync(address);
                 }
 
@@ -192,9 +192,7 @@ class Server {
                     log.info("listening on http+unix://%s", address.replace(/\//g, "%2F"));
                 });
 
-                if (process.platform !== "win32") {
-                    fs.chmodSync(address, "777");
-                }
+                fs.chmodSync(address, "777");
             } else {
                 server.listen(serverConfig.port, address, () => {
                     if (address.includes(":") === true) {

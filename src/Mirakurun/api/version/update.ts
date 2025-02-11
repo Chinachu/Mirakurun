@@ -24,7 +24,7 @@ const current = require("../../../../package.json").version as string;
 
 export const put: Operation = async (req, res) => {
 
-    if (!req.query.force && !process.env.pm_uptime && !process.env.USING_WINSER) {
+    if (!req.query.force && !process.env.pm_uptime) {
         api.responseError(res, 500);
         return;
     }

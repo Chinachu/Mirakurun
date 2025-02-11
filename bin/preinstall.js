@@ -22,25 +22,12 @@ if (process.env["npm_config_global"] !== "true") {
 
 const child_process = require("child_process");
 
-if (process.platform === "linux" || process.platform === "darwin") {
-    if (process.getuid() !== 0) {
-        console.log("Note: `sudo npm install mirakurun -g --unsafe-perm --production` to install Mirakurun as Server.");
-        process.exit(0);
-    }
+if (process.getuid() !== 0) {
+    console.log("Note: `sudo npm install mirakurun -g --unsafe-perm --production` to install Mirakurun as Server.");
+    process.exit(0);
+}
 
-    if (process.env.DOCKER === "YES") {
-        console.log("Note: running in Docker.");
-        process.exit(0);
-    }
-} else if (process.platform === "win32") {
-    try {
-        child_process.execSync("winser -r -x", {
-            stdio: [
-                null,
-                process.stdout,
-                null
-            ]
-        });
-    } catch (e) {
-    }
+if (process.env.DOCKER === "YES") {
+    console.log("Note: running in Docker.");
+    process.exit(0);
 }

@@ -22,7 +22,7 @@ if (process.env.DOCKER === "YES") {
     console.error("Error: running in Docker.");
     process.exit(1);
 }
-if (process.platform !== "win32" && process.getuid() !== 0) {
+if (process.getuid() !== 0) {
     console.error("Error: root please.");
     process.exit(1);
 }
@@ -65,18 +65,14 @@ if (!pkg._resolved) {
 
 function spawnNpmInstall(version: string): ChildProcess {
 
-    let command = "npm";
+    const command = "npm";
     const args = [
         "install",
         `${pkg.name}@${version}`,
         "-g",
-        "--production"
+        "--production",
+        "--unsafe-perm"
     ];
-    if (process.platform === "win32") {
-        command = "npm.cmd";
-    } else {
-        args.push("--unsafe-perm");
-    }
 
     console.log(">", command, ...args);
 

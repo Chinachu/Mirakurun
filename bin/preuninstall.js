@@ -21,32 +21,22 @@ if (process.env["npm_config_global"] !== "true") {
 
 const execSync = require("child_process").execSync;
 
-if (process.platform === "linux" || process.platform === "darwin") {
-    if (process.getuid() !== 0 || process.env.DOCKER === "YES") {
-        process.exit(0);
-    }
-
-    execSync("pm2 stop mirakurun-server", {
-        stdio: [
-            null,
-            process.stdout,
-            process.stderr
-        ]
-    });
-
-    execSync("pm2 delete mirakurun-server", {
-        stdio: [
-            null,
-            process.stdout,
-            process.stderr
-        ]
-    });
-} else if (process.platform === "win32") {
-    execSync("winser -r -x -s", {
-        stdio: [
-            null,
-            process.stdout,
-            process.stderr
-        ]
-    });
+if (process.getuid() !== 0 || process.env.DOCKER === "YES") {
+    process.exit(0);
 }
+
+execSync("pm2 stop mirakurun-server", {
+    stdio: [
+        null,
+        process.stdout,
+        process.stderr
+    ]
+});
+
+execSync("pm2 delete mirakurun-server", {
+    stdio: [
+        null,
+        process.stdout,
+        process.stderr
+    ]
+});
