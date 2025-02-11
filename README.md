@@ -75,11 +75,6 @@ http://_your_mirakurun_ip_:40772/
 http://_your_mirakurun_ip_:40772/api/debug
 ```
 
-## PM2 Plus (Keymetrics)
-
-You can use PM2 Plus to realtime monitoring if running by PM2.
-
-* [PM2 Plus](https://pm2.io/plus/) (Keymetrics)
 
 ## Client Implementations
 
