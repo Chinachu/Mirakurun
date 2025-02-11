@@ -47,6 +47,22 @@ export const parameters = [
     }
 ];
 
+export const head: Operation = (req, res) => {
+
+    const channel = _.channel.get(req.params.type as ChannelType, req.params.channel);
+
+    if (channel === null) {
+        api.responseError(res, 404);
+        return;
+    }
+
+    const userId = (req.ip || "unix") + ":" + (req.socket.remotePort || Date.now());
+
+    res.setHeader("Content-Type", "video/MP2T");
+    res.setHeader("X-Mirakurun-Tuner-User-ID", userId);
+    res.status(200).end();
+};
+
 export const get: Operation = (req, res) => {
 
     const channel = _.channel.get(req.params.type as ChannelType, req.params.channel);
@@ -83,6 +99,31 @@ export const get: Operation = (req, res) => {
             res.status(200);
         })
         .catch((err) => api.responseStreamErrorHandler(res, err));
+};
+
+head.apiDoc = {
+    tags: ["channels", "stream"],
+    operationId: "getChannelStream",
+    produces: ["video/MP2T"],
+    responses: {
+        200: {
+            description: "OK",
+            headers: {
+                "X-Mirakurun-Tuner-User-ID": {
+                    type: "string"
+                }
+            }
+        },
+        404: {
+            description: "Not Found"
+        },
+        503: {
+            description: "Tuner Resource Unavailable"
+        },
+        default: {
+            description: "Unexpected Error"
+        }
+    }
 };
 
 get.apiDoc = {
