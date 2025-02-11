@@ -180,7 +180,7 @@ export default class EPG {
                         startAt: getTimeFromMJD(e.start_time),
                         duration: UNKNOWN_DURATION.compare(e.duration) === 0 ? 1 : getTimeFromBCD24(e.duration),
                         isFree: e.free_CA_mode === 0,
-                        _pf: isPF || undefined,     // for compatibility
+                        _pf: isPF || undefined, // for compatibility
                         _isPresent: isP || undefined,
                         _isFollowing: isF || undefined
                     };
@@ -231,7 +231,7 @@ export default class EPG {
                             startAt: getTimeFromMJD(e.start_time),
                             duration: UNKNOWN_DURATION.compare(e.duration) === 0 ? 1 : getTimeFromBCD24(e.duration),
                             isFree: e.free_CA_mode === 0,
-                            _pf: isPF || undefined,     // for compatibility
+                            _pf: isPF || undefined, // for compatibility
                             _isPresent: isP || undefined,
                             _isFollowing: isF || undefined
                         });
