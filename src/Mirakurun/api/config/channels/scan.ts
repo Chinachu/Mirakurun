@@ -23,7 +23,7 @@ import _ from "../../../_";
 let isScanning = false;
 
 const compareOptions = {
-    sensitivity: "base",
+    sensitivity: "base" as const,
     numeric: true
 };
 
