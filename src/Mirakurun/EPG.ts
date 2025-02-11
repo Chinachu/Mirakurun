@@ -128,6 +128,7 @@ interface EventState {
     };
 
     present?: true;
+    following?: true;
 }
 
 // forked from rndomhack/node-aribts/blob/1e7ef94bba3d6ac26aec764bf24dde2c2852bfcb/lib/epg.js
@@ -148,6 +149,7 @@ export default class EPG {
         }
 
         const isP = isPF && eit.section_number === 0;
+        const isF = isPF && eit.section_number === 1;
 
         const networkId = eit.original_network_id;
 
@@ -178,7 +180,9 @@ export default class EPG {
                         startAt: getTimeFromMJD(e.start_time),
                         duration: UNKNOWN_DURATION.compare(e.duration) === 0 ? 1 : getTimeFromBCD24(e.duration),
                         isFree: e.free_CA_mode === 0,
-                        _pf: isPF || undefined
+                        _pf: isPF || undefined, // for compatibility
+                        _isPresent: isP || undefined,
+                        _isFollowing: isF || undefined
                     };
                     _.program.add(programItem);
                 }
@@ -210,19 +214,16 @@ export default class EPG {
                         version: {},
                         _groups: []
                     },
-
-                    present: isP || undefined
+                    present: isP || undefined,
+                    following: isF || undefined
                 };
 
+                state.version[eit.table_id] = eit.version_number;
                 service[e.event_id] = state;
             } else {
                 state = service[e.event_id];
 
-                if (!state.present && isP) {
-                    state.present = true;
-                }
-
-                if ((!state.present || (state.present && isP)) && isOutOfDate(eit, state.version)) {
+                if ((!state.present && isP) || (!state.following && isF) || isOutOfDate(eit, state.version)) {
                     state.version[eit.table_id] = eit.version_number;
 
                     if (UNKNOWN_START_TIME.compare(e.start_time) !== 0) {
@@ -230,9 +231,14 @@ export default class EPG {
                             startAt: getTimeFromMJD(e.start_time),
                             duration: UNKNOWN_DURATION.compare(e.duration) === 0 ? 1 : getTimeFromBCD24(e.duration),
                             isFree: e.free_CA_mode === 0,
-                            _pf: isPF || undefined
+                            _pf: isPF || undefined, // for compatibility
+                            _isPresent: isP || undefined,
+                            _isFollowing: isF || undefined
                         });
                     }
+
+                    state.present = isP || undefined;
+                    state.following = isF || undefined;
                 }
             }
 

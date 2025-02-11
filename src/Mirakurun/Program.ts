@@ -28,6 +28,7 @@ export function getProgramItemId(networkId: number, serviceId: number, eventId: 
 export default class Program {
 
     private _itemMap = new Map<number, db.Program>();
+    private _itemMapDeleted = new Map<number, db.Program>();
     private _saveTimerId: NodeJS.Timer;
     private _emitTimerId: NodeJS.Timer;
     private _emitRunning = false;
@@ -50,6 +51,9 @@ export default class Program {
             return;
         }
 
+        // purge logically deleted item
+        this._itemMapDeleted.delete(item.id);
+
         if (firstAdd === false) {
             this._findAndRemoveConflicts(item);
         }
@@ -68,7 +72,22 @@ export default class Program {
     }
 
     set(id: number, props: Partial<db.Program>): void {
-        const item = this.get(id);
+        let item = this.get(id);
+        if (!item) {
+            // Recovers logically deleted item if that is exsts into the tempolally collection.
+            item = this._itemMapDeleted.get(id) || null;
+            if (item) {
+                this._itemMap.set(item.id, item);
+                this._itemMapDeleted.delete(item.id);
+                this._emitPrograms.set(item, "create");
+                this.save();
+
+                log.debug(
+                    "ProgramItem#%d (networkId=%d, serviceId=%d, eventId=%d) has recovered from the logically-deleted store",
+                    item.id, item.networkId, item.serviceId, item.eventId
+                );
+            }
+        }
         if (item && common.updateObject(item, props) === true) {
             if (props.startAt || props.duration) {
                 this._findAndRemoveConflicts(item);
@@ -78,14 +97,27 @@ export default class Program {
         }
     }
 
-    remove(id: number): void {
-        if (this._itemMap.delete(id)) {
-            this.save();
+    remove(id: number, logicallyDelete: boolean = false): void {
+        if (logicallyDelete) {
+            const item = this.get(id);
+            if (item) {
+                this._itemMapDeleted.set(item.id, item);
+                this._itemMap.delete(id);
+                this.save();
+            }
+        } else {
+            if (this._itemMap.delete(id)) {
+                this.save();
+            }
         }
     }
 
     exists(id: number): boolean {
         return this._itemMap.has(id);
+    }
+
+    isLogicallyDeleted(id: number): boolean {
+        return this._itemMapDeleted.has(id);
     }
 
     findByQuery(query: object): db.Program[] {
@@ -189,9 +221,9 @@ export default class Program {
                         (added.startAt <= item.startAt && item.startAt < addedEndAt) ||
                         (item.startAt <= added.startAt && added.startAt < itemEndAt)
                     ) &&
-                    (!item._pf || added._pf)
+                    (!(item._isPresent || item._isFollowing) || added._isPresent)
                 ) {
-                    this.remove(item.id);
+                    this.remove(item.id, true);
                     Event.emit("program", "remove", { id: item.id });
 
                     log.debug(
@@ -227,6 +259,7 @@ export default class Program {
 
         log.debug("saving programs...");
 
+        // TODO: Do we need to save/load logically deleted items?
         db.savePrograms(
             Array.from(this._itemMap.values()),
             _.configIntegrity.channels
@@ -251,6 +284,17 @@ export default class Program {
                 ) {
                     ++count;
                     this.remove(item.id);
+                }
+            }
+
+            // Perform GC for the logically-deleted store
+            for (const item of this._itemMapDeleted.values()) {
+                if (
+                    (item.duration === 1 ? longExp : shortExp) > (item.startAt + item.duration) ||
+                    maximum < item.startAt
+                ) {
+                    ++count;
+                    this._itemMapDeleted.delete(item.id);
                 }
             }
 
