@@ -106,7 +106,7 @@ export default class Service {
     }
 
     private _items: ServiceItem[] = [];
-    private _saveTimerId: NodeJS.Timer;
+    private _saveTimerId: NodeJS.Timeout;
 
     constructor() {
         this._load();
