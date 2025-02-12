@@ -56,10 +56,10 @@ stages:
       displayName: npm run clean
 
 - stage: Publish
+  condition: |
+    and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
   jobs:
   - job: Publish
-    condition: |
-      and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
     pool:
       vmImage: 'ubuntu-22.04'
     steps:
