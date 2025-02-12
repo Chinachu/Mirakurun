@@ -23,9 +23,9 @@ see: available [Tags](https://hub.docker.com/r/chinachu/mirakurun/tags) (Docker 
 mkdir ~/mirakurun/
 cd ~/mirakurun/
 wget https://raw.githubusercontent.com/Chinachu/Mirakurun/master/docker/docker-compose.yml
-docker-compose pull
-docker-compose run --rm -e SETUP=true mirakurun
-docker-compose up -d
+docker compose pull
+docker compose run --rm -e SETUP=true mirakurun
+docker compose up -d
 ```
 
 see: [doc/Platforms.md](doc/Platforms.md)
@@ -56,8 +56,8 @@ see: [doc/Platforms.md](doc/Platforms.md)
 
 ## Requirements / Supported Platforms
 
-* [Node.js](http://nodejs.org/) 14, 16, 18
-* Linux w/ [PM2](http://pm2.keymetrics.io/) or [Docker](https://hub.docker.com/r/chinachu/mirakurun)
+* [Node.js](http://nodejs.org/) 18, 20, 22
+* Linux w/ [Docker](https://hub.docker.com/r/chinachu/mirakurun)
 
 see: [doc/Platforms.md](doc/Platforms.md)
 
