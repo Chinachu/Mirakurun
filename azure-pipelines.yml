@@ -5,6 +5,7 @@ trigger:
     include:
     - master
     - feature/*
+    - release/*
     - refs/tags/*.*.*
 
 pr:
