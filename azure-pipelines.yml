@@ -54,10 +54,28 @@ stages:
       displayName: npm test
     - script: npm run clean
       displayName: npm run clean
-  # todo: publish
-  # - job: Publish
-  #   condition: |
-  #     and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
+
+- stage: Publish
+  jobs:
+  - job: Publish
+    condition: |
+      and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
+    pool:
+      vmImage: 'ubuntu-22.04'
+    steps:
+    - checkout: self
+      submodules: 'true'
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '22.x'
+    - script: npm ci
+      displayName: npm ci
+    - task: Npm@1
+      displayName: npm publish
+      inputs:
+        command: publish
+        publishEndpoint: npm
+
 - stage: DockerBuildAndPush
   condition: |
     and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
