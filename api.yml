@@ -101,6 +101,7 @@ definitions:
       - BS
       - CS
       - SKY
+      - BS4K
 
   # service -------------------------------------------------------------------
 
@@ -497,6 +498,10 @@ definitions:
         type: array
         items:
           type: string
+      useTSId:
+        type: boolean
+      useStreamId:
+        type: boolean
 
   ConfigTuners:
     type: array
@@ -526,6 +531,8 @@ definitions:
       remoteMirakurunDecoder:
         type: boolean
       decoder:
+        type: string
+      tlvDecoder:
         type: string
       isDisabled:
         type: boolean
@@ -608,6 +615,10 @@ definitions:
             type: array
             items:
               $ref: '#/definitions/NetworkId'
+          gatheringChannels:
+            type: array
+            items:
+              type: string
           storedEvents:
             type: integer
       rpcCount:
@@ -618,6 +629,8 @@ definitions:
           tunerDevice:
             type: integer
           tsFilter:
+            type: integer
+          tlvFilter:
             type: integer
           decoder:
             type: integer

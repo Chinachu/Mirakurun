@@ -49,7 +49,8 @@ export enum ChannelTypes {
     "GR" = "GR",
     "BS" = "BS",
     "CS" = "CS",
-    "SKY" = "SKY"
+    "SKY" = "SKY",
+    "BS4K" = "BS4K"
 }
 
 export type ChannelType = keyof typeof ChannelTypes;
@@ -133,4 +134,10 @@ export function getTimeFromBCD24(buffer: Uint8Array | Buffer): number {
     time += (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);
 
     return time * 1000;
+}
+
+const textDecoder = new TextDecoder();
+
+export function decodeUTF8(buffer: Uint8Array) {
+    return textDecoder.decode(buffer, { stream: false });
 }

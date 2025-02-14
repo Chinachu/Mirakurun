@@ -29,6 +29,8 @@ disableEITParsing: false # boolean
 disableWebUI: false # boolean
 allowIPv4CidrRanges: ["10.0.0.0/8", "127.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"] # array of string
 allowIPv6CidrRanges: ["fc00::/7"] # array of string
+useTSId: false
+useStreamId: true
 ```
 
 ### Environment Values (Docker)
