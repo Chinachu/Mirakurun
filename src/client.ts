@@ -109,7 +109,7 @@ export default class Client {
     priority = 0;
     host = "";
     port = 40772;
-    socketPath = process.platform === "win32" ? "\\\\.\\pipe\\mirakurun" : "/var/run/mirakurun.sock";
+    socketPath = "/var/run/mirakurun.sock";
     agent: http.Agent | boolean;
     /** provide User-Agent string to identify client. */
     userAgent = "";

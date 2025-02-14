@@ -23,7 +23,7 @@ import _ from "../../../_";
 let isScanning = false;
 
 const compareOptions = {
-    sensitivity: "base",
+    sensitivity: "base" as const,
     numeric: true
 };
 
@@ -39,6 +39,11 @@ enum ScanMode {
     Service = "Service"
 }
 
+const CHANNEL_NAME_FORMAT_GR = "{ch}";
+const CHANNEL_NAME_FORMAT_BS = "{ch}";
+const CHANNEL_NAME_FORMAT_BS_SUBCH = "BS{ch00}_{subch}";
+const CHANNEL_NAME_FORMAT_CS = "CS{ch}";
+
 interface ChannelScanOption {
     type: string;
     startCh?: number;
@@ -49,6 +54,7 @@ interface ChannelScanOption {
     scanMode?: ScanMode;
     setDisabledOnAdd?: boolean;
     refresh?: boolean;
+    channelNameFormat?: string;
 }
 
 interface ScanConfig {
@@ -57,8 +63,37 @@ interface ScanConfig {
     readonly setDisabledOnAdd: boolean;
 }
 
-function range(start: number, end: number): string[] {
-    return Array.from({length: (end - start + 1)}, (v, index) => (index + start).toString(10));
+function range(start: number, end: number): number[] {
+    return Array.from({ length: (end - start + 1) }, (x, i) => i + start);​​​​​​
+}
+
+function formatChannelName(format: string, ch: number, subch?: number): string {
+    const values = new Map<string, string>();
+    // {変数名} 形式の文字列をかき集める
+    const placeholders = format.match(/({[\\_a-zA-Z0-9]+})/g);
+    if (placeholders) {
+        for (const placeholder of placeholders) {
+            // {ch[0]*}
+            const chDigits = placeholder.match(/{ch([0]*)}/);
+            if (chDigits) {
+                const digits = chDigits[1] ? chDigits[1].length : 1;
+                values.set(placeholder, (ch ? ch : 0).toString(10).padStart(digits, "0"));
+            }
+            // {subch[0]*}
+            const subchDigits = placeholder.match(/{subch([0]*)}/);
+            if (subchDigits) {
+                const digits = subchDigits[1] ? subchDigits[1].length : 1;
+                values.set(placeholder, (subch ? subch : 0).toString(10).padStart(digits, "0"));
+            }
+        }
+    }
+    let formatted = format;
+    for (const [key, value] of values) {
+        while (formatted.includes(key)) {
+            formatted = formatted.replace(key, value);
+        }
+    }
+    return formatted;
 }
 
 export function generateScanConfig(option: ChannelScanOption): ScanConfig {
@@ -76,7 +111,7 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
         };
 
         return {
-            channels: range(option.startCh, option.endCh).map((ch) => ch),
+            channels: range(option.startCh, option.endCh).map((ch) => formatChannelName(option.channelNameFormat ? option.channelNameFormat : CHANNEL_NAME_FORMAT_GR, ch)),
             scanMode: option.scanMode,
             setDisabledOnAdd: option.setDisabledOnAdd
         };
@@ -101,7 +136,7 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
             const channels: string[] = [];
             for (const ch of range(option.startCh, option.endCh)) {
                 for (const subCh of range(option.startSubCh, option.endSubCh)) {
-                    channels.push(`BS${ch.toString().padStart(2, "0")}_${subCh}`);
+                    channels.push(formatChannelName(option.channelNameFormat ? option.channelNameFormat : CHANNEL_NAME_FORMAT_BS_SUBCH, ch, subCh));
                 }
             }
 
@@ -119,7 +154,7 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
         };
 
         return {
-            channels: range(option.startCh, option.endCh).map((ch) => ch),
+            channels: range(option.startCh, option.endCh).map((ch) => formatChannelName(option.channelNameFormat ? option.channelNameFormat : CHANNEL_NAME_FORMAT_BS, ch)),
             scanMode: option.scanMode,
             setDisabledOnAdd: option.setDisabledOnAdd
         };
@@ -133,7 +168,7 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
         };
 
         return {
-            channels: range(option.startCh, option.endCh).map((ch) => `CS${ch}`),
+            channels: range(option.startCh, option.endCh).map((ch) => formatChannelName(option.channelNameFormat ? option.channelNameFormat : CHANNEL_NAME_FORMAT_CS, ch)),
             scanMode: option.scanMode,
             setDisabledOnAdd: option.setDisabledOnAdd
         };
@@ -240,6 +275,7 @@ export const put: Operation = async (req, res) => {
         startSubCh: req.query.minSubCh as any as number,
         endSubCh: req.query.maxSubCh as any as number,
         useSubCh: req.query.useSubCh as any as boolean,
+        channelNameFormat: req.query.channelNameFormat as any as string,
         scanMode: req.query.scanMode as any as ScanMode,
         setDisabledOnAdd: req.query.setDisabledOnAdd as any as boolean
     });
@@ -394,6 +430,14 @@ About BS Subchannel Style:
             allowEmptyValue: true,
             default: true,
             description: "Specify true to specify the channel in the subchannel style. Only used for BS scans. (e.g. BS01_0)"
+        },
+        {
+            in: "query",
+            name: "channelNameFormat",
+            type: "string",
+            allowEmptyValue: true,
+            default: "{ch}",
+            description: "Override format to use for channel name. (e.g. {ch} -> 1, BS{ch00}_{subch} -> BS01_2)"
         },
         {
             in: "query",

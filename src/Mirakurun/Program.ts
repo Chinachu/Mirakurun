@@ -29,8 +29,8 @@ export default class Program {
 
     private _itemMap = new Map<number, db.Program>();
     private _itemMapDeleted = new Map<number, db.Program>();
-    private _saveTimerId: NodeJS.Timer;
-    private _emitTimerId: NodeJS.Timer;
+    private _saveTimerId: NodeJS.Timeout;
+    private _emitTimerId: NodeJS.Timeout;
     private _emitRunning = false;
     private _emitPrograms = new Map<db.Program, EventType>();
     private _programGCInterval = _.config.server.programGCInterval || 1000 * 60 * 60; // 1 hour
