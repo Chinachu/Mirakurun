@@ -353,7 +353,7 @@ export const put: Operation = async (req, res) => {
                 result.push({
                     name: c.channel,
                     type,
-                    channel: c.channel,
+                    channel: c.channel
                 });
                 ++newCount;
             }
