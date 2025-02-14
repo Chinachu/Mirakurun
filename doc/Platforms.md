@@ -148,3 +148,96 @@ $ cp /usr/local/bin/something-static /opt/mirakurun/opt/bin/
 * Opt: `/opt/mirakurun/opt/`
   * `bin/`
   * `bin/startup` - custom startup script (optional)
+
+## Linux
+
+**Note:**
+
+* ⚠ Any desktop environment / VM is not supported. lacking reliability by critical performance issue.
+
+### Node.js
+
+* **via Package Manager** (recommended)
+  * [Debian / Ubuntu](https://github.com/nodesource/distributions/blob/master/README.md#deb) (deb)
+    * `curl -sL https://deb.nodesource.com/setup_18.x | sudo -E bash -`
+    * `sudo apt-get install -y nodejs`
+  * [CentOS](https://github.com/nodesource/distributions/blob/master/README.md#rpm) (rpm)
+    * (root) `curl -sL https://rpm.nodesource.com/setup_18.x | bash -`
+  * [Gentoo](https://nodejs.org/en/download/package-manager/#gentoo)
+    * `emerge nodejs`
+* [nave](https://github.com/isaacs/nave)
+  * `sudo /path/to/nave.sh usemain 18`
+
+### Install / Update
+
+```sh
+# for building C++ addons (Debian / Ubuntu)
+sudo apt install build-essential
+
+# PM2 (Process Manager)
+sudo npm install pm2 -g
+
+# Quick
+sudo npm install mirakurun -g --unsafe-perm --foreground-scripts --production
+
+# Advanced
+sudo npm install mirakurun -g --production
+sudo mirakurun init # to install as service
+sudo mirakurun restart # when updated
+```
+
+### Uninstall
+
+```sh
+# Quick
+sudo npm uninstall mirakurun -g --unsafe-perm
+
+# Advanced
+sudo pm2 stop mirakurun-server
+sudo pm2 delete mirakurun-server
+sudo pm2 save
+sudo npm uninstall mirakurun -g
+```
+
+### Administration
+
+#### Config
+
+```
+mirakurun config [server|tuners|channels]
+```
+
+see: [Configuration.md](Configuration.md)
+
+#### Log Stream
+
+```
+mirakurun log server
+```
+
+#### Service Management
+
+```
+mirakurun [status|start|stop|restart]
+```
+
+#### Version Info
+
+```
+mirakurun version
+```
+
+
+### 💡 Locations
+
+* Socket: `/var/run/mirakurun.sock`
+* Config: `/usr/local/etc/mirakurun/`
+  * `server.yml`
+  * `tuners.yml`
+  * `channels.yml`
+* Data: `/usr/local/var/db/mirakurun/`
+  * `services.json`
+  * `programs.json`
+* Log: `/usr/local/var/log/`
+  * `mirakurun.stdout.log` - normal log
+  * `mirakurun.stderr.log` - error log
