@@ -574,7 +574,7 @@ export default class TSFilter extends EventEmitter {
             const tsIdList: number[] = data.transport_streams.map(ts => ts.transport_stream_id);
             const channels: db.Channel[] = tsIdList.map(tsid => ({
                 type: channelType,
-                channel: `${tsid}`,
+                channel: `${tsid}`
             }));
             this.emit("networkStreams", channels);
         } else {
