@@ -56,6 +56,7 @@ interface ChannelScanOption {
     setDisabledOnAdd?: boolean;
     refresh?: boolean;
     useNIT?: boolean;
+    channelNameFormat?: string;
 }
 
 interface ScanConfig {
