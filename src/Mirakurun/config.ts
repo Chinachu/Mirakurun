@@ -74,12 +74,14 @@ export interface Server {
     readonly disableWebUI?: true;
     readonly allowIPv4CidrRanges?: string[];
     readonly allowIPv6CidrRanges?: string[];
+    readonly useTSId?: boolean;
+    readonly useStreamId?: boolean;
 }
 
 export interface Tuner {
     readonly name: string;
 
-    // GR / BS / CS / SKY
+    // GR / BS / CS / SKY / BS4K
     readonly types: common.ChannelType[];
 
     // for chardev / dvb
@@ -95,6 +97,7 @@ export interface Tuner {
 
     // decoder
     readonly decoder?: string;
+    readonly tlvDecoder?: string;
 
     readonly isDisabled?: boolean;
 }
@@ -102,7 +105,7 @@ export interface Tuner {
 export interface Channel {
     readonly name: string;
 
-    // GR / BS / CS / SKY
+    // GR / BS / CS / SKY / BS4K
     readonly type: common.ChannelType;
 
     // passed to tuning command
@@ -163,6 +166,13 @@ export function loadServer(): Server {
     }
     if (!config.allowIPv6CidrRanges) {
         config.allowIPv6CidrRanges = ["fc00::/7"];
+    }
+
+    if (typeof config.useTSId !== "boolean") {
+        config.useTSId = false;
+    }
+    if (typeof config.useStreamId !== "boolean") {
+        config.useStreamId = true;
     }
 
     // Docker

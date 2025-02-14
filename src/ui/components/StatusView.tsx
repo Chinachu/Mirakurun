@@ -84,9 +84,11 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
         statusItem.push({ label: "Node.js Version", text: status.process?.versions?.node });
         statusItem.push({ label: "Memory (RSS)", text: `${Math.round(status.process?.memoryUsage?.rss / 1024 / 1024)} MB` });
         statusItem.push({ label: "EPG Gathering Network IDs", text: status.epg.gatheringNetworks.map(id => `0x${id.toString(16).toUpperCase()}`).join(", ") });
+        statusItem.push({ label: "EPG Gathering Channels", text: status.epg.gatheringChannels.join(", ") });
         statusItem.push({ label: "EPG Stored Events", text: `${status.epg.storedEvents} Events` });
         statusItem.push({ label: "TunerDevice Streams", text: `${status.streamCount.tunerDevice}` });
         statusItem.push({ label: "TSFilter Streams", text: `${status.streamCount.tsFilter}` });
+        statusItem.push({ label: "TLVFilter Streams", text: `${status.streamCount.tlvFilter}` });
         statusItem.push({ label: "Decoder Streams", text: `${status.streamCount.decoder}` });
         statusItem.push({ label: "RPC Connections", text: `${status.rpcCount}` });
     }
@@ -141,7 +143,7 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
                                 </span>
                                 <span style={{ marginLeft: 4, fontSize: 13, verticalAlign: "middle" }}>
                                     {
-                                        status.epg.gatheringNetworks.includes(service.networkId) && <Icon iconName="Sync" style={{ color: "#f6ad49" }} /> ||
+                                        (status.epg.gatheringNetworks.includes(service.networkId) || (service.channel?.channel != null && status.epg.gatheringChannels.includes(service.channel?.channel))) && <Icon iconName="Sync" style={{ color: "#f6ad49" }} /> ||
                                         service.epgReady && <Icon iconName="CheckMark" style={{ color: "#c3d825" }} /> ||
                                         <Icon iconName="Clock" style={{ color: "#777" }} />
                                     }

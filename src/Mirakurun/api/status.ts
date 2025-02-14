@@ -76,12 +76,14 @@ export function getStatus(): Status {
         },
         epg: {
             gatheringNetworks: [],
+            gatheringChannels: [],
             storedEvents: _.program.itemMap.size
         },
         rpcCount: status.rpcCount,
         streamCount: {
             tunerDevice: _.tuner.devices.filter(td => td.isUsing === true).length,
             tsFilter: status.streamCount.tsFilter,
+            tlvFilter: status.streamCount.tlvFilter,
             decoder: status.streamCount.decoder
         },
         errorCount: status.errorCount,
@@ -109,6 +111,12 @@ export function getStatus(): Status {
     for (const nid in status.epg) {
         if (status.epg[nid] === true) {
             ret.epg.gatheringNetworks.push(parseInt(nid, 10));
+        }
+    }
+
+    for (const channel in status.epgByChannel) {
+        if (status.epgByChannel[channel] === true) {
+            ret.epg.gatheringChannels.push(channel);
         }
     }
 

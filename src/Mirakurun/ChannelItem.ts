@@ -21,7 +21,7 @@ import * as log from "./log";
 import * as common from "./common";
 import * as config from "./config";
 import ServiceItem from "./ServiceItem";
-import TSFilter from "./TSFilter";
+import { StreamFilter } from "./StreamFilter";
 
 export default class ChannelItem {
 
@@ -150,7 +150,7 @@ export default class ChannelItem {
         return _.service.findByChannel(this);
     }
 
-    getStream(user: common.User, output: stream.Writable): Promise<TSFilter> {
+    getStream(user: common.User, output: stream.Writable): Promise<StreamFilter> {
         return _.tuner.initChannelStream(this, user, output);
     }
 
@@ -164,7 +164,8 @@ export default class ChannelItem {
 
             let services: db.Service[];
             try {
-                services = await _.tuner.getServices(this);
+                const r = await _.tuner.getServices(this);
+                services = r.services;
             } catch (e) {
                 log.warn("ChannelItem#'%s' service scan has failed [%s]", this._name, e);
 
