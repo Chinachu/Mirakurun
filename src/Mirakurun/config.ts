@@ -151,11 +151,7 @@ export function loadServer(): Server {
         // copy if not exists
         try {
             log.info("copying default server config to `%s`", path);
-            if (process.platform === "win32") {
-                fs.copyFileSync("config/server.win32.yml", path);
-            } else {
-                fs.copyFileSync("config/server.yml", path);
-            }
+            fs.copyFileSync("config/server.yml", path);
         } catch (e) {
             log.fatal("failed to copy server config to `%s`", path);
             console.error(e);
@@ -297,7 +293,7 @@ export function loadTuners(): Tuner[] {
     }
 
     // auto
-    if (process.platform === "linux" && fs.existsSync(path) === false) {
+    if (fs.existsSync(path) === false) {
         log.info("missing tuners config `%s`", path);
         log.info("trying to detect tuners...");
         const tuners: Tuner[] = [];
@@ -364,11 +360,7 @@ export function loadTuners(): Tuner[] {
         log.info("missing tuners config `%s`", path);
         try {
             log.info("copying default tuners config to `%s`", path);
-            if (process.platform === "win32") {
-                fs.copyFileSync("config/tuners.win32.yml", path);
-            } else {
-                fs.copyFileSync("config/tuners.yml", path);
-            }
+            fs.copyFileSync("config/tuners.yml", path);
         } catch (e) {
             log.fatal("failed to copy tuners config to `%s`", path);
             console.error(e);
@@ -406,11 +398,7 @@ export function loadChannels(): Channel[] {
         log.info("missing channels config `%s`", path);
         try {
             log.info("copying default channels config to `%s`", path);
-            if (process.platform === "win32") {
-                fs.copyFileSync("config/channels.win32.yml", path);
-            } else {
-                fs.copyFileSync("config/channels.yml", path);
-            }
+            fs.copyFileSync("config/channels.yml", path);
         } catch (e) {
             log.fatal("failed to copy channels config to `%s`", path);
             console.error(e);

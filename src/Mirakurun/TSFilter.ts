@@ -133,14 +133,14 @@ export default class TSFilter extends EventEmitter {
     private _serviceIds = new Set<number>();
     private _parseServiceIds = new Set<number>();
     private _pmtPid = -1;
-    private _pmtTimer: NodeJS.Timer;
+    private _pmtTimer: NodeJS.Timeout;
     private _streamTime: number = null;
     private _essMap = new Map<number, number>(); // <serviceId, pid>
     private _essEsPids = new Set<number>();
     private _dlDataMap = new Map<number, DownloadData>();
-    private _logoDataTimer: NodeJS.Timer;
+    private _logoDataTimer: NodeJS.Timeout;
     private _provideEventLastDetectedAt = -1;
-    private _provideEventTimeout: NodeJS.Timer = null;
+    private _provideEventTimeout: NodeJS.Timeout = null;
 
     /** Number divisible by a multiple of 188 */
     private _maxBufferBytesBeforeReady: number = (() => {

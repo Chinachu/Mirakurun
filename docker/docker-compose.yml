@@ -1,4 +1,3 @@
-version: "3.7"
 services:
   mirakurun:
     build:
@@ -15,28 +14,37 @@ services:
       # LOG_LEVEL: "3"
       # DEBUG: "true"
     network_mode: host
+    # comment out `devices:` if you commented out all devices
+    # device を全てコメントアウトした場合は devices: もコメントアウト
     devices:
+      # comment out below if you don't use card readers
+      # カードリーダーを使わない場合は以下をコメントアウト
       - /dev/bus:/dev/bus
+      # comment out below if you don't use DVB devices
+      # DVB チューナーを使わない場合は以下をコメントアウト
       - /dev/dvb:/dev/dvb
     volumes:
-      # ** CAUTION **
-      # (default) `/usr/local/mirakurun/*` has been moved to `/opt/mirakurun/*`
-      # try:
-      #   sudo mv -vf /usr/local/mirakurun /opt/mirakurun
-      #   sudo mkdir -p /opt/mirakurun/run /opt/mirakurun/opt /opt/mirakurun/config /opt/mirakurun/data
-      # you can change to any location if required.
+      # you can change to any location if you want.
       - type: bind
-        source: /opt/mirakurun/run/
-        target: /var/run/
+        source: /opt/mirakurun/run
+        target: /var/run
+        bind:
+          create_host_path: true
       - type: bind
-        source: /opt/mirakurun/opt/
-        target: /opt/
+        source: /opt/mirakurun/opt
+        target: /opt
+        bind:
+          create_host_path: true
       - type: bind
-        source: /opt/mirakurun/config/
-        target: /app-config/
+        source: /opt/mirakurun/config
+        target: /app-config
+        bind:
+          create_host_path: true
       - type: bind
-        source: /opt/mirakurun/data/
-        target: /app-data/
+        source: /opt/mirakurun/data
+        target: /app-data
+        bind:
+          create_host_path: true
     restart: always
     logging:
       driver: json-file

@@ -110,7 +110,7 @@ export default class Tuner {
 
     async getEPG(channel: ChannelItem, time?: number): Promise<void> {
 
-        let timeout: NodeJS.Timer;
+        let timeout: NodeJS.Timeout;
         if (!time) {
             time = _.config.server.epgRetrievalTime || 1000 * 60 * 10;
         }
