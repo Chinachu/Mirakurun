@@ -2,14 +2,19 @@
 
 ## Overview
 
-**Bold** is the recommended. also, **Node.js** `^18 || ^20 || ^22` needed.
+**Bold** is the recommended.
 
 * [**Docker on Linux**](#docker-on-linux)
   * [Docker Engine](https://docs.docker.com/engine/install/) `>=18.06.0`
   * [Docker Compose](https://docs.docker.com/compose/install/) `>=1.22.0`
   * **x64** / arm32v7 / **arm64v8**
-  * **Ubuntu Server 20.04** / Debian 9 / CentOS 8.1
+  * **Ubuntu Server 24.10** / etc.
   * ⚠ Note: Desktop Environment / VM is not supported and unstable!
+
+* [Linux w/ PM2 (legacy)](#linux-w-pm2-legacy)
+  * git
+  * [Node.js](https://nodejs.org/en/download) `^18 || ^20 || ^22`
+  * [PM2](https://pm2.keymetrics.io/)
 
 ## Docker on Linux
 
@@ -20,7 +25,7 @@
 * PT2/PT3/PX-* users: Use default DVB driver instead of chardev driver.
   * please uninstall chardev drivers then reboot before install.
 
-### Docker
+### Install Docker Engine
 
 ```sh
 # for new machine
@@ -148,3 +153,45 @@ $ cp /usr/local/bin/something-static /opt/mirakurun/opt/bin/
 * Opt: `/opt/mirakurun/opt/`
   * `bin/`
   * `bin/startup` - custom startup script (optional)
+
+## Linux w/ PM2 (legacy)
+
+This is not recommended.
+The code related to PM2 has already been removed and is not confirmed to work.
+
+```sh
+git clone git@github.com:Chinachu/Mirakurun.git
+cd Mirakurun
+
+npm install
+npm run build
+
+npm install pm2 -g
+pm2 startup
+
+# start
+pm2 start processes.json
+pm2 save
+
+# stop
+pm2 stop processes.json
+pm2 save
+
+# uninstall
+pm2 delete processes.json
+pm2 save
+```
+
+### 💡 Locations
+
+* Socket: `/var/run/mirakurun.sock`
+* Config: `/usr/local/etc/mirakurun/`
+  * `server.yml`
+  * `tuners.yml`
+  * `channels.yml`
+* Data: `/usr/local/var/db/mirakurun/`
+  * `services.json`
+  * `programs.json`
+* Log: `/usr/local/var/log/`
+  * `mirakurun.stdout.log` - normal log
+  * `mirakurun.stderr.log` - error log
