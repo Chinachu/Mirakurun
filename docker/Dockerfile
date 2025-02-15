@@ -1,5 +1,5 @@
 ARG ARCH=
-FROM ${ARCH}node:22.13.1-bookworm AS build
+FROM ${ARCH}node:22.14.0-bookworm AS build
 WORKDIR /app
 ENV DOCKER=YES NODE_ENV=production
 ADD . .
@@ -10,7 +10,7 @@ RUN apt-get update && \
     npm run build && \
     npm ci --omit=dev
 
-FROM ${ARCH}node:22.13.1-bookworm-slim
+FROM ${ARCH}node:22.14.0-bookworm-slim
 WORKDIR /app
 RUN apt-get update && \
     apt-get upgrade -y && \
