@@ -2,7 +2,7 @@
   "name": "mirakurun",
   "preferGlobal": true,
   "description": "DVR Tuner Server for Japanese TV.",
-  "version": "4.0.0-beta.1",
+  "version": "4.0.0-beta.2",
   "homepage": "https://github.com/Chinachu/Mirakurun",
   "keywords": [
     "mirakurun",
@@ -31,7 +31,6 @@
   },
   "license": "Apache-2.0",
   "bin": {
-    "mirakurun": "bin/cli.sh",
     "mirakurun-epgdump": "bin/epgdump.js"
   },
   "main": "lib/client.js",

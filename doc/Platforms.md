@@ -2,14 +2,19 @@
 
 ## Overview
 
-**Bold** is the recommended. also, **Node.js** `^18 || ^20 || ^22` needed.
+**Bold** is the recommended.
 
 * [**Docker on Linux**](#docker-on-linux)
   * [Docker Engine](https://docs.docker.com/engine/install/) `>=18.06.0`
   * [Docker Compose](https://docs.docker.com/compose/install/) `>=1.22.0`
   * **x64** / arm32v7 / **arm64v8**
-  * **Ubuntu Server 20.04** / Debian 9 / CentOS 8.1
+  * **Ubuntu Server 24.10** / etc.
   * ⚠ Note: Desktop Environment / VM is not supported and unstable!
+
+* [Linux w/ PM2 (legacy)](#linux-w-pm2-legacy)
+  * git
+  * [Node.js](https://nodejs.org/en/download) `^18 || ^20 || ^22`
+  * [PM2](https://pm2.keymetrics.io/)
 
 ## Docker on Linux
 
@@ -20,7 +25,7 @@
 * PT2/PT3/PX-* users: Use default DVB driver instead of chardev driver.
   * please uninstall chardev drivers then reboot before install.
 
-### Docker
+### Install Docker Engine
 
 ```sh
 # for new machine
@@ -149,84 +154,33 @@ $ cp /usr/local/bin/something-static /opt/mirakurun/opt/bin/
   * `bin/`
   * `bin/startup` - custom startup script (optional)
 
-## Linux
+## Linux w/ PM2 (legacy)
 
-**Note:**
-
-* ⚠ Any desktop environment / VM is not supported. lacking reliability by critical performance issue.
-
-### Node.js
-
-* **via Package Manager** (recommended)
-  * [Debian / Ubuntu](https://github.com/nodesource/distributions/blob/master/README.md#deb) (deb)
-    * `curl -sL https://deb.nodesource.com/setup_18.x | sudo -E bash -`
-    * `sudo apt-get install -y nodejs`
-  * [CentOS](https://github.com/nodesource/distributions/blob/master/README.md#rpm) (rpm)
-    * (root) `curl -sL https://rpm.nodesource.com/setup_18.x | bash -`
-  * [Gentoo](https://nodejs.org/en/download/package-manager/#gentoo)
-    * `emerge nodejs`
-* [nave](https://github.com/isaacs/nave)
-  * `sudo /path/to/nave.sh usemain 18`
-
-### Install / Update
+This is not recommended.
+The code related to PM2 has already been removed and is not confirmed to work.
 
 ```sh
-# for building C++ addons (Debian / Ubuntu)
-sudo apt install build-essential
+git clone git@github.com:Chinachu/Mirakurun.git
+cd Mirakurun
 
-# PM2 (Process Manager)
-sudo npm install pm2 -g
+npm install
+npm run build
 
-# Quick
-sudo npm install mirakurun -g --unsafe-perm --foreground-scripts --production
+npm install pm2 -g
+pm2 startup
 
-# Advanced
-sudo npm install mirakurun -g --production
-sudo mirakurun init # to install as service
-sudo mirakurun restart # when updated
+# start
+pm2 start processes.json
+pm2 save
+
+# stop
+pm2 stop processes.json
+pm2 save
+
+# uninstall
+pm2 delete processes.json
+pm2 save
 ```
-
-### Uninstall
-
-```sh
-# Quick
-sudo npm uninstall mirakurun -g --unsafe-perm
-
-# Advanced
-sudo pm2 stop mirakurun-server
-sudo pm2 delete mirakurun-server
-sudo pm2 save
-sudo npm uninstall mirakurun -g
-```
-
-### Administration
-
-#### Config
-
-```
-mirakurun config [server|tuners|channels]
-```
-
-see: [Configuration.md](Configuration.md)
-
-#### Log Stream
-
-```
-mirakurun log server
-```
-
-#### Service Management
-
-```
-mirakurun [status|start|stop|restart]
-```
-
-#### Version Info
-
-```
-mirakurun version
-```
-
 
 ### 💡 Locations
 

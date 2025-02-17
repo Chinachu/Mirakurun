@@ -6,9 +6,9 @@
 
 ## server.yml
 
-```sh
-sudo mirakurun config server
-```
+* Env: `SERVER_CONFIG_PATH`
+* Docker Host (default): `/opt/mirakurun/config/server.yml`
+* Linux (legacy): `/usr/local/etc/mirakurun/server.yml`
 
 ### Structure
 
@@ -33,7 +33,7 @@ useTSId: false
 useStreamId: true
 ```
 
-### Environment Values (Docker)
+### Environment Variables (Docker)
 
 ```sh
 HOSTNAME
@@ -53,9 +53,9 @@ ALLOW_IPV6_CIDR_RANGES
 
 ## tuners.yml
 
-```sh
-sudo mirakurun config tuners
-```
+* Env: `TUNERS_CONFIG_PATH`
+* Docker Host (default): `/opt/mirakurun/config/tuners.yml`
+* Linux (legacy): `/usr/local/etc/mirakurun/tuners.yml`
 
 ### Structure
 
@@ -99,9 +99,9 @@ sudo npm install arib-b25-stream-test -g --unsafe-perm
 
 ## channels.yml
 
-```sh
-sudo mirakurun config channels
-```
+* Env: `CHANNELS_CONFIG_PATH`
+* Docker Host (default): `/opt/mirakurun/config/channels.yml`
+* Linux (legacy): `/usr/local/etc/mirakurun/channels.yml`
 
 ### Structure
 
