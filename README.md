@@ -12,6 +12,7 @@ DVR Tuner Server for Japanese TV which designed for the "Air" (in development co
 [![Sponsors on Open Collective](https://opencollective.com/Mirakurun/sponsors/badge.svg)](#sponsors)
 
 ## このforkについて
+Forked from otya128/MMirakurun
 
 MMT/TLV対応のforkであり、EPGの収集、チャンネルスキャン、ロゴ収集、イベントid指定のストリーミングなどに対応しています。
 サービス別のストリームについては現在1TLV1サービスで運用されており必要がないため実装しておらず、どのAPIでも無加工のTLVストリームが出力されます。
