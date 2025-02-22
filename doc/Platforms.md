@@ -162,6 +162,7 @@ The code related to PM2 has already been removed and is not confirmed to work.
 ```sh
 git clone git@github.com:Chinachu/Mirakurun.git
 cd Mirakurun
+git submodule update --init --recursive
 
 npm install
 npm run build
