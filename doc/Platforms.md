@@ -42,7 +42,7 @@ sudo mkdir -p /opt/mirakurun/run /opt/mirakurun/opt /opt/mirakurun/config /opt/m
 # Install
 mkdir ~/mirakurun/
 cd ~/mirakurun/
-wget https://raw.githubusercontent.com/Chinachu/Mirakurun/master/docker/docker-compose.yml
+wget https://raw.githubusercontent.com/Chinachu/Mirakurun/refs/heads/release/4.0.0/docker/docker-compose.yml
 docker compose pull
 docker compose run --rm -e SETUP=true mirakurun
 docker compose up -d
