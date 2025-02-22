@@ -3,6 +3,9 @@ services:
     build:
       context: ../
       dockerfile: docker/Dockerfile
+    # `:latest` can be changed to fix the version
+    # `:latest` の部分を編集するとバージョンを固定できます
+    # available tags: https://hub.docker.com/r/chinachu/mirakurun/tags
     image: chinachu/mirakurun:latest
     container_name: mirakurun
     cap_add:
@@ -10,12 +13,19 @@ services:
       - SYS_NICE
     environment:
       TZ: Asia/Tokyo
+      # comment out below if you commented out `network_mode: host`
+      # `network_mode: host` をコメントアウトする場合はここもコメントアウト
       DOCKER_NETWORK: host
+      # you must set hostname if accesing by hostname (other than IP address)
+      # ブラウザから IP アドレス以外でアクセスする場合はホスト名を設定する必要があります
+      # hostname: localhost
+      # --
+      # for debug
       # LOG_LEVEL: "3"
       # DEBUG: "true"
     network_mode: host
     # comment out `devices:` if you commented out all devices
-    # device を全てコメントアウトした場合は devices: もコメントアウト
+    # `devices` を全てコメントアウトした場合は `devices:` もコメントアウト
     devices:
       # comment out below if you don't use card readers
       # カードリーダーを使わない場合は以下をコメントアウト
