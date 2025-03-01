@@ -35,26 +35,10 @@ services:
       - /dev/dvb:/dev/dvb
     volumes:
       # you can change to any location if you want.
-      - type: bind
-        source: /opt/mirakurun/run
-        target: /var/run
-        bind:
-          create_host_path: true
-      - type: bind
-        source: /opt/mirakurun/opt
-        target: /opt
-        bind:
-          create_host_path: true
-      - type: bind
-        source: /opt/mirakurun/config
-        target: /app-config
-        bind:
-          create_host_path: true
-      - type: bind
-        source: /opt/mirakurun/data
-        target: /app-data
-        bind:
-          create_host_path: true
+      - /opt/mirakurun/run:/var/run
+      - /opt/mirakurun/opt:/opt
+      - /opt/mirakurun/config:/app-config
+      - /opt/mirakurun/data:/app-data
     restart: always
     logging:
       driver: json-file
