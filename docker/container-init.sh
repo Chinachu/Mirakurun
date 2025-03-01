@@ -11,6 +11,10 @@ export PATH=/opt/bin:$PATH
 export DOCKER=YES
 export INIT_PID=$$
 
+# npm
+export npm_config_cache=/tmp/.npm
+export npm_config_update_notifier=false
+
 # tweaks for glibc memory usage
 export MALLOC_ARENA_MAX=2
 
