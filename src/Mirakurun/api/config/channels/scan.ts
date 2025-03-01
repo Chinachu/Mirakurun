@@ -26,9 +26,26 @@ import _ from "../../../_";
 let isScanning = false;
 
 /**
+ * Global flag to track if scan cancellation is requested
+ */
+let isCancellationRequested = false;
+
+/**
  * Global object to track current scan status
  */
-let currentScanStatus: ScanResult = null;
+interface CurrentScanStatus {
+    status: ScanPhase;
+    type: common.ChannelType;
+    dryRun: boolean;
+    progress: number;
+    currentChannel: string;
+    scanLog: string[];
+    newCount: number;
+    takeoverCount: number;
+    result: config.Channel[];
+}
+
+let currentScanStatus: CurrentScanStatus | null = null;
 
 /**
  * Options for string comparison when sorting channels
@@ -57,22 +74,36 @@ enum ScanMode {
 }
 
 /**
- * Status codes for the scanning process
+ * Overall phase status codes for the scanning process
  */
-enum ScanStatus {
+enum ScanPhase {
+    NotStarted = "not_started",           // No scan has been started
     Scanning = "scanning",                // Currently scanning
-    DryRun = "dryRun",                    // Running in dry run mode
+    Completed = "completed",              // Scan completed successfully
+    Cancelled = "cancelled",              // Scan was cancelled by user
+    Error = "error"                       // Error occurred
+}
+
+/**
+ * Process step status codes for the scanning process
+ */
+enum ScanStep {
+    DryRun = "dry_run",                   // Running in dry run mode
     Started = "started",                  // Scan has started
     ScanningChannel = "scanning_channel", // Currently scanning a specific channel
     Takeover = "takeover",                // Taking over existing channel config
     Skipped = "skipped",                  // Channel was skipped
-    Error = "error",                      // Error occurred
     ServicesFound = "services_found",     // Services found on channel
-    ChannelsFound = "channels_found",     // Channels found after scan
+    ChannelsFound = "channels_found"      // Channels found after scan
+}
+
+/**
+ * Result type status codes for the scanning process
+ */
+enum ScanResultType {
     Summary = "summary",                  // Scan summary info
     SummaryNew = "summary_new",           // New channels summary
     SummaryTakeover = "summary_takeover", // Takeover channels summary
-    Completed = "completed",              // Scan completed
     RestartRequired = "restart_required", // Restart required to apply changes
     FinalResult = "final_result"          // Final scan results
 }
@@ -113,8 +144,8 @@ interface ScanConfig {
 /**
  * Result structure for a scan operation
  */
-interface ScanResult {
-    status: ScanStatus;                // Current status of scan
+interface ScanStatusInfo {
+    status: ScanPhase;                // Current phase of scan
     type: common.ChannelType;          // Channel type being scanned
     dryRun: boolean;                   // Whether this is a dry run
     progress: number;                  // Progress percentage (0-100)
@@ -401,12 +432,49 @@ export function generateChannelItems(
     return [generateChannelItemForChannel(type, channel, services, setDisabledOnAdd)];
 }
 /**
- * Interface for scan status update information
+ * Base interface for scan status updates
  */
-interface ScanStatusUpdate {
-    status: ScanStatus;
-    [key: string]: any; // Additional properties depend on status type
+interface BaseScanStatusUpdate {
+    channel?: string;
+    type?: common.ChannelType;
 }
+
+/**
+ * Interface for phase status updates
+ */
+interface PhaseScanStatusUpdate extends BaseScanStatusUpdate {
+    status: ScanPhase;
+    error?: string;
+    saved?: boolean;
+    dryRun?: boolean;
+}
+
+/**
+ * Interface for step status updates
+ */
+interface StepScanStatusUpdate extends BaseScanStatusUpdate {
+    status: ScanStep;
+    progress?: number;
+    enabled?: boolean;
+    reason?: string;
+    items?: config.Channel[];
+    count?: number;
+}
+
+/**
+ * Interface for result status updates
+ */
+interface ResultScanStatusUpdate extends BaseScanStatusUpdate {
+    status: ScanResultType;
+    newCount?: number;
+    takeoverCount?: number;
+    result?: config.Channel[];
+}
+
+/**
+ * Union type for all scan status updates
+ */
+type ScanStatusUpdate = PhaseScanStatusUpdate | StepScanStatusUpdate | ResultScanStatusUpdate;
 
 /**
  * Executes the channel scanning process
@@ -436,7 +504,7 @@ async function runChannelScan(
 
         // Initialize global scan status
         currentScanStatus = {
-            status: ScanStatus.Scanning,
+            status: ScanPhase.Scanning,
             type,
             dryRun,
             progress: 0,
@@ -448,68 +516,115 @@ async function runChannelScan(
         };
 
         /**
-         * Updates scan status and logs
-         *
-         * @param statusUpdate Optional status update object
+         * Updates scan phase status
+         * @param update Phase status update
          * @param textOutput Optional text output for logs
          */
-        const updateScanStatus = (statusUpdate?: ScanStatusUpdate, textOutput?: string): void => {
-            // Update status fields based on the status type
-            if (statusUpdate) {
-                switch (statusUpdate.status) {
-                    case ScanStatus.ScanningChannel:
-                        currentScanStatus.progress = statusUpdate.progress;
-                        currentScanStatus.currentChannel = statusUpdate.channel;
-                        break;
-                    case ScanStatus.Summary:
-                        currentScanStatus.newCount = statusUpdate.newCount;
-                        currentScanStatus.takeoverCount = statusUpdate.takeoverCount;
-                        break;
-                    case ScanStatus.Completed:
-                        currentScanStatus.status = ScanStatus.Completed;
-                        break;
-                    case ScanStatus.FinalResult:
-                        currentScanStatus.result = statusUpdate.result;
-                        break;
-                }
+        const updatePhaseStatus = (update: PhaseScanStatusUpdate, textOutput?: string): void => {
+            if (!currentScanStatus) {
+                return;
             }
 
-            // Add text to log and output if requested
-            if (textOutput) {
+            currentScanStatus.status = update.status;
+            if (update.channel) {
+                currentScanStatus.currentChannel = update.channel;
+            }
+
+            appendToLog(textOutput);
+        };
+
+        /**
+         * Updates scan step status
+         * @param update Step status update
+         * @param textOutput Optional text output for logs
+         */
+        const updateStepStatus = (update: StepScanStatusUpdate, textOutput?: string): void => {
+            if (!currentScanStatus) {
+                return;
+            }
+
+            if (update.progress !== undefined) {
+                currentScanStatus.progress = update.progress;
+            }
+            if (update.channel) {
+                currentScanStatus.currentChannel = update.channel;
+            }
+
+            appendToLog(textOutput);
+        };
+
+        /**
+         * Updates scan result status
+         * @param update Result status update
+         * @param textOutput Optional text output for logs
+         */
+        const updateResultStatus = (update: ResultScanStatusUpdate, textOutput?: string): void => {
+            if (!currentScanStatus) {
+                return;
+            }
+
+            if (update.newCount !== undefined) {
+                currentScanStatus.newCount = update.newCount;
+            }
+            if (update.takeoverCount !== undefined) {
+                currentScanStatus.takeoverCount = update.takeoverCount;
+            }
+            if (update.result) {
+                currentScanStatus.result = update.result;
+            }
+
+            appendToLog(textOutput);
+        };
+
+        /**
+         * Appends text to scan log and writes output
+         * @param textOutput Text to append
+         */
+        const appendToLog = (textOutput?: string): void => {
+            if (textOutput && currentScanStatus) {
                 const trimmedText = textOutput.trim();
-                scanLog.push(trimmedText);
-                outputWriter?.(textOutput);
+                currentScanStatus.scanLog.push(trimmedText);
+                if (outputWriter) {
+                    outputWriter(textOutput);
+                }
             }
         };
 
         // Print dry run notice if applicable
         if (dryRun) {
-            updateScanStatus(
-                { status: ScanStatus.DryRun, enabled: dryRun },
+            updateStepStatus(
+                { status: ScanStep.DryRun, enabled: dryRun },
                 "-- dry run --\n\n"
             );
         }
 
         // Print scan start message
-        updateScanStatus(
-            { status: ScanStatus.Started, type },
+        updateStepStatus(
+            { status: ScanStep.Started, type },
             `channel scanning... (type: "${type}")\n\n`
         );
 
         // Process each channel in the scan configuration
         const totalChannels = scanConfig.channels.length;
         for (let i = 0; i < totalChannels; i++) {
+            // Check if scanning has been cancelled
+            if (isCancellationRequested) {
+                updatePhaseStatus(
+                    { status: ScanPhase.Cancelled },
+                    "Channel scan was cancelled by user request.\n"
+                );
+                break;
+            }
+
             const channel = scanConfig.channels[i];
             const progressPercent = Math.round((i + 1) / totalChannels * 100);
 
             // Update status to show current channel being scanned
-            updateScanStatus(
+            updateStepStatus(
                 {
-                    status: ScanStatus.ScanningChannel,
+                    status: ScanStep.ScanningChannel,
                     channel,
-                    progress: progressPercent,
-                    current: i + 1,
-                    total: totalChannels
+                    progress: progressPercent
                 },
                 `channel: "${channel}" (${i + 1}/${totalChannels}) [${progressPercent}%] ...\n`
             );
@@ -525,13 +640,13 @@ async function runChannelScan(
                 // If there are existing channels, take them over instead of scanning
                 if (existingChannels.length > 0) {
                     const takeoverInfo = {
-                        status: ScanStatus.Takeover,
+                        status: ScanStep.Takeover,
                         channel,
                         count: existingChannels.length,
                         items: existingChannels
                     };
 
-                    updateScanStatus(
+                    updateStepStatus(
                         takeoverInfo,
                         `-> ${existingChannels.length} existing config found.\n`
                     );
@@ -540,12 +655,12 @@ async function runChannelScan(
                     for (const channelItem of existingChannels) {
                         result.push(channelItem);
                         takeoverCount++;
-                        updateScanStatus(undefined, `-> ${JSON.stringify(channelItem)}\n`);
+                        appendToLog(`-> ${JSON.stringify(channelItem)}\n`);
                     }
 
-                    updateScanStatus(
+                    updateStepStatus(
                         {
-                            status: ScanStatus.Skipped,
+                            status: ScanStep.Skipped,
                             channel,
                             reason: "existing_config"
                         },
@@ -568,7 +683,7 @@ async function runChannelScan(
                 // Handle errors (often no signal)
                 const isNoSignalError = /stream has closed before get network/.test(String(error));
                 const errorInfo = {
-                    status: ScanStatus.Error,
+                    status: ScanPhase.Error,
                     channel,
                     error: isNoSignalError ? "no_signal" : String(error)
                 };
@@ -579,16 +694,16 @@ async function runChannelScan(
                 }
                 errorText += "\n\n";
 
-                updateScanStatus(errorInfo, errorText);
+                updatePhaseStatus(errorInfo, errorText);
                 continue; // Skip to next channel
             }
 
             // Filter services to television types (1 = digital TV, 173 = temporary digital TV)
             services = services.filter(service => service.type === 1 || service.type === 173);
 
-            updateScanStatus(
+            updateStepStatus(
                 {
-                    status: ScanStatus.ServicesFound,
+                    status: ScanStep.ServicesFound,
                     channel,
                     count: services.length
                 },
@@ -597,7 +712,7 @@ async function runChannelScan(
 
             // Skip if no services found
             if (services.length === 0) {
-                updateScanStatus(undefined, "\n");
+                appendToLog("\n");
                 continue;
             }
 
@@ -616,12 +731,12 @@ async function runChannelScan(
                 result.push(newChannelItem);
                 newCount++;
                 scannedItems.push(newChannelItem);
-                updateScanStatus(undefined, `-> ${JSON.stringify(newChannelItem)}\n`);
+                appendToLog(`-> ${JSON.stringify(newChannelItem)}\n`);
             }
 
-            updateScanStatus(
+            updateStepStatus(
                 {
-                    status: ScanStatus.ChannelsFound,
+                    status: ScanStep.ChannelsFound,
                     channel,
                     items: scannedItems
                 },
@@ -640,7 +755,7 @@ async function runChannelScan(
 
         // Generate and display summary
         const summaryData = {
-            status: ScanStatus.Summary,
+            status: ScanResultType.Summary,
             newCount,
             takeoverCount,
             totalTypeCount: newCount + takeoverCount,
@@ -648,43 +763,43 @@ async function runChannelScan(
             type
         };
 
-        updateScanStatus(
+        updateResultStatus(
             summaryData,
             `-> total ${newCount + takeoverCount}/${result.length} (${type}/Any) channels configured.\n\n`
         );
 
-        updateScanStatus(
-            { status: ScanStatus.SummaryNew, newCount },
+        updateResultStatus(
+            { status: ScanResultType.SummaryNew, newCount },
             `-> new ${newCount} channels found.\n`
         );
 
-        updateScanStatus(
-            { status: ScanStatus.SummaryTakeover, takeoverCount },
+        updateResultStatus(
+            { status: ScanResultType.SummaryTakeover, takeoverCount },
             `-> existing ${takeoverCount} channels merged.\n`
         );
 
         // Save results if not a dry run
         if (!dryRun) {
             await config.saveChannels(result);
-            updateScanStatus(
-                { status: ScanStatus.Completed, saved: true },
+            updatePhaseStatus(
+                { status: ScanPhase.Completed, saved: true },
                 "channel scan has been completed and saved successfully.\n"
             );
-            updateScanStatus(
-                { status: ScanStatus.RestartRequired },
+            updateResultStatus(
+                { status: ScanResultType.RestartRequired },
                 "**RESTART REQUIRED** to apply changes.\n"
             );
         } else {
-            updateScanStatus(
-                { status: ScanStatus.Completed, dryRun: true },
+            updatePhaseStatus(
+                { status: ScanPhase.Completed, dryRun: true },
                 "channel scan has been completed.\n\n-- dry run --\n"
             );
         }
 
         // Send final result
-        updateScanStatus(
+        updateResultStatus(
             {
-                status: ScanStatus.FinalResult,
+                status: ScanResultType.FinalResult,
                 result
             },
             `Final result: ${result.length} channels\n`
@@ -692,8 +807,9 @@ async function runChannelScan(
 
         return result;
     } finally {
-        // Always reset scanning flag when done
+        // Always reset scanning and cancellation flags when done
         isScanning = false;
+        isCancellationRequested = false;
     }
 }
 
@@ -795,7 +911,7 @@ export const put: Operation = async (req, res) => {
             .catch(error => {
                 console.error("Channel scan error:", error);
                 if (currentScanStatus) {
-                    currentScanStatus.status = ScanStatus.Error;
+                    currentScanStatus.status = ScanPhase.Error;
                     currentScanStatus.scanLog.push(`Error: ${String(error)}`);
                 }
                 isScanning = false;
@@ -825,6 +941,82 @@ export const put: Operation = async (req, res) => {
         res.write(`Error during scan: ${error}\n`);
         res.end();
         isScanning = false;
+    }
+};
+
+/**
+ * Stop a channel scan in progress - API handler
+ */
+export const del: Operation = async (req, res) => {
+    // Check if a scan is currently in progress
+    if (!isScanning) {
+        api.responseError(res, 404, "No scan in progress");
+        return;
+    }
+
+    // Check if a cancellation is already requested
+    if (isCancellationRequested) {
+        api.responseError(res, 409, "Already Stopping");
+        return;
+    }
+
+    // Set cancellation flag to true to request scan to stop
+    isCancellationRequested = true;
+
+    // Update the scan status
+    if (currentScanStatus) {
+        currentScanStatus.status = ScanPhase.Cancelled;
+        currentScanStatus.scanLog.push("Scan cancellation requested by user.");
+    }
+
+    // Return success response
+    res.status(206);
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.json({
+        status: "stopping",
+        message: "Channel scan stop has been requested"
+    });
+};
+
+/**
+ * API documentation for the DELETE channel scan endpoint
+ */
+del.apiDoc = {
+    tags: ["config"],
+    summary: "Stop Channel Scan",
+    description: "Stops a currently running channel scan operation",
+    operationId: "stopChannelScan",
+    produces: [
+        "application/json"
+    ],
+    responses: {
+        206: {
+            description: "Accepted",
+            schema: {
+                type: "object",
+                properties: {
+                    status: {
+                        type: "string",
+                        enum: ["stopping"]
+                    },
+                    message: {
+                        type: "string"
+                    }
+                }
+            }
+        },
+        404: {
+            description: "No scan in progress",
+            schema: {
+                $ref: "#/definitions/Error"
+            }
+        },
+        default: {
+            description: "Unexpected Error",
+            schema: {
+                $ref: "#/definitions/Error"
+            }
+        }
     }
 };
 

@@ -580,22 +580,11 @@ definitions:
         type: string
         description: "Current scan status"
         enum:
+          - not_started
           - scanning
-          - dryRun
-          - started
-          - scanning_channel
-          - takeover
-          - skipped
-          - error
-          - services_found
-          - channels_found
-          - summary
-          - summary_new
-          - summary_takeover
           - completed
-          - restart_required
-          - final_result
-          - no_scan_data
+          - cancelled
+          - error
       isScanning:
         type: boolean
         description: "Whether a scan is currently in progress"
