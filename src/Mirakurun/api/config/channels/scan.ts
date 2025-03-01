@@ -20,89 +20,184 @@ import * as config from "../../../config";
 import * as db from "../../../db";
 import _ from "../../../_";
 
+/**
+ * Global flag to track if scan is in progress
+ */
 let isScanning = false;
 
-const compareOptions = {
+/**
+ * Global object to track current scan status
+ */
+let currentScanStatus: ScanResult = null;
+
+/**
+ * Options for string comparison when sorting channels
+ */
+const compareOptions: Intl.CollatorOptions = {
     sensitivity: "base" as const,
     numeric: true
 };
 
-const channelOrder = {
+/**
+ * Channel type order for sorting
+ */
+const channelOrder: Record<common.ChannelType, number> = {
     GR: 1,
     BS: 2,
     CS: 3,
     SKY: 4
 };
 
+/**
+ * Scan modes for channel scanning
+ */
 enum ScanMode {
-    Channel = "Channel",
-    Service = "Service"
+    Channel = "Channel", // Channel-based scanning (one entry per channel)
+    Service = "Service"  // Service-based scanning (one entry per service)
 }
 
-const CHANNEL_NAME_FORMAT_GR = "{ch}";
-const CHANNEL_NAME_FORMAT_BS = "{ch}";
-const CHANNEL_NAME_FORMAT_BS_SUBCH = "BS{ch00}_{subch}";
-const CHANNEL_NAME_FORMAT_CS = "CS{ch}";
+/**
+ * Status codes for the scanning process
+ */
+enum ScanStatus {
+    Scanning = "scanning",                // Currently scanning
+    DryRun = "dryRun",                    // Running in dry run mode
+    Started = "started",                  // Scan has started
+    ScanningChannel = "scanning_channel", // Currently scanning a specific channel
+    Takeover = "takeover",                // Taking over existing channel config
+    Skipped = "skipped",                  // Channel was skipped
+    Error = "error",                      // Error occurred
+    ServicesFound = "services_found",     // Services found on channel
+    ChannelsFound = "channels_found",     // Channels found after scan
+    Summary = "summary",                  // Scan summary info
+    SummaryNew = "summary_new",           // New channels summary
+    SummaryTakeover = "summary_takeover", // Takeover channels summary
+    Completed = "completed",              // Scan completed
+    RestartRequired = "restart_required", // Restart required to apply changes
+    FinalResult = "final_result"          // Final scan results
+}
 
+/**
+ * Channel name format templates
+ */
+const CHANNEL_NAME_FORMAT_GR = "{ch}";                // GR channel format
+const CHANNEL_NAME_FORMAT_BS = "{ch}";                // BS channel format
+const CHANNEL_NAME_FORMAT_BS_SUBCH = "BS{ch00}_{subch}"; // BS subchannel format
+const CHANNEL_NAME_FORMAT_CS = "CS{ch}";              // CS channel format
+
+/**
+ * Options for a channel scan operation
+ */
 interface ChannelScanOption {
-    type: string;
-    startCh?: number;
-    endCh?: number;
-    startSubCh?: number;
-    endSubCh?: number;
-    useSubCh?: boolean;
-    scanMode?: ScanMode;
-    setDisabledOnAdd?: boolean;
-    refresh?: boolean;
-    channelNameFormat?: string;
+    type: common.ChannelType;          // Channel type
+    startCh?: number;                  // Start channel number
+    endCh?: number;                    // End channel number
+    startSubCh?: number;               // Start subchannel number (for BS)
+    endSubCh?: number;                 // End subchannel number (for BS)
+    useSubCh?: boolean;                // Use subchannel style (for BS)
+    scanMode?: ScanMode;               // Scan mode
+    setDisabledOnAdd?: boolean;        // Set disabled flag on newly added channels
+    refresh?: boolean;                 // Refresh existing channel configs
+    channelNameFormat?: string;        // Custom channel name format
 }
 
+/**
+ * Configuration for a scan operation
+ */
 interface ScanConfig {
-    readonly channels: string[];
-    readonly scanMode: ScanMode;
-    readonly setDisabledOnAdd: boolean;
+    readonly channels: string[];         // List of channel identifiers to scan
+    readonly scanMode: ScanMode;         // Scan mode to use
+    readonly setDisabledOnAdd: boolean;  // Whether to set disabled on new channels
 }
 
+/**
+ * Result structure for a scan operation
+ */
+interface ScanResult {
+    status: ScanStatus;                // Current status of scan
+    type: common.ChannelType;          // Channel type being scanned
+    dryRun: boolean;                   // Whether this is a dry run
+    progress: number;                  // Progress percentage (0-100)
+    currentChannel: string;            // Current channel being scanned
+    scanLog: string[];                 // Log of scan operations
+    newCount: number;                  // Count of new channels found
+    takeoverCount: number;             // Count of existing configs taken over
+    result: config.Channel[];          // Resulting channel configurations
+}
+
+/**
+ * Generate an array of numbers in a range
+ *
+ * @param start The start number of the range (inclusive)
+ * @param end The end number of the range (inclusive)
+ * @returns Array of numbers from start to end
+ */
 function range(start: number, end: number): number[] {
-    return Array.from({ length: (end - start + 1) }, (x, i) => i + start);​​​​​​
+    return Array.from({ length: (end - start + 1) }, (_, i) => i + start);
 }
 
+/**
+ * Format a channel name using placeholders
+ *
+ * @param format The format string with placeholders like {ch}, {ch00}, {subch}
+ * @param ch The channel number
+ * @param subch The optional subchannel number
+ * @returns The formatted channel name
+ *
+ * Supported placeholder formats:
+ * - {ch} - Channel number
+ * - {ch0}, {ch00}, etc. - Channel number with zero padding
+ * - {subch} - Subchannel number
+ * - {subch0}, {subch00}, etc. - Subchannel number with zero padding
+ */
 function formatChannelName(format: string, ch: number, subch?: number): string {
     const values = new Map<string, string>();
-    // {変数名} 形式の文字列をかき集める
+    // Find all placeholders in format {name}
     const placeholders = format.match(/({[\\_a-zA-Z0-9]+})/g);
+
     if (placeholders) {
         for (const placeholder of placeholders) {
-            // {ch[0]*}
+            // Handle {ch} or {ch00} style placeholders
             const chDigits = placeholder.match(/{ch([0]*)}/);
             if (chDigits) {
                 const digits = chDigits[1] ? chDigits[1].length : 1;
-                values.set(placeholder, (ch ? ch : 0).toString(10).padStart(digits, "0"));
+                values.set(placeholder, (ch ?? 0).toString(10).padStart(digits, "0"));
             }
-            // {subch[0]*}
+
+            // Handle {subch} or {subch00} style placeholders
             const subchDigits = placeholder.match(/{subch([0]*)}/);
             if (subchDigits) {
                 const digits = subchDigits[1] ? subchDigits[1].length : 1;
-                values.set(placeholder, (subch ? subch : 0).toString(10).padStart(digits, "0"));
+                values.set(placeholder, (subch ?? 0).toString(10).padStart(digits, "0"));
             }
         }
     }
+
+    // Replace all placeholders with their values
     let formatted = format;
     for (const [key, value] of values) {
         while (formatted.includes(key)) {
             formatted = formatted.replace(key, value);
         }
     }
+
     return formatted;
 }
 
-export function generateScanConfig(option: ChannelScanOption): ScanConfig {
-
-    // delete undefined from option
+/**
+ * Generates a scan configuration for a given channel type and options
+ *
+ * @param option The scan options including channel type, ranges, and formatting
+ * @returns A scan configuration with channels to scan and associated settings
+ */
+export function generateScanConfig(option: ChannelScanOption): ScanConfig | undefined {
+    // Remove undefined properties from options
     Object.keys(option).forEach(key => option[key] === undefined && delete option[key]);
 
+    // Handle GR (Ground) channels
     if (option.type === common.ChannelTypes.GR) {
-        option = {
+        // Set GR-specific defaults
+        const grOptions = {
             startCh: 13,
             endCh: 62,
             scanMode: ScanMode.Channel,
@@ -110,105 +205,153 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig {
             ...option
         };
 
+        // Generate channel list using range and format
+        const channelFormat = grOptions.channelNameFormat || CHANNEL_NAME_FORMAT_GR;
         return {
-            channels: range(option.startCh, option.endCh).map((ch) => formatChannelName(option.channelNameFormat ? option.channelNameFormat : CHANNEL_NAME_FORMAT_GR, ch)),
-            scanMode: option.scanMode,
-            setDisabledOnAdd: option.setDisabledOnAdd
+            channels: range(grOptions.startCh, grOptions.endCh)
+                .map(ch => formatChannelName(channelFormat, ch)),
+            scanMode: grOptions.scanMode,
+            setDisabledOnAdd: grOptions.setDisabledOnAdd
         };
     }
 
-    option = {
+    // Default options for satellite channels (BS/CS)
+    const satelliteOptions = {
         scanMode: ScanMode.Service,
         setDisabledOnAdd: true,
         ...option
     };
 
+    // Handle BS (Broadcast Satellite) channels
     if (option.type === common.ChannelTypes.BS) {
-        if (option.useSubCh) {
-            option = {
+        // Handle subchannel style BS scanning (e.g. BS01_0)
+        if (satelliteOptions.useSubCh) {
+            const bsSubchOptions = {
                 startCh: 1,
                 endCh: 23,
                 startSubCh: 0,
                 endSubCh: 3,
-                ...option
+                ...satelliteOptions
             };
 
+            // Generate cross product of channels and subchannels
             const channels: string[] = [];
-            for (const ch of range(option.startCh, option.endCh)) {
-                for (const subCh of range(option.startSubCh, option.endSubCh)) {
-                    channels.push(formatChannelName(option.channelNameFormat ? option.channelNameFormat : CHANNEL_NAME_FORMAT_BS_SUBCH, ch, subCh));
+            const channelFormat = bsSubchOptions.channelNameFormat || CHANNEL_NAME_FORMAT_BS_SUBCH;
+
+            for (const ch of range(bsSubchOptions.startCh, bsSubchOptions.endCh)) {
+                for (const subCh of range(bsSubchOptions.startSubCh, bsSubchOptions.endSubCh)) {
+                    channels.push(formatChannelName(channelFormat, ch, subCh));
                 }
             }
 
             return {
-                channels: channels,
-                scanMode: option.scanMode,
-                setDisabledOnAdd: option.setDisabledOnAdd
+                channels,
+                scanMode: bsSubchOptions.scanMode,
+                setDisabledOnAdd: bsSubchOptions.setDisabledOnAdd
             };
         }
 
-        option = {
+        // Regular BS channel style (e.g. 101-256)
+        const bsOptions = {
             startCh: 101,
             endCh: 256,
-            ...option
+            ...satelliteOptions
         };
 
+        const channelFormat = bsOptions.channelNameFormat || CHANNEL_NAME_FORMAT_BS;
         return {
-            channels: range(option.startCh, option.endCh).map((ch) => formatChannelName(option.channelNameFormat ? option.channelNameFormat : CHANNEL_NAME_FORMAT_BS, ch)),
-            scanMode: option.scanMode,
-            setDisabledOnAdd: option.setDisabledOnAdd
+            channels: range(bsOptions.startCh, bsOptions.endCh)
+                .map(ch => formatChannelName(channelFormat, ch)),
+            scanMode: bsOptions.scanMode,
+            setDisabledOnAdd: bsOptions.setDisabledOnAdd
         };
     }
 
+    // Handle CS (Communication Satellite) channels
     if (option.type === common.ChannelTypes.CS) {
-        option = {
+        const csOptions = {
             startCh: 2,
             endCh: 24,
-            ...option
+            ...satelliteOptions
         };
 
+        const channelFormat = csOptions.channelNameFormat || CHANNEL_NAME_FORMAT_CS;
         return {
-            channels: range(option.startCh, option.endCh).map((ch) => formatChannelName(option.channelNameFormat ? option.channelNameFormat : CHANNEL_NAME_FORMAT_CS, ch)),
-            scanMode: option.scanMode,
-            setDisabledOnAdd: option.setDisabledOnAdd
+            channels: range(csOptions.startCh, csOptions.endCh)
+                .map(ch => formatChannelName(channelFormat, ch)),
+            scanMode: csOptions.scanMode,
+            setDisabledOnAdd: csOptions.setDisabledOnAdd
         };
     }
+
+    return undefined;
 }
 
-export function generateChannelItemForService(type: common.ChannelType, channel: string, service: db.Service, setDisabledOnAdd: boolean): config.Channel {
-
-    let name = service.name;
-    name = name.trim();
+/**
+ * Generates a channel item for a specific service
+ *
+ * @param type The channel type (GR, BS, CS, SKY)
+ * @param channel The channel identifier
+ * @param service The service information
+ * @param setDisabledOnAdd Whether to set the channel as disabled initially
+ * @returns A channel configuration object
+ */
+export function generateChannelItemForService(
+    type: common.ChannelType,
+    channel: string,
+    service: db.Service,
+    setDisabledOnAdd: boolean
+): config.Channel {
+    // Use service name, or fallback to generated name if empty
+    let name = service.name.trim();
     if (name.length === 0) {
         name = `${type}${channel}:${service.serviceId}`;
     }
 
     return {
-        name: name,
-        type: type,
-        channel: channel,
+        name,
+        type,
+        channel,
         serviceId: service.serviceId,
         isDisabled: setDisabledOnAdd
     };
 }
 
-export function generateChannelItemForChannel(type: common.ChannelType, channel: string, services: db.Service[], setDisabledOnAdd: boolean): config.Channel {
-
+/**
+ * Generates a channel item for a channel with multiple services
+ * Finding a common prefix among all service names for the channel name
+ *
+ * @param type The channel type (GR, BS, CS, SKY)
+ * @param channel The channel identifier
+ * @param services Array of services on this channel
+ * @param setDisabledOnAdd Whether to set the channel as disabled initially
+ * @returns A channel configuration object
+ */
+export function generateChannelItemForChannel(
+    type: common.ChannelType,
+    channel: string,
+    services: db.Service[],
+    setDisabledOnAdd: boolean
+): config.Channel {
+    // Find the common prefix among all service names
     const baseName = services[0].name;
     let matchIndex = baseName.length;
 
+    // Compare each service name with the base name to find the common prefix
     for (let servicesIndex = 1; servicesIndex < services.length; servicesIndex++) {
         const service = services[servicesIndex];
         for (let nameIndex = 0; nameIndex < baseName.length && nameIndex < service.name.length; nameIndex++) {
+            // If characters don't match
             if (baseName[nameIndex] !== service.name[nameIndex]) {
                 if (nameIndex === 0) {
-                    break;
+                    break; // No common prefix at all
                 }
                 if (nameIndex < matchIndex) {
-                    matchIndex = nameIndex;
+                    matchIndex = nameIndex; // Update the match length
                 }
                 break;
             }
+            // If this service name is shorter and is a prefix of the base name
             if (nameIndex + 1 >= service.name.length && service.name.length < matchIndex) {
                 matchIndex = service.name.length;
                 break;
@@ -216,151 +359,478 @@ export function generateChannelItemForChannel(type: common.ChannelType, channel:
         }
     }
 
-    let name = baseName.slice(0, matchIndex);
-    name = name.trim();
+    // Extract and clean up the common prefix
+    let name = baseName.slice(0, matchIndex).trim();
     if (name.length === 0) {
-        name = `${type}${channel}`;
+        name = `${type}${channel}`; // Fallback name if no common prefix
     }
 
     return {
-        name: name,
-        type: type,
-        channel: channel,
+        name,
+        type,
+        channel,
         isDisabled: setDisabledOnAdd
     };
 }
 
-export function generateChannelItems(scanMode: ScanMode, type: common.ChannelType, channel: string, services: db.Service[], setDisabledOnAdd: boolean): config.Channel[] {
-
+/**
+ * Generates channel items based on scan mode, either per service or per channel
+ *
+ * @param scanMode The scan mode (Service or Channel)
+ * @param type The channel type (GR, BS, CS, SKY)
+ * @param channel The channel identifier
+ * @param services Array of services found on this channel
+ * @param setDisabledOnAdd Whether to set new channels as disabled
+ * @returns Array of channel configuration objects
+ */
+export function generateChannelItems(
+    scanMode: ScanMode,
+    type: common.ChannelType,
+    channel: string,
+    services: db.Service[],
+    setDisabledOnAdd: boolean
+): config.Channel[] {
+    // Service mode: create one channel item per service
     if (scanMode === ScanMode.Service) {
-        const channelItems: config.Channel[] = [];
-        for (const service of services) {
-            channelItems.push(generateChannelItemForService(type, channel, service, setDisabledOnAdd));
-        }
-        return channelItems;
+        return services.map(service =>
+            generateChannelItemForService(type, channel, service, setDisabledOnAdd)
+        );
     }
 
+    // Channel mode: create one channel item for all services
     return [generateChannelItemForChannel(type, channel, services, setDisabledOnAdd)];
 }
+/**
+ * Interface for scan status update information
+ */
+interface ScanStatusUpdate {
+    status: ScanStatus;
+    [key: string]: any; // Additional properties depend on status type
+}
 
+/**
+ * Executes the channel scanning process
+ *
+ * @param scanConfig Configuration for the scan including channels to scan
+ * @param dryRun If true, don't save changes
+ * @param type Channel type being scanned (GR, BS, CS, SKY)
+ * @param refresh Whether to rescan channels that already exist
+ * @param outputWriter Optional function to write output text during scan
+ * @returns Promise resolving to the final channel list
+ */
+async function runChannelScan(
+    scanConfig: ScanConfig,
+    dryRun: boolean,
+    type: common.ChannelType,
+    refresh: boolean,
+    outputWriter?: (text: string) => void
+): Promise<config.Channel[]> {
+    try {
+        // Initialize scan data
+        const scanLog: string[] = [];
+        const oldChannelItems = config.loadChannels();
+        // Filter out channels of the type we're scanning (they'll be replaced)
+        const result: config.Channel[] = oldChannelItems.filter(channel => channel.type !== type);
+        let newCount = 0;
+        let takeoverCount = 0;
+
+        // Initialize global scan status
+        currentScanStatus = {
+            status: ScanStatus.Scanning,
+            type,
+            dryRun,
+            progress: 0,
+            currentChannel: "",
+            scanLog,
+            newCount,
+            takeoverCount,
+            result: []
+        };
+
+        /**
+         * Updates scan status and logs
+         *
+         * @param statusUpdate Optional status update object
+         * @param textOutput Optional text output for logs
+         */
+        const updateScanStatus = (statusUpdate?: ScanStatusUpdate, textOutput?: string): void => {
+            // Update status fields based on the status type
+            if (statusUpdate) {
+                switch (statusUpdate.status) {
+                    case ScanStatus.ScanningChannel:
+                        currentScanStatus.progress = statusUpdate.progress;
+                        currentScanStatus.currentChannel = statusUpdate.channel;
+                        break;
+                    case ScanStatus.Summary:
+                        currentScanStatus.newCount = statusUpdate.newCount;
+                        currentScanStatus.takeoverCount = statusUpdate.takeoverCount;
+                        break;
+                    case ScanStatus.Completed:
+                        currentScanStatus.status = ScanStatus.Completed;
+                        break;
+                    case ScanStatus.FinalResult:
+                        currentScanStatus.result = statusUpdate.result;
+                        break;
+                }
+            }
+
+            // Add text to log and output if requested
+            if (textOutput) {
+                const trimmedText = textOutput.trim();
+                scanLog.push(trimmedText);
+                outputWriter?.(textOutput);
+            }
+        };
+
+        // Print dry run notice if applicable
+        if (dryRun) {
+            updateScanStatus(
+                { status: ScanStatus.DryRun, enabled: dryRun },
+                "-- dry run --\n\n"
+            );
+        }
+
+        // Print scan start message
+        updateScanStatus(
+            { status: ScanStatus.Started, type },
+            `channel scanning... (type: "${type}")\n\n`
+        );
+
+        // Process each channel in the scan configuration
+        const totalChannels = scanConfig.channels.length;
+        for (let i = 0; i < totalChannels; i++) {
+            const channel = scanConfig.channels[i];
+            const progressPercent = Math.round((i + 1) / totalChannels * 100);
+
+            // Update status to show current channel being scanned
+            updateScanStatus(
+                {
+                    status: ScanStatus.ScanningChannel,
+                    channel,
+                    progress: progressPercent,
+                    current: i + 1,
+                    total: totalChannels
+                },
+                `channel: "${channel}" (${i + 1}/${totalChannels}) [${progressPercent}%] ...\n`
+            );
+
+            // Check for existing enabled channels if we're not refreshing
+            if (!refresh) {
+                const existingChannels = oldChannelItems.filter(
+                    item => item.type === type &&
+                           item.channel === channel &&
+                           !item.isDisabled
+                );
+
+                // If there are existing channels, take them over instead of scanning
+                if (existingChannels.length > 0) {
+                    const takeoverInfo = {
+                        status: ScanStatus.Takeover,
+                        channel,
+                        count: existingChannels.length,
+                        items: existingChannels
+                    };
+
+                    updateScanStatus(
+                        takeoverInfo,
+                        `-> ${existingChannels.length} existing config found.\n`
+                    );
+
+                    // Add each existing channel to results
+                    for (const channelItem of existingChannels) {
+                        result.push(channelItem);
+                        takeoverCount++;
+                        updateScanStatus(undefined, `-> ${JSON.stringify(channelItem)}\n`);
+                    }
+
+                    updateScanStatus(
+                        {
+                            status: ScanStatus.Skipped,
+                            channel,
+                            reason: "existing_config"
+                        },
+                        `# scan has skipped due to the "refresh = false" option because an existing config was found.\n\n`
+                    );
+
+                    continue; // Skip to next channel
+                }
+            }
+
+            // Scan the channel for services
+            let services: db.Service[];
+            try {
+                // Get services from the tuner
+                services = await _.tuner.getServices(<any> {
+                    type,
+                    channel
+                });
+            } catch (error) {
+                // Handle errors (often no signal)
+                const isNoSignalError = /stream has closed before get network/.test(String(error));
+                const errorInfo = {
+                    status: ScanStatus.Error,
+                    channel,
+                    error: isNoSignalError ? "no_signal" : String(error)
+                };
+
+                let errorText = "-> no signal.";
+                if (!isNoSignalError) {
+                    errorText += ` [${error}]`;
+                }
+                errorText += "\n\n";
+
+                updateScanStatus(errorInfo, errorText);
+                continue; // Skip to next channel
+            }
+
+            // Filter services to television types (1 = digital TV, 173 = temporary digital TV)
+            services = services.filter(service => service.type === 1 || service.type === 173);
+
+            updateScanStatus(
+                {
+                    status: ScanStatus.ServicesFound,
+                    channel,
+                    count: services.length
+                },
+                `-> ${services.length} services found.\n`
+            );
+
+            // Skip if no services found
+            if (services.length === 0) {
+                updateScanStatus(undefined, "\n");
+                continue;
+            }
+
+            // Generate channel items based on scan mode (Service or Channel)
+            const scannedChannelItems = generateChannelItems(
+                scanConfig.scanMode,
+                type,
+                channel,
+                services,
+                scanConfig.setDisabledOnAdd
+            );
+
+            // Add newly scanned items to results
+            const scannedItems: config.Channel[] = [];
+            for (const newChannelItem of scannedChannelItems) {
+                result.push(newChannelItem);
+                newCount++;
+                scannedItems.push(newChannelItem);
+                updateScanStatus(undefined, `-> ${JSON.stringify(newChannelItem)}\n`);
+            }
+
+            updateScanStatus(
+                {
+                    status: ScanStatus.ChannelsFound,
+                    channel,
+                    items: scannedItems
+                },
+                `Found ${scannedItems.length} channels for ${channel}\n\n`
+            );
+        }
+
+        // Sort results by type and channel number
+        result.sort((a, b) => {
+            if (a.type === b.type) {
+                return a.channel.localeCompare(b.channel, undefined, compareOptions);
+            } else {
+                return channelOrder[a.type] - channelOrder[b.type];
+            }
+        });
+
+        // Generate and display summary
+        const summaryData = {
+            status: ScanStatus.Summary,
+            newCount,
+            takeoverCount,
+            totalTypeCount: newCount + takeoverCount,
+            totalCount: result.length,
+            type
+        };
+
+        updateScanStatus(
+            summaryData,
+            `-> total ${newCount + takeoverCount}/${result.length} (${type}/Any) channels configured.\n\n`
+        );
+
+        updateScanStatus(
+            { status: ScanStatus.SummaryNew, newCount },
+            `-> new ${newCount} channels found.\n`
+        );
+
+        updateScanStatus(
+            { status: ScanStatus.SummaryTakeover, takeoverCount },
+            `-> existing ${takeoverCount} channels merged.\n`
+        );
+
+        // Save results if not a dry run
+        if (!dryRun) {
+            await config.saveChannels(result);
+            updateScanStatus(
+                { status: ScanStatus.Completed, saved: true },
+                "channel scan has been completed and saved successfully.\n"
+            );
+            updateScanStatus(
+                { status: ScanStatus.RestartRequired },
+                "**RESTART REQUIRED** to apply changes.\n"
+            );
+        } else {
+            updateScanStatus(
+                { status: ScanStatus.Completed, dryRun: true },
+                "channel scan has been completed.\n\n-- dry run --\n"
+            );
+        }
+
+        // Send final result
+        updateScanStatus(
+            {
+                status: ScanStatus.FinalResult,
+                result
+            },
+            `Final result: ${result.length} channels\n`
+        );
+
+        return result;
+    } finally {
+        // Always reset scanning flag when done
+        isScanning = false;
+    }
+}
+
+/**
+ * Get channel scan status - API handler
+ */
+export const get: Operation = async (req, res) => {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+
+    // If no scan has been performed yet
+    if (currentScanStatus === null) {
+        api.responseJSON(res, {
+            status: "no_scan_data",
+            isScanning
+        });
+        return;
+    }
+
+    // Return current scan status
+    api.responseJSON(res, {
+        ...currentScanStatus,
+        isScanning
+    });
+};
+
+get.apiDoc = {
+    tags: ["config"],
+    summary: "Get Channel Scan Status",
+    description: "Returns the current or last completed scan status and results",
+    operationId: "getChannelScanStatus",
+    produces: [
+        "application/json"
+    ],
+    responses: {
+        200: {
+            description: "OK",
+            schema: {
+                $ref: "#/definitions/ChannelScanStatus"
+            }
+        }
+    }
+};
+
+/**
+ * Initiate a channel scan - API handler
+ */
 export const put: Operation = async (req, res) => {
-
+    // Check if a scan is already in progress
     if (isScanning === true) {
         api.responseError(res, 409, "Already Scanning");
         return;
     }
+
+    // Set scanning flag
     isScanning = true;
 
-    req.setTimeout(1000 * 60 * 10); // 10 minites
-
-    const dryRun = req.query.dryRun as any as boolean;
+    // Extract query parameters
+    const asyncMode = Boolean(req.query.async);
+    const dryRun = Boolean(req.query.dryRun);
     const type = req.query.type as common.ChannelType;
-    const refresh = req.query.refresh as any as boolean;
-    const oldChannelItems = config.loadChannels();
-    const result: config.Channel[] = oldChannelItems.filter(channel => channel.type !== type);
-    let newCount = 0;
-    let takeoverCount = 0;
+    const refresh = Boolean(req.query.refresh);
 
+    // Parse channel configuration options
+    const channelOptions: ChannelScanOption = {
+        type,
+        startCh: req.query.minCh ? Number(req.query.minCh) : undefined,
+        endCh: req.query.maxCh ? Number(req.query.maxCh) : undefined,
+        startSubCh: req.query.minSubCh ? Number(req.query.minSubCh) : undefined,
+        endSubCh: req.query.maxSubCh ? Number(req.query.maxSubCh) : undefined,
+        useSubCh: req.query.useSubCh !== undefined ? Boolean(req.query.useSubCh) : undefined,
+        channelNameFormat: req.query.channelNameFormat as string,
+        scanMode: req.query.scanMode as ScanMode,
+        setDisabledOnAdd: req.query.setDisabledOnAdd !== undefined ?
+            Boolean(req.query.setDisabledOnAdd) : undefined
+    };
+
+    // Generate scan configuration
+    const scanConfig = generateScanConfig(channelOptions);
+
+    // Handle missing scan configuration
+    if (!scanConfig) {
+        isScanning = false;
+        api.responseError(res, 400, "Invalid scan configuration");
+        return;
+    }
+
+    // Handle asynchronous scan mode
+    if (asyncMode) {
+        res.status(202);
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.json({
+            status: "accepted",
+            message: "Channel scan started in async mode"
+        });
+        res.end();
+
+        // Run scan in background
+        runChannelScan(scanConfig, dryRun, type, refresh, null)
+            .catch(error => {
+                console.error("Channel scan error:", error);
+                if (currentScanStatus) {
+                    currentScanStatus.status = ScanStatus.Error;
+                    currentScanStatus.scanLog.push(`Error: ${String(error)}`);
+                }
+                isScanning = false;
+            });
+
+        return;
+    }
+
+    // Synchronous mode - wait for completion
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.status(200);
-    if (dryRun) {
-        res.write("-- dry run --\n\n");
+
+    // Set longer timeout for synchronous scan mode
+    req.setTimeout(1000 * 60 * 30); // 30 minutes
+
+    try {
+        // Stream output directly to response
+        const logTextOutput = (textContent: string): void => {
+            res.write(textContent);
+        };
+
+        // Run scan with output streaming
+        await runChannelScan(scanConfig, dryRun, type, refresh, logTextOutput);
+        res.end();
+    } catch (error) {
+        console.error("Channel scan error:", error);
+        res.write(`Error during scan: ${error}\n`);
+        res.end();
+        isScanning = false;
     }
-    res.write(`channel scanning... (type: "${type}")\n\n`);
-
-    const scanConfig = generateScanConfig({
-        type: type,
-        startCh: req.query.minCh as any as number,
-        endCh: req.query.maxCh as any as number,
-        startSubCh: req.query.minSubCh as any as number,
-        endSubCh: req.query.maxSubCh as any as number,
-        useSubCh: req.query.useSubCh as any as boolean,
-        channelNameFormat: req.query.channelNameFormat as any as string,
-        scanMode: req.query.scanMode as any as ScanMode,
-        setDisabledOnAdd: req.query.setDisabledOnAdd as any as boolean
-    });
-
-    const chLength = scanConfig.channels.length;
-    for (let i = 0; i < chLength; i++) {
-        const channel = scanConfig.channels[i];
-
-        res.write(`channel: "${channel}" (${i + 1}/${chLength}) [${Math.round((i + 1) / chLength * 100)}%] ...\n`);
-
-        if (!refresh) {
-            const takeoverChannelItems = oldChannelItems.filter(chItem => chItem.type === type && chItem.channel === channel && !chItem.isDisabled);
-            if (takeoverChannelItems.length > 0) {
-                res.write(`-> ${takeoverChannelItems.length} existing config found.\n`);
-                for (const channelItem of takeoverChannelItems) {
-                    result.push(channelItem);
-                    ++takeoverCount;
-                    res.write(`-> ${JSON.stringify(channelItem)}\n`);
-                }
-                res.write(`# scan has skipped due to the "refresh = false" option because an existing config was found.\n\n`);
-                continue;
-            }
-        }
-
-        let services: db.Service[];
-        try {
-            services = await _.tuner.getServices(<any> {
-                type: type,
-                channel: channel
-            });
-        } catch (e) {
-            res.write("-> no signal.");
-            if (/stream has closed before get network/.test(e) === false) {
-                res.write(` [${e}]`);
-            }
-            res.write("\n\n");
-            continue;
-        }
-
-        services = services.filter(service => service.type === 1 || service.type === 173);
-        res.write(`-> ${services.length} services found.\n`);
-
-        if (services.length === 0) {
-            res.write("\n");
-            continue;
-        }
-
-        const scannedChannelItems = generateChannelItems(scanConfig.scanMode, type, channel, services, scanConfig.setDisabledOnAdd);
-        for (const scannedChannelItem of scannedChannelItems) {
-            result.push(scannedChannelItem);
-            ++newCount;
-            res.write(`-> ${JSON.stringify(scannedChannelItem)}\n`);
-        }
-        res.write("\n");
-    }
-
-    result.sort((a, b) => {
-        if (a.type === b.type) {
-            return a.channel.localeCompare(b.channel, undefined, compareOptions);
-        } else {
-            return channelOrder[a.type] - channelOrder[b.type];
-        }
-    });
-
-    res.write(`-> new ${newCount} channels found.\n`);
-    res.write(`-> existing ${takeoverCount} channels merged.\n`);
-    res.write(`-> total ${newCount + takeoverCount}/${result.length} (${type}/Any) channels configured.\n\n`);
-
-    if (!dryRun) {
-        config.saveChannels(result);
-    }
-
-    isScanning = false;
-
-    if (dryRun) {
-        res.write("channel scan has been completed.\n\n");
-        res.write("-- dry run --\n");
-    } else {
-        res.write("channel scan has been completed and saved successfully.\n");
-        res.write("**RESTART REQUIRED** to apply changes.\n");
-    }
-
-    res.end();
 };
 
+/**
+ * API documentation for the channel scan endpoint
+ */
 put.apiDoc = {
     tags: ["config"],
     summary: "Channel Scan",
@@ -389,7 +859,7 @@ About BS Subchannel Style:
             type: "boolean",
             allowEmptyValue: true,
             default: false,
-            description: "dry run. If `true`, the scanned result will not be saved."
+            description: "Dry run mode. If `true`, the scanned result will not be saved to configuration."
         },
         {
             in: "query",
@@ -415,13 +885,13 @@ About BS Subchannel Style:
             in: "query",
             name: "minSubCh",
             type: "integer",
-            description: "Specifies the minimum number of subchannel numbers to scan. This parameter is only used if the type is `BS` and the bs_subch_style is `true`."
+            description: "Specifies the minimum number of subchannel numbers to scan. This parameter is only used if the type is `BS` and the useSubCh is `true`."
         },
         {
             in: "query",
             name: "maxSubCh",
             type: "integer",
-            description: "Specifies the maximum number of subchannel numbers to scan. This parameter is only used if the type is `BS` and the bs_subch_style is `true`."
+            description: "Specifies the maximum number of subchannel numbers to scan. This parameter is only used if the type is `BS` and the useSubCh is `true`."
         },
         {
             in: "query",
@@ -429,22 +899,21 @@ About BS Subchannel Style:
             type: "boolean",
             allowEmptyValue: true,
             default: true,
-            description: "Specify true to specify the channel in the subchannel style. Only used for BS scans. (e.g. BS01_0)"
+            description: "Specify true to use the subchannel style for channel numbers. Only used for BS scans. (e.g. BS01_0)"
         },
         {
             in: "query",
             name: "channelNameFormat",
             type: "string",
             allowEmptyValue: true,
-            default: "{ch}",
-            description: "Override format to use for channel name. (e.g. {ch} -> 1, BS{ch00}_{subch} -> BS01_2)"
+            description: "Override format to use for channel name. Supports placeholders like {ch}, {ch00}, {subch}. (e.g. {ch} -> 1, BS{ch00}_{subch} -> BS01_2)"
         },
         {
             in: "query",
             name: "scanMode",
             type: "string",
             enum: [ScanMode.Channel, ScanMode.Service],
-            description: "To specify the service explictly, use the `Service` mode.\n\n" +
+            description: "Channel scan mode. Use `Service` mode to create separate entries per service.\n\n" +
                 "_Default value (GR)_: Channel\n" +
                 "_Default value (BS/CS)_: Service"
         },
@@ -453,7 +922,7 @@ About BS Subchannel Style:
             name: "setDisabledOnAdd",
             type: "boolean",
             allowEmptyValue: true,
-            description: "If `true`, set disable on add channel.\n\n" +
+            description: "If `true`, newly discovered channels will be added in disabled state.\n\n" +
                 "_Default value (GR)_: false\n" +
                 "_Default value (BS/CS)_: true"
         },
@@ -463,13 +932,48 @@ About BS Subchannel Style:
             type: "boolean",
             allowEmptyValue: true,
             default: false,
-            description: "If `true`, update the existing settings without inheriting them.\n" +
-                "However, non-scanned types of channels will always be inherited."
+            description: "If `true`, update the existing channel configurations without preserving them.\n" +
+                "When false, enabled channels that already exist in the config will be preserved.\n" +
+                "Note: Channels of other types will always be preserved regardless of this setting."
+        },
+        {
+            in: "query",
+            name: "async",
+            type: "boolean",
+            allowEmptyValue: true,
+            default: false,
+            description: "If `true`, the API returns 202 Accepted immediately and performs scan asynchronously.\n" +
+                "Use GET /config/channels/scan to monitor progress and retrieve the result."
         }
     ],
     responses: {
         200: {
-            description: "OK"
+            description: "OK - Synchronous scan completed",
+            schema: {
+                type: "string",
+                description: "Text output of scan process"
+            }
+        },
+        202: {
+            description: "Accepted - Asynchronous scan started",
+            schema: {
+                type: "object",
+                properties: {
+                    status: {
+                        type: "string",
+                        enum: ["accepted"]
+                    },
+                    message: {
+                        type: "string"
+                    }
+                }
+            }
+        },
+        400: {
+            description: "Invalid scan configuration",
+            schema: {
+                $ref: "#/definitions/Error"
+            }
         },
         409: {
             description: "Already Scanning",
