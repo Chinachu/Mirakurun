@@ -39,6 +39,8 @@ services:
       - /opt/mirakurun/opt:/opt
       - /opt/mirakurun/config:/app-config
       - /opt/mirakurun/data:/app-data
+    tmpfs:
+      - /tmp
     restart: always
     logging:
       driver: json-file
