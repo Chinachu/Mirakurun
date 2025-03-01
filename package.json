@@ -51,7 +51,9 @@
     "docker:run-setup": "docker compose -f docker/docker-compose.yml run --rm -e SETUP=true --service-ports mirakurun",
     "docker:run": "docker compose -f docker/docker-compose.yml run --rm --service-ports mirakurun",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down",
     "docker:logs": "docker compose -f docker/docker-compose.yml logs -f",
+    "docker:bash": "docker compose -f docker/docker-compose.yml exec mirakurun bash",
     "docker:debug": "docker compose -f docker/docker-compose.yml run --rm --service-ports -e DEBUG=true mirakurun"
   },
   "directories": {
