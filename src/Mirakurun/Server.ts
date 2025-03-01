@@ -15,11 +15,11 @@
 */
 import * as fs from "fs";
 import * as http from "http";
-import * as express from "express";
-import * as cors from "cors";
-import * as mime from "mime";
+import express from "express";
+import cors from "cors";
+import mime from "mime";
 import * as openapi from "express-openapi";
-import * as morgan from "morgan";
+import morgan from "morgan";
 import * as yaml from "js-yaml";
 import { OpenAPIV2 } from "openapi-types";
 import RPCServer from "jsonrpc2-ws/lib/server";

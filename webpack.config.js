@@ -23,7 +23,7 @@ module.exports = {
                     {
                         loader: "ts-loader",
                         options: {
-                            configFile: "tsconfig.webpack.json"
+                            configFile: `${__dirname}/src/ui/tsconfig.json`
                         }
                     }
                 ]

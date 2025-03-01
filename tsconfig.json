@@ -2,13 +2,12 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
     "alwaysStrict": true,
-    "target": "es2020",
     "lib": [
-      "es2020",
-      "dom"
+      "es2022"
     ],
+    "module": "node16",
+    "target": "es2022",
     "removeComments": true,
-    "module": "commonjs",
     "sourceMap": true,
     "incremental": true,
     "outDir": "lib"
