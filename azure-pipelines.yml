@@ -131,7 +131,7 @@ stages:
   jobs:
   - job: Manifest
     pool:
-      vmImage: 'ubuntu-20.04'
+      vmImage: 'ubuntu-22.04'
     steps:
     - task: Docker@2
       inputs:
