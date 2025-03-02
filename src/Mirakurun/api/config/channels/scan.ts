@@ -894,17 +894,8 @@ export const put: Operation = async (req, res) => {
     const type = req.query.type as common.ChannelType;
     const refresh = Boolean(req.query.refresh);
 
-    // Parse skipCh parameter (comma-separated list of channel numbers to skip)
-    const skipCh: number[] = [];
-    if (req.query.skipCh) {
-        const skipChStr = req.query.skipCh as string;
-        skipChStr.split(",").forEach(ch => {
-            const num = parseInt(ch.trim(), 10);
-            if (!isNaN(num)) {
-                skipCh.push(num);
-            }
-        });
-    }
+    // Parse skipCh parameter
+    const skipCh: number[] = req.query?.skipCh as any as number[] || [];
 
     // Parse channel configuration options
     const channelOptions: ChannelScanOption = {
