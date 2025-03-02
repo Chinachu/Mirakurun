@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0">
+    <title>Mirakurun API Documentation</title>
+    <link id="icon" rel="icon" type="image/svg+xml" href="/icon.svg">
+    <script src="/redoc/redoc.standalone.js#/redoc@999.9.9+dummy-for-redoc-try/"></script>
+    <script src="/redoc-try/try.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="redoc-container"></div>
+    <script>
+      initTry({
+        openApi: '/api/docs',
+        redocOptions: {
+          scrollYOffset: 0,
+          hideDownloadButton: true,
+          theme: {
+            colors: {
+              primary: {
+                main: '#1976d2'
+              }
+            }
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

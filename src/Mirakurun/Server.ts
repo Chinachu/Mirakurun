@@ -138,8 +138,9 @@ class Server {
                     }
                 }
             }));
-            app.use("/swagger-ui", express.static("node_modules/swagger-ui-dist"));
-            app.use("/api/debug", express.static("lib/ui/swagger-ui.html"));
+            app.use("/redoc", express.static("node_modules/redoc/bundles"));
+            app.use("/redoc-try", express.static("node_modules/redoc-try/dist"));
+            app.use("/api/debug", express.static("lib/ui/redoc-ui.html"));
         }
 
         const api = yaml.load(fs.readFileSync("api.yml", "utf8")) as OpenAPIV2.Document;
