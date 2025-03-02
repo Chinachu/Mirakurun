@@ -90,13 +90,13 @@ enum ScanPhase {
  * Process step status codes for the scanning process
  */
 enum ScanStep {
-    DryRun = "dry_run",                   // Running in dry run mode
     Started = "started",                  // Scan has started
     ScanningChannel = "scanning_channel", // Currently scanning a specific channel
     Takeover = "takeover",                // Taking over existing channel config
     Skipped = "skipped",                  // Channel was skipped
     ServicesFound = "services_found",     // Services found on channel
-    ChannelsFound = "channels_found"      // Channels found after scan
+    ChannelsFound = "channels_found",     // Channels found after scan
+    Error = "error"                       // Error occurred during scanning
 }
 
 /**
@@ -599,10 +599,7 @@ async function runChannelScan(
 
         // Print dry run notice if applicable
         if (dryRun) {
-            updateStepStatus(
-                { status: ScanStep.DryRun, enabled: dryRun },
-                "-- dry run --\n\n"
-            );
+            appendToLog("-- dry run --\n\n");
         }
 
         // Print scan start message
@@ -704,9 +701,10 @@ async function runChannelScan(
                 // Handle errors (often no signal)
                 const isNoSignalError = /stream has closed before get network/.test(String(error));
                 const errorInfo = {
-                    status: ScanPhase.Error,
+                    status: ScanStep.Error,
                     channel,
-                    error: isNoSignalError ? "no_signal" : String(error)
+                    reason: isNoSignalError ? "no_signal" : String(error),
+                    progress: progressPercent
                 };
 
                 let errorText = "-> no signal.";
@@ -715,7 +713,7 @@ async function runChannelScan(
                 }
                 errorText += "\n\n";
 
-                updatePhaseStatus(errorInfo, errorText);
+                updateStepStatus(errorInfo, errorText);
                 continue; // Skip to next channel
             }
 
@@ -799,22 +797,25 @@ async function runChannelScan(
             `-> existing ${takeoverCount} channels merged.\n`
         );
 
-        // Save results if not a dry run
-        if (!dryRun) {
-            await config.saveChannels(result);
-            updatePhaseStatus(
-                { status: ScanPhase.Completed, saved: true },
-                "channel scan has been completed and saved successfully.\n"
-            );
-            updateResultStatus(
-                { status: ScanResultType.RestartRequired },
-                "**RESTART REQUIRED** to apply changes.\n"
-            );
-        } else {
-            updatePhaseStatus(
-                { status: ScanPhase.Completed, dryRun: true },
-                "channel scan has been completed.\n\n-- dry run --\n"
-            );
+        // キャンセルされた場合は Completed にしない
+        if (!isCancellationRequested) {
+            // Save results if not a dry run
+            if (!dryRun) {
+                await config.saveChannels(result);
+                updatePhaseStatus(
+                    { status: ScanPhase.Completed, saved: true },
+                    "channel scan has been completed and saved successfully.\n"
+                );
+                updateResultStatus(
+                    { status: ScanResultType.RestartRequired },
+                    "**RESTART REQUIRED** to apply changes.\n"
+                );
+            } else {
+                updatePhaseStatus(
+                    { status: ScanPhase.Completed, dryRun: true },
+                    "channel scan has been completed.\n\n-- dry run --\n"
+                );
+            }
         }
 
         // Send final result
@@ -843,7 +844,7 @@ export const get: Operation = async (req, res) => {
     // If no scan has been performed yet
     if (currentScanStatus === null) {
         api.responseJSON(res, {
-            status: "no_scan_data",
+            status: "not_started",
             isScanning
         });
         return;
@@ -944,6 +945,7 @@ export const put: Operation = async (req, res) => {
             .catch(error => {
                 console.error("Channel scan error:", error);
                 if (currentScanStatus) {
+                    // ScanPhase.Error is used only when the scan is stopped
                     currentScanStatus.status = ScanPhase.Error;
                     currentScanStatus.scanLog.push(`Error: ${String(error)}`);
                 }
@@ -971,6 +973,11 @@ export const put: Operation = async (req, res) => {
         res.end();
     } catch (error) {
         console.error("Channel scan error:", error);
+        if (currentScanStatus) {
+            // ScanPhase.Error is used only when the scan is stopped
+            currentScanStatus.status = ScanPhase.Error;
+            currentScanStatus.scanLog.push(`Error: ${String(error)}`);
+        }
         res.write(`Error during scan: ${error}\n`);
         res.end();
         isScanning = false;
