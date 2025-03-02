@@ -616,6 +616,10 @@ definitions:
         description: "Complete channel configuration"
         items:
           $ref: "#/definitions/ConfigChannelsItem"
+      startTime:
+        $ref: '#/definitions/UnixtimeMS'
+      updateTime:
+        $ref: '#/definitions/UnixtimeMS'
 
   Status:
     type: object

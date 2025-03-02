@@ -43,6 +43,8 @@ interface CurrentScanStatus {
     newCount: number;
     takeoverCount: number;
     result: config.Channel[];
+    startTime: number;
+    updateTime: number;
 }
 
 let currentScanStatus: CurrentScanStatus | null = null;
@@ -503,6 +505,7 @@ async function runChannelScan(
         let takeoverCount = 0;
 
         // Initialize global scan status
+        const now = Date.now();
         currentScanStatus = {
             status: ScanPhase.Scanning,
             type,
@@ -512,7 +515,9 @@ async function runChannelScan(
             scanLog,
             newCount,
             takeoverCount,
-            result: []
+            result: [],
+            startTime: now,
+            updateTime: now
         };
 
         /**
@@ -549,6 +554,7 @@ async function runChannelScan(
             if (update.channel) {
                 currentScanStatus.currentChannel = update.channel;
             }
+            currentScanStatus.updateTime = Date.now();
 
             appendToLog(textOutput);
         };
