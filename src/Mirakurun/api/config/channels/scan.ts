@@ -493,7 +493,8 @@ async function runChannelScan(
     dryRun: boolean,
     type: common.ChannelType,
     refresh: boolean,
-    outputWriter?: (text: string) => void
+    outputWriter?: (text: string) => void,
+    skipCh: number[] = []
 ): Promise<config.Channel[]> {
     try {
         // Initialize scan data
@@ -621,9 +622,23 @@ async function runChannelScan(
                 );
                 break;
             }
-
             const channel = scanConfig.channels[i];
             const progressPercent = Math.round((i + 1) / totalChannels * 100);
+
+            // Check if this channel should be skipped based on skipCh parameter
+            const channelNumber = parseInt(channel.replace(/[^0-9]/g, ""), 10);
+            if (!isNaN(channelNumber) && skipCh.includes(channelNumber)) {
+                updateStepStatus(
+                    {
+                        status: ScanStep.Skipped,
+                        channel,
+                        reason: "skip_parameter",
+                        progress: progressPercent
+                    },
+                    `channel: "${channel}" (${i + 1}/${totalChannels}) [${progressPercent}%] - skipped by skipCh parameter\n\n`
+                );
+                continue; // Skip to next channel
+            }
 
             // Update status to show current channel being scanned
             updateStepStatus(
@@ -878,6 +893,18 @@ export const put: Operation = async (req, res) => {
     const type = req.query.type as common.ChannelType;
     const refresh = Boolean(req.query.refresh);
 
+    // Parse skipCh parameter (comma-separated list of channel numbers to skip)
+    const skipCh: number[] = [];
+    if (req.query.skipCh) {
+        const skipChStr = req.query.skipCh as string;
+        skipChStr.split(",").forEach(ch => {
+            const num = parseInt(ch.trim(), 10);
+            if (!isNaN(num)) {
+                skipCh.push(num);
+            }
+        });
+    }
+
     // Parse channel configuration options
     const channelOptions: ChannelScanOption = {
         type,
@@ -913,7 +940,7 @@ export const put: Operation = async (req, res) => {
         res.end();
 
         // Run scan in background
-        runChannelScan(scanConfig, dryRun, type, refresh, null)
+        runChannelScan(scanConfig, dryRun, type, refresh, null, skipCh)
             .catch(error => {
                 console.error("Channel scan error:", error);
                 if (currentScanStatus) {
@@ -940,7 +967,7 @@ export const put: Operation = async (req, res) => {
         };
 
         // Run scan with output streaming
-        await runChannelScan(scanConfig, dryRun, type, refresh, logTextOutput);
+        await runChannelScan(scanConfig, dryRun, type, refresh, logTextOutput, skipCh);
         res.end();
     } catch (error) {
         console.error("Channel scan error:", error);
@@ -1078,6 +1105,17 @@ About BS Subchannel Style:
             name: "maxCh",
             type: "integer",
             description: "Specifies the maximum number of channel numbers to scan."
+        },
+        {
+            in: "query",
+            name: "skipCh",
+            type: "array",
+            items: {
+                type: "integer"
+            },
+            collectionFormat: "csv",
+            description: "Comma-separated list of channel numbers to skip during scanning.\n" +
+                "Example: `skipCh=13,14,15` will skip channels 13, 14, and 15."
         },
         {
             in: "query",
