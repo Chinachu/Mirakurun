@@ -797,7 +797,7 @@ async function runChannelScan(
             `-> existing ${takeoverCount} channels merged.\n`
         );
 
-        // キャンセルされた場合は Completed にしない
+        // If canceled, do not set to Completed
         if (!isCancellationRequested) {
             // Save results if not a dry run
             if (!dryRun) {
