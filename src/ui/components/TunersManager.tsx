@@ -42,6 +42,9 @@ interface Item {
     controls?: JSX.Element;
     user?: JSX.Element;
     priority?: JSX.Element;
+    ch?: JSX.Element;
+    sid?: JSX.Element;
+    ua?: JSX.Element;
 }
 
 const deviceColumns: IColumn[] = [
@@ -62,15 +65,33 @@ const deviceColumns: IColumn[] = [
 
 const userColumns: IColumn[] = [
     {
+        key: "col-priority",
+        name: "",
+        fieldName: "priority",
+        minWidth: 0
+    },
+    {
         key: "col-user",
         name: "",
         fieldName: "user",
         minWidth: 0
     },
     {
-        key: "col-priority",
+        key: "col-ch",
         name: "",
-        fieldName: "priority",
+        fieldName: "ch",
+        minWidth: 0
+    },
+    {
+        key: "col-sid",
+        name: "",
+        fieldName: "sid",
+        minWidth: 0
+    },
+    {
+        key: "col-ua",
+        name: "",
+        fieldName: "ua",
         minWidth: 0
     }
 ];
@@ -145,6 +166,24 @@ const TunersManager: React.FC<{ tuners: TunerDevice[] }> = ({ tuners }) => {
                     <>
                         <Icon title="Priority" iconName="SortLines" />
                         <Text style={{ marginLeft: 8 }}>{user.priority}</Text>
+                    </>
+                ),
+                ch: (
+                    <>
+                        <Icon title="Channel" iconName="TVMonitor" />
+                        <Text style={{ marginLeft: 8 }}>{user.streamSetting.channel.type} / {user.streamSetting.channel.channel}</Text>
+                    </>
+                ),
+                sid: (
+                    <>
+                        <Icon title="Service ID" iconName="Filter" />
+                        <Text style={{ marginLeft: 8 }}>{user.streamSetting.serviceId ? `SID: 0x${user.streamSetting.serviceId.toString(16).toUpperCase()} (${user.streamSetting.serviceId})` : "-"}</Text>
+                    </>
+                ),
+                ua: (
+                    <>
+                        <Icon title="User-Agent" iconName="Tag" />
+                        <Text style={{ marginLeft: 8 }}>{user.agent || "-"}</Text>
                     </>
                 )
             });
