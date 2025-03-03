@@ -22,7 +22,8 @@ import {
     Icon,
     TooltipHost,
     ITooltipHostStyles,
-    ITooltipProps
+    ITooltipProps,
+    Checkbox
 } from "@fluentui/react";
 import { UIState } from "../index";
 import TunersManager from "./TunersManager";
@@ -51,6 +52,11 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
     const [status, setStatus] = useState<UIState["status"]>(uiState.status);
     const [services, setServices] = useState<UIState["services"]>(uiState.services);
     const [tuners, setTuners] = useState<UIState["tuners"]>(uiState.tuners);
+
+    // サービスタイプフィルター状態
+    const [showDTV, setShowDTV] = useState<boolean>(true);
+    const [showData, setShowData] = useState<boolean>(false);
+    const [showOthers, setShowOthers] = useState<boolean>(false);
 
     useEffect(() => {
 
@@ -106,12 +112,19 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
         );
     }
 
-    const serviceList: JSX.Element[] = [];
-    for (let i = 0; i < services.length; i++) {
-        const service = services[i];
-        if (service.type !== 1 && service.type !== 173) {
-            continue;
+    // フィルタリングされたサービスリストを作成
+    const filteredServices = services.filter(service => {
+        if (service.type === 0x01 || service.type === 0xAD) {
+            return showDTV;
+        } else if (service.type === 0xC0) {
+            return showData;
         }
+        return showOthers;
+    });
+
+    const serviceList: JSX.Element[] = [];
+    for (let i = 0; i < filteredServices.length; i++) {
+        const service = filteredServices[i];
         const tooltipId = `service-list-item#${i}-tooltip`;
         serviceList.push(
             <div key={`service-list-item${i}`} className="ms-Grid-col ms-sm6 ms-xl3 ms-xxl2">
@@ -124,6 +137,7 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
                         `#${service.id}\n` +
                         `SID: 0x${service.serviceId.toString(16).toUpperCase()} (${service.serviceId})\n` +
                         `NID: 0x${service.networkId.toString(16).toUpperCase()} (${service.networkId})\n` +
+                        `Type: 0x${service.type.toString(16).toUpperCase()} (${service.type})\n` +
                         `Channel: ${service.channel.type} / ${service.channel.channel}`
                     )}
                 >
@@ -166,6 +180,25 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
             </Stack>
             <Stack>
                 <Separator alignContent="start">Services</Separator>
+                <div style={{ display: "flex", marginLeft: 12, marginTop: 8, marginBottom: 8 }}>
+                    <Checkbox
+                        label="DTV"
+                        checked={showDTV}
+                        onChange={(_, checked) => setShowDTV(!!checked)}
+                        styles={{ root: { marginRight: 16 } }}
+                    />
+                    <Checkbox
+                        label="Data"
+                        checked={showData}
+                        onChange={(_, checked) => setShowData(!!checked)}
+                        styles={{ root: { marginRight: 16 } }}
+                    />
+                    <Checkbox
+                        label="Others"
+                        checked={showOthers}
+                        onChange={(_, checked) => setShowOthers(!!checked)}
+                    />
+                </div>
                 <div className="ms-Grid" dir="ltr" style={{ marginLeft: 8 }}>
                     <div className="ms-Grid-row">
                         {serviceList}
