@@ -21,51 +21,46 @@ import * as db from "../../../db";
 import _ from "../../../_";
 
 /**
- * Global flag to track if scan is in progress
- */
-let isScanning = false;
-
-/**
- * Global flag to track if scan cancellation is requested
- */
-let isCancellationRequested = false;
-
-/**
  * Global object to track current scan status
  */
 interface CurrentScanStatus {
     status: ScanPhase;
-    type: common.ChannelType;
-    dryRun: boolean;
-    progress: number;
-    currentChannel: string;
-    scanLog: string[];
-    newCount: number;
-    takeoverCount: number;
-    result: config.Channel[];
-    startTime: number;
-    updateTime: number;
+    type?: common.ChannelType;
+    dryRun?: boolean;
+    progress?: number;
+    currentChannel?: string;
+    scanLog?: string[];
+    newCount?: number;
+    takeoverCount?: number;
+    result?: config.Channel[];
+    startTime?: number;
+    updateTime?: number;
 }
 
-let currentScanStatus: CurrentScanStatus | null = null;
+/**
+ * Options for a channel scan operation
+ */
+interface ChannelScanOption {
+    type: common.ChannelType;          // Channel type
+    startCh?: number;                  // Start channel number
+    endCh?: number;                    // End channel number
+    startSubCh?: number;               // Start subchannel number (for BS)
+    endSubCh?: number;                 // End subchannel number (for BS)
+    useSubCh?: boolean;                // Use subchannel style (for BS)
+    scanMode?: ScanMode;               // Scan mode
+    setDisabledOnAdd?: boolean;        // Set disabled flag on newly added channels
+    refresh?: boolean;                 // Refresh existing channel configs
+    channelNameFormat?: string;        // Custom channel name format
+}
 
 /**
- * Options for string comparison when sorting channels
+ * Configuration for a scan operation
  */
-const compareOptions: Intl.CollatorOptions = {
-    sensitivity: "base" as const,
-    numeric: true
-};
-
-/**
- * Channel type order for sorting
- */
-const channelOrder: Record<common.ChannelType, number> = {
-    GR: 1,
-    BS: 2,
-    CS: 3,
-    SKY: 4
-};
+interface ScanConfig {
+    readonly channels: string[];         // List of channel identifiers to scan
+    readonly scanMode: ScanMode;         // Scan mode to use
+    readonly setDisabledOnAdd: boolean;  // Whether to set disabled on new channels
+}
 
 /**
  * Scan modes for channel scanning
@@ -111,6 +106,36 @@ enum ScanResultType {
 }
 
 /**
+ * Service types supported for scanning
+ * 0x01 = デジタルTVサービス
+ * 0x02 = デジタル音声サービス
+ * 0xA1 = 臨時映像サービス
+ * 0xA4 = エンジニアリングサービス
+ * 0xA5 = プロモーション映像サービス
+ * 0xAD = 超高精細度4K専用TVサービス
+ * 0xC0 = データサービス
+ */
+const serviceTypes = [0x01, 0x02, 0xA1, 0xA4, 0xA5, 0xAD, 0xC0];
+
+/**
+ * Options for string comparison when sorting channels
+ */
+const compareOptions: Intl.CollatorOptions = {
+    sensitivity: "base" as const,
+    numeric: true
+};
+
+/**
+ * Channel type order for sorting
+ */
+const channelOrder: Record<common.ChannelType, number> = {
+    GR: 1,
+    BS: 2,
+    CS: 3,
+    SKY: 4
+};
+
+/**
  * Channel name format templates
  */
 const CHANNEL_NAME_FORMAT_GR = "{ch}";                // GR channel format
@@ -119,44 +144,21 @@ const CHANNEL_NAME_FORMAT_BS_SUBCH = "BS{ch00}_{subch}"; // BS subchannel format
 const CHANNEL_NAME_FORMAT_CS = "CS{ch}";              // CS channel format
 
 /**
- * Options for a channel scan operation
+ * Global flag to track if scan is in progress
  */
-interface ChannelScanOption {
-    type: common.ChannelType;          // Channel type
-    startCh?: number;                  // Start channel number
-    endCh?: number;                    // End channel number
-    startSubCh?: number;               // Start subchannel number (for BS)
-    endSubCh?: number;                 // End subchannel number (for BS)
-    useSubCh?: boolean;                // Use subchannel style (for BS)
-    scanMode?: ScanMode;               // Scan mode
-    setDisabledOnAdd?: boolean;        // Set disabled flag on newly added channels
-    refresh?: boolean;                 // Refresh existing channel configs
-    channelNameFormat?: string;        // Custom channel name format
-}
+let isScanning = false;
 
 /**
- * Configuration for a scan operation
+ * Global flag to track if scan cancellation is requested
  */
-interface ScanConfig {
-    readonly channels: string[];         // List of channel identifiers to scan
-    readonly scanMode: ScanMode;         // Scan mode to use
-    readonly setDisabledOnAdd: boolean;  // Whether to set disabled on new channels
-}
+let isCancellationRequested = false;
 
 /**
- * Result structure for a scan operation
+ * Global object to track current scan status
  */
-interface ScanStatusInfo {
-    status: ScanPhase;                // Current phase of scan
-    type: common.ChannelType;          // Channel type being scanned
-    dryRun: boolean;                   // Whether this is a dry run
-    progress: number;                  // Progress percentage (0-100)
-    currentChannel: string;            // Current channel being scanned
-    scanLog: string[];                 // Log of scan operations
-    newCount: number;                  // Count of new channels found
-    takeoverCount: number;             // Count of existing configs taken over
-    result: config.Channel[];          // Resulting channel configurations
-}
+let currentScanStatus: CurrentScanStatus | null = {
+    status: ScanPhase.NotStarted
+};
 
 /**
  * Generate an array of numbers in a range
@@ -699,6 +701,9 @@ async function runChannelScan(
                 services = await _.tuner.getServices(<any> {
                     type,
                     channel
+                }, {
+                    id: "Mirakurun:API:channelScan",
+                    priority: 1
                 });
             } catch (error) {
                 // Handle errors (often no signal)
@@ -720,8 +725,8 @@ async function runChannelScan(
                 continue; // Skip to next channel
             }
 
-            // Filter services to television types (1 = digital TV, 173 = temporary digital TV)
-            services = services.filter(service => service.type === 1 || service.type === 173);
+            // Filter services
+            services = services.filter(service => serviceTypes.includes(service.type));
 
             updateStepStatus(
                 {
@@ -846,15 +851,6 @@ async function runChannelScan(
  */
 export const get: Operation = async (req, res) => {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
-
-    // If no scan has been performed yet
-    if (currentScanStatus === null) {
-        api.responseJSON(res, {
-            status: "not_started",
-            isScanning
-        });
-        return;
-    }
 
     // Return current scan status
     api.responseJSON(res, {
