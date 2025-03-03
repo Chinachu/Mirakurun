@@ -978,82 +978,6 @@ export const put: Operation = async (req, res) => {
 };
 
 /**
- * Stop a channel scan in progress - API handler
- */
-export const del: Operation = async (req, res) => {
-    // Check if a scan is currently in progress
-    if (!isScanning) {
-        api.responseError(res, 404, "No scan in progress");
-        return;
-    }
-
-    // Check if a cancellation is already requested
-    if (isCancellationRequested) {
-        api.responseError(res, 409, "Already Stopping");
-        return;
-    }
-
-    // Set cancellation flag to true to request scan to stop
-    isCancellationRequested = true;
-
-    // Update the scan status
-    if (currentScanStatus) {
-        currentScanStatus.status = ScanPhase.Cancelled;
-        currentScanStatus.scanLog.push("Scan cancellation requested by user.");
-    }
-
-    // Return success response
-    res.status(206);
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.json({
-        status: "stopping",
-        message: "Channel scan stop has been requested"
-    });
-};
-
-/**
- * API documentation for the DELETE channel scan endpoint
- */
-del.apiDoc = {
-    tags: ["config"],
-    summary: "Stop Channel Scan",
-    description: "Stops a currently running channel scan operation",
-    operationId: "stopChannelScan",
-    produces: [
-        "application/json"
-    ],
-    responses: {
-        206: {
-            description: "Accepted",
-            schema: {
-                type: "object",
-                properties: {
-                    status: {
-                        type: "string",
-                        enum: ["stopping"]
-                    },
-                    message: {
-                        type: "string"
-                    }
-                }
-            }
-        },
-        404: {
-            description: "No scan in progress",
-            schema: {
-                $ref: "#/definitions/Error"
-            }
-        },
-        default: {
-            description: "Unexpected Error",
-            schema: {
-                $ref: "#/definitions/Error"
-            }
-        }
-    }
-};
-
-/**
  * API documentation for the channel scan endpoint
  */
 put.apiDoc = {
@@ -1213,6 +1137,82 @@ About BS Subchannel Style:
         },
         409: {
             description: "Already Scanning",
+            schema: {
+                $ref: "#/definitions/Error"
+            }
+        },
+        default: {
+            description: "Unexpected Error",
+            schema: {
+                $ref: "#/definitions/Error"
+            }
+        }
+    }
+};
+
+/**
+ * Stop a channel scan in progress - API handler
+ */
+export const del: Operation = async (req, res) => {
+    // Check if a scan is currently in progress
+    if (!isScanning) {
+        api.responseError(res, 404, "No scan in progress");
+        return;
+    }
+
+    // Check if a cancellation is already requested
+    if (isCancellationRequested) {
+        api.responseError(res, 409, "Already Stopping");
+        return;
+    }
+
+    // Set cancellation flag to true to request scan to stop
+    isCancellationRequested = true;
+
+    // Update the scan status
+    if (currentScanStatus) {
+        currentScanStatus.status = ScanPhase.Cancelled;
+        currentScanStatus.scanLog.push("Scan cancellation requested by user.");
+    }
+
+    // Return success response
+    res.status(206);
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.json({
+        status: "stopping",
+        message: "Channel scan stop has been requested"
+    });
+};
+
+/**
+ * API documentation for the DELETE channel scan endpoint
+ */
+del.apiDoc = {
+    tags: ["config"],
+    summary: "Stop Channel Scan",
+    description: "Stops a currently running channel scan operation",
+    operationId: "stopChannelScan",
+    produces: [
+        "application/json"
+    ],
+    responses: {
+        206: {
+            description: "Accepted",
+            schema: {
+                type: "object",
+                properties: {
+                    status: {
+                        type: "string",
+                        enum: ["stopping"]
+                    },
+                    message: {
+                        type: "string"
+                    }
+                }
+            }
+        },
+        404: {
+            description: "No scan in progress",
             schema: {
                 $ref: "#/definitions/Error"
             }
