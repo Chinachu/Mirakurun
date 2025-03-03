@@ -1,140 +1,197 @@
 - name: ＴＯＫＹＯ　ＭＸ
   type: GR
   channel: '16'
+  isDisabled: true
 
 - name: フジテレビ
   type: GR
   channel: '21'
+  isDisabled: true
 
 - name: ＴＢＳ
   type: GR
   channel: '22'
+  isDisabled: true
 
-- name: テレビ東京
+- name: テレ東
   type: GR
   channel: '23'
+  isDisabled: true
 
 - name: テレビ朝日
   type: GR
   channel: '24'
+  isDisabled: true
 
 - name: 日テレ
   type: GR
   channel: '25'
+  isDisabled: true
 
-- name: ＮＨＫＥテレ・東京
+- name: ＮＨＫＥテレ
   type: GR
   channel: '26'
+  isDisabled: true
 
-- name: ＮＨＫ総合・東京
+- name: ＮＨＫ総合
   type: GR
   channel: '27'
-
-- name: NHK BS1
-  type: BS
-  channel: BS15_0
-  serviceId: 101
-
-- name: NHK BS1 (Sub)
-  type: BS
-  channel: BS15_0
-  serviceId: 102
-
-- name: ＮＨＫＢＳプレミアム
-  type: BS
-  channel: BS03_1
-  serviceId: 103
-
-- name: ＮＨＫＢＳプレミアム
-  type: BS
-  channel: BS03_1
-  serviceId: 104
-
-- name: ＢＳ日テレ
-  type: BS
-  channel: BS13_0
-  serviceId: 141
-
-- name: ＢＳ日テレ
-  type: BS
-  channel: BS13_0
-  serviceId: 142
+  isDisabled: true
 
 - name: ＢＳ朝日１
   type: BS
   channel: BS01_0
   serviceId: 151
+  isDisabled: true
 
 - name: ＢＳ朝日２
   type: BS
   channel: BS01_0
   serviceId: 152
+  isDisabled: true
+
+- name: ＢＳ朝日３
+  type: BS
+  channel: BS01_0
+  serviceId: 153
+  isDisabled: true
 
 - name: ＢＳ－ＴＢＳ
   type: BS
   channel: BS01_1
   serviceId: 161
+  isDisabled: true
+
+- name: ＢＳ－ＴＢＳ
+  type: BS
+  channel: BS01_1
+  serviceId: 162
+  isDisabled: true
+
+- name: ＢＳ－ＴＢＳ
+  type: BS
+  channel: BS01_1
+  serviceId: 163
+  isDisabled: true
 
 - name: ＢＳテレ東
   type: BS
   channel: BS01_2
   serviceId: 171
-
-- name: ＢＳフジ・１８１
-  type: BS
-  channel: BS13_1
-  serviceId: 181
-
-- name: ＷＯＷＯＷプライム
-  type: BS
-  channel: BS03_0
-  serviceId: 191
   isDisabled: true
 
-- name: ＷＯＷＯＷライブ
+- name: ＢＳテレ東２
   type: BS
-  channel: BS05_0
-  serviceId: 192
+  channel: BS01_2
+  serviceId: 172
   isDisabled: true
 
-- name: ＷＯＷＯＷシネマ
+- name: ＢＳテレ東３
   type: BS
-  channel: BS05_1
-  serviceId: 193
+  channel: BS01_2
+  serviceId: 173
   isDisabled: true
 
 - name: ＢＳ１１イレブン
   type: BS
   channel: BS09_0
   serviceId: 211
+  isDisabled: true
 
-- name: ＢＳスカパー！
+- name: ＢＳ１２トゥエルビ
   type: BS
-  channel: BS11_1
-  serviceId: 241
-
-- name: テレ朝チャンネル1
-  type: CS
-  channel: CS2
-  serviceId: 298
+  channel: BS09_2
+  serviceId: 222
   isDisabled: true
 
-- name: テレ朝チャンネル2
-  type: CS
-  channel: CS2
-  serviceId: 299
+- name: ＢＳ日テレ
+  type: BS
+  channel: BS13_0
+  serviceId: 141
   isDisabled: true
 
-- name: 日テレプラス
-  type: CS
-  channel: CS24
-  serviceId: 300
+- name: ＢＳ日テレ
+  type: BS
+  channel: BS13_0
+  serviceId: 142
   isDisabled: true
 
-- name: AT-X
+- name: ＢＳ日テレ
+  type: BS
+  channel: BS13_0
+  serviceId: 143
+  isDisabled: true
+
+- name: ＢＳフジ・１８１
+  type: BS
+  channel: BS13_1
+  serviceId: 181
+  isDisabled: true
+
+- name: ＢＳフジ・１８２
+  type: BS
+  channel: BS13_1
+  serviceId: 182
+  isDisabled: true
+
+- name: ＢＳフジ・１８３
+  type: BS
+  channel: BS13_1
+  serviceId: 183
+  isDisabled: true
+
+- name: 放送大学テレビ
+  type: BS
+  channel: BS13_2
+  serviceId: 231
+  isDisabled: true
+
+- name: 放送大学テレビ
+  type: BS
+  channel: BS13_2
+  serviceId: 232
+  isDisabled: true
+
+- name: ＮＨＫ　ＢＳ
+  type: BS
+  channel: BS15_0
+  serviceId: 101
+  isDisabled: true
+
+- name: ＮＨＫ　ＢＳ
+  type: BS
+  channel: BS15_0
+  serviceId: 102
+  isDisabled: true
+
+- name: ＢＳ１０
+  type: BS
+  channel: BS15_2
+  serviceId: 200
+  isDisabled: true
+
+- name: ＢＳよしもと
+  type: BS
+  channel: BS23_1
+  serviceId: 265
+  isDisabled: true
+
+- name: ＢＳ松竹東急
+  type: BS
+  channel: BS23_3
+  serviceId: 260
+  isDisabled: true
+
+- name: ショップチャンネル
   type: CS
-  channel: CS16
-  serviceId: 333
+  channel: CS8
+  serviceId: 55
+  isDisabled: true
+
+- name: ＱＶＣ
+  type: CS
+  channel: CS22
+  serviceId: 161
   isDisabled: true
 
 - name: BS SPTV
@@ -142,18 +199,4 @@
   channel: CH585
   serviceId: 33353
   satellite: JCSAT3A
-  isDisabled: true
-
-- name: AT-X HD
-  type: SKY
-  channel: ATXHD
-  serviceId: 33435
-  satellite: JCSAT3A
-  isDisabled: true
-
-- name: AXN HD
-  type: SKY
-  channel: AXNHD
-  serviceId: 33418
-  satellite: JCSAT4A
   isDisabled: true
