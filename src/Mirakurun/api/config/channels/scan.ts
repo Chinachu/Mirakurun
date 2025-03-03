@@ -673,6 +673,9 @@ async function runChannelScan(
                     for (const channelItem of existingChannels) {
                         result.push(channelItem);
                         takeoverCount++;
+                        if (currentScanStatus) {
+                            currentScanStatus.takeoverCount = takeoverCount;
+                        }
                         appendToLog(`-> ${JSON.stringify(channelItem)}\n`);
                     }
 
@@ -749,6 +752,9 @@ async function runChannelScan(
             for (const newChannelItem of scannedChannelItems) {
                 result.push(newChannelItem);
                 newCount++;
+                if (currentScanStatus) {
+                    currentScanStatus.newCount = newCount;
+                }
                 scannedItems.push(newChannelItem);
                 appendToLog(`-> ${JSON.stringify(newChannelItem)}\n`);
             }
