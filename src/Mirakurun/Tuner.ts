@@ -151,7 +151,7 @@ export default class Tuner {
         });
     }
 
-    async getServices(channel: ChannelItem): Promise<db.Service[]> {
+    async getServices(channel: ChannelItem, user: Partial<common.User> = {}): Promise<db.Service[]> {
 
         const tsFilter = await this._initTS({
             id: "Mirakurun:getServices()",
@@ -161,7 +161,8 @@ export default class Tuner {
                 channel,
                 parseNIT: true,
                 parseSDT: true
-            }
+            },
+            ...user
         });
         return new Promise<db.Service[]>((resolve, reject) => {
 
