@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-import { Writable } from "stream";
+import rfdc from "rfdc";
 import ChannelItem from "./ChannelItem";
 
 export interface User {
@@ -53,6 +53,8 @@ export enum ChannelTypes {
 }
 
 export type ChannelType = keyof typeof ChannelTypes;
+
+export const deepClone = rfdc();
 
 export function updateObject<T, U>(target: T, input: U): boolean;
 export function updateObject<T extends any[], U extends any[]>(target: T, input: U): boolean {

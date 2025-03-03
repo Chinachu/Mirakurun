@@ -13,9 +13,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-import EventEmitter = require("eventemitter3");
-import rfdc = require("rfdc");
-const clone = rfdc();
+import EventEmitter from "eventemitter3";
+import { deepClone } from "./common";
 import _ from "./_";
 
 export interface EventMessage<T = any> {
@@ -51,7 +50,7 @@ export default class Event extends EventEmitter {
         const message: EventMessage = {
             resource: resource,
             type: type,
-            data: clone(data),
+            data: deepClone(data),
             time: Date.now()
         };
 

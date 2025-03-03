@@ -17,13 +17,13 @@ import { Operation } from "express-openapi";
 import sift from "sift";
 import * as api from "../api";
 import _ from "../_";
-import { ChannelTypes } from "../common";
+import { ChannelTypes, deepClone } from "../common";
 
 export const get: Operation = (req, res) => {
 
     const channels = _.channel.items.map(channel => {
 
-        const ch: any = channel.toJSON();
+        const ch: any = deepClone(channel);
 
         ch.services = channel.getServices().map(service => ({
             id: service.id,

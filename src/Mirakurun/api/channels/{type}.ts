@@ -17,7 +17,7 @@ import { Operation } from "express-openapi";
 import sift from "sift";
 import * as api from "../../api";
 import _ from "../../_";
-import { ChannelTypes, ChannelType } from "../../common";
+import { ChannelTypes, ChannelType, deepClone } from "../../common";
 
 export const parameters = [
     {
@@ -33,7 +33,7 @@ export const get: Operation = (req, res) => {
 
     const channels = _.channel.findByType(req.params.type as ChannelType).map(channel => {
 
-        const ch: any = channel.toJSON();
+        const ch: any = deepClone(channel);
 
         ch.services = channel.getServices().map(service => ({
             id: service.id,

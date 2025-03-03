@@ -16,7 +16,7 @@
 import { Operation } from "express-openapi";
 import * as api from "../../../api";
 import _ from "../../../_";
-import { ChannelTypes, ChannelType } from "../../../common";
+import { ChannelTypes, ChannelType, deepClone } from "../../../common";
 
 export const parameters = [
     {
@@ -43,7 +43,7 @@ export const get: Operation = (req, res) => {
         return;
     }
 
-    const body: any = channel.toJSON();
+    const body: any = deepClone(channel);
 
     body.services = channel.getServices().map(service => ({
         id: service.id,
