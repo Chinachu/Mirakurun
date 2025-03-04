@@ -29,6 +29,9 @@ disableEITParsing: false # boolean
 disableWebUI: false # boolean
 allowIPv4CidrRanges: ["10.0.0.0/8", "127.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"] # array of string
 allowIPv6CidrRanges: ["fc00::/7"] # array of string
+allowOrigins: ["https://mirakurun-secure-contexts-api.pages.dev"] # array of string
+allowPNA: true # boolean
+tsplayEndpoint: https://mirakurun-secure-contexts-api.pages.dev/tsplay/ # string
 ```
 
 ### Environment Variables (Docker)
@@ -47,6 +50,9 @@ DISABLE_EIT_PARSING
 DISABLE_WEB_UI
 ALLOW_IPV4_CIDR_RANGES
 ALLOW_IPV6_CIDR_RANGES
+ALLOW_ORIGINS
+ALLOW_PNA
+TSPLAY_ENDPOINT
 ```
 
 ## tuners.yml

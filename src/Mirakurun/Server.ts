@@ -86,19 +86,6 @@ class Server {
         app.disable("x-powered-by");
         app.disable("etag");
 
-        const corsOptions: cors.CorsOptions = {
-            origin: (origin, callback) => {
-                if (!origin) {
-                    return callback(null, true);
-                }
-                if (system.isPermittedHost(origin, serverConfig.hostname)) {
-                    return callback(null, true);
-                }
-                return callback(new Error("Not allowed by CORS"));
-            }
-        };
-        app.use(cors(corsOptions));
-
         app.use(morgan(":remote-addr :remote-user :method :url HTTP/:http-version :status :res[content-length] - :response-time ms :user-agent", {
             stream: log.event as any
         }));
@@ -112,8 +99,9 @@ class Server {
                 return;
             }
 
-            if (req.get("Origin") !== undefined) {
-                if (!system.isPermittedHost(req.get("Origin"), serverConfig.hostname)) {
+            const origin = req.get("Origin");
+            if (origin !== undefined) {
+                if (!system.isPermittedHost(origin, serverConfig.hostname) && !serverConfig.allowOrigins.includes(origin)) {
                     res.status(403).end();
                     return;
                 }
@@ -126,9 +114,20 @@ class Server {
                 }
             }
 
+            if (serverConfig.allowPNA && req.get("Access-Control-Request-Method") && req.get("Access-Control-Request-Private-Network") === "true") {
+                res.setHeader("Access-Control-Allow-Private-Network", "true");
+                res.setHeader("Private-Network-Access-Name", `Mirakurun_${serverConfig.hostname}`);
+                res.setHeader("Private-Network-Access-ID", "00:00:00:00:00:00");
+            }
+
+            res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
             res.setHeader("Server", "Mirakurun/" + pkg.version);
             next();
         });
+
+        // do not place before the access control
+        app.use(cors());
 
         if (!serverConfig.disableWebUI) {
             app.use(express.static("lib/ui", {

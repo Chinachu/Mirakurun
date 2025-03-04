@@ -245,6 +245,89 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                         }}
                     />
 
+                    <TextField
+                        styles={{ fieldGroup: { "max-width": 380 } }}
+                        label="Allow Origins"
+                        onRenderLabel={(props) => (
+                            <Stack horizontal verticalAlign="end">
+                                <Label>{props.label}</Label>
+                                <TooltipHost content={
+                                    `If running in Docker, Env var \`ALLOW_ORIGINS\` is preferred.
+                                    ⚠️ Origins allowed for CORS, PNA/LNA requests.`
+                                }>
+                                    <Icon
+                                        iconName="TestBeakerSolid"
+                                        style={{ marginLeft: 4, marginBottom: 6 }}
+                                    />
+                                </TooltipHost>
+                            </Stack>
+                        )}
+                        multiline rows={3}
+                        value={(editing.allowOrigins || []).join("\n")}
+                        onChange={(ev, newValue) => {
+                            if (newValue.trim() === "") {
+                                setEditing({ ...editing, allowOrigins: null });
+                            } else {
+                                setEditing({ ...editing, allowOrigins: newValue.split("\n").map(origin => origin.trim()) })
+                            }
+                        }}
+                    />
+
+                    <Toggle
+                        label={
+                            <Stack horizontal verticalAlign="end">
+                                <Label>Allow PNA/LNA</Label>
+                                <TooltipHost content={
+                                    `If running in Docker, Env var \`ALLOW_PNA\` is preferred.
+                                    ⚠️ Allow Private Network Access for secure contexts from allowed origins.`
+                                }>
+                                    <Icon
+                                        iconName="TestBeakerSolid"
+                                        style={{ marginLeft: 4, marginBottom: 6 }}
+                                    />
+                                </TooltipHost>
+                            </Stack>
+                        }
+                        checked={(editing.allowPNA === undefined || editing.allowPNA === true)}
+                        onText="Enable"
+                        offText="Disable"
+                        onChange={(ev, checked) => {
+                            setEditing({ ...editing, allowPNA: checked });
+                        }}
+                    />
+
+                    <TextField
+                        styles={{ fieldGroup: { "max-width": 380 } }}
+                        label="TSPlay Endpoint"
+                        description={`
+                            Experimental.
+                            It is unstable due to changes in or discontinuation of browser PNA/LNA specifications.
+                            It can also be discontinued due to various factors.
+                        `}
+                        onRenderLabel={(props) => (
+                            <Stack horizontal verticalAlign="end">
+                                <Label>{props.label}</Label>
+                                <TooltipHost content={
+                                    `If running in Docker, Env var \`TSPLAY_ENDPOINT\` is preferred.
+                                    Endpoint URL for TS playback in secure contexts.`
+                                }>
+                                    <Icon
+                                        iconName="TestBeakerSolid"
+                                        style={{ marginLeft: 4, marginBottom: 6 }}
+                                    />
+                                </TooltipHost>
+                            </Stack>
+                        )}
+                        value={editing.tsplayEndpoint || ""}
+                        onChange={(ev, newValue) => {
+                            if (newValue.trim() === "") {
+                                setEditing({ ...editing, tsplayEndpoint: null });
+                            } else {
+                                setEditing({ ...editing, tsplayEndpoint: newValue.trim() });
+                            }
+                        }}
+                    />
+
                     <Stack horizontal tokens={{ childrenGap: "0 8" }} style={{ marginTop: 16 }}>
                         <PrimaryButton text="Save" disabled={!changed || invalid} onClick={() => setShowSaveDialog(true)} />
                         <DefaultButton text="Cancel" disabled={!changed} onClick={() => setEditing({ ...current })} />

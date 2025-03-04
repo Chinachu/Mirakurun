@@ -27,11 +27,14 @@ import {
 } from "@fluentui/react";
 import { UIState } from "../index";
 import TunersManager from "./TunersManager";
+import { ConfigServer } from "../../../api";
 
 interface StatusItem {
     label: string;
     text: string;
 }
+
+const configAPI = "/api/config/server";
 
 const calloutProps = { gapSpace: 0 };
 const tooltipHostStyles: Partial<ITooltipHostStyles> = {
@@ -52,6 +55,22 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
     const [status, setStatus] = useState<UIState["status"]>(uiState.status);
     const [services, setServices] = useState<UIState["services"]>(uiState.services);
     const [tuners, setTuners] = useState<UIState["tuners"]>(uiState.tuners);
+
+    const [allowPNA, setAllowPNA] = useState<ConfigServer["allowPNA"]>(false);
+    const [tsplayEndpoint, setTsplayEndpoint] = useState<ConfigServer["tsplayEndpoint"]>("");
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await (await fetch(configAPI)).json();
+                console.log("StatusView", "GET", configAPI, "->", res);
+                setAllowPNA(res.allowPNA);
+                setTsplayEndpoint(res.tsplayEndpoint);
+            } catch (e) {
+                console.error(e);
+            }
+        })();
+    }, []);
 
     // サービスタイプフィルター状態
     const [showDTV, setShowDTV] = useState<boolean>(true);
@@ -160,6 +179,18 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
                                         <Icon iconName="Clock" style={{ color: "#777" }} />
                                     }
                                 </span>
+                                {service.type === 0x01 && allowPNA && tsplayEndpoint && (
+                                    <span style={{ marginLeft: 4, fontSize: 13, verticalAlign: "middle", cursor: "pointer" }}>
+                                        <Icon
+                                            iconName="Play"
+                                            style={{ color: "#0078d4" }}
+                                            onClick={() => {
+                                                window.open(`${tsplayEndpoint}#${location.protocol}//${location.host}/api/services/${service.id}/stream?decode=1`, "_blank", "popup");
+                                            }}
+                                            title="TSPlay (Experimental)"
+                                        />
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>

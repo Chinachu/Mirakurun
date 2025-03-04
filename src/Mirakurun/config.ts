@@ -42,7 +42,10 @@ const {
     DISABLE_EIT_PARSING,
     DISABLE_WEB_UI,
     ALLOW_IPV4_CIDR_RANGES,
-    ALLOW_IPV6_CIDR_RANGES
+    ALLOW_IPV6_CIDR_RANGES,
+    ALLOW_ORIGINS,
+    ALLOW_PNA,
+    TSPLAY_ENDPOINT
 } = process.env;
 
 const IS_DOCKER = DOCKER === "YES";
@@ -74,6 +77,9 @@ export interface Server {
     readonly disableWebUI?: true;
     readonly allowIPv4CidrRanges?: string[];
     readonly allowIPv6CidrRanges?: string[];
+    readonly allowOrigins?: string[];
+    readonly allowPNA?: boolean;
+    readonly tsplayEndpoint?: string;
 }
 
 export interface Tuner {
@@ -164,6 +170,17 @@ export function loadServer(): Server {
     if (!config.allowIPv6CidrRanges) {
         config.allowIPv6CidrRanges = ["fc00::/7"];
     }
+    if (!config.allowOrigins) {
+        config.allowOrigins = [
+            "https://mirakurun-secure-contexts-api.pages.dev"
+        ];
+    }
+    if (!config.allowPNA) {
+        config.allowPNA = true;
+    }
+    if (!config.tsplayEndpoint) {
+        config.tsplayEndpoint = "https://mirakurun-secure-contexts-api.pages.dev/tsplay/";
+    }
 
     // Docker
     if (IS_DOCKER) {
@@ -211,6 +228,17 @@ export function loadServer(): Server {
         }
         if (typeof ALLOW_IPV6_CIDR_RANGES !== "undefined" && ALLOW_IPV6_CIDR_RANGES.trim().length > 0) {
             config.allowIPv6CidrRanges = ALLOW_IPV6_CIDR_RANGES.split(",");
+        }
+        if (typeof ALLOW_ORIGINS !== "undefined" && ALLOW_ORIGINS.trim().length > 0) {
+            config.allowOrigins = ALLOW_ORIGINS.split(",");
+        }
+        if (ALLOW_PNA === "true") {
+            config.allowPNA = true;
+        } else if (ALLOW_PNA === "false") {
+            config.allowPNA = false;
+        }
+        if (typeof TSPLAY_ENDPOINT !== "undefined" && TSPLAY_ENDPOINT.trim().length > 0) {
+            config.tsplayEndpoint = TSPLAY_ENDPOINT.trim();
         }
 
         log.info("load server config (merged w/ env): %s", JSON.stringify(config));
