@@ -14,8 +14,9 @@
    limitations under the License.
 */
 import { dirname } from "path";
-import { promises as fsPromises } from "fs";
-import * as fs from "fs";
+import { existsSync } from "fs";
+import { mkdir, readFile, writeFile } from "fs/promises";
+import Queue from "promise-queue";
 import * as common from "./common";
 import * as log from "./log";
 
@@ -151,7 +152,7 @@ export interface ProgramRelatedItem {
     eventId: number;
 }
 
-export function loadServices(integrity: string): Service[] {
+export async function loadServices(integrity: string): Promise<Service[]> {
     return load(process.env.SERVICES_DB_PATH, integrity);
 }
 
@@ -159,7 +160,7 @@ export async function saveServices(data: Service[], integrity: string): Promise<
     return save(process.env.SERVICES_DB_PATH, data, integrity);
 }
 
-export function loadPrograms(integrity: string): Program[] {
+export async function loadPrograms(integrity: string): Promise<Program[]> {
     return load(process.env.PROGRAMS_DB_PATH, integrity);
 }
 
@@ -167,55 +168,76 @@ export async function savePrograms(data: Program[], integrity: string): Promise<
     return save(process.env.PROGRAMS_DB_PATH, data, integrity);
 }
 
-function load(path: string, integrity: string) {
+// use queue because async fs ops is not thread safe
+const dbIOQueue = new Queue(1, Infinity);
+
+async function load(path: string, integrity: string): Promise<any[]> {
 
     log.info("load db `%s` w/ integrity (%s)", path, integrity);
 
-    if (fs.existsSync(path) === true) {
-        const json = fs.readFileSync(path, "utf8");
-        try {
-            const array: any[] = JSON.parse(json);
-            if (array.length > 0 && array[0].__integrity__) {
-                if (integrity === array[0].__integrity__) {
-                    return array.slice(1);
-                } else {
-                    log.warn("db `%s` integrity check has failed", path);
-                    return [];
+    return dbIOQueue.add(async () => {
+        if (existsSync(path) === true) {
+            const json = await readFile(path, "utf8");
+            try {
+                const array: any[] = JSON.parse(json);
+                if (array.length > 0 && array[0].__integrity__) {
+                    if (integrity === array[0].__integrity__) {
+                        return array.slice(1);
+                    } else {
+                        log.warn("db `%s` integrity check has failed", path);
+                        return [];
+                    }
                 }
+                return array;
+            } catch (e) {
+                log.error("db `%s` is broken (%s: %s)", path, e.name, e.message);
+                return [];
             }
-            return array;
-        } catch (e) {
-            log.error("db `%s` is broken (%s: %s)", path, e.name, e.message);
-            return [];
         }
-    } else {
+
         log.info("db `%s` is not exists", path);
         return [];
-    }
+    });
 }
 
 async function save(path: string, data: any[], integrity: string, retrying = false): Promise<void> {
 
     log.info("save db `%s` w/ integirty (%s)", path, integrity);
 
-    data.unshift({ __integrity__: integrity });
-
-    try {
-        await fsPromises.writeFile(path, JSON.stringify(data));
-    } catch (e) {
-        if (retrying === false) {
-            // mkdir if not exists
-            const dirPath = dirname(path);
-            if (fs.existsSync(dirPath) === false) {
-                try {
-                    fs.mkdirSync(dirPath, { recursive: true });
-                } catch (e) {
-                    throw e;
-                }
-            }
-            // retry
-            return save(path, data, integrity, true);
-        }
-        throw e;
+    if (retrying === false) {
+        data.unshift({ __integrity__: integrity });
     }
+
+    return dbIOQueue.add(async () => {
+        try {
+            await writeFile(path, JSON.stringify(data));
+        } catch (e) {
+            if (retrying === false) {
+                // mkdir if not exists
+                const dirPath = dirname(path);
+                if (existsSync(dirPath) === false) {
+                    try {
+                        await mkdir(dirPath, { recursive: true });
+                    } catch (e) {
+                        throw e;
+                    }
+                }
+                // retry
+                await save(path, data, integrity, true);
+            }
+            throw e;
+        }
+    });
 }
+
+process.on("beforeExit", () => {
+    if (dbIOQueue.getQueueLength() + dbIOQueue.getPendingLength() === 0) {
+        return;
+    }
+
+    log.warn("dbIOQueue is not empty. waiting for completion...");
+
+    setTimeout(() => {
+        log.warn("try to exit again...");
+    }, 100);
+});

@@ -16,9 +16,11 @@
 import { execSync } from "child_process";
 import { dirname } from "path";
 import { hostname } from "os";
-import * as fs from "fs";
+import { existsSync, readdirSync } from "fs";
+import { mkdir, copyFile, readFile, writeFile } from "fs/promises";
 import * as yaml from "js-yaml";
 import * as ipnum from "ip-num";
+import Queue from "promise-queue";
 import * as common from "./common";
 import * as log from "./log";
 
@@ -130,17 +132,17 @@ export interface Channel {
     readonly satelite?: string;
 }
 
-export function loadServer(): Server {
+export async function loadServer(): Promise<Server> {
 
     const path = SERVER_CONFIG_PATH;
 
     // mkdir if not exists
     const dirPath = dirname(path);
-    if (fs.existsSync(dirPath) === false) {
+    if (existsSync(dirPath) === false) {
         log.info("missing directory `%s`", dirPath);
         try {
             log.info("making directory `%s`", dirPath);
-            fs.mkdirSync(dirPath, { recursive: true });
+            await mkdir(dirPath, { recursive: true });
         } catch (e) {
             log.fatal("failed to make directory `%s`", dirPath);
             console.error(e);
@@ -149,19 +151,19 @@ export function loadServer(): Server {
     }
 
     // copy if not exists
-    if (fs.existsSync(path) === false) {
+    if (existsSync(path) === false) {
         log.info("missing server config `%s`", path);
         // copy if not exists
         try {
             log.info("copying default server config to `%s`", path);
-            fs.copyFileSync("config/server.yml", path);
+            await copyFile("config/server.yml", path);
         } catch (e) {
             log.fatal("failed to copy server config to `%s`", path);
             console.error(e);
             process.exit(1);
         }
     }
-    const config: Writable<Server> = load("server", path);
+    const config: Writable<Server> = await load("server", path);
 
     // set default
     if (!config.allowIPv4CidrRanges) {
@@ -292,17 +294,17 @@ export function saveServer(data: Server): Promise<void> {
     return save("server", SERVER_CONFIG_PATH, data);
 }
 
-export function loadTuners(): Tuner[] {
+export async function loadTuners(): Promise<Tuner[]> {
 
     const path = TUNERS_CONFIG_PATH;
 
     // mkdir if not exists
     const dirPath = dirname(path);
-    if (fs.existsSync(dirPath) === false) {
+    if (existsSync(dirPath) === false) {
         log.info("missing directory `%s`", dirPath);
         try {
             log.info("making directory `%s`", dirPath);
-            fs.mkdirSync(dirPath, { recursive: true });
+            await mkdir(dirPath, { recursive: true });
         } catch (e) {
             log.fatal("failed to make directory `%s`", dirPath);
             console.error(e);
@@ -311,7 +313,7 @@ export function loadTuners(): Tuner[] {
     }
 
     // auto
-    if (fs.existsSync(path) === false) {
+    if (existsSync(path) === false) {
         log.info("missing tuners config `%s`", path);
         log.info("trying to detect tuners...");
         const tuners: Tuner[] = [];
@@ -320,7 +322,7 @@ export function loadTuners(): Tuner[] {
         try {
             execSync("which dvb-fe-tool");
 
-            const adapters = fs.readdirSync("/dev/dvb").filter(name => /^adapter[0-9]+$/.test(name));
+            const adapters = readdirSync("/dev/dvb").filter(name => /^adapter[0-9]+$/.test(name));
             for (let i = 0; i < adapters.length; i++) {
                 log.info("detected DVB device: %s", adapters[i]);
 
@@ -364,7 +366,7 @@ export function loadTuners(): Tuner[] {
         if (tuners.length > 0) {
             try {
                 log.info("writing auto generated tuners config to `%s`", path);
-                fs.writeFileSync(path, yaml.dump(tuners));
+                await saveTuners(tuners);
             } catch (e) {
                 log.fatal("failed to write tuners config to `%s`", path);
                 console.error(e);
@@ -374,11 +376,11 @@ export function loadTuners(): Tuner[] {
     }
 
     // copy if not exists
-    if (fs.existsSync(path) === false) {
+    if (existsSync(path) === false) {
         log.info("missing tuners config `%s`", path);
         try {
             log.info("copying default tuners config to `%s`", path);
-            fs.copyFileSync("config/tuners.yml", path);
+            await copyFile("config/tuners.yml", path);
         } catch (e) {
             log.fatal("failed to copy tuners config to `%s`", path);
             console.error(e);
@@ -393,17 +395,17 @@ export function saveTuners(data: Tuner[]): Promise<void> {
     return save("tuners", TUNERS_CONFIG_PATH, data);
 }
 
-export function loadChannels(): Channel[] {
+export async function loadChannels(): Promise<Channel[]> {
 
     const path = CHANNELS_CONFIG_PATH;
 
     // mkdir if not exists
     const dirPath = dirname(path);
-    if (fs.existsSync(dirPath) === false) {
+    if (existsSync(dirPath) === false) {
         log.info("missing directory `%s`", dirPath);
         try {
             log.info("making directory `%s`", dirPath);
-            fs.mkdirSync(dirPath, { recursive: true });
+            await mkdir(dirPath, { recursive: true });
         } catch (e) {
             log.fatal("failed to make directory `%s`", dirPath);
             console.error(e);
@@ -412,11 +414,11 @@ export function loadChannels(): Channel[] {
     }
 
     // copy if not exists
-    if (fs.existsSync(path) === false) {
+    if (existsSync(path) === false) {
         log.info("missing channels config `%s`", path);
         try {
             log.info("copying default channels config to `%s`", path);
-            fs.copyFileSync("config/channels.yml", path);
+            await copyFile("config/channels.yml", path);
         } catch (e) {
             log.fatal("failed to copy channels config to `%s`", path);
             console.error(e);
@@ -431,32 +433,41 @@ export function saveChannels(data: Channel[]): Promise<void> {
     return save("channels", CHANNELS_CONFIG_PATH, data);
 }
 
-function load(name: "server", path: string): Server;
-function load(name: "tuners", path: string): Tuner[];
-function load(name: "channels", path: string): Channel[];
-function load(name: string, path: string) {
+// use queue because async fs ops is not thread safe
+const configIOQueue = new Queue(1, Infinity);
+
+async function load(name: "server", path: string): Promise<Server>;
+async function load(name: "tuners", path: string): Promise<Tuner[]>;
+async function load(name: "channels", path: string): Promise<Channel[]>;
+async function load(name: "server" | "tuners" | "channels", path: string) {
 
     log.info("load %s config `%s`", name, path);
 
-    return yaml.load(fs.readFileSync(path, "utf8"));
+    return configIOQueue.add(async () => {
+        return yaml.load(await readFile(path, "utf8"));
+    });
 }
 
-function save(name: "server", path: string, data: Server): Promise<void>;
-function save(name: "tuners", path: string, data: Tuner[]): Promise<void>;
-function save(name: "channels", path: string, data: Channel[]): Promise<void>;
-function save(name: string, path: string, data: object): Promise<void> {
+async function save(name: "server", path: string, data: Server): Promise<void>;
+async function save(name: "tuners", path: string, data: Tuner[]): Promise<void>;
+async function save(name: "channels", path: string, data: Channel[]): Promise<void>;
+async function save(name: "server" | "tuners" | "channels", path: string, data: object): Promise<void> {
 
     log.info("save %s config `%s`", name, path);
 
-    return new Promise<void>((resolve, reject) => {
-
-        fs.writeFile(path, yaml.dump(data), err => {
-
-            if (err) {
-                return reject(err);
-            }
-
-            resolve();
-        });
+    await configIOQueue.add(async () => {
+        await writeFile(path, yaml.dump(data));
     });
 }
+
+process.on("beforeExit", () => {
+    if (configIOQueue.getQueueLength() + configIOQueue.getPendingLength() === 0) {
+        return;
+    }
+
+    log.warn("configIOQueue is not empty. waiting for completion...");
+
+    setTimeout(() => {
+        log.warn("try to exit again...");
+    }, 100);
+});

@@ -19,7 +19,7 @@ import * as path from "path";
 
 if (process.argv.length < 3) {
     console.error("Mirakurun EPG Dump Test Program");
-    console.error("Usage: mirakurun-epgdump src.ts dest.json");
+    console.error("Usage: mirakurun-epgdump [-f] src.ts dest.json");
     process.exit(1);
 }
 
@@ -47,11 +47,9 @@ import _ from "./Mirakurun/_";
 import Event from "./Mirakurun/Event";
 import Program from "./Mirakurun/Program";
 import EPG from "./Mirakurun/EPG";
-import * as config from "./Mirakurun/config";
 import * as log from "./Mirakurun/log";
 
 (<any> log).logLevel = log.LogLevel.INFO;
-_.config.server = config.loadServer();
 _.event = new Event();
 _.program = new Program();
 const epg = new EPG();

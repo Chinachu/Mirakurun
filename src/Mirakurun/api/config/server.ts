@@ -16,10 +16,10 @@
 import { Operation } from "express-openapi";
 import * as config from "../../config";
 
-export const get: Operation = (req, res) => {
+export const get: Operation = async (req, res) => {
 
     res.status(200);
-    res.json(config.loadServer());
+    res.json(await config.loadServer());
 };
 
 get.apiDoc = {

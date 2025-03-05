@@ -501,7 +501,7 @@ async function runChannelScan(
     try {
         // Initialize scan data
         const scanLog: string[] = [];
-        const oldChannelItems = config.loadChannels();
+        const oldChannelItems = await config.loadChannels();
         // Filter out channels of the type we're scanning (they'll be replaced)
         const result: config.Channel[] = oldChannelItems.filter(channel => channel.type !== type);
         let newCount = 0;

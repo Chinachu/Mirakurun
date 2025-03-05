@@ -33,7 +33,7 @@ export default class Program {
     private _emitTimerId: NodeJS.Timeout;
     private _emitRunning = false;
     private _emitPrograms = new Map<db.Program, EventType>();
-    private _programGCInterval = _.config.server.programGCInterval || 1000 * 60 * 60; // 1 hour
+    private _programGCInterval = _.config?.server?.programGCInterval || 1000 * 60 * 60; // 1 hour
 
     constructor() {
         this._load();
@@ -180,14 +180,15 @@ export default class Program {
         this._saveTimerId = setTimeout(() => this._save(), 1000 * 10);
     }
 
-    private _load(): void {
+    private async _load(): Promise<void> {
 
         log.debug("loading programs...");
 
         const now = Date.now();
         let dropped = false;
 
-        db.loadPrograms(_.configIntegrity.channels).forEach(item => {
+        const programs = await db.loadPrograms(_.configIntegrity.channels);
+        programs.forEach(item => {
 
             if (item.networkId === undefined) {
                 dropped = true;

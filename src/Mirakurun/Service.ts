@@ -14,8 +14,8 @@
    limitations under the License.
 */
 import { join, dirname } from "path";
-import { promises as fsPromises } from "fs";
-import * as fs from "fs";
+import { existsSync } from "fs";
+import { stat, mkdir, readFile, writeFile } from "fs/promises";
 import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
@@ -43,7 +43,7 @@ export default class Service {
         }
 
         try {
-            return (await fsPromises.stat(Service.getLogoDataPath(networkId, logoId))).mtimeMs;
+            return (await stat(Service.getLogoDataPath(networkId, logoId))).mtimeMs;
         } catch (e) {
             return 0;
         }
@@ -56,7 +56,7 @@ export default class Service {
         }
 
         try {
-            return (await fsPromises.stat(Service.getLogoDataPath(networkId, logoId))).isFile();
+            return (await stat(Service.getLogoDataPath(networkId, logoId))).isFile();
         } catch (e) {
             return false;
         }
@@ -69,7 +69,7 @@ export default class Service {
         }
 
         try {
-            return await fsPromises.readFile(Service.getLogoDataPath(networkId, logoId));
+            return await readFile(Service.getLogoDataPath(networkId, logoId));
         } catch (e) {
             return null;
         }
@@ -82,15 +82,15 @@ export default class Service {
         const path = Service.getLogoDataPath(networkId, logoId);
 
         try {
-            await fsPromises.writeFile(path, data, { encoding: "binary" });
+            await writeFile(path, data, { encoding: "binary" });
         } catch (e) {
             if (retrying === false) {
                 // mkdir if not exists
                 const dirPath = dirname(path);
-                if (fs.existsSync(dirPath) === false) {
+                if (existsSync(dirPath) === false) {
                     log.warn("Service.saveLogoData(): making directory `%s`... (networkId=%d logoId=%d)", dirPath, networkId, logoId);
                     try {
-                        fs.mkdirSync(dirPath, { recursive: true });
+                        await mkdir(dirPath, { recursive: true });
                     } catch (e) {
                         throw e;
                     }
@@ -205,13 +205,13 @@ export default class Service {
         this._saveTimerId = setTimeout(() => this._save(), 1000 * 3);
     }
 
-    private _load(): void {
+    private async _load(): Promise<void> {
 
         log.debug("loading services...");
 
         let updated = false;
 
-        const services = db.loadServices(_.configIntegrity.channels);
+        const services = await db.loadServices(_.configIntegrity.channels);
         for (const service of services) {
             const channelItem = _.channel.get(service.channel.type, service.channel.channel);
 
