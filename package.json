@@ -34,8 +34,8 @@
   },
   "main": "lib/client.js",
   "scripts": {
-    "start": "node -r source-map-support/register lib/server.js",
-    "debug": "node -r source-map-support/register --inspect=0.0.0.0:9229 lib/server.js",
+    "start": "node --max-semi-space-size=64 -r source-map-support/register lib/server.js ",
+    "debug": "node --max-semi-space-size=64 -r source-map-support/register --inspect=0.0.0.0:9229 lib/server.js",
     "build": "npm run build:server && npm run build:webpack",
     "build:server": "tslint --project . && tsc --declaration",
     "build:webpack": "webpack",
