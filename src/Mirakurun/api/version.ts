@@ -23,7 +23,7 @@ export const get: Operation = async (req, res) => {
 
     const version: Version = {
         current: pkg.version,
-        latest: getLatestVersion()
+        latest: await getLatestVersion()
     };
 
     api.responseJSON(res, version);
