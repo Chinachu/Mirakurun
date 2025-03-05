@@ -202,7 +202,7 @@ async function load(path: string, integrity: string): Promise<any[]> {
 
 async function save(path: string, data: any[], integrity: string, retrying = false): Promise<void> {
 
-    log.info("save db `%s` w/ integirty (%s)", path, integrity);
+    log.info("save db `%s` w/ integrity (%s)", path, integrity);
 
     if (retrying === false) {
         data.unshift({ __integrity__: integrity });
