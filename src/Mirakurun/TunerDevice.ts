@@ -31,7 +31,7 @@ interface User extends common.User {
     _stream?: TSFilter;
 }
 
-interface Status {
+export interface TunerDeviceStatus {
     readonly index: number;
     readonly name: string;
     readonly types: common.ChannelType[];
@@ -139,7 +139,7 @@ export default class TunerDevice extends EventEmitter {
         return priority;
     }
 
-    toJSON(): Status {
+    toJSON(): TunerDeviceStatus {
         return {
             index: this._index,
             name: this._config.name,

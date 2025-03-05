@@ -42,7 +42,7 @@ export const get: Operation = async (req, res) => {
         ...serviceItem.export(),
         hasLogoData: await Service.isLogoDataExists(serviceItem.networkId, serviceItem.logoId)
     };
-    res.json(service);
+    api.responseJSON(res, service);
 };
 
 get.apiDoc = {

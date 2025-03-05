@@ -13,6 +13,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+import { promisify } from "util";
+import * as yieldableJSON from "yieldable-json";
+const stringifyAsync = promisify(yieldableJSON.stringifyAsync);
 import * as express from "express";
 
 export interface Error {
@@ -53,12 +56,12 @@ export function responseStreamErrorHandler(res: express.Response, err: NodeJS.Er
     return responseError(res, 500, err.message);
 }
 
-export function responseJSON(res: express.Response, body: any): express.Response {
+export async function responseJSON(res: express.Response, body: any): Promise<express.Response> {
 
     // this is lighter than res.json()
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.status(200);
-    res.end(JSON.stringify(body));
+    res.end(await stringifyAsync(body));
 
     return res;
 }

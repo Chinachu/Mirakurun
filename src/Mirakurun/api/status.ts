@@ -26,7 +26,7 @@ export const get: Operation = (req, res) => {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.status(200);
 
-    res.end(JSON.stringify(getStatus(), null, 2));
+    api.responseJSON(res, getStatus());
 };
 
 get.apiDoc = {

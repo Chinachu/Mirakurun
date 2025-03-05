@@ -16,6 +16,10 @@
 import { dirname } from "path";
 import { existsSync } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
+import { promisify } from "util";
+import * as yieldableJSON from "yieldable-json";
+const parseAsync = promisify(yieldableJSON.parseAsync);
+const stringifyAsync = promisify(yieldableJSON.stringifyAsync);
 import Queue from "promise-queue";
 import * as common from "./common";
 import * as log from "./log";
@@ -179,7 +183,7 @@ async function load(path: string, integrity: string): Promise<any[]> {
         if (existsSync(path) === true) {
             const json = await readFile(path, "utf8");
             try {
-                const array: any[] = JSON.parse(json);
+                const array: any[] = await parseAsync(json);
                 if (array.length > 0 && array[0].__integrity__) {
                     if (integrity === array[0].__integrity__) {
                         return array.slice(1);
@@ -210,7 +214,7 @@ async function save(path: string, data: any[], integrity: string, retrying = fal
 
     return dbIOQueue.add(async () => {
         try {
-            await writeFile(path, JSON.stringify(data));
+            await writeFile(path, await stringifyAsync(data));
         } catch (e) {
             if (retrying === false) {
                 // mkdir if not exists

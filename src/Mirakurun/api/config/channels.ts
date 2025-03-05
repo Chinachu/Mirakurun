@@ -14,12 +14,13 @@
    limitations under the License.
 */
 import { Operation } from "express-openapi";
+import * as api from "../../api";
 import * as config from "../../config";
 
 export const get: Operation = async (req, res) => {
 
     res.status(200);
-    res.json(await config.loadChannels());
+    api.responseJSON(res, await config.loadChannels());
 };
 
 get.apiDoc = {
@@ -41,14 +42,14 @@ get.apiDoc = {
     }
 };
 
-export const put: Operation = (req, res) => {
+export const put: Operation = async (req, res) => {
 
     const channels: config.Channel[] = req.body;
 
-    config.saveChannels(channels);
+    await config.saveChannels(channels);
 
     res.status(200);
-    res.json(channels);
+    api.responseJSON(res, channels);
 };
 
 put.apiDoc = {

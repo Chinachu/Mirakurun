@@ -18,7 +18,7 @@ import * as common from "./common";
 import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
-import TunerDevice from "./TunerDevice";
+import TunerDevice, { TunerDeviceStatus } from "./TunerDevice";
 import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
 import TSFilter from "./TSFilter";
@@ -32,8 +32,8 @@ export default class Tuner {
         this._load();
     }
 
-    get devices(): TunerDevice[] {
-        return this._devices;
+    get devices(): TunerDeviceStatus[] {
+        return this._devices.map(device => device.toJSON());
     }
 
     get(index: number): TunerDevice {

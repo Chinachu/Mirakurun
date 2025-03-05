@@ -52,7 +52,7 @@ export const get: Operation = (req, res) => {
         name: service.name
     }));
 
-    res.json(body);
+    api.responseJSON(res, body);
 };
 
 get.apiDoc = {

@@ -37,7 +37,7 @@ export const get: Operation = (req, res) => {
         return;
     }
 
-    res.json(program);
+    api.responseJSON(res, program);
 };
 
 get.apiDoc = {
