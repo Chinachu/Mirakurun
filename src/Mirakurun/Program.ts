@@ -177,7 +177,7 @@ export default class Program {
         clearTimeout(this._emitTimerId);
         this._emitTimerId = setTimeout(() => this._emit(), 1000);
         clearTimeout(this._saveTimerId);
-        this._saveTimerId = setTimeout(() => this._save(), 1000 * 10);
+        this._saveTimerId = setTimeout(() => this._save(), 1000 * 30);
     }
 
     private async _load(): Promise<void> {

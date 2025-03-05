@@ -202,7 +202,7 @@ export default class Service {
 
     save(): void {
         clearTimeout(this._saveTimerId);
-        this._saveTimerId = setTimeout(() => this._save(), 1000 * 3);
+        this._saveTimerId = setTimeout(() => this._save(), 1000 * 10);
     }
 
     private async _load(): Promise<void> {
