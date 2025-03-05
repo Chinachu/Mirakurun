@@ -16,7 +16,7 @@
 import EventEmitter from "eventemitter3";
 import * as React from "react";
 import { useState, useEffect } from "react";
-import * as ReactDOM from "react-dom";
+import * as ReactDOM from "react-dom/client";
 import {
     createTheme,
     loadTheme,
@@ -217,7 +217,7 @@ const Content = () => {
         }
 
         const icon = document.getElementById("icon");
-        if (icon.getAttribute("href") !== iconSrcMap[state.statusIconName]) {
+        if (icon && icon.getAttribute("href") !== iconSrcMap[state.statusIconName]) {
             icon.setAttribute("href", iconSrcMap[state.statusIconName]);
         }
 
@@ -229,7 +229,7 @@ const Content = () => {
         return () => {
             uiStateEvents.removeListener("update", onStateUpdate);
         };
-    });
+    }, [state.statusName, state.version, state.statusIconName]);
 
     return (
         <Fabric style={{ margin: "16px" }}>
@@ -292,10 +292,8 @@ const Content = () => {
     );
 };
 
-ReactDOM.render(
-    <Content />,
-    document.getElementById("root")
-);
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<Content />);
 
 // dark theme
 const myTheme = createTheme({
