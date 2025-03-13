@@ -2,7 +2,102 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
-## 3.9.0 (2023-xx-xx)
+## 4.0.0-beta.7 (2025-03-14)
+
+**Important Notice**: Mirakurun 4.0.0 includes significant performance improvements, enhanced EPG processing, asynchronous file I/O operations, and new features. As announced in 3.9.0, the experimental Win32 support has been completely removed.
+
+### Key Changes
+
+- **Node.js**: Updated supported versions: `^18 || ^20 || ^22` (dropped support for Node.js 14 and 16)
+- **Win32**: Completely removed support
+- **UI**: Added UI for channel scanning
+- **Performance**: Eliminated blocking file I/O operations to improve real-time processing
+- **Configuration**: Reduced storage write frequency to minimize interruptions to real-time processing
+- **Docker**: Updated configuration files, improved commands, and added Node.js 22 support
+
+### Breaking Changes
+
+- **Win32**: Completely removed support
+- **Project Structure**: Changed global installation to be discouraged and removed PM2 support
+
+### Server Changes
+
+- **config/server**: Added new configuration options:
+  - `allowOrigins`: Specify CORS origins
+  - `allowPNA`: Allow Private Network Access (default: `true`)
+  - `tsplayEndpoint`: Endpoint for TSPlay feature
+- **CORS**: Support for multiple origins, Cross-Origin Resource Policy set to "cross-origin"
+- **Private Network Access**: Added PNA/LNA support, enabling secure access within private networks
+- **Memory Usage**: Increased Node.js `max-semi-space-size` to 64MB to improve memory performance (this may slight increase memory usage)
+- **config/channels/scan**: Added service type support, improved scanning capabilities
+  - Added `skipCh` parameter to skip specific channels
+  - Added asynchronous channel scanning with progress tracking
+  - Added DELETE endpoint for canceling scans
+- **UI**:
+  - Changed API documentation from Swagger UI to ReDoc
+  - Added new UI components and service type filtering options
+  - Added channel, service ID, and User-Agent columns to tuner manager
+  - Added UI for channel scanning with visual progress tracking
+- **TSPlay**: Added experimental TSPlay feature
+
+### Docker Changes
+
+- **Base Image**: Updated from `node:18.15.0-buster-slim` to `node:22.14.0-bookworm-slim`
+- **Build Process**: Changed from `npm install` to `npm ci` for more reliable builds
+- **Configuration**:
+  - Made Dockerfile and image tag configurable via environment variables (`DOCKERFILE`, `MIRAKURUN_IMAGE_TAG`)
+  - Added `tmpfs` mount for `/tmp` to improve I/O performance
+- **docker-compose.yml**:
+  - Simplified volume binding syntax
+  - Added configuration guidance for users not using card readers or DVB devices
+  - Added detailed comments for hostname settings
+- **Commands**: Added new npm scripts for developers:
+  - `docker:run-setup`: Run container in setup mode
+  - `docker:down`: Stop and remove container
+  - `docker:logs`: Display container logs
+  - `docker:bash`: Run Bash shell in container
+
+### Other Changes
+
+- **File I/O Processing**:
+  - Replaced synchronous file I/O operations with asynchronous ones to improve real-time processing performance
+  - Replaced synchronous methods from the `fs` module with asynchronous methods from `fs/promises`
+  - Introduced queues for config file I/O operations to prevent concurrent access issues
+  - Reduced storage write frequency (extended program info save interval from 10 seconds to 30 seconds)
+
+- **Performance Optimization**:
+  - Implemented asynchronous JSON processing to prevent interruptions to real-time stream processing
+  - Introduced `yieldable-json` package for asynchronous JSON parsing
+  - Increased Node.js `max-semi-space-size` to 64MB to improve garbage collection efficiency
+
+- **Packages and Frameworks**:
+  - Updated major dependencies:
+    - express: `4.17.3` → `4.21.2`
+    - glob: `7.2.3` → `11.0.1`
+    - semver: `7.3.5` → `7.7.1`
+    - rfdc: `1.3.0` → `1.4.1`
+    - React: `17.0.2` → `^18.3.1`
+    - React DOM: `17.0.2` → `^18.3.1`
+    - TypeScript: `4.7` → `5.7`
+  - Added new dependencies:
+    - redoc: `2.4.0` (as an alternative to Swagger UI)
+    - redoc-try: `1.4.10`
+    - yieldable-json: `^2.1.0`
+  - Removed dependencies:
+    - swagger-ui-dist (due to change in API documentation tool to ReDoc)
+
+- **Project Structure**:
+  - Removed global installation (`preferGlobal`) flag
+  - Removed PM2 support, added dummy CLI script for migration guidance
+  - Completely removed Win32-specific scripts and support
+  - Improved TypeScript configuration and consistency
+  - Updated Azure Pipelines configuration (updated to Ubuntu 22.04 base)
+
+- **Channels**:
+  - Updated default sample channel configuration
+  - Significantly improved and extended channel scanning functionality
+
+## 3.9.0-rc.4 (2023-04-09)
 
 Performance improvements, fixes for memory leaks and bugs related to EPG processing, etc.
 
