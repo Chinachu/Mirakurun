@@ -2,11 +2,13 @@ services:
   mirakurun:
     build:
       context: ../
-      dockerfile: docker/Dockerfile
-    # `:latest` can be changed to fix the version
-    # `:latest` の部分を編集するとバージョンを固定できます
+      dockerfile: docker/${DOCKERFILE:-Dockerfile}
+    # `latest` can be changed to fix the version
+    # `latest` の部分を編集するとバージョンを固定できます
+    # `MIRAKURUN_IMAGE_TAG` environment variable can also be used
+    # `MIRAKURUN_IMAGE_TAG` 環境変数でも固定できます
     # available tags: https://hub.docker.com/r/chinachu/mirakurun/tags
-    image: chinachu/mirakurun:latest
+    image: chinachu/mirakurun:${MIRAKURUN_IMAGE_TAG:-latest}
     container_name: mirakurun
     cap_add:
       - SYS_ADMIN
