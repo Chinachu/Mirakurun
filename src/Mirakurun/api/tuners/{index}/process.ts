@@ -67,7 +67,7 @@ get.apiDoc = {
     }
 };
 
-export const del: Operation = (req, res) => {
+export const del: Operation = async (req, res) => {
 
     const tuner = _.tuner.get(req.params.index as any as number);
 
@@ -76,9 +76,14 @@ export const del: Operation = (req, res) => {
         return;
     }
 
-    tuner.kill()
-        .then(() => api.responseJSON(res, {pid: null}))
-        .catch((error: Error) => api.responseError(res, 500, error.message));
+    try {
+        await tuner.kill();
+    } catch (err) {
+        api.responseError(res, 500, err.message);
+        return;
+    }
+
+    res.status(204).end();
 };
 
 del.apiDoc = {
@@ -86,16 +91,8 @@ del.apiDoc = {
     summary: "Kill Tuner Process",
     operationId: "killTunerProcess",
     responses: {
-        200: {
-            description: "OK",
-            schema: {
-                type: "object",
-                properties: {
-                    pid: {
-                        type: "null"
-                    }
-                }
-            }
+        204: {
+            description: "Killed"
         },
         404: {
             description: "Not Found",
