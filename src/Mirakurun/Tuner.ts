@@ -16,7 +16,7 @@
 import { Writable } from "stream";
 import * as common from "./common";
 import * as log from "./log";
-import * as db from "./db";
+import * as apid from "../../api";
 import _ from "./_";
 import TunerDevice, { TunerDeviceStatus } from "./TunerDevice";
 import ChannelItem from "./ChannelItem";
@@ -48,7 +48,7 @@ export default class Tuner {
         return null;
     }
 
-    typeExists(type: common.ChannelType): boolean {
+    typeExists(type: apid.ChannelType): boolean {
 
         const l = this._devices.length;
         for (let i = 0; i < l; i++) {
@@ -92,7 +92,7 @@ export default class Tuner {
         }, output);
     }
 
-    initProgramStream(program: db.Program, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
+    initProgramStream(program: apid.Program, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
 
         return this._initTS({
             ...userReq,
@@ -151,7 +151,7 @@ export default class Tuner {
         });
     }
 
-    async getServices(channel: ChannelItem, user: Partial<common.User> = {}): Promise<db.Service[]> {
+    async getServices(channel: ChannelItem, user: Partial<common.User> = {}): Promise<apid.Service[]> {
 
         const tsFilter = await this._initTS({
             id: "Mirakurun:getServices()",
@@ -164,14 +164,14 @@ export default class Tuner {
             },
             ...user
         });
-        return new Promise<db.Service[]>((resolve, reject) => {
+        return new Promise<apid.Service[]>((resolve, reject) => {
 
             let network = {
                 networkId: -1,
                 areaCode: -1,
                 remoteControlKeyId: -1
             };
-            let services: db.Service[] = null;
+            let services: apid.Service[] = null;
 
             setTimeout(() => tsFilter.close(), 20000);
 
@@ -405,7 +405,7 @@ export default class Tuner {
         });
     }
 
-    private _getDevicesByType(type: common.ChannelType): TunerDevice[] {
+    private _getDevicesByType(type: apid.ChannelType): TunerDevice[] {
 
         const devices = [];
 

@@ -15,39 +15,21 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../../../api";
-import * as common from "../../../common";
+import * as apid from "../../../../../api";
 import * as config from "../../../config";
-import * as db from "../../../db";
 import _ from "../../../_";
-
-/**
- * Global object to track current scan status
- */
-interface CurrentScanStatus {
-    status: ScanPhase;
-    type?: common.ChannelType;
-    dryRun?: boolean;
-    progress?: number;
-    currentChannel?: string;
-    scanLog?: string[];
-    newCount?: number;
-    takeoverCount?: number;
-    result?: config.Channel[];
-    startTime?: number;
-    updateTime?: number;
-}
 
 /**
  * Options for a channel scan operation
  */
 interface ChannelScanOption {
-    type: common.ChannelType;          // Channel type
+    type: apid.ChannelType;          // Channel type
     startCh?: number;                  // Start channel number
     endCh?: number;                    // End channel number
     startSubCh?: number;               // Start subchannel number (for BS)
     endSubCh?: number;                 // End subchannel number (for BS)
     useSubCh?: boolean;                // Use subchannel style (for BS)
-    scanMode?: ScanMode;               // Scan mode
+    scanMode?: apid.ChannelScanMode;               // Scan mode
     setDisabledOnAdd?: boolean;        // Set disabled flag on newly added channels
     refresh?: boolean;                 // Refresh existing channel configs
     channelNameFormat?: string;        // Custom channel name format
@@ -58,51 +40,8 @@ interface ChannelScanOption {
  */
 interface ScanConfig {
     readonly channels: string[];         // List of channel identifiers to scan
-    readonly scanMode: ScanMode;         // Scan mode to use
+    readonly scanMode: apid.ChannelScanMode;         // Scan mode to use
     readonly setDisabledOnAdd: boolean;  // Whether to set disabled on new channels
-}
-
-/**
- * Scan modes for channel scanning
- */
-enum ScanMode {
-    Channel = "Channel", // Channel-based scanning (one entry per channel)
-    Service = "Service"  // Service-based scanning (one entry per service)
-}
-
-/**
- * Overall phase status codes for the scanning process
- */
-enum ScanPhase {
-    NotStarted = "not_started",           // No scan has been started
-    Scanning = "scanning",                // Currently scanning
-    Completed = "completed",              // Scan completed successfully
-    Cancelled = "cancelled",              // Scan was cancelled by user
-    Error = "error"                       // Error occurred
-}
-
-/**
- * Process step status codes for the scanning process
- */
-enum ScanStep {
-    Started = "started",                  // Scan has started
-    ScanningChannel = "scanning_channel", // Currently scanning a specific channel
-    Takeover = "takeover",                // Taking over existing channel config
-    Skipped = "skipped",                  // Channel was skipped
-    ServicesFound = "services_found",     // Services found on channel
-    ChannelsFound = "channels_found",     // Channels found after scan
-    Error = "error"                       // Error occurred during scanning
-}
-
-/**
- * Result type status codes for the scanning process
- */
-enum ScanResultType {
-    Summary = "summary",                  // Scan summary info
-    SummaryNew = "summary_new",           // New channels summary
-    SummaryTakeover = "summary_takeover", // Takeover channels summary
-    RestartRequired = "restart_required", // Restart required to apply changes
-    FinalResult = "final_result"          // Final scan results
 }
 
 /**
@@ -128,7 +67,7 @@ const compareOptions: Intl.CollatorOptions = {
 /**
  * Channel type order for sorting
  */
-const channelOrder: Record<common.ChannelType, number> = {
+const channelOrder: Record<apid.ChannelType, number> = {
     GR: 1,
     BS: 2,
     CS: 3,
@@ -144,11 +83,6 @@ const CHANNEL_NAME_FORMAT_BS_SUBCH = "BS{ch00}_{subch}"; // BS subchannel format
 const CHANNEL_NAME_FORMAT_CS = "CS{ch}";              // CS channel format
 
 /**
- * Global flag to track if scan is in progress
- */
-let isScanning = false;
-
-/**
  * Global flag to track if scan cancellation is requested
  */
 let isCancellationRequested = false;
@@ -156,8 +90,9 @@ let isCancellationRequested = false;
 /**
  * Global object to track current scan status
  */
-let currentScanStatus: CurrentScanStatus | null = {
-    status: ScanPhase.NotStarted
+const scanStatus: apid.ChannelScanStatus = {
+    isScanning: false,
+    status: "not_started"
 };
 
 /**
@@ -230,12 +165,12 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig | unde
     Object.keys(option).forEach(key => option[key] === undefined && delete option[key]);
 
     // Handle GR (Ground) channels
-    if (option.type === common.ChannelTypes.GR) {
+    if (option.type === "GR") {
         // Set GR-specific defaults
         const grOptions = {
             startCh: 13,
             endCh: 62,
-            scanMode: ScanMode.Channel,
+            scanMode: "Channel" as const,
             setDisabledOnAdd: false,
             ...option
         };
@@ -252,13 +187,13 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig | unde
 
     // Default options for satellite channels (BS/CS)
     const satelliteOptions = {
-        scanMode: ScanMode.Service,
+        scanMode: "Service" as const,
         setDisabledOnAdd: true,
         ...option
     };
 
     // Handle BS (Broadcast Satellite) channels
-    if (option.type === common.ChannelTypes.BS) {
+    if (option.type === "BS") {
         // Handle subchannel style BS scanning (e.g. BS01_0)
         if (satelliteOptions.useSubCh) {
             const bsSubchOptions = {
@@ -303,7 +238,7 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig | unde
     }
 
     // Handle CS (Communication Satellite) channels
-    if (option.type === common.ChannelTypes.CS) {
+    if (option.type === "CS") {
         const csOptions = {
             startCh: 2,
             endCh: 24,
@@ -332,11 +267,11 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig | unde
  * @returns A channel configuration object
  */
 export function generateChannelItemForService(
-    type: common.ChannelType,
+    type: apid.ChannelType,
     channel: string,
-    service: db.Service,
+    service: apid.Service,
     setDisabledOnAdd: boolean
-): config.Channel {
+): apid.ConfigChannelsItem {
     // Use service name, or fallback to generated name if empty
     let name = service.name.trim();
     if (name.length === 0) {
@@ -363,11 +298,11 @@ export function generateChannelItemForService(
  * @returns A channel configuration object
  */
 export function generateChannelItemForChannel(
-    type: common.ChannelType,
+    type: apid.ChannelType,
     channel: string,
-    services: db.Service[],
+    services: apid.Service[],
     setDisabledOnAdd: boolean
-): config.Channel {
+): apid.ConfigChannelsItem {
     // Find the common prefix among all service names
     const baseName = services[0].name;
     let matchIndex = baseName.length;
@@ -419,14 +354,14 @@ export function generateChannelItemForChannel(
  * @returns Array of channel configuration objects
  */
 export function generateChannelItems(
-    scanMode: ScanMode,
-    type: common.ChannelType,
+    scanMode: apid.ChannelScanMode,
+    type: apid.ChannelType,
     channel: string,
-    services: db.Service[],
+    services: apid.Service[],
     setDisabledOnAdd: boolean
-): config.Channel[] {
+): apid.ConfigChannels {
     // Service mode: create one channel item per service
-    if (scanMode === ScanMode.Service) {
+    if (scanMode === "Service") {
         return services.map(service =>
             generateChannelItemForService(type, channel, service, setDisabledOnAdd)
         );
@@ -440,14 +375,14 @@ export function generateChannelItems(
  */
 interface BaseScanStatusUpdate {
     channel?: string;
-    type?: common.ChannelType;
+    type?: apid.ChannelType;
 }
 
 /**
  * Interface for phase status updates
  */
 interface PhaseScanStatusUpdate extends BaseScanStatusUpdate {
-    status: ScanPhase;
+    status: apid.ChannelScanPhase;
     error?: string;
     saved?: boolean;
     dryRun?: boolean;
@@ -457,11 +392,11 @@ interface PhaseScanStatusUpdate extends BaseScanStatusUpdate {
  * Interface for step status updates
  */
 interface StepScanStatusUpdate extends BaseScanStatusUpdate {
-    status: ScanStep;
+    status: apid.ChannelScanStep;
     progress?: number;
     enabled?: boolean;
     reason?: string;
-    items?: config.Channel[];
+    items?: apid.ConfigChannels;
     count?: number;
 }
 
@@ -469,10 +404,10 @@ interface StepScanStatusUpdate extends BaseScanStatusUpdate {
  * Interface for result status updates
  */
 interface ResultScanStatusUpdate extends BaseScanStatusUpdate {
-    status: ScanResultType;
+    status: apid.ChannelScanResultType;
     newCount?: number;
     takeoverCount?: number;
-    result?: config.Channel[];
+    result?: apid.ConfigChannels;
 }
 
 /**
@@ -493,24 +428,24 @@ type ScanStatusUpdate = PhaseScanStatusUpdate | StepScanStatusUpdate | ResultSca
 async function runChannelScan(
     scanConfig: ScanConfig,
     dryRun: boolean,
-    type: common.ChannelType,
+    type: apid.ChannelType,
     refresh: boolean,
     outputWriter?: (text: string) => void,
     skipCh: number[] = []
-): Promise<config.Channel[]> {
+): Promise<apid.ConfigChannels> {
     try {
         // Initialize scan data
         const scanLog: string[] = [];
         const oldChannelItems = await config.loadChannels();
         // Filter out channels of the type we're scanning (they'll be replaced)
-        const result: config.Channel[] = oldChannelItems.filter(channel => channel.type !== type);
+        const result: apid.ConfigChannels = oldChannelItems.filter(channel => channel.type !== type);
         let newCount = 0;
         let takeoverCount = 0;
 
         // Initialize global scan status
         const now = Date.now();
-        currentScanStatus = {
-            status: ScanPhase.Scanning,
+        Object.assign(scanStatus, {
+            status: "scanning" as const,
             type,
             dryRun,
             progress: 0,
@@ -521,7 +456,7 @@ async function runChannelScan(
             result: [],
             startTime: now,
             updateTime: now
-        };
+        });
 
         /**
          * Updates scan phase status
@@ -529,13 +464,9 @@ async function runChannelScan(
          * @param textOutput Optional text output for logs
          */
         const updatePhaseStatus = (update: PhaseScanStatusUpdate, textOutput?: string): void => {
-            if (!currentScanStatus) {
-                return;
-            }
-
-            currentScanStatus.status = update.status;
+            scanStatus.status = update.status;
             if (update.channel) {
-                currentScanStatus.currentChannel = update.channel;
+                scanStatus.currentChannel = update.channel;
             }
 
             appendToLog(textOutput);
@@ -547,17 +478,13 @@ async function runChannelScan(
          * @param textOutput Optional text output for logs
          */
         const updateStepStatus = (update: StepScanStatusUpdate, textOutput?: string): void => {
-            if (!currentScanStatus) {
-                return;
-            }
-
             if (update.progress !== undefined) {
-                currentScanStatus.progress = update.progress;
+                scanStatus.progress = update.progress;
             }
             if (update.channel) {
-                currentScanStatus.currentChannel = update.channel;
+                scanStatus.currentChannel = update.channel;
             }
-            currentScanStatus.updateTime = Date.now();
+            scanStatus.updateTime = Date.now();
 
             appendToLog(textOutput);
         };
@@ -568,18 +495,14 @@ async function runChannelScan(
          * @param textOutput Optional text output for logs
          */
         const updateResultStatus = (update: ResultScanStatusUpdate, textOutput?: string): void => {
-            if (!currentScanStatus) {
-                return;
-            }
-
             if (update.newCount !== undefined) {
-                currentScanStatus.newCount = update.newCount;
+                scanStatus.newCount = update.newCount;
             }
             if (update.takeoverCount !== undefined) {
-                currentScanStatus.takeoverCount = update.takeoverCount;
+                scanStatus.takeoverCount = update.takeoverCount;
             }
             if (update.result) {
-                currentScanStatus.result = update.result;
+                scanStatus.result = update.result;
             }
 
             appendToLog(textOutput);
@@ -590,9 +513,9 @@ async function runChannelScan(
          * @param textOutput Text to append
          */
         const appendToLog = (textOutput?: string): void => {
-            if (textOutput && currentScanStatus) {
+            if (textOutput) {
                 const trimmedText = textOutput.trim();
-                currentScanStatus.scanLog.push(trimmedText);
+                scanStatus.scanLog.push(trimmedText);
                 if (outputWriter) {
                     outputWriter(textOutput);
                 }
@@ -606,7 +529,7 @@ async function runChannelScan(
 
         // Print scan start message
         updateStepStatus(
-            { status: ScanStep.Started, type },
+            { status: "started" as const, type },
             `channel scanning... (type: "${type}")\n\n`
         );
 
@@ -616,7 +539,7 @@ async function runChannelScan(
             // Check if scanning has been cancelled
             if (isCancellationRequested) {
                 updatePhaseStatus(
-                    { status: ScanPhase.Cancelled },
+                    { status: "cancelled" as const },
                     "Channel scan was cancelled by user request.\n"
                 );
                 break;
@@ -629,7 +552,7 @@ async function runChannelScan(
             if (!isNaN(channelNumber) && skipCh.includes(channelNumber)) {
                 updateStepStatus(
                     {
-                        status: ScanStep.Skipped,
+                        status: "skipped" as const,
                         channel,
                         reason: "skip_parameter",
                         progress: progressPercent
@@ -642,7 +565,7 @@ async function runChannelScan(
             // Update status to show current channel being scanned
             updateStepStatus(
                 {
-                    status: ScanStep.ScanningChannel,
+                    status: "scanning_channel" as const,
                     channel,
                     progress: progressPercent
                 },
@@ -660,7 +583,7 @@ async function runChannelScan(
                 // If there are existing channels, take them over instead of scanning
                 if (existingChannels.length > 0) {
                     const takeoverInfo = {
-                        status: ScanStep.Takeover,
+                        status: "takeover" as const,
                         channel,
                         count: existingChannels.length,
                         items: existingChannels
@@ -675,15 +598,13 @@ async function runChannelScan(
                     for (const channelItem of existingChannels) {
                         result.push(channelItem);
                         takeoverCount++;
-                        if (currentScanStatus) {
-                            currentScanStatus.takeoverCount = takeoverCount;
-                        }
+                        scanStatus.takeoverCount = takeoverCount;
                         appendToLog(`-> ${JSON.stringify(channelItem)}\n`);
                     }
 
                     updateStepStatus(
                         {
-                            status: ScanStep.Skipped,
+                        status: "skipped" as const,
                             channel,
                             reason: "existing_config"
                         },
@@ -695,7 +616,7 @@ async function runChannelScan(
             }
 
             // Scan the channel for services
-            let services: db.Service[];
+            let services: apid.Service[];
             try {
                 // Get services from the tuner
                 services = await _.tuner.getServices(<any> {
@@ -709,7 +630,7 @@ async function runChannelScan(
                 // Handle errors (often no signal)
                 const isNoSignalError = /stream has closed before get network/.test(String(error));
                 const errorInfo = {
-                    status: ScanStep.Error,
+                    status: "error" as const,
                     channel,
                     reason: isNoSignalError ? "no_signal" : String(error),
                     progress: progressPercent
@@ -730,7 +651,7 @@ async function runChannelScan(
 
             updateStepStatus(
                 {
-                    status: ScanStep.ServicesFound,
+                    status: "services_found" as const,
                     channel,
                     count: services.length
                 },
@@ -753,20 +674,18 @@ async function runChannelScan(
             );
 
             // Add newly scanned items to results
-            const scannedItems: config.Channel[] = [];
+            const scannedItems: apid.ConfigChannels = [];
             for (const newChannelItem of scannedChannelItems) {
                 result.push(newChannelItem);
                 newCount++;
-                if (currentScanStatus) {
-                    currentScanStatus.newCount = newCount;
-                }
+                scanStatus.newCount = newCount;
                 scannedItems.push(newChannelItem);
                 appendToLog(`-> ${JSON.stringify(newChannelItem)}\n`);
             }
 
             updateStepStatus(
                 {
-                    status: ScanStep.ChannelsFound,
+                    status: "channels_found" as const,
                     channel,
                     items: scannedItems
                 },
@@ -785,7 +704,7 @@ async function runChannelScan(
 
         // Generate and display summary
         const summaryData = {
-            status: ScanResultType.Summary,
+            status: "summary" as const,
             newCount,
             takeoverCount,
             totalTypeCount: newCount + takeoverCount,
@@ -799,12 +718,12 @@ async function runChannelScan(
         );
 
         updateResultStatus(
-            { status: ScanResultType.SummaryNew, newCount },
+            { status: "summary_new" as const, newCount },
             `-> new ${newCount} channels found.\n`
         );
 
         updateResultStatus(
-            { status: ScanResultType.SummaryTakeover, takeoverCount },
+            { status: "summary_takeover" as const, takeoverCount },
             `-> existing ${takeoverCount} channels merged.\n`
         );
 
@@ -814,16 +733,16 @@ async function runChannelScan(
             if (!dryRun) {
                 await config.saveChannels(result);
                 updatePhaseStatus(
-                    { status: ScanPhase.Completed, saved: true },
+                    { status: "completed" as const, saved: true },
                     "channel scan has been completed and saved successfully.\n"
                 );
                 updateResultStatus(
-                    { status: ScanResultType.RestartRequired },
+                    { status: "restart_required" as const },
                     "**RESTART REQUIRED** to apply changes.\n"
                 );
             } else {
                 updatePhaseStatus(
-                    { status: ScanPhase.Completed, dryRun: true },
+                    { status: "completed" as const, dryRun: true },
                     "channel scan has been completed.\n\n-- dry run --\n"
                 );
             }
@@ -832,7 +751,7 @@ async function runChannelScan(
         // Send final result
         updateResultStatus(
             {
-                status: ScanResultType.FinalResult,
+                status: "final_result" as const,
                 result
             },
             `Final result: ${result.length} channels\n`
@@ -841,7 +760,7 @@ async function runChannelScan(
         return result;
     } finally {
         // Always reset scanning and cancellation flags when done
-        isScanning = false;
+        scanStatus.isScanning = false;
         isCancellationRequested = false;
     }
 }
@@ -853,10 +772,7 @@ export const get: Operation = async (req, res) => {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
 
     // Return current scan status
-    api.responseJSON(res, {
-        ...currentScanStatus,
-        isScanning
-    });
+    api.responseJSON(res, scanStatus as apid.ChannelScanStatus);
 };
 
 get.apiDoc = {
@@ -882,18 +798,18 @@ get.apiDoc = {
  */
 export const put: Operation = async (req, res) => {
     // Check if a scan is already in progress
-    if (isScanning === true) {
+    if (scanStatus.isScanning === true) {
         api.responseError(res, 409, "Already Scanning");
         return;
     }
 
     // Set scanning flag
-    isScanning = true;
+    scanStatus.isScanning = true;
 
     // Extract query parameters
     const asyncMode = Boolean(req.query.async);
     const dryRun = Boolean(req.query.dryRun);
-    const type = req.query.type as common.ChannelType;
+    const type = req.query.type as apid.ChannelType;
     const refresh = Boolean(req.query.refresh);
 
     // Parse skipCh parameter
@@ -908,7 +824,7 @@ export const put: Operation = async (req, res) => {
         endSubCh: req.query.maxSubCh ? Number(req.query.maxSubCh) : undefined,
         useSubCh: req.query.useSubCh !== undefined ? Boolean(req.query.useSubCh) : undefined,
         channelNameFormat: req.query.channelNameFormat as string,
-        scanMode: req.query.scanMode as ScanMode,
+        scanMode: req.query.scanMode as apid.ChannelScanMode,
         setDisabledOnAdd: req.query.setDisabledOnAdd !== undefined ?
             Boolean(req.query.setDisabledOnAdd) : undefined
     };
@@ -918,7 +834,7 @@ export const put: Operation = async (req, res) => {
 
     // Handle missing scan configuration
     if (!scanConfig) {
-        isScanning = false;
+        scanStatus.isScanning = false;
         api.responseError(res, 400, "Invalid scan configuration");
         return;
     }
@@ -937,12 +853,10 @@ export const put: Operation = async (req, res) => {
         runChannelScan(scanConfig, dryRun, type, refresh, null, skipCh)
             .catch(error => {
                 console.error("Channel scan error:", error);
-                if (currentScanStatus) {
-                    // ScanPhase.Error is used only when the scan is stopped
-                    currentScanStatus.status = ScanPhase.Error;
-                    currentScanStatus.scanLog.push(`Error: ${String(error)}`);
-                }
-                isScanning = false;
+                // Error is used only when the scan is stopped
+                scanStatus.status = "error" as const;
+                scanStatus.scanLog.push(`Error: ${String(error)}`);
+                scanStatus.isScanning = false;
             });
 
         return;
@@ -966,14 +880,12 @@ export const put: Operation = async (req, res) => {
         res.end();
     } catch (error) {
         console.error("Channel scan error:", error);
-        if (currentScanStatus) {
-            // ScanPhase.Error is used only when the scan is stopped
-            currentScanStatus.status = ScanPhase.Error;
-            currentScanStatus.scanLog.push(`Error: ${String(error)}`);
-        }
+        // Error is used only when the scan is stopped
+        scanStatus.status = "error" as const;
+        scanStatus.scanLog.push(`Error: ${String(error)}`);
         res.write(`Error during scan: ${error}\n`);
         res.end();
-        isScanning = false;
+        scanStatus.isScanning = false;
     }
 };
 
@@ -1014,8 +926,8 @@ About BS Subchannel Style:
             in: "query",
             name: "type",
             type: "string",
-            enum: [common.ChannelTypes.GR, common.ChannelTypes.BS, common.ChannelTypes.CS],
-            default: common.ChannelTypes.GR,
+            enum: ["GR", "BS", "CS"] as apid.ChannelType[],
+            default: "GR",
             description: "Specifies the channel type to scan."
         },
         {
@@ -1072,7 +984,7 @@ About BS Subchannel Style:
             in: "query",
             name: "scanMode",
             type: "string",
-            enum: [ScanMode.Channel, ScanMode.Service],
+            enum: ["Channel", "Service"] as apid.ChannelScanMode[],
             description: "Channel scan mode. Use `Service` mode to create separate entries per service.\n\n" +
                 "_Default value (GR)_: Channel\n" +
                 "_Default value (BS/CS)_: Service"
@@ -1155,7 +1067,7 @@ About BS Subchannel Style:
  */
 export const del: Operation = async (req, res) => {
     // Check if a scan is currently in progress
-    if (!isScanning) {
+    if (!scanStatus.isScanning) {
         api.responseError(res, 404, "No scan in progress");
         return;
     }
@@ -1170,10 +1082,8 @@ export const del: Operation = async (req, res) => {
     isCancellationRequested = true;
 
     // Update the scan status
-    if (currentScanStatus) {
-        currentScanStatus.status = ScanPhase.Cancelled;
-        currentScanStatus.scanLog.push("Scan cancellation requested by user.");
-    }
+    scanStatus.status = "cancelled" as const;
+    scanStatus.scanLog.push("Scan cancellation requested by user.");
 
     // Return success response
     res.status(206);

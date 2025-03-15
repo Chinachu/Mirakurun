@@ -15,12 +15,13 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../../api";
+import * as apid from "../../../../api";
 import * as config from "../../config";
 
 export const get: Operation = async (req, res) => {
 
     res.status(200);
-    api.responseJSON(res, await config.loadChannels());
+    api.responseJSON(res, await config.loadChannels() as apid.ConfigChannels);
 };
 
 get.apiDoc = {
@@ -43,8 +44,7 @@ get.apiDoc = {
 };
 
 export const put: Operation = async (req, res) => {
-
-    const channels: config.Channel[] = req.body;
+    const channels: apid.ConfigChannels = req.body;
 
     await config.saveChannels(channels);
 

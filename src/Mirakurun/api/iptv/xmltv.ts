@@ -14,7 +14,7 @@
    limitations under the License.
 */
 import { Operation } from "express-openapi";
-import { Program } from "../../db";
+import { Program } from "../../../../api";
 import Service from "../../Service";
 import _ from "../../_";
 

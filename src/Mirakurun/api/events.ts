@@ -15,11 +15,12 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../api";
+import * as apid from "../../../api";
 import Event from "../Event";
 
 export const get: Operation = (req, res) => {
 
-    api.responseJSON(res, Event.log);
+    api.responseJSON(res, Event.log as apid.Event[]);
 };
 
 get.apiDoc = {

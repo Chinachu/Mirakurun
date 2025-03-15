@@ -20,13 +20,14 @@ import * as db from "./db";
 import * as log from "./log";
 import * as common from "./common";
 import * as config from "./config";
+import * as apid from "../../api";
 import ServiceItem from "./ServiceItem";
 import TSFilter from "./TSFilter";
 
 export default class ChannelItem {
 
     readonly name: string;
-    readonly type: common.ChannelType;
+    readonly type: apid.ChannelType;
     readonly channel: string;
     readonly satellite: string;
     readonly space: number;
@@ -34,8 +35,7 @@ export default class ChannelItem {
     readonly polarity: "H" | "V";
     readonly tsmfRelTs: number;
 
-    constructor(config: config.Channel) {
-
+    constructor(config: apid.ConfigChannelsItem) {
         this.name = config.name;
         this.type = config.type;
         this.channel = config.channel;
@@ -117,7 +117,7 @@ export default class ChannelItem {
 
             log.info("ChannelItem#'%s' service scan has started", this.name);
 
-            let services: db.Service[];
+            let services: apid.Service[];
             try {
                 services = await _.tuner.getServices(this);
             } catch (e) {

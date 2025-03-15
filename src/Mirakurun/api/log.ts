@@ -14,7 +14,6 @@
    limitations under the License.
 */
 import { Operation } from "express-openapi";
-import * as api from "../api";
 import { event } from "../log";
 
 export const get: Operation = (req, res) => {

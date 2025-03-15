@@ -15,12 +15,13 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../../api";
+import * as apid from "../../../../api";
 import * as config from "../../config";
 
 export const get: Operation = async (req, res) => {
 
     res.status(200);
-    api.responseJSON(res, await config.loadServer());
+    api.responseJSON(res, await config.loadServer() as apid.ConfigServer);
 };
 
 get.apiDoc = {
@@ -43,8 +44,7 @@ get.apiDoc = {
 };
 
 export const put: Operation = async (req, res) => {
-
-    const server: config.Server = req.body;
+    const server: apid.ConfigServer = req.body;
 
     await config.saveServer(server);
 

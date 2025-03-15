@@ -15,7 +15,7 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../api";
-import { Status } from "../../../api";
+import * as apid from "../../../api";
 import status from "../status";
 import _ from "../_";
 
@@ -26,7 +26,7 @@ export const get: Operation = (req, res) => {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.status(200);
 
-    api.responseJSON(res, getStatus());
+    api.responseJSON(res, getStatus() as apid.Status);
 };
 
 get.apiDoc = {
@@ -49,9 +49,9 @@ get.apiDoc = {
     }
 };
 
-export function getStatus(): Status {
+export function getStatus(): apid.Status {
 
-    const ret: Status = {
+    const ret: apid.Status = {
         time: Date.now(),
         version: pkg.version,
         process: {

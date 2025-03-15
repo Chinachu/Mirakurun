@@ -13,8 +13,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-import * as common from "./common";
 import * as log from "./log";
+import * as apid from "../../api";
 import _ from "./_";
 import status from "./status";
 import queue from "./queue";
@@ -45,7 +45,7 @@ export default class Channel {
         }
     }
 
-    get(type: common.ChannelType, channel: string): ChannelItem {
+    get(type: apid.ChannelType, channel: string): ChannelItem {
 
         const l = this._items.length;
         for (let i = 0; i < l; i++) {
@@ -57,7 +57,7 @@ export default class Channel {
         return null;
     }
 
-    findByType(type: common.ChannelType): ChannelItem[] {
+    findByType(type: apid.ChannelType): ChannelItem[] {
 
         const items = [];
 

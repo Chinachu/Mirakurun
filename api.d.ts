@@ -51,8 +51,6 @@ export interface Channel {
 
 export type ChannelType = "GR" | "BS" | "CS" | "SKY";
 
-export type ChannelScanMode = "Channel" | "Service";
-
 export interface Service {
     id: ServiceItemId;
     serviceId: ServiceId;
@@ -85,24 +83,7 @@ export interface Program {
         streamContent: number;
         componentType: number;
     }
-    audios?: {
-        /** component_type
-         * - 0x01 - 1/0 mode (single-mono)
-         * - 0x02 - 1/0 + 1/0 mode (dual-mono)
-         * - 0x03 - 2/0 mode (stereo)
-         * - 0x07 - 3/1 mode
-         * - 0x08 - 3/2 mode
-         * - 0x09 - 3/2 + LFE mode
-         */
-        componentType: number;
-        componentTag: number;
-        isMain: boolean;
-        samplingRate: ProgramAudioSamplingRate;
-        /** ISO_639_language_code, ISO_639_language_code_2
-         * - this `#length` will `2` if dual-mono multi-lingual.
-         */
-        langs: ProgramAudioLanguageCode[];
-    }[]
+    audios?: ProgramAudio[];
 
     series?: ProgramSeries;
 
@@ -122,16 +103,44 @@ export interface ProgramGenre {
 
 export type ProgramVideoType = "mpeg2" | "h.264" | "h.265";
 
-export type ProgramVideoResolution = "240p" | "480i" | "480p" | "720p" | "1080i" | "2160p" | "4320p";
+export type ProgramVideoResolution = (
+    "240p" |
+    "480i" |
+    "480p" |
+    "720p" |
+    "1080i" |
+    "1080p" |
+    "2160p" |
+    "4320p"
+);
 
-export enum ProgramAudioSamplingRate {
-    "16kHz" = 16000,
-    "22.05kHz" = 22050,
-    "24kHz" = 24000,
-    "32kHz" = 32000,
-    "44.1kHz" = 44100,
-    "48kHz" = 48000
+export interface ProgramAudio {
+    /** component_type
+     * - 0x01 - 1/0 mode (single-mono)
+     * - 0x02 - 1/0 + 1/0 mode (dual-mono)
+     * - 0x03 - 2/0 mode (stereo)
+     * - 0x07 - 3/1 mode
+     * - 0x08 - 3/2 mode
+     * - 0x09 - 3/2 + LFE mode
+     */
+    componentType: number;
+    componentTag: number;
+    isMain: boolean;
+    samplingRate: ProgramAudioSamplingRate;
+    /** ISO_639_language_code, ISO_639_language_code_2
+     * - this `#length` will `2` if dual-mono multi-lingual.
+     */
+    langs: ProgramAudioLanguageCode[];
 }
+
+export type ProgramAudioSamplingRate = (
+    16000 |
+    22050 |
+    24000 |
+    32000 |
+    44100 |
+    48000
+);
 
 export type ProgramAudioLanguageCode = (
     "jpn" |
@@ -244,13 +253,14 @@ export interface ConfigServer {
     tsplayEndpoint: string;
 }
 
-export enum LogLevel {
-    "FATAL" = -1,
-    "ERROR" = 0,
-    "WARN" = 1,
-    "INFO" = 2,
-    "DEBUG" = 3
-}
+/**
+ * FATAL: -1
+ * ERROR: 0
+ * WARN: 1
+ * INFO: 2
+ * DEBUG: 3
+ */
+export type LogLevel = -1 | 0 | 1 | 2 | 3;
 
 export type ConfigTuners = ConfigTunersItem[];
 
@@ -289,7 +299,52 @@ export interface ConfigChannelsItem {
     polarity?: "H" | "V";
     tsmfRelTs?: number;
     isDisabled?: boolean;
+    /** @deprecated */
+    readonly satelite?: string;
 }
+
+export interface ChannelScanStatus {
+    isScanning: boolean;
+    status: ChannelScanPhase;
+    type?: ChannelType;
+    dryRun?: boolean;
+    progress?: number;
+    currentChannel?: string;
+    scanLog?: string[];
+    newCount?: number;
+    takeoverCount?: number;
+    result?: ConfigChannelsItem[];
+    startTime?: number;
+    updateTime?: number;
+}
+
+export type ChannelScanMode = "Channel" | "Service";
+
+export type ChannelScanPhase = (
+    "not_started" |
+    "scanning" |
+    "completed" |
+    "cancelled" |
+    "error"
+);
+
+export type ChannelScanStep = (
+    "started" |
+    "scanning_channel" |
+    "takeover" |
+    "skipped" |
+    "services_found" |
+    "channels_found" |
+    "error"
+);
+
+export type ChannelScanResultType = (
+    "summary" |
+    "summary_new" |
+    "summary_takeover" |
+    "restart_required" |
+    "final_result"
+);
 
 export interface Version {
     current: string;

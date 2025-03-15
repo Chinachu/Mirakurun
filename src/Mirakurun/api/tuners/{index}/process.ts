@@ -15,6 +15,7 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../../../api";
+import * as apid from "../../../../../api";
 import _ from "../../../_";
 
 export const parameters = [
@@ -36,7 +37,8 @@ export const get: Operation = (req, res) => {
         return;
     }
 
-    api.responseJSON(res, { pid: tuner.pid });
+    const tunerProcess: apid.TunerProcess = { pid: tuner.pid };
+    api.responseJSON(res, tunerProcess);
 };
 
 get.apiDoc = {

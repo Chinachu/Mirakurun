@@ -34,7 +34,7 @@ interface User extends common.User {
 export interface TunerDeviceStatus {
     readonly index: number;
     readonly name: string;
-    readonly types: common.ChannelType[];
+    readonly types: apid.ChannelType[];
     readonly command: string;
     readonly pid: number;
     readonly users: common.User[];
@@ -61,7 +61,7 @@ export default class TunerDevice extends EventEmitter {
     private _exited = false;
     private _closing = false;
 
-    constructor(private _index: number, private _config: config.Tuner) {
+    constructor(private _index: number, private _config: apid.ConfigTunersItem) {
         super();
         this._isRemote = !!this._config.remoteMirakurunHost;
         Event.emit("tuner", "create", this.toJSON());
@@ -72,7 +72,7 @@ export default class TunerDevice extends EventEmitter {
         return this._index;
     }
 
-    get config(): config.Tuner {
+    get config(): apid.ConfigTunersItem {
         return this._config;
     }
 

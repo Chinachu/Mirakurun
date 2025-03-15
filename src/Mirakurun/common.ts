@@ -15,6 +15,7 @@
 */
 import rfdc from "rfdc";
 import ChannelItem from "./ChannelItem";
+import * as apid from "../../api";
 
 export interface User {
     readonly id: string;
@@ -45,14 +46,7 @@ export interface StreamInfo {
     };
 }
 
-export enum ChannelTypes {
-    "GR" = "GR",
-    "BS" = "BS",
-    "CS" = "CS",
-    "SKY" = "SKY"
-}
-
-export type ChannelType = keyof typeof ChannelTypes;
+export const channelTypes: apid.ChannelType[] = ["GR", "BS", "CS", "SKY"];
 
 export const deepClone = rfdc();
 

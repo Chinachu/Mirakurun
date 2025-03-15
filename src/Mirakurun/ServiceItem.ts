@@ -16,7 +16,7 @@
 import * as stream from "stream";
 import * as common from "./common";
 import _ from "./_";
-import * as db from "./db";
+import * as apid from "../../api";
 import Event from "./Event";
 import ChannelItem from "./ChannelItem";
 import TSFilter from "./TSFilter";
@@ -143,9 +143,9 @@ export default class ServiceItem {
         return this._channel;
     }
 
-    export(): db.Service {
+    export(): apid.Service {
 
-        const ret: db.Service = {
+        const ret: apid.Service = {
             id: this._id,
             serviceId: this._serviceId,
             networkId: this._networkId,

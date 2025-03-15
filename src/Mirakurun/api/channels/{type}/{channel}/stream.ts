@@ -15,15 +15,16 @@
 */
 import {Operation} from "express-openapi";
 import * as api from "../../../../api";
+import * as apid from "../../../../../../api";
+import { channelTypes } from "../../../../common";
 import _ from "../../../../_";
-import { ChannelType, ChannelTypes } from "../../../../common";
 
 export const parameters = [
     {
         in: "path",
         name: "type",
         type: "string",
-        enum: Object.keys(ChannelTypes),
+        enum: channelTypes,
         required: true
     },
     {
@@ -49,7 +50,7 @@ export const parameters = [
 
 export const head: Operation = (req, res) => {
 
-    const channel = _.channel.get(req.params.type as ChannelType, req.params.channel);
+    const channel = _.channel.get(req.params.type as apid.ChannelType, req.params.channel);
 
     if (channel === null) {
         api.responseError(res, 404);
@@ -65,7 +66,7 @@ export const head: Operation = (req, res) => {
 
 export const get: Operation = (req, res) => {
 
-    const channel = _.channel.get(req.params.type as ChannelType, req.params.channel);
+    const channel = _.channel.get(req.params.type as apid.ChannelType, req.params.channel);
 
     if (channel === null) {
         api.responseError(res, 404);

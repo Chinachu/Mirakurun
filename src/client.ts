@@ -88,6 +88,9 @@ export interface ChannelScanOption {
     scanMode?: apid.ChannelScanMode;
     setDisabledOnAdd?: boolean;
     refresh?: boolean;
+    skipCh?: number[];
+    channelNameFormat?: string;
+    async?: boolean;
 }
 
 export class ErrorResponse implements ErrorResponse {
@@ -127,7 +130,7 @@ export default class Client {
                     const ret: Response = {
                         status: res.statusCode,
                         statusText: res.statusMessage,
-                        contentType: res.headers["content-type"].split(";")[0],
+                        contentType: res.headers["content-type"]?.split(";")[0] || "",
                         headers: res.headers,
                         isSuccess: (res.statusCode >= 200 && res.statusCode <= 202)
                     };
@@ -473,6 +476,18 @@ export default class Client {
     async channelScan(option?: ChannelScanOption): Promise<http.IncomingMessage> {
 
         return this.call("channelScan", option);
+    }
+
+    async getChannelScanStatus(): Promise<apid.ChannelScanStatus> {
+
+        const res = await this.call("getChannelScanStatus");
+        return res.body as apid.ChannelScanStatus;
+    }
+
+    async stopChannelScan(): Promise<{ status: string; message: string }> {
+
+        const res = await this.call("stopChannelScan");
+        return res.body as { status: string; message: string };
     }
 
     async getServerConfig(): Promise<apid.ConfigServer> {

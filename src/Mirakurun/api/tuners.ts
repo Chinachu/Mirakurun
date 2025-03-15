@@ -15,11 +15,12 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../api";
+import * as apid from "../../../api";
 import _ from "../_";
 
 export const get: Operation = (req, res) => {
 
-    api.responseJSON(res, _.tuner.devices);
+    api.responseJSON(res, _.tuner.devices as apid.TunerDevice[]);
 };
 
 get.apiDoc = {

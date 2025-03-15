@@ -16,20 +16,22 @@
 import { Operation } from "express-openapi";
 import sift from "sift";
 import * as api from "../api";
+import * as apid from "../../../api";
 import _ from "../_";
-import { ChannelTypes, deepClone } from "../common";
+import { deepClone, channelTypes } from "../common";
 
 export const get: Operation = (req, res) => {
 
-    const channels = _.channel.items.map(channel => {
+    const channels: apid.Channel[] = _.channel.items.map(channel => {
 
-        const ch: any = deepClone(channel);
+        const ch: apid.Channel = deepClone(channel);
 
         ch.services = channel.getServices().map(service => ({
             id: service.id,
             serviceId: service.serviceId,
             networkId: service.networkId,
-            name: service.name
+            name: service.name,
+            type: service.type
         }));
 
         return ch;
@@ -46,7 +48,7 @@ get.apiDoc = {
             in: "query",
             name: "type",
             type: "string",
-            enum: Object.keys(ChannelTypes),
+            enum: channelTypes,
             required: false
         },
         {

@@ -19,7 +19,7 @@ import * as api from "../api";
 import * as apid from "../../../api";
 import _ from "../_";
 import Service from "../Service";
-import { ChannelTypes } from "../common";
+import { channelTypes } from "../common";
 
 export const get: Operation = async (req, res) => {
 
@@ -70,7 +70,7 @@ get.apiDoc = {
             in: "query",
             name: "channel.type",
             type: "string",
-            enum: Object.keys(ChannelTypes),
+            enum: channelTypes,
             required: false
         },
         {

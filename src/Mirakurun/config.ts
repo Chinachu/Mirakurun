@@ -21,7 +21,7 @@ import { mkdir, copyFile, readFile, writeFile } from "fs/promises";
 import * as yaml from "js-yaml";
 import * as ipnum from "ip-num";
 import Queue from "promise-queue";
-import * as common from "./common";
+import * as apid from "../../api";
 import * as log from "./log";
 
 type Writable<T> = { -readonly [K in keyof T]: T[K] };
@@ -52,85 +52,9 @@ const {
 
 const IS_DOCKER = DOCKER === "YES";
 
-export interface Server {
-    // as Local Server
-    readonly path?: string;
-
-    // as Remote Server
-    readonly port?: number;
-
-    // hostname
-    readonly hostname?: string;
-
-    /** `true` to disable IPv6 listening */
-    readonly disableIPv6?: boolean;
-
-    readonly logLevel?: log.LogLevel;
-    readonly maxLogHistory?: number;
-
-    readonly maxBufferBytesBeforeReady?: number;
-    readonly eventEndTimeout?: number;
-
-    readonly programGCInterval?: number;
-    readonly epgGatheringInterval?: number;
-    readonly epgRetrievalTime?: number;
-    readonly logoDataInterval?: number;
-    readonly disableEITParsing?: true;
-    readonly disableWebUI?: true;
-    readonly allowIPv4CidrRanges?: string[];
-    readonly allowIPv6CidrRanges?: string[];
-    readonly allowOrigins?: string[];
-    readonly allowPNA?: boolean;
-    readonly tsplayEndpoint?: string;
-}
-
-export interface Tuner {
-    readonly name: string;
-
-    // GR / BS / CS / SKY
-    readonly types: common.ChannelType[];
-
-    // for chardev / dvb
-    readonly command?: string;
-
-    // for dvb
-    readonly dvbDevicePath?: string;
-
-    // for multiplexing w/ remote Mirakurun
-    readonly remoteMirakurunHost?: string;
-    readonly remoteMirakurunPort?: number;
-    readonly remoteMirakurunDecoder?: boolean;
-
-    // decoder
-    readonly decoder?: string;
-
-    readonly isDisabled?: boolean;
-}
-
-export interface Channel {
-    readonly name: string;
-
-    // GR / BS / CS / SKY
-    readonly type: common.ChannelType;
-
-    // passed to tuning command
-    readonly channel: string;
-    readonly satellite?: string;
-    readonly space?: number;
-    readonly freq?: number;
-    readonly polarity?: "H" | "V";
-
-    // tsmf
-    readonly tsmfRelTs?: number;
-
-    // service id
-    readonly serviceId?: number;
-
-    readonly isDisabled?: boolean;
-
-    /** @deprecated */
-    readonly satelite?: string;
-}
+type Server = Readonly<apid.ConfigServer>;
+type Tuner = Readonly<apid.ConfigTunersItem>;
+type Channel = Readonly<apid.ConfigChannelsItem>;
 
 export async function loadServer(): Promise<Server> {
 
@@ -196,7 +120,7 @@ export async function loadServer(): Promise<Server> {
             config.hostname = HOSTNAME.trim();
         }
         if (typeof LOG_LEVEL !== "undefined" && /^-?[0123]$/.test(LOG_LEVEL)) {
-            config.logLevel = parseInt(LOG_LEVEL, 10);
+            config.logLevel = parseInt(LOG_LEVEL, 10) as apid.LogLevel;
         }
         if (typeof MAX_LOG_HISTORY !== "undefined" && /^[0-9]+$/.test(MAX_LOG_HISTORY)) {
             config.maxLogHistory = parseInt(MAX_LOG_HISTORY, 10);
