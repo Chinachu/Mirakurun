@@ -2,6 +2,27 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 4.0.0-beta.8 (2025-03-16)
+
+**Important Notice**: Mirakurun 4.0.0 includes significant performance improvements, enhanced EPG processing, asynchronous file I/O operations, and new features. As announced in 3.9.0, the experimental Win32 support has been completely removed.
+
+### Server Changes
+
+- **API**:
+  - **getTuner**: Fixed broken response (*bug*)
+  - **killTunerProcess**: The normal status code was changed to `204`. Response is now empty. (*breaking change*)
+  - **getChannelStream**,<br>
+    **getServiceStreamByChannel**,<br>
+    **getProgramStream**,<br>
+    **getServiceStream**:
+    - Fixed processing of HEAD requests; removed operationId because duplicated. (*bug*)
+
+### Client Changes
+
+- channelScan: (Note) Response spec may change. asynchronous support is under consideration.
+- **getChannelScanStatus**: Added
+- **stopChannelScan**: Added
+
 ## 4.0.0-beta.7 (2025-03-14)
 
 **Important Notice**: Mirakurun 4.0.0 includes significant performance improvements, enhanced EPG processing, asynchronous file I/O operations, and new features. As announced in 3.9.0, the experimental Win32 support has been completely removed.
