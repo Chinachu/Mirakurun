@@ -19,7 +19,6 @@ import * as apid from "../../../api";
 import _ from "../_";
 
 export const get: Operation = (req, res) => {
-
     let programs: apid.Program[];
 
     // tslint:disable-next-line:prefer-conditional-expression

@@ -25,7 +25,6 @@ let _itemId = 0;
 let logListCache: JSX.Element[] = [];
 
 const LogsView: React.FC<{ uiStateEvents: EventEmitter, rpc: RPCClient }> = ({ uiStateEvents, rpc }) => {
-
     const [logList, setLogList] = useState<JSX.Element[]>([]);
     const latestRef = useRef<HTMLDivElement>(null);
 
@@ -50,7 +49,6 @@ const LogsView: React.FC<{ uiStateEvents: EventEmitter, rpc: RPCClient }> = ({ u
     };
 
     useEffect(() => {
-
         const join = () => {
             rpc.call("join", { rooms: ["logs"] } as JoinParams);
         };

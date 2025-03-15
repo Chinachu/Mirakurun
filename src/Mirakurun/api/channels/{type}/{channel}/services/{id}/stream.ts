@@ -56,7 +56,6 @@ export const parameters = [
 ];
 
 export const get: Operation = (req, res) => {
-
     const channel = _.channel.get(req.params.type as apid.ChannelType, req.params.channel);
 
     if (channel === null) {
@@ -96,7 +95,6 @@ export const get: Operation = (req, res) => {
         disableDecoder: (<number> <any> req.query.decode === 0)
     }, res)
         .then(tsFilter => {
-
             if (requestAborted === true || req.aborted === true) {
                 return tsFilter.close();
             }

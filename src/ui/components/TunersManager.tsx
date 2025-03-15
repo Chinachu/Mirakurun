@@ -111,7 +111,6 @@ const onRenderCell = (nestingDepth: number, item: Item, itemIndex: number) => {
 };
 
 const TunersManager: React.FC<{ tuners: TunerDevice[] }> = ({ tuners }) => {
-
     const [killTarget, setKillTarget] = useState<number>(null);
 
     const items: Item[] = [];

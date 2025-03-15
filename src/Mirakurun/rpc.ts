@@ -46,7 +46,6 @@ export interface NotifyParams<T> {
  * @experimental
  */
 export function createRPCServer(server: http.Server): RPCServer {
-
     const rpc = new RPCServer({
         pingInterval: 1000 * 30,
         wss: {
@@ -71,7 +70,6 @@ export function createRPCServer(server: http.Server): RPCServer {
 
 const _notifierListeners = new Map<Set<RPCServer>, [Function, Function]>();
 export function initRPCNotifier(rpcs: Set<RPCServer>): void {
-
     const eventsNMDict = {
         program: new NotifyManager<EventMessage>("events:program", "events", rpcs),
         service: new NotifyManager<EventMessage>("events:service", "events", rpcs),
@@ -122,7 +120,6 @@ class NotifyManager<T> {
 }
 
 function serverOnUpgrade(this: RPCServer["wss"], req: http.IncomingMessage, socket: net.Socket, head: Buffer): void {
-
     if (req.socket.remoteAddress && !isPermittedIPAddress(req.socket.remoteAddress)) {
         socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
         socket.destroy();

@@ -25,7 +25,6 @@ interface HDHRChannel {
 }
 
 export const get: Operation = (req, res) => {
-
     const apiRoot = `${req.protocol}://${req.headers.host}/api`;
 
     const services = [..._.service.items]; // shallow copy

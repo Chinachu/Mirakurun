@@ -51,7 +51,6 @@ const tooltipProps: Partial<ITooltipProps> = {
 };
 
 const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = ({ uiState, uiStateEvents }) => {
-
     const [status, setStatus] = useState<UIState["status"]>(uiState.status);
     const [services, setServices] = useState<UIState["services"]>(uiState.services);
     const [tuners, setTuners] = useState<UIState["tuners"]>(uiState.tuners);
@@ -78,7 +77,6 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
     const [showOthers, setShowOthers] = useState<boolean>(false);
 
     useEffect(() => {
-
         const onStatusUpdate = () => {
             setStatus({ ...uiState.status });
         };

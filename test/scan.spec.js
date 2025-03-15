@@ -3,7 +3,6 @@ var assert = require('assert');
 const scan = require("../lib/Mirakurun/api/config/channels/scan");
 
 describe("Mirakurun/api/config/channel/scan : generateScanConfig", () => {
-
     it("GR: Type only", () => {
         const config = scan.generateScanConfig({
             type: "GR"
@@ -505,7 +504,6 @@ describe("Mirakurun/api/config/channel/scan : generateScanConfig", () => {
 });
 
 describe("Mirakurun/api/config/channel/scan : generateChannelItemForService", () => {
-
     it("GR Regular case", () => {
         const type = "GR";
         const ch = "10";
@@ -760,7 +758,6 @@ describe("Mirakurun/api/config/channel/scan : generateChannelItemForService", ()
 });
 
 describe("Mirakurun/api/config/channel/scan : generateChannelItemForChannel (single service)", () => {
-
     it("GR Regular case", () => {
         const type = "GR";
         const ch = "10";
@@ -1001,7 +998,6 @@ describe("Mirakurun/api/config/channel/scan : generateChannelItemForChannel (sin
 });
 
 describe("Mirakurun/api/config/channel/scan : generateChannelItemForChannel (multiple service)", () => {
-
     it("Name Summary regular case.1", () => {
         const type = "GR";
         const ch = "10";
@@ -1572,7 +1568,6 @@ describe("Mirakurun/api/config/channel/scan : generateChannelItemForChannel (mul
 });
 
 describe("Mirakurun/api/config/channel/scan : generateChannelItems", () => {
-
     it("Service mode case.1", () => {
         const mode = "Service";
         const type = "GR";

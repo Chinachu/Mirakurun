@@ -42,7 +42,6 @@ export const parameters = [
 ];
 
 export const get: Operation = (req, res) => {
-
     const program = _.program.get(req.params.id as any as number);
 
     if (program === null) {

@@ -22,7 +22,6 @@ import ChannelItem from "./ChannelItem";
 import TSFilter from "./TSFilter";
 
 export default class ServiceItem {
-
     static getId(networkId: number, serviceId: number): number {
         return parseInt(networkId + (serviceId / 100000).toFixed(5).slice(2), 10);
     }
@@ -60,7 +59,6 @@ export default class ServiceItem {
     }
 
     set name(name: string) {
-
         if (this._name !== name) {
             this._name = name;
 
@@ -74,7 +72,6 @@ export default class ServiceItem {
     }
 
     set type(type: number) {
-
         if (this._type !== type) {
             this._type = type;
 
@@ -88,7 +85,6 @@ export default class ServiceItem {
     }
 
     set logoId(logoId: number) {
-
         if (this._logoId !== logoId) {
             this._logoId = logoId;
 
@@ -102,7 +98,6 @@ export default class ServiceItem {
     }
 
     set remoteControlKeyId(id: number) {
-
         if (this._remoteControlKeyId !== id) {
             this._remoteControlKeyId = id;
 
@@ -116,7 +111,6 @@ export default class ServiceItem {
     }
 
     set epgReady(epgReady: boolean) {
-
         if (this._epgReady !== epgReady) {
             this._epgReady = epgReady;
 
@@ -130,7 +124,6 @@ export default class ServiceItem {
     }
 
     set epgUpdatedAt(time: number) {
-
         if (this._epgUpdatedAt !== time) {
             this._epgUpdatedAt = time;
 
@@ -144,7 +137,6 @@ export default class ServiceItem {
     }
 
     export(): apid.Service {
-
         const ret: apid.Service = {
             id: this._id,
             serviceId: this._serviceId,
@@ -169,7 +161,6 @@ export default class ServiceItem {
     }
 
     getOrder(): number {
-
         let order: string;
 
         switch (this._channel.type) {

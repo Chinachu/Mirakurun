@@ -33,13 +33,11 @@ import { createRPCServer, initRPCNotifier } from "./rpc";
 const pkg = require("../../package.json");
 
 class Server {
-
     private _isRunning = false;
     private _servers = new Set<http.Server>();
     private _rpcs = new Set<RPCServer>();
 
     async init() {
-
         if (this._isRunning === true) {
             throw new Error("Server is running");
         }
@@ -93,7 +91,6 @@ class Server {
         app.use(express.json());
 
         app.use((req: express.Request, res: express.Response, next) => {
-
             if (req.ip && system.isPermittedIPAddress(req.ip) === false) {
                 req.socket.end();
                 return;
@@ -153,7 +150,6 @@ class Server {
         });
 
         app.use((err, req, res: express.Response, next) => {
-
             if (err.message === "Not allowed by CORS") {
                 res.status(403).end();
                 return;
@@ -178,7 +174,6 @@ class Server {
         });
 
         addresses.forEach(address => {
-
             const server = http.createServer(app);
 
             server.timeout = 1000 * 15; // 15 sec.

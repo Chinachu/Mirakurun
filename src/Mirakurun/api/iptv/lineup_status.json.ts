@@ -17,7 +17,6 @@ import { Operation } from "express-openapi";
 import * as api from "../../api";
 
 export const get: Operation = (req, res) => {
-
     api.responseJSON(res, {
         ScanInProgress: 0,
         ScanPossible: 0,

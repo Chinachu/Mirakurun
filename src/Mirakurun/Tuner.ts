@@ -25,7 +25,6 @@ import TSFilter from "./TSFilter";
 import TSDecoder from "./TSDecoder";
 
 export default class Tuner {
-
     private _devices: TunerDevice[] = [];
 
     constructor() {
@@ -37,7 +36,6 @@ export default class Tuner {
     }
 
     get(index: number): TunerDevice {
-
         const l = this._devices.length;
         for (let i = 0; i < l; i++) {
             if (this._devices[i].index === index) {
@@ -49,7 +47,6 @@ export default class Tuner {
     }
 
     typeExists(type: apid.ChannelType): boolean {
-
         const l = this._devices.length;
         for (let i = 0; i < l; i++) {
             if (this._devices[i].config.types.includes(type) === true) {
@@ -61,7 +58,6 @@ export default class Tuner {
     }
 
     initChannelStream(channel: ChannelItem, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
-
         let networkId: number;
 
         const services = channel.getServices();
@@ -80,7 +76,6 @@ export default class Tuner {
     }
 
     initServiceStream(service: ServiceItem, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
-
         return this._initTS({
             ...userReq,
             streamSetting: {
@@ -93,7 +88,6 @@ export default class Tuner {
     }
 
     initProgramStream(program: apid.Program, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
-
         return this._initTS({
             ...userReq,
             streamSetting: {
@@ -107,7 +101,6 @@ export default class Tuner {
     }
 
     async getEPG(channel: ChannelItem, time?: number): Promise<void> {
-
         let timeout: NodeJS.Timeout;
         if (!time) {
             time = _.config.server.epgRetrievalTime || 1000 * 60 * 10;
@@ -152,7 +145,6 @@ export default class Tuner {
     }
 
     async getServices(channel: ChannelItem, user: Partial<common.User> = {}): Promise<apid.Service[]> {
-
         const tsFilter = await this._initTS({
             id: "Mirakurun:getServices()",
             priority: -1,
@@ -165,7 +157,6 @@ export default class Tuner {
             ...user
         });
         return new Promise<apid.Service[]>((resolve, reject) => {
-
             let network = {
                 networkId: -1,
                 areaCode: -1,
@@ -191,7 +182,6 @@ export default class Tuner {
             ]).then(() => tsFilter.close());
 
             tsFilter.once("close", () => {
-
                 tsFilter.removeAllListeners("network");
                 tsFilter.removeAllListeners("services");
 
@@ -213,13 +203,11 @@ export default class Tuner {
     }
 
     private _load(): this {
-
         log.debug("loading tuners...");
 
         const tuners = _.config.tuners;
 
         tuners.forEach((tuner, i) => {
-
             if (!tuner.name || !tuner.types || (!tuner.remoteMirakurunHost && !tuner.command)) {
                 log.error("missing required property in tuner#%s configuration", i);
                 return;
@@ -276,9 +264,7 @@ export default class Tuner {
     }
 
     private _initTS(user: common.User, dest?: Writable): Promise<TSFilter> {
-
         return new Promise<TSFilter>((resolve, reject) => {
-
             const setting = user.streamSetting;
 
             if (_.config.server.disableEITParsing === true) {
@@ -291,7 +277,6 @@ export default class Tuner {
             const length = devices.length;
 
             function find() {
-
                 let device: TunerDevice = null;
 
                 // 1. join to existing
@@ -406,7 +391,6 @@ export default class Tuner {
     }
 
     private _getDevicesByType(type: apid.ChannelType): TunerDevice[] {
-
         const devices = [];
 
         const l = this._devices.length;

@@ -19,7 +19,6 @@ import * as apid from "../../../../api";
 import * as config from "../../config";
 
 export const get: Operation = async (req, res) => {
-
     res.status(200);
     api.responseJSON(res, await config.loadTuners() as apid.ConfigTuners);
 };

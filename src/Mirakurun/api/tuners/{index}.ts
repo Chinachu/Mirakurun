@@ -29,7 +29,6 @@ export const parameters = [
 ];
 
 export const get: Operation = (req, res) => {
-
     const tuner: apid.TunerDevice = _.tuner.get(req.params.index as any as number).toJSON();
 
     if (tuner === null) {

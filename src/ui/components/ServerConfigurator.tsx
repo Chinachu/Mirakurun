@@ -40,7 +40,6 @@ import { ConfigServer } from "../../../api";
 const configAPI = "/api/config/server";
 
 const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = ({ uiState, uiStateEvents }) => {
-
     const [current, setCurrent] = useState<ConfigServer>(null);
     const [editing, setEditing] = useState<ConfigServer>(null);
     const [showSaveDialog, setShowSaveDialog] = useState<boolean>(false);

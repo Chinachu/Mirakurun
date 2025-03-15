@@ -86,7 +86,6 @@ interface DownloadData {
 }
 
 export default class TSFilter extends EventEmitter {
-
     streamInfo: StreamInfo = {};
 
     // output
@@ -239,7 +238,6 @@ export default class TSFilter extends EventEmitter {
     }
 
     write(chunk: Buffer): void {
-
         if (this._closed) {
             throw new Error("TSFilter has closed already");
         }
@@ -304,7 +302,6 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _processPackets(packets: Buffer[]): void {
-
         const parsingBuffers: Buffer[] = [];
 
         for (let packet of packets) {
@@ -409,7 +406,6 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _onPAT(pid: number, data: any): void {
-
         this._tsid = data.transport_stream_id;
         this._serviceIds = new Set();
         this._parseServiceIds = new Set();
@@ -509,7 +505,6 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _onPMT(pid: number, data: any): void {
-
         if (this._essMap.has(data.program_number)) {
             for (const stream of data.streams) {
                 for (const descriptor of stream.ES_info) {
@@ -557,7 +552,6 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _onNIT(pid: number, data: any): void {
-
         const _network = {
             networkId: data.network_id,
             areaCode: -1,
@@ -585,7 +579,6 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _onSDT(pid: number, data: any): void {
-
         if (this._tsid !== data.transport_stream_id) {
             return;
         }
@@ -636,7 +629,6 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _onEIT(pid: number, data: any): void {
-
         // detect current event
         if (
             this._pmtPid !== -1 &&
@@ -691,12 +683,10 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _onTOT(pid: number, data: any): void {
-
         this._streamTime = getTimeFromMJD(data.JST_time);
     }
 
     private _onCDT(pid: number, data: any): void {
-
         if (data.data_type === 0x01) {
             // Logo
             const dataModule = new tsDataModule.TsDataModuleCdtLogo(data.data_module_byte).decode();
@@ -712,7 +702,6 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _onDSMCC(pid: number, data: any): void {
-
         if (data.table_id === 0x3C) {
             // DDB - Download Data Block (frequently than DII)
             const ddb = data.message;
@@ -802,7 +791,6 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _observeProvideEvent(): void {
-
         // note: EIT p/f interval is max 3s. (ARIB TR-B15)
         if (Date.now() - this._provideEventLastDetectedAt < 10000) {
             this._provideEventTimeout = setTimeout(
@@ -817,7 +805,6 @@ export default class TSFilter extends EventEmitter {
     }
 
     private async _standbyLogoData(): Promise<void> {
-
         if (this._closed) {
             return;
         }
@@ -917,7 +904,6 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _updateEpgState(data: any): void {
-
         const networkId = data.original_network_id;
         const serviceId = data.service_id;
         const versionNumber = data.version_number;
@@ -1026,7 +1012,6 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _clearEpgState() {
-
         if (!this._epgState) {
             return;
         }
@@ -1037,7 +1022,6 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _close(): void {
-
         if (this._closed) {
             return;
         }

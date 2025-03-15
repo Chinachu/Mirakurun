@@ -78,7 +78,6 @@ let statusRefreshInterval: any;
 let servicesRefreshInterval: any;
 
 function idleStatusChecker(): boolean {
-
     let statusName = "Standby";
     let statusIconName = "normal";
 
@@ -105,7 +104,6 @@ const rpc = new RPCClient(`${location.protocol === "https:" ? "wss:" : "ws:"}//$
 });
 
 rpc.on("connecting", () => {
-
     console.log("rpc:connecting");
 
     uiState.statusName = "Connecting";
@@ -113,7 +111,6 @@ rpc.on("connecting", () => {
 });
 
 rpc.on("connected", async () => {
-
     console.log("rpc:connected");
 
     status: {
@@ -157,7 +154,6 @@ rpc.on("connected", async () => {
 });
 
 rpc.on("disconnect", () => {
-
     console.log("rpc:disconnected");
 
     clearInterval(statusRefreshInterval);
@@ -169,7 +165,6 @@ rpc.on("disconnect", () => {
 });
 
 rpc.methods.set("events", async (socket, { array }: NotifyParams<EventMessage>) => {
-
     let reloadServiceRequired = false;
 
     for (const event of array) {
@@ -206,11 +201,9 @@ rpc.methods.set("logs", (socket, { array }: NotifyParams<string> ) => {
 });
 
 const Content = () => {
-
     const [state, setState] = useState<UIState>(uiState);
 
     useEffect(() => {
-
         const title = `${state.statusName} - Mirakurun ${state.version}`;
         if (document.title !== title) {
             document.title = title;

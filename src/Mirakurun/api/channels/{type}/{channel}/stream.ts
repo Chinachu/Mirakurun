@@ -49,7 +49,6 @@ export const parameters = [
 ];
 
 export const get: Operation = (req, res) => {
-
     const channel = _.channel.get(req.params.type as apid.ChannelType, req.params.channel);
 
     if (channel === null) {

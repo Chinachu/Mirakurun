@@ -96,7 +96,6 @@ function sortTypes(types: ChannelType[]): ChannelType[] {
 }
 
 const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = ({ uiState, uiStateEvents }) => {
-
     const [current, setCurrent] = useState<ConfigTuners>(null);
     const [editing, setEditing] = useState<ConfigTuners>(null);
     const [showSaveDialog, setShowSaveDialog] = useState<boolean>(false);

@@ -58,7 +58,6 @@ export async function savePrograms(data: Program[], integrity: string): Promise<
 const dbIOQueue = new Queue(1, Infinity);
 
 async function load(path: string, integrity: string): Promise<any[]> {
-
     log.info("load db `%s` w/ integrity (%s)", path, integrity);
 
     return dbIOQueue.add(async () => {
@@ -87,7 +86,6 @@ async function load(path: string, integrity: string): Promise<any[]> {
 }
 
 async function save(path: string, data: any[], integrity: string, retrying = false): Promise<void> {
-
     log.info("save db `%s` w/ integrity (%s)", path, integrity);
 
     if (retrying === false) {

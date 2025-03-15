@@ -26,7 +26,6 @@ let _itemId = 0;
 let eventsCache: JSX.Element[] = [];
 
 const EventsView: React.FC<{ uiStateEvents: EventEmitter, rpc: RPCClient }> = ({ uiStateEvents, rpc }) => {
-
     const [eventList, setEventList] = useState<JSX.Element[]>([]);
     const latestRef = useRef<HTMLDivElement>(null);
 
@@ -49,7 +48,6 @@ const EventsView: React.FC<{ uiStateEvents: EventEmitter, rpc: RPCClient }> = ({
     };
 
     useEffect(() => {
-
         const join = () => {
             rpc.call("join", { rooms: ["events:program"] } as JoinParams);
         };

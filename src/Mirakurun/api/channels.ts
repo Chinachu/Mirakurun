@@ -21,9 +21,7 @@ import _ from "../_";
 import { deepClone, channelTypes } from "../common";
 
 export const get: Operation = (req, res) => {
-
     const channels: apid.Channel[] = _.channel.items.map(channel => {
-
         const ch: apid.Channel = deepClone(channel);
 
         ch.services = channel.getServices().map(service => ({

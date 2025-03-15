@@ -26,7 +26,6 @@ export function getProgramItemId(networkId: number, serviceId: number, eventId: 
 }
 
 export default class Program {
-
     private _itemMap = new Map<number, db.Program>();
     private _itemMapDeleted = new Map<number, db.Program>();
     private _saveTimerId: NodeJS.Timeout;
@@ -46,7 +45,6 @@ export default class Program {
     }
 
     add(item: db.Program, firstAdd: boolean = false): void {
-
         if (this.exists(item.id)) {
             return;
         }
@@ -125,7 +123,6 @@ export default class Program {
     }
 
     findByNetworkId(networkId: number): db.Program[] {
-
         const items = [];
 
         for (const item of this._itemMap.values()) {
@@ -138,7 +135,6 @@ export default class Program {
     }
 
     findByNetworkIdAndTime(networkId: number, time: number): db.Program[] {
-
         const items = [];
 
         for (const item of this._itemMap.values()) {
@@ -151,7 +147,6 @@ export default class Program {
     }
 
     findByNetworkIdAndReplace(networkId: number, programs: db.Program[]): void {
-
         let count = 0;
 
         for (const item of [...this._itemMap.values()].reverse()) {
@@ -181,7 +176,6 @@ export default class Program {
     }
 
     private async _load(): Promise<void> {
-
         log.debug("loading programs...");
 
         const now = Date.now();
@@ -189,7 +183,6 @@ export default class Program {
 
         const programs = await db.loadPrograms(_.configIntegrity.channels);
         programs.forEach(item => {
-
             if (item.networkId === undefined) {
                 dropped = true;
                 return;
@@ -208,7 +201,6 @@ export default class Program {
     }
 
     private _findAndRemoveConflicts(added: db.Program): void {
-
         const addedEndAt = added.startAt + added.duration;
 
         for (const item of this._itemMap.values()) {
@@ -237,7 +229,6 @@ export default class Program {
     }
 
     private async _emit(): Promise<void> {
-
         if (this._emitRunning) {
             return;
         }
@@ -257,7 +248,6 @@ export default class Program {
     }
 
     private _save(): void {
-
         log.debug("saving programs...");
 
         // TODO: Do we need to save/load logically deleted items?
@@ -268,11 +258,9 @@ export default class Program {
     }
 
     private _gc(): void {
-
         log.debug("Program GC has queued");
 
         queue.add(async () => {
-
             const shortExp = Date.now() - 1000 * 60 * 60 * 3; // 3 hour
             const longExp = Date.now() - 1000 * 60 * 60 * 24; // 24 hours
             const maximum = Date.now() + 1000 * 60 * 60 * 24 * 9; // 9 days

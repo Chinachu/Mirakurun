@@ -63,7 +63,6 @@ const readStream = fs.createReadStream(src);
 
 const transformStream = new stream.Transform({
     transform: function (chunk: Buffer, encoding: string, done: Function) {
-
         bytesRead += chunk.length;
 
         console.log("\u001b[2A");
@@ -73,7 +72,6 @@ const transformStream = new stream.Transform({
         done();
     },
     flush: done => {
-
         console.log("\u001b[2A");
         console.log(`reading - ${bytesRead} of ${size} [${Math.floor(bytesRead / size * 100)}%] (events=${events}) [done]`);
         console.timeEnd("read");
@@ -95,7 +93,6 @@ tsStream.on("eit", (pid, data) => {
 tsStream.resume();
 
 function finalize() {
-
     const programs = Array.from(_.program.itemMap.values());
 
     console.log("programs:", programs.length, "(events)");

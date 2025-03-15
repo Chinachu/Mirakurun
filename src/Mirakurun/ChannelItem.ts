@@ -25,7 +25,6 @@ import ServiceItem from "./ServiceItem";
 import TSFilter from "./TSFilter";
 
 export default class ChannelItem {
-
     readonly name: string;
     readonly type: apid.ChannelType;
     readonly channel: string;
@@ -59,7 +58,6 @@ export default class ChannelItem {
     }
 
     addService(serviceId: number): void {
-
         if (!_.service) {
             process.nextTick(() => this.addService(serviceId));
             return;
@@ -72,7 +70,6 @@ export default class ChannelItem {
         log.debug("ChannelItem#'%s' serviceId=%d check has queued", this.name, serviceId);
 
         queue.add(async () => {
-
             log.info("ChannelItem#'%s' serviceId=%d check has started", this.name, serviceId);
 
             let services;
@@ -110,11 +107,9 @@ export default class ChannelItem {
     }
 
     serviceScan(add: boolean): void {
-
         log.debug("ChannelItem#'%s' service scan has queued", this.name);
 
         queue.add(async () => {
-
             log.info("ChannelItem#'%s' service scan has started", this.name);
 
             let services: apid.Service[];
@@ -130,7 +125,6 @@ export default class ChannelItem {
             log.debug("ChannelItem#'%s' services: %s", this.name, JSON.stringify(services, null, "  "));
 
             services.forEach(service => {
-
                 const item = _.service.get(service.networkId, service.serviceId);
                 if (item !== null) {
                     item.name = service.name;

@@ -19,7 +19,6 @@ import _ from "../../_";
 const pkg = require("../../../../package.json");
 
 export const get: Operation = (req, res) => {
-
     const apiRoot = `${req.protocol}://${req.headers.host}/api`;
 
     api.responseJSON(res, {

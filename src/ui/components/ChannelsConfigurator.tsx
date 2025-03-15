@@ -121,7 +121,6 @@ interface ChannelScanStatus {
 }
 
 const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = ({ uiState, uiStateEvents }) => {
-
     const [current, setCurrent] = useState<ConfigChannels>(null);
     const [editing, setEditing] = useState<ConfigChannels>(null);
     const [showSaveDialog, setShowSaveDialog] = useState<boolean>(false);

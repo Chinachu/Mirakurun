@@ -26,9 +26,7 @@ import ServiceItem from "./ServiceItem";
 const { LOGO_DATA_DIR_PATH } = process.env;
 
 export default class Service {
-
     static getLogoDataPath(networkId: number, logoId: number) {
-
         if (typeof logoId !== "number" || logoId < 0) {
             throw new Error("Invalid `logoId`");
         }
@@ -37,7 +35,6 @@ export default class Service {
     }
 
     static async getLogoDataMTime(networkId: number, logoId: number): Promise<number> {
-
         if (typeof logoId !== "number" || logoId < 0) {
             return 0;
         }
@@ -50,7 +47,6 @@ export default class Service {
     }
 
     static async isLogoDataExists(networkId: number, logoId: number): Promise<boolean> {
-
         if (typeof logoId !== "number" || logoId < 0) {
             return false;
         }
@@ -63,7 +59,6 @@ export default class Service {
     }
 
     static async loadLogoData(networkId: number, logoId: number): Promise<Buffer> {
-
         if (typeof logoId !== "number" || logoId < 0) {
             return null;
         }
@@ -76,7 +71,6 @@ export default class Service {
     }
 
     static async saveLogoData(networkId: number, logoId: number, data: Uint8Array, retrying = false): Promise<void> {
-
         log.info("Service.saveLogoData(): saving... (networkId=%d logoId=%d)", networkId, logoId);
 
         const path = Service.getLogoDataPath(networkId, logoId);
@@ -117,7 +111,6 @@ export default class Service {
     }
 
     add(item: ServiceItem): void {
-
         if (this.get(item.id) !== null) {
             return;
         }
@@ -132,7 +125,6 @@ export default class Service {
     get(id: number): ServiceItem;
     get(networkId: number, serviceId: number): ServiceItem;
     get(id: number, serviceId?: number) {
-
         if (serviceId === undefined) {
             const l = this._items.length;
             for (let i = 0; i < l; i++) {
@@ -159,7 +151,6 @@ export default class Service {
     }
 
     findByChannel(channel: ChannelItem): ServiceItem[] {
-
         const items = [];
 
         const l = this._items.length;
@@ -173,7 +164,6 @@ export default class Service {
     }
 
     findByNetworkId(networkId: number): ServiceItem[] {
-
         const items = [];
 
         const l = this._items.length;
@@ -187,7 +177,6 @@ export default class Service {
     }
 
     findByNetworkIdWithLogoId(networkId: number, logoId: number): ServiceItem[] {
-
         const items = [];
 
         const l = this._items.length;
@@ -206,7 +195,6 @@ export default class Service {
     }
 
     private async _load(): Promise<void> {
-
         log.debug("loading services...");
 
         let updated = false;
@@ -259,7 +247,6 @@ export default class Service {
     }
 
     private _save(): void {
-
         log.debug("saving services...");
 
         db.saveServices(

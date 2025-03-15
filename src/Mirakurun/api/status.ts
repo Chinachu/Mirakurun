@@ -22,7 +22,6 @@ import _ from "../_";
 const pkg = require("../../../package.json");
 
 export const get: Operation = (req, res) => {
-
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.status(200);
 
@@ -50,7 +49,6 @@ get.apiDoc = {
 };
 
 export function getStatus(): apid.Status {
-
     const ret: apid.Status = {
         time: Date.now(),
         version: pkg.version,

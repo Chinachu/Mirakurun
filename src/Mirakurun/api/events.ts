@@ -19,7 +19,6 @@ import * as apid from "../../../api";
 import Event from "../Event";
 
 export const get: Operation = (req, res) => {
-
     api.responseJSON(res, Event.log as apid.Event[]);
 };
 

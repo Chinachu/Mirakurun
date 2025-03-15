@@ -57,7 +57,6 @@ type Tuner = Readonly<apid.ConfigTunersItem>;
 type Channel = Readonly<apid.ConfigChannelsItem>;
 
 export async function loadServer(): Promise<Server> {
-
     const path = SERVER_CONFIG_PATH;
 
     // mkdir if not exists
@@ -219,7 +218,6 @@ export function saveServer(data: Server): Promise<void> {
 }
 
 export async function loadTuners(): Promise<Tuner[]> {
-
     const path = TUNERS_CONFIG_PATH;
 
     // mkdir if not exists
@@ -320,7 +318,6 @@ export function saveTuners(data: Tuner[]): Promise<void> {
 }
 
 export async function loadChannels(): Promise<Channel[]> {
-
     const path = CHANNELS_CONFIG_PATH;
 
     // mkdir if not exists
@@ -364,7 +361,6 @@ async function load(name: "server", path: string): Promise<Server>;
 async function load(name: "tuners", path: string): Promise<Tuner[]>;
 async function load(name: "channels", path: string): Promise<Channel[]>;
 async function load(name: "server" | "tuners" | "channels", path: string) {
-
     log.info("load %s config `%s`", name, path);
 
     return configIOQueue.add(async () => {
@@ -376,7 +372,6 @@ async function save(name: "server", path: string, data: Server): Promise<void>;
 async function save(name: "tuners", path: string, data: Tuner[]): Promise<void>;
 async function save(name: "channels", path: string, data: Channel[]): Promise<void>;
 async function save(name: "server" | "tuners" | "channels", path: string, data: object): Promise<void> {
-
     log.info("save %s config `%s`", name, path);
 
     await configIOQueue.add(async () => {

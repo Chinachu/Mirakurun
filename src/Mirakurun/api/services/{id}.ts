@@ -30,7 +30,6 @@ export const parameters = [
 ];
 
 export const get: Operation = async (req, res) => {
-
     const serviceItem = _.service.get(req.params.id as any as number);
 
     if (serviceItem === null || serviceItem === undefined) {

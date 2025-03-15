@@ -32,7 +32,6 @@ export const parameters = [
 
 export const get: Operation = (req, res) => {
     const channels: apid.Channel[] = _.channel.findByType(req.params.type as apid.ChannelType).map(channel => {
-
         const ch: apid.Channel = deepClone(channel);
 
         ch.services = channel.getServices().map(service => ({
