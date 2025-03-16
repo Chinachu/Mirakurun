@@ -25,6 +25,7 @@ import {
     ITooltipProps,
     Checkbox
 } from "@fluentui/react";
+import { Client as RPCClient } from "jsonrpc2-ws";
 import { UIState } from "../index";
 import TunersManager from "./TunersManager";
 import { ConfigServer } from "../../../api";
@@ -50,7 +51,7 @@ const tooltipProps: Partial<ITooltipProps> = {
     }
 };
 
-const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = ({ uiState, uiStateEvents }) => {
+const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter, rpc: RPCClient }> = ({ uiState, uiStateEvents, rpc }) => {
     const [status, setStatus] = useState<UIState["status"]>(uiState.status);
     const [services, setServices] = useState<UIState["services"]>(uiState.services);
     const [tuners, setTuners] = useState<UIState["tuners"]>(uiState.tuners);
@@ -236,7 +237,7 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
             </Stack>
             <Stack>
                 <Separator alignContent="start">Tuners</Separator>
-                <TunersManager tuners={tuners} />
+                <TunersManager tuners={tuners} rpc={rpc} />
             </Stack>
         </Stack>
     );

@@ -15,8 +15,10 @@
 */
 import * as React from "react";
 import { useState, useEffect } from "react";
+import { Client as RPCClient } from "jsonrpc2-ws";
 import {
     Text,
+    Link,
     Icon,
     GroupedList,
     DetailsRow,
@@ -31,7 +33,7 @@ import {
     IconButton,
     ColorClassNames
 } from "@fluentui/react";
-import { TunerDevice } from "../../../api";
+import { StreamInfo, TunerDevice } from "../../../api";
 
 interface Item {
     _group: string;
@@ -44,7 +46,7 @@ interface Item {
     priority?: JSX.Element;
     ch?: JSX.Element;
     sid?: JSX.Element;
-    ua?: JSX.Element;
+    streamInfo?: JSX.Element;
 }
 
 const deviceColumns: IColumn[] = [
@@ -89,9 +91,9 @@ const userColumns: IColumn[] = [
         minWidth: 0
     },
     {
-        key: "col-ua",
+        key: "col-streamInfo",
         name: "",
-        fieldName: "ua",
+        fieldName: "streamInfo",
         minWidth: 0
     }
 ];
@@ -110,11 +112,52 @@ const onRenderCell = (nestingDepth: number, item: Item, itemIndex: number) => {
     />
 };
 
-const TunersManager: React.FC<{ tuners: TunerDevice[] }> = ({ tuners }) => {
+const summarizeStreamInfo = (streamInfo: StreamInfo) => {
+    if (!streamInfo) {
+        return "-";
+    }
+
+    let packets = 0;
+    let drops = 0;
+    for (const pid in streamInfo) {
+        packets += streamInfo[pid].packet;
+        drops += streamInfo[pid].drop;
+    }
+
+    return `Dropped Pkts: ${drops} / ${packets}`;
+};
+
+const TunersManager: React.FC<{ tuners: TunerDevice[], rpc: RPCClient }> = ({ tuners, rpc }) => {
     const [killTarget, setKillTarget] = useState<number>(null);
+    const [tunersEx, setTunersEx] = useState<TunerDevice[]>([]);
+    const [streamDetail, setStreamDetail] = useState<{ userId: string; info: StreamInfo }>(null);
+
+    // get streamInfo
+    useEffect(() => {
+        const interval = setInterval(async () => {
+            if (document.hidden) {
+                return;
+            }
+            setTunersEx(await rpc.call("getTuners"));
+        }, 1000 * 5);
+
+        return () => clearInterval(interval);
+    }, []);
+
+
 
     const items: Item[] = [];
     for (const tuner of tuners) {
+        const tunerEx = tunersEx.find(tunerFull => tunerFull.index === tuner.index);
+        if (tunerEx) {
+            for (const user of tuner.users) {
+                const userEx = tunerEx.users.find(userFull => userFull.id === user.id);
+                if (userEx) {
+                    user.streamInfo = userEx.streamInfo;
+                }
+            }
+        }
+
         const item: Item = {
             _group: `#${tuner.index}: ${tuner.name} (${tuner.types.join(", ")})`,
             _kind: "device",
@@ -179,11 +222,14 @@ const TunersManager: React.FC<{ tuners: TunerDevice[] }> = ({ tuners }) => {
                         <Text style={{ marginLeft: 8 }}>{user.streamSetting.serviceId ? `SID: 0x${user.streamSetting.serviceId.toString(16).toUpperCase()} (${user.streamSetting.serviceId})` : "-"}</Text>
                     </>
                 ),
-                ua: (
-                    <>
-                        <Icon title="User-Agent" iconName="Tag" />
-                        <Text style={{ marginLeft: 8 }}>{user.agent || "-"}</Text>
-                    </>
+                streamInfo: (
+                    <div
+                        style={{ cursor: "pointer" }}
+                        onClick={() => setStreamDetail({ userId: user.id, info: user.streamInfo })}
+                    >
+                        <Icon title="Stream Info" iconName="CubeShape" />
+                        <Link style={{ marginLeft: 8 }}><Text style={{ color: "inherit" }}>{summarizeStreamInfo(user.streamInfo)}</Text></Link>
+                    </div>
                 )
             });
         }
@@ -240,7 +286,63 @@ const TunersManager: React.FC<{ tuners: TunerDevice[] }> = ({ tuners }) => {
                     />
                 </DialogFooter>
             </Dialog>
+
+            <Dialog
+                hidden={!streamDetail}
+                onDismiss={() => setStreamDetail(null)}
+                dialogContentProps={{
+                    type: DialogType.normal,
+                    title: "Stream Info",
+                    subText: `${streamDetail?.userId || ""}`
+                }}
+                minWidth={500}
+            >
+                {streamDetail && <StreamInfoTable userId={streamDetail.userId} tuners={tunersEx} initialInfo={streamDetail.info} />}
+                <DialogFooter>
+                    <DefaultButton
+                        text="Close"
+                        onClick={() => setStreamDetail(null)}
+                    />
+                </DialogFooter>
+            </Dialog>
         </>
+    );
+};
+
+const StreamInfoTable: React.FC<{
+    userId: string;
+    tuners: TunerDevice[];
+    initialInfo: StreamInfo;
+}> = ({ userId, tuners, initialInfo }) => {
+    // Find current streamInfo from tuners
+    let currentInfo = initialInfo;
+    for (const tuner of tuners) {
+        const user = tuner.users.find(u => u.id === userId);
+        if (user) {
+            currentInfo = user.streamInfo;
+            break;
+        }
+    }
+
+    return (
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+                <tr>
+                    <th style={{ padding: "8px", textAlign: "left", borderBottom: "1px solid #ccc" }}>PID</th>
+                    <th style={{ padding: "8px", textAlign: "right", borderBottom: "1px solid #ccc" }}>Packets</th>
+                    <th style={{ padding: "8px", textAlign: "right", borderBottom: "1px solid #ccc" }}>Drops</th>
+                </tr>
+            </thead>
+            <tbody>
+                {Object.entries(currentInfo || {}).map(([pid, data]) => (
+                    <tr key={pid} style={{ borderBottom: "1px solid rgb(52, 54, 63)"}}>
+                        <td style={{ padding: "4px 8px", textAlign: "left" }}>{pid}</td>
+                        <td style={{ padding: "4px 8px", textAlign: "right" }}>{data.packet}</td>
+                        <td style={{ padding: "4px 8px", textAlign: "right" }}>{data.drop}</td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
     );
 };
 

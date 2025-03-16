@@ -113,7 +113,8 @@ rpc.on("connecting", () => {
 rpc.on("connected", async () => {
     console.log("rpc:connected");
 
-    status: {
+    // status
+    {
         uiState.status = await rpc.call("getStatus");
 
         statusRefreshInterval = setInterval(async () => {
@@ -122,7 +123,7 @@ rpc.on("connected", async () => {
             }
             uiState.status = await rpc.call("getStatus");
             uiStateEvents.emit("update:status");
-        }, 1000 * 3);
+        }, 1000 * 5);
 
         if (uiState.version !== ".." && uiState.version !== uiState.status.version) {
             location.reload();
@@ -130,7 +131,8 @@ rpc.on("connected", async () => {
         }
         uiState.version = uiState.status.version;
     }
-    services: {
+    // services
+    {
         uiState.services = await (await fetch("/api/services")).json();
 
         servicesRefreshInterval = setInterval(async () => {
@@ -247,7 +249,7 @@ const Content = () => {
 
                 <Pivot>
                     <PivotItem itemIcon="GroupedList" headerText="Status">
-                        <StatusView uiState={uiState} uiStateEvents={uiStateEvents} />
+                        <StatusView uiState={uiState} uiStateEvents={uiStateEvents} rpc={rpc} />
                     </PivotItem>
                     <PivotItem itemIcon="EntitlementRedemption" headerText="Events">
                         <EventsView uiStateEvents={uiStateEvents} rpc={rpc} />
