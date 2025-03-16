@@ -2,9 +2,17 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
-## 4.0.0-beta.8 (2025-03-16)
+## 4.0.0-beta.9 (2025-03-16)
 
 **Important Notice**: Mirakurun 4.0.0 includes significant performance improvements, enhanced EPG processing, asynchronous file I/O operations, and new features. As announced in 3.9.0, the experimental Win32 support has been completely removed.
+
+### Server Changes
+
+- **UI**:
+  - **ChannelsConfigurator**: Fixed layout issue on initial view (*bug*)
+  - **TunersManager**: Added dropped packet counter
+
+## 4.0.0-beta.8 (2025-03-16)
 
 ### Server Changes
 
