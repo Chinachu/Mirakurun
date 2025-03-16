@@ -165,13 +165,13 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
     const expandChannelRanges = (input: string): string => {
         if (!input) return "";
 
-        const parts = input.split(',');
+        const parts = input.split(",");
         const result: number[] = [];
 
         for (const part of parts) {
-            if (part.includes('-')) {
+            if (part.includes("-")) {
                 // 範囲指定の処理
-                const [start, end] = part.split('-').map(n => parseInt(n.trim(), 10));
+                const [start, end] = part.split("-").map(n => parseInt(n.trim(), 10));
                 if (!isNaN(start) && !isNaN(end)) {
                     for (let i = start; i <= end; i++) {
                         result.push(i);
@@ -187,7 +187,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
         }
 
         // 重複を削除して昇順にソート
-        return [...new Set(result)].sort((a, b) => a - b).join(',');
+        return [...new Set(result)].sort((a, b) => a - b).join(",");
     };
 
     // スキャンを開始する関数
@@ -722,7 +722,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                             }
                         }}
                         description="Enter channel numbers to skip during scanning. Range notation (e.g. 14-16) is supported."
-                        styles={{ root: { width: '100%' } }}
+                        styles={{ root: { width: "100%" } }}
                     />
 
                     {scanType === "BS" && (
@@ -765,7 +765,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                             description="Format to use for channel names. Supports placeholders like {ch}, {ch00}, {subch}."
                             value={scanChannelNameFormat}
                             onChange={(ev, val) => setScanChannelNameFormat(val)}
-                            styles={{ root: { width: '100%' } }}
+                            styles={{ root: { width: "100%" } }}
                         />
                     )}
 
