@@ -24,7 +24,7 @@ import ServiceItem from "./ServiceItem";
 import TSFilter from "./TSFilter";
 import TSDecoder from "./TSDecoder";
 
-export default class Tuner {
+export class Tuner {
     private _devices: TunerDevice[] = [];
 
     constructor() {
@@ -403,3 +403,5 @@ export default class Tuner {
         return devices;
     }
 }
+
+export default Tuner;

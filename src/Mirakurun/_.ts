@@ -13,7 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-import * as config from "./config";
 import * as apid from "../../api";
 import Event from "./Event";
 import Tuner from "./Tuner";
@@ -39,7 +38,7 @@ interface Shared {
     server?: Server;
 }
 
-const _: Shared = {
+export const _: Shared = {
     config: {},
     configIntegrity: {
         channels: ""

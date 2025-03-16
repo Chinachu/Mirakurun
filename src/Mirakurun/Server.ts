@@ -32,7 +32,7 @@ import { createRPCServer, initRPCNotifier } from "./rpc";
 
 const pkg = require("../../package.json");
 
-class Server {
+export class Server {
     private _isRunning = false;
     private _servers = new Set<http.Server>();
     private _rpcs = new Set<RPCServer>();

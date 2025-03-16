@@ -25,7 +25,7 @@ import ServiceItem from "./ServiceItem";
 
 const { LOGO_DATA_DIR_PATH } = process.env;
 
-export default class Service {
+export class Service {
     static getLogoDataPath(networkId: number, logoId: number) {
         if (typeof logoId !== "number" || logoId < 0) {
             throw new Error("Invalid `logoId`");
@@ -255,3 +255,5 @@ export default class Service {
         );
     }
 }
+
+export default Service;

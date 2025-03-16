@@ -25,7 +25,7 @@ export function getProgramItemId(networkId: number, serviceId: number, eventId: 
     return parseInt(`${networkId}${serviceId.toString(10).padStart(5, "0")}${eventId.toString(10).padStart(5, "0")}`, 10);
 }
 
-export default class Program {
+export class Program {
     private _itemMap = new Map<number, db.Program>();
     private _itemMapDeleted = new Map<number, db.Program>();
     private _saveTimerId: NodeJS.Timeout;
@@ -293,3 +293,5 @@ export default class Program {
         });
     }
 }
+
+export default Program;

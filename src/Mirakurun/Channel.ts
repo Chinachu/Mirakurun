@@ -20,7 +20,7 @@ import status from "./status";
 import queue from "./queue";
 import ChannelItem from "./ChannelItem";
 
-export default class Channel {
+export class Channel {
     private _items: ChannelItem[] = [];
     private _epgGatheringInterval: number = _.config.server.epgGatheringInterval || 1000 * 60 * 30; // 30 mins
 
@@ -204,3 +204,5 @@ export default class Channel {
         });
     }
 }
+
+export default Channel;
