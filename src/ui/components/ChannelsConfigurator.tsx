@@ -291,10 +291,10 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
         })();
     }, [saved]);
 
-    // コンポーネントがマウントされたときにスキャン状態を確認
+    // スキャン状態を確認
     useEffect(() => {
         fetchScanStatus();
-    }, []);
+    }, [current]);
 
     // スキャン状態を定期的に更新（スキャン中は5秒、それ以外は30秒ごと）
     useEffect(() => {
