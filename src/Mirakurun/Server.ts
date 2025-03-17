@@ -15,6 +15,7 @@
 */
 import * as fs from "fs";
 import * as http from "http";
+import { promisify } from "util";
 import express from "express";
 import cors from "cors";
 import mime from "mime";
@@ -33,9 +34,20 @@ import { createRPCServer, initRPCNotifier } from "./rpc";
 const pkg = require("../../package.json");
 
 export class Server {
+    /** used for test */
+    testMode = false;
+
     private _isRunning = false;
     private _servers = new Set<http.Server>();
     private _rpcs = new Set<RPCServer>();
+
+    get isRunning() {
+        return this._isRunning;
+    }
+
+    get servers() {
+        return this._servers;
+    }
 
     async init() {
         if (this._isRunning === true) {
@@ -45,37 +57,37 @@ export class Server {
 
         const serverConfig = _.config.server;
 
-        let addresses: string[] = [];
+        const addresses: string[] = [];
 
         if (serverConfig.path) {
             addresses.push(serverConfig.path);
         }
 
-        if (serverConfig.port) {
-            while (true) {
-                try {
-                    if (system.getIPv4AddressesForListen().length > 0) {
-                        break;
+        if (typeof serverConfig.port === "number") {
+            if (!this.testMode) {
+                while (true) {
+                    try {
+                        const systemIPv4s = system.getIPv4AddressesForListen();
+                        if (systemIPv4s.length > 0) {
+                            addresses.push(...systemIPv4s);
+                            break;
+                        }
+                    } catch (e) {
+                        console.error(e);
                     }
-                } catch (e) {
-                    console.error(e);
+                    log.warn("Server hasn't detected IPv4 addresses...");
+                    await sleep(5000);
                 }
-                log.warn("Server hasn't detected IPv4 addresses...");
-                await sleep(5000);
             }
 
-            addresses = [
-                ...addresses,
-                ...system.getIPv4AddressesForListen(),
-                "127.0.0.1"
-            ];
+            addresses.push("127.0.0.1");
 
             if (serverConfig.disableIPv6 !== true) {
-                addresses = [
-                    ...addresses,
-                    ...system.getIPv6AddressesForListen(),
-                    "::1"
-                ];
+                if (!this.testMode) {
+                    addresses.push(...system.getIPv6AddressesForListen());
+                }
+
+                addresses.push("::1");
             }
         }
 
@@ -173,40 +185,77 @@ export class Server {
             next();
         });
 
-        addresses.forEach(address => {
-            const server = http.createServer(app);
+        if (!this._isRunning) {
+            return;
+        }
 
+        for (const address of addresses) {
+            const server = http.createServer(app);
             server.timeout = 1000 * 15; // 15 sec.
 
-            if (regexp.unixDomainSocket.test(address) === true) {
-                if (fs.existsSync(address) === true) {
+            if (regexp.unixDomainSocket.test(address)) {
+                if (fs.existsSync(address)) {
                     fs.unlinkSync(address);
                 }
 
-                server.listen(address, () => {
-                    log.info("listening on http+unix://%s", address.replace(/\//g, "%2F"));
+                await new Promise<void>(resolve => {
+                    server.listen(address, () => {
+                        log.info("listening on http+unix://%s", address.replace(/\//g, "%2F"));
+                        resolve();
+                    });
                 });
 
                 fs.chmodSync(address, "777");
             } else {
-                server.listen(serverConfig.port, address, () => {
-                    if (address.includes(":") === true) {
-                        const [addr, iface] = address.split("%");
-                        log.info("listening on http://[%s]:%d (%s)", addr, serverConfig.port, iface);
-                    } else {
-                        log.info("listening on http://%s:%d", address, serverConfig.port);
-                    }
+                await new Promise<void>(resolve => {
+                    server.listen(serverConfig.port, address, () => {
+                        const serverAddr = server.address();
+                        const port = typeof serverAddr === "string" ? serverConfig.port : serverAddr.port;
+                        if (address.includes(":")) {
+                            const [addr, iface] = address.split("%");
+                            log.info("listening on http://[%s]:%d (%s)", addr, port, iface);
+                        } else {
+                            log.info("listening on http://%s:%d", address, port);
+                        }
+                        resolve();
+                    });
                 });
+            }
+
+            if (!this._isRunning) {
+                const serverCloseAsync = promisify(server.close).bind(server);
+                await serverCloseAsync();
+                return;
             }
 
             this._servers.add(server);
             this._rpcs.add(createRPCServer(server));
-        });
+        }
 
         // event notifications for RPC
         initRPCNotifier(this._rpcs);
 
         log.info("RPC interface is enabled");
+    }
+
+    async deinit() {
+        if (this._isRunning === false) {
+            return;
+        }
+
+        for (const rpc of this._rpcs) {
+            await rpc.close();
+        }
+
+        for (const server of this._servers) {
+            const serverCloseAsync = promisify(server.close).bind(server);
+            await serverCloseAsync();
+        }
+
+        this._rpcs.clear();
+        this._servers.clear();
+
+        this._isRunning = false;
     }
 }
 
