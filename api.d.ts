@@ -220,10 +220,10 @@ export interface TunerProcess {
     pid: number;
 }
 
-export interface Event {
+export interface Event<T = any> {
     resource: EventResource;
     type: EventType;
-    data: any;
+    data: T;
     time: UnixtimeMS;
 }
 

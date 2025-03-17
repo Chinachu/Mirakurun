@@ -17,8 +17,9 @@ import sift from "sift";
 import * as common from "./common";
 import * as log from "./log";
 import * as db from "./db";
+import * as apid from "../../api";
 import _ from "./_";
-import Event, { EventType } from "./Event";
+import Event from "./Event";
 import queue from "./queue";
 
 export function getProgramItemId(networkId: number, serviceId: number, eventId: number): number {
@@ -31,7 +32,7 @@ export class Program {
     private _saveTimerId: NodeJS.Timeout;
     private _emitTimerId: NodeJS.Timeout;
     private _emitRunning = false;
-    private _emitPrograms = new Map<db.Program, EventType>();
+    private _emitPrograms = new Map<db.Program, apid.EventType>();
     private _programGCInterval = _.config?.server?.programGCInterval || 1000 * 60 * 60; // 1 hour
 
     constructor() {

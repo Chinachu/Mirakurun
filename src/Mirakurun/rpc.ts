@@ -17,10 +17,10 @@ import * as net from "net";
 import * as http from "http";
 import RPCServer, { Socket } from "jsonrpc2-ws/lib/server";
 import * as log from "./log";
+import * as apid from "../../api";
 import _ from "./_";
 import status from "./status";
 import Event from "./Event";
-import { EventMessage } from "./Event";
 import { event as logEvent } from "./log";
 import { isPermittedHost, isPermittedIPAddress } from "./system";
 import { getStatus } from "./api/status";
@@ -71,11 +71,11 @@ export function createRPCServer(server: http.Server): RPCServer {
 const _notifierListeners = new Map<Set<RPCServer>, [Function, Function]>();
 export function initRPCNotifier(rpcs: Set<RPCServer>): void {
     const eventsNMDict = {
-        program: new NotifyManager<EventMessage>("events:program", "events", rpcs),
-        service: new NotifyManager<EventMessage>("events:service", "events", rpcs),
-        tuner: new NotifyManager<EventMessage>("events:tuner", "events", rpcs)
+        program: new NotifyManager<apid.Event>("events:program", "events", rpcs),
+        service: new NotifyManager<apid.Event>("events:service", "events", rpcs),
+        tuner: new NotifyManager<apid.Event>("events:tuner", "events", rpcs)
     };
-    function onEventListener(event: EventMessage) {
+    function onEventListener(event: apid.Event) {
         eventsNMDict[event.resource].notify(event);
     }
 

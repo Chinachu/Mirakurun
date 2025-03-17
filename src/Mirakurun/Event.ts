@@ -15,28 +15,19 @@
 */
 import EventEmitter from "eventemitter3";
 import { deepClone } from "./common";
+import * as apid from "../../api";
 import _ from "./_";
 
-export interface EventMessage<T = any> {
-    readonly resource: EventResource;
-    readonly type: EventType;
-    readonly data: T;
-    readonly time: number;
-}
-
-export type EventResource = "program" | "service" | "tuner";
-export type EventType = "create" | "update" | "remove";
-
 export class Event extends EventEmitter {
-    static get log(): EventMessage[] {
+    static get log(): apid.Event[] {
         return _.event.log;
     }
 
-    static onEvent(listener: (message: EventMessage) => void): void {
+    static onEvent(listener: (message: apid.Event) => void): void {
         _.event.on("event", listener);
     }
 
-    static onceEvent(listener: (message: EventMessage) => void): void {
+    static onceEvent(listener: (message: apid.Event) => void): void {
         _.event.once("event", listener);
     }
 
@@ -44,8 +35,8 @@ export class Event extends EventEmitter {
         _.event.removeListener("event", listener);
     }
 
-    static emit(resource: EventResource, type: EventType, data: any): boolean {
-        const message: EventMessage = {
+    static emit(resource: apid.EventResource, type: apid.EventType, data: any): boolean {
+        const message: apid.Event = {
             resource: resource,
             type: type,
             data: deepClone(data),
@@ -55,7 +46,7 @@ export class Event extends EventEmitter {
         return _.event.emit("event", message);
     }
 
-    private _log: EventMessage[] = [];
+    private _log: apid.Event[] = [];
 
     constructor() {
         super();
@@ -70,7 +61,7 @@ export class Event extends EventEmitter {
         });
     }
 
-    get log(): EventMessage[] {
+    get log(): apid.Event[] {
         return this._log;
     }
 }

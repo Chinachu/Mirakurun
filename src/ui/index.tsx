@@ -34,8 +34,7 @@ import {
 import { initializeIcons } from "@fluentui/react/lib/Icons";
 import { Client as RPCClient } from "jsonrpc2-ws";
 import { JoinParams, NotifyParams } from "../../lib/Mirakurun/rpc.d";
-import { EventMessage } from "../../lib/Mirakurun/Event.d";
-import { TunerDevice, Service, Status, Program } from "../../api.d";
+import { TunerDevice, Service, Status, Event } from "../../api.d";
 import ConnectionGuide from "./components/ConnectionGuide";
 import UpdateAlert from "./components/UpdateAlert";
 import Restart from "./components/Restart";
@@ -166,7 +165,7 @@ rpc.on("disconnect", () => {
     uiStateEvents.emit("update");
 });
 
-rpc.methods.set("events", async (socket, { array }: NotifyParams<EventMessage>) => {
+rpc.methods.set("events", async (socket, { array }: NotifyParams<Event>) => {
     let reloadServiceRequired = false;
 
     for (const event of array) {
