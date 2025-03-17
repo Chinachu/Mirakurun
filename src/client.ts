@@ -104,7 +104,7 @@ export class ErrorResponse implements ErrorResponse {
     }
 }
 
-export default class Client {
+export class Client {
     basePath = spec.basePath;
     docsPath = "/docs";
     /** positive integer */
@@ -118,6 +118,13 @@ export default class Client {
 
     private _userAgent = `MirakurunClient/${pkg.version} Node/${process.version} (${process.platform})`;
     private _docs: OpenAPIV2.Document;
+
+    async getDocs() {
+        if (!this._docs) {
+            await this._getDocs();
+        }
+        return this._docs;
+    }
 
     request(method: RequestMethod, path: string, option: RequestOption = {}): Promise<Response>|Promise<ErrorResponse> {
         return new Promise((resolve, reject) => {
@@ -604,3 +611,5 @@ export default class Client {
         this._docs = res.body;
     }
 }
+
+export default Client;
