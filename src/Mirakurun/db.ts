@@ -29,8 +29,6 @@ interface Service extends apid.Service {
     logoData?: string; // base64
 }
 
-type Channel = apid.Channel;
-
 export interface Program extends apid.Program {
     /** (internal) indicates EIT[p/f] received */
     _pf?: true; // for compatibility
