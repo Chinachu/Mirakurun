@@ -321,6 +321,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
             key: `item${i}`,
             enable: (
                 <Toggle
+                    label={ch.isDisabled ? "OFF" : "ON"}
                     checked={!ch.isDisabled}
                     onChange={(ev, checked) => {
                         ch.isDisabled = !checked;
@@ -331,6 +332,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
             ),
             name: (
                 <TextField
+                    label="Name"
                     value={ch.name}
                     onChange={(ev, newValue) => {
                         ch.name = newValue;
@@ -346,6 +348,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
             ),
             type: (
                 <Dropdown
+                    label="Type"
                     options={[
                         { key: "GR", text: "GR" },
                         { key: "BS", text: "BS" },
@@ -361,6 +364,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
             ),
             channel: (
                 <TextField
+                    label="Channel"
                     value={ch.channel}
                     onChange={(ev, newValue) => {
                         ch.channel = newValue;
@@ -379,7 +383,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                     <Stack horizontal tokens={{ childrenGap: "0 8" }}>
                         <TextField
                             style={{ width: 55 }}
-                            label="Service ID:"
+                            label="Service ID"
                             value={`${ch.serviceId || ""}`}
                             onChange={(ev, newValue) => {
                                 if (newValue === "") {
@@ -394,69 +398,8 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                             }}
                         />
                         <TextField
-                            style={{ width: 80 }}
-                            label="Satellite:"
-                            value={ch.satellite || ""}
-                            onChange={(ev, newValue) => {
-                                if (newValue === "") {
-                                    delete ch.satellite;
-                                } else {
-                                    ch.satellite = newValue;
-                                }
-                                setEditing([...editing]);
-                            }}
-                        />
-                        <TextField
-                            style={{ width: 40 }}
-                            label="Space:"
-                            placeholder="0"
-                            value={`${ch.space || ""}`}
-                            onChange={(ev, newValue) => {
-                                if (newValue === "") {
-                                    delete ch.space;
-                                } else if (/^[0-9]+$/.test(newValue)) {
-                                    const space = parseInt(newValue, 10);
-                                    if (space <= 65535 && space >= 0) {
-                                        ch.space = space;
-                                    }
-                                }
-                                setEditing([...editing]);
-                            }}
-                        />
-                        <TextField
-                            style={{ width: 60 }}
-                            label="Freq:"
-                            value={`${ch.freq || ""}`}
-                            onChange={(ev, newValue) => {
-                                if (newValue === "") {
-                                    delete ch.freq;
-                                } else if (/^[0-9\.]+$/.test(newValue)) {
-                                    const freq = parseFloat(newValue);
-                                    ch.freq = freq;
-                                }
-                                setEditing([...editing]);
-                            }}
-                        />
-                        <Dropdown
-                            label="Polarity:"
-                            options={[
-                                { key: "-", text: "-" },
-                                { key: "H", text: "H" },
-                                { key: "V", text: "V" }
-                            ]}
-                            selectedKey={ch.polarity || "-"}
-                            onChange={(ev, option) => {
-                                if (option.key === "-") {
-                                    delete ch.polarity;
-                                } else {
-                                    ch.polarity = option.key as any;
-                                }
-                                setEditing([...editing]);
-                            }}
-                        />
-                        <TextField
-                            style={{ width: 40 }}
-                            label="TsmfRelTs:"
+                            style={{ width: 55 }}
+                            label="TsmfRelTs"
                             value={`${ch.tsmfRelTs || ""}`}
                             onChange={(ev, newValue) => {
                                 if (newValue === "") {
@@ -468,6 +411,155 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                                 setEditing([...editing]);
                             }}
                         />
+
+                        {/* Command Args Section - Styled like other fields */}
+                        <div style={{ flexGrow: 1 }}>
+                            <div style={{ marginBottom: 5 }}>
+                                <label style={{
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    paddingTop: 5,
+                                    paddingBottom: 0,
+                                    display: "block"
+                                }}>Command Args</label>
+                            </div>
+
+                            {/* Auto-migrate from deprecated fields */}
+                            {(() => {
+                                // Auto-migrate deprecated fields
+                                if ((ch.satellite || ch.space !== undefined || ch.freq !== undefined || ch.polarity) && (!ch.commandVars || Object.keys(ch.commandVars).length === 0)) {
+                                    // Create commandVars if it doesn't exist
+                                    if (!ch.commandVars) ch.commandVars = {};
+
+                                    // Copy values from readonly deprecated properties
+                                    if (ch.satellite) {
+                                        ch.commandVars["satellite"] = ch.satellite;
+                                    }
+                                    if (ch.space !== undefined) {
+                                        ch.commandVars["space"] = ch.space;
+                                    }
+                                    if (ch.freq !== undefined) {
+                                        ch.commandVars["freq"] = ch.freq;
+                                    }
+                                    if (ch.polarity) {
+                                        ch.commandVars["polarity"] = ch.polarity;
+                                    }
+                                }
+
+                                // Return null as this is just for side effects
+                                return null;
+                            })()}
+
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 1 }}>
+                                {/* Display existing commandVars entries */}
+                                {ch.commandVars && Object.entries(ch.commandVars).map(([key, value], idx) => (
+                                    <div key={`cmd-arg-${idx}`} style={{ display: "inline-flex", alignItems: "center", marginBottom: 4 }}>
+                                        <div style={{
+                                            border: "1px solid #f3f2f1",
+                                            padding: "0 4px",
+                                            borderRadius: 2,
+                                            display: "flex",
+                                            backgroundColor: "#ffffff"
+                                        }}>
+                                            <TextField
+                                                borderless
+                                                style={{
+                                                    width: 70,
+                                                    display: "inline-block",
+                                                    margin: 0
+                                                }}
+                                                value={key}
+                                                onChange={(ev, newKey) => {
+                                                    // Always allow any key including empty string
+                                                    if (!ch.commandVars) ch.commandVars = {};
+
+                                                    // Create a new object with updated key
+                                                    const updatedArgs: Record<string, string | number> = {};
+                                                    Object.entries(ch.commandVars).forEach(([k, v]) => {
+                                                        if (k === key) {
+                                                            updatedArgs[newKey || ""] = v;
+                                                        } else {
+                                                            updatedArgs[k] = v;
+                                                        }
+                                                    });
+                                                    ch.commandVars = updatedArgs;
+                                                    setEditing([...editing]);
+                                                }}
+                                            />
+                                            <span style={{ margin: "0 4px", display: "flex", alignItems: "center" }}>:</span>
+                                            <TextField
+                                                borderless
+                                                style={{
+                                                    width: 70,
+                                                    display: "inline-block",
+                                                    margin: 0
+                                                }}
+                                                value={`${value}`}
+                                                onChange={(ev, newValue) => {
+                                                    if (!ch.commandVars) ch.commandVars = {};
+
+                                                    // Always set the value
+                                                    if (newValue === "") {
+                                                        // Keep empty string as is
+                                                        ch.commandVars[key] = "";
+                                                    } else if (newValue === "0") {
+                                                        // Make sure zero is handled as a number
+                                                        ch.commandVars[key] = 0;
+                                                    }
+                                                    // Try to convert to number if applicable
+                                                    else if (/^[0-9]+(\.[0-9]+)?$/.test(newValue)) {
+                                                        ch.commandVars[key] = parseFloat(newValue);
+                                                    } else {
+                                                        ch.commandVars[key] = newValue;
+                                                    }
+                                                    setEditing([...editing]);
+                                                }}
+                                            />
+                                        </div>
+                                        <IconButton
+                                            iconProps={{ iconName: "Cancel" }}
+                                            title="Remove"
+                                            style={{ height: 24, width: 24 }}
+                                            onClick={() => {
+                                                if (!ch.commandVars) return;
+                                                delete ch.commandVars[key];
+                                                if (Object.keys(ch.commandVars).length === 0) {
+                                                    delete ch.commandVars;
+                                                }
+                                                setEditing([...editing]);
+                                            }}
+                                        />
+                                    </div>
+                                ))}
+
+                                {/* Add new commandVars entry button */}
+                                <ActionButton
+                                    iconProps={{ iconName: "Add" }}
+                                    text="Add"
+                                    style={{ height: 32, padding: "0 8px" }}
+                                    onClick={() => {
+                                        // Initialize commandVars if it doesn't exist
+                                        if (!ch.commandVars) {
+                                            ch.commandVars = {};
+                                        }
+
+                                        // Find a unique key name
+                                        let newKey = "arg";
+                                        let counter = 1;
+                                        while (ch.commandVars[newKey] !== undefined) {
+                                            newKey = `arg${counter}`;
+                                            counter++;
+                                        }
+
+                                        // Set the empty string value explicitly
+                                        ch.commandVars[newKey] = "";
+
+                                        // Force update
+                                        setEditing([...editing]);
+                                    }}
+                                />
+                            </div>
+                        </div>
                     </Stack>
                 </Stack>
             ),
@@ -610,6 +702,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                             columns={columns}
                             selection={dummySelection}
                             selectionMode={SelectionMode.none}
+                            isHeaderVisible={false}
                         />
                     </div>
 

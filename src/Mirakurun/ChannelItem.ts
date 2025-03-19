@@ -25,21 +25,15 @@ export default class ChannelItem {
     readonly name: string;
     readonly type: apid.ChannelType;
     readonly channel: string;
-    readonly satellite: string;
-    readonly space: number;
-    readonly freq: number;
-    readonly polarity: "H" | "V";
     readonly tsmfRelTs: number;
+    readonly commandVars: apid.ConfigChannelsItem["commandVars"];
 
     constructor(config: apid.ConfigChannelsItem) {
         this.name = config.name;
         this.type = config.type;
         this.channel = config.channel;
-        this.satellite = config.satellite;
-        this.space = config.space;
-        this.freq = config.freq;
-        this.polarity = config.polarity;
         this.tsmfRelTs = config.tsmfRelTs;
+        this.commandVars = config.commandVars;
 
         if (config.serviceId) {
             this.addService(config.serviceId);

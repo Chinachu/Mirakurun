@@ -260,29 +260,16 @@ export default class TunerDevice extends EventEmitter {
             cmd = this._config.command;
         }
 
-        cmd = cmd.replace("<channel>", ch.channel);
+        cmd = common.replaceCommandTemplate(cmd, {
+            channel: ch.channel,
+            satelite: ch.commandVars?.satellite || "", // deprecated, for backward compatibility
+            space: 0, // default value for backward compatibility
+            ...ch.commandVars
+        });
 
-        if (ch.satellite) {
-            cmd = cmd.replace("<satelite>", ch.satellite); // deprecated
-            cmd = cmd.replace("<satellite>", ch.satellite);
-        }
+        const parsed = common.parseCommandForSpawn(cmd);
 
-        // tslint:disable-next-line:prefer-conditional-expression
-        if (ch.space) {
-            cmd = cmd.replace("<space>", ch.space.toString(10));
-        } else {
-            cmd = cmd.replace("<space>", "0"); // set default value to '0'
-        }
-
-        if (ch.freq !== undefined) {
-            cmd = cmd.replace("<freq>", ch.freq.toString(10));
-        }
-
-        if (ch.polarity) {
-            cmd = cmd.replace("<polarity>", ch.polarity);
-        }
-
-        this._process = child_process.spawn(cmd.split(" ")[0], cmd.split(" ").slice(1));
+        this._process = child_process.spawn(parsed.command, parsed.args);
         this._command = cmd;
         this._channel = ch;
 

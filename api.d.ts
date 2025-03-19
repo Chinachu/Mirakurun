@@ -42,10 +42,6 @@ export interface Channel {
     type: ChannelType;
     channel: string;
     name?: string;
-    satellite?: string;
-    space?: number;
-    freq?: number;
-    polarity?: "H" | "V";
     services?: Service[];
 }
 
@@ -292,15 +288,25 @@ export interface ConfigChannelsItem {
     type: ChannelType;
     /** passed to tuning command */
     channel: string;
-    satellite?: string;
     serviceId?: number;
-    space?: number;
-    freq?: number;
-    polarity?: "H" | "V";
+    /** TSMF (MPEG-TS Multi Frame) relative TS number config for CATV */
     tsmfRelTs?: number;
+    /**
+     * passed to tuning command variables.
+     * @example { "freq": 123456, "polarity": "H", "space": 6, "extra-args": "..." }
+     */
+    commandVars?: Record<string, string | number>;
     isDisabled?: boolean;
-    /** @deprecated */
+    /** @deprecated typo of "satellite". */
     readonly satelite?: string;
+    /** @deprecated from 4.0.0, use `commandVars` instead. */
+    readonly satellite?: string;
+    /** @deprecated from 4.0.0, use `commandVars` instead. */
+    readonly space?: number;
+    /** @deprecated from 4.0.0, use `commandVars` instead. */
+    readonly freq?: number;
+    /** @deprecated from 4.0.0, use `commandVars` instead. */
+    readonly polarity?: "H" | "V";
 }
 
 export interface ChannelScanStatus {
