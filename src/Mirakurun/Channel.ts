@@ -13,22 +13,41 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+import * as common from "./common";
 import * as log from "./log";
 import * as apid from "../../api";
 import _ from "./_";
 import status from "./status";
-import queue from "./queue";
 import ChannelItem from "./ChannelItem";
+import { JobItem } from "./Job";
 
 export class Channel {
     private _items: ChannelItem[] = [];
-    private _epgGatheringInterval: number = _.config.server.epgGatheringInterval || 1000 * 60 * 30; // 30 mins
+    private _epgGatheringInterval: number = _.config.server.epgGatheringInterval || 1000 * 60 * 20; // 30 mins
 
     constructor() {
         this._load();
 
         if (_.config.server.disableEITParsing !== true) {
-            setTimeout(this._epgGatherer.bind(this), 1000 * 60);
+            const epgJob: JobItem = {
+                key: "EPG",
+                name: "EPG",
+                fn: this._epgGatherer.bind(this)
+            };
+
+            _.job.add({
+                ...epgJob,
+                readyFn: async () => {
+                    await common.sleep(1000 * 60);
+                    return true;
+                }
+            });
+
+            _.job.addSchedule({
+                key: "EPG",
+                schedule: "25,55 * * * *", // todo: config
+                job: epgJob
+            });
         }
     }
 
@@ -144,26 +163,41 @@ export class Channel {
         });
     }
 
-    private _epgGatherer(): void {
-        queue.add(async () => {
-            const networkIds = [...new Set(_.service.items.map(item => item.networkId))];
+    private async _epgGatherer(): Promise<void> {
+        const networkIds = [...new Set(_.service.items.map(item => item.networkId))];
 
-            networkIds.forEach(networkId => {
-                const services = _.service.findByNetworkId(networkId);
+        for (const networkId of networkIds) {
+            const services = _.service.findByNetworkId(networkId);
+            if (services.length === 0) {
+                continue;
+            }
+            const service = services[0];
 
-                if (services.length === 0) {
-                    return;
-                }
-                const service = services[0];
-
-                queue.add(async () => {
+            _.job.add({
+                key: `EPG.Gather.NID.${networkId}`,
+                name: `EPG Gather Network#${networkId}`,
+                fn: async () => {
+                    log.info("Network#%d EPG gathering has started", networkId);
+                    try {
+                        await _.tuner.getEPG(service.channel);
+                        log.info("Network#%d EPG gathering has finished", networkId);
+                    } catch (e) {
+                        log.warn("Network#%d EPG gathering has failed [%s]", networkId, e);
+                        throw new Error("EPG gathering failed");
+                    }
+                },
+                readyFn: async () => {
+                    if (status.epg[networkId] === true) {
+                        log.info("Network#%d EPG gathering is already in progress on another stream", networkId);
+                        return false;
+                    }
                     if (service.epgReady === true) {
                         const now = Date.now();
                         if (now - service.epgUpdatedAt < this._epgGatheringInterval) {
                             log.info("Network#%d EPG gathering has skipped by `epgGatheringInterval`", networkId);
-                            return;
+                            return false;
                         }
-                        if (now - service.epgUpdatedAt > 1000 * 60 * 60 * 6) { // 6 hours
+                        if (now - service.epgUpdatedAt > 1000 * 60 * 60 * 12) { // 12 hours
                             log.info("Network#%d EPG gathering is resuming forcibly because reached maximum pause time", networkId);
                             service.epgReady = false;
                         } else {
@@ -173,35 +207,17 @@ export class Channel {
                                 const networkPrograms = _.program.findByNetworkId(networkId);
                                 if (networkPrograms.length > 0) {
                                     log.info("Network#%d EPG gathering has skipped because broadcast is off", networkId);
-                                    return;
+                                    return false;
                                 }
                                 service.epgReady = false;
                             }
                         }
+
+                        return _.tuner.readyForJob(service.channel);
                     }
-
-                    if (status.epg[networkId] === true) {
-                        log.info("Network#%d EPG gathering is already in progress on another stream", networkId);
-                        return;
-                    }
-
-                    log.info("Network#%d EPG gathering has started", networkId);
-
-                    try {
-                        await _.tuner.getEPG(service.channel);
-                        log.info("Network#%d EPG gathering has finished", networkId);
-                    } catch (e) {
-                        log.warn("Network#%d EPG gathering has failed [%s]", networkId, e);
-                    }
-                });
-
-                log.debug("Network#%d EPG gathering has queued", networkId);
+                }
             });
-
-            queue.add(async () => {
-                setTimeout(this._epgGatherer.bind(this), this._epgGatheringInterval);
-            });
-        });
+        }
     }
 }
 

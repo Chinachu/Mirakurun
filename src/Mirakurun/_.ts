@@ -14,6 +14,7 @@
    limitations under the License.
 */
 import * as apid from "../../api";
+import Job from "./Job";
 import Event from "./Event";
 import Tuner from "./Tuner";
 import Channel from "./Channel";
@@ -30,6 +31,7 @@ interface Shared {
     readonly configIntegrity: {
         channels: string;
     };
+    job?: Job;
     event?: Event;
     tuner?: Tuner;
     channel?: Channel;

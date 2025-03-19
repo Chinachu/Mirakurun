@@ -46,6 +46,24 @@ export class Tuner {
         return null;
     }
 
+    /**
+     * readyFn
+     */
+    async readyForJob(channel: ChannelItem): Promise<boolean> {
+        const devices = this._getDevicesByType(channel.type);
+        if (devices.length === 0) {
+            return false;
+        }
+
+        while (true) {
+            const device = this._pickTunerDevice(devices, channel, -1);
+            if (device) {
+                return true;
+            }
+            await common.sleep(1000 * 10);
+        }
+    }
+
     typeExists(type: apid.ChannelType): boolean {
         const l = this._devices.length;
         for (let i = 0; i < l; i++) {
@@ -263,131 +281,139 @@ export class Tuner {
         return this;
     }
 
-    private _initTS(user: common.User, dest?: Writable): Promise<TSFilter> {
-        return new Promise<TSFilter>((resolve, reject) => {
-            const setting = user.streamSetting;
+    private async _initTS(user: common.User, dest?: Writable): Promise<TSFilter | null> {
+        const setting = user.streamSetting;
 
-            if (_.config.server.disableEITParsing === true) {
-                setting.parseEIT = false;
+        if (_.config.server.disableEITParsing === true) {
+            setting.parseEIT = false;
+        }
+
+        const devices = this._getDevicesByType(setting.channel.type);
+        let tryCount = 50;
+
+        if (!dest) {
+            const remoteResult = await this._useRemoteData(user, devices);
+            if (remoteResult) {
+                return null;
             }
+        }
 
-            const devices = this._getDevicesByType(setting.channel.type);
+        while (tryCount > 0) {
+            const device = this._pickTunerDevice(devices, setting.channel, user.priority);
 
-            let tryCount = 50;
-            const length = devices.length;
-
-            function find() {
-                let device: TunerDevice = null;
-
-                // 1. join to existing
-                for (let i = 0; i < length; i++) {
-                    if (devices[i].isAvailable === true && devices[i].channel === setting.channel) {
-                        device = devices[i];
-                        break;
-                    }
+            if (device === null) {
+                // retry
+                tryCount--;
+                if (tryCount <= 0) {
+                    throw new Error("no available tuners");
                 }
-
-                // x. use remote data
-                if (device === null && !dest) {
-                    const remoteDevice = devices.find(device => device.isRemote);
-                    if (remoteDevice) {
-                        if (setting.networkId !== undefined && setting.parseEIT === true) {
-                            remoteDevice.getRemotePrograms({ networkId: setting.networkId })
-                                .then(async programs => {
-                                    await common.sleep(1000);
-                                    _.program.findByNetworkIdAndReplace(setting.networkId, programs);
-                                    for (const service of _.service.findByNetworkId(setting.networkId)) {
-                                        service.epgReady = true;
-                                    }
-                                    await common.sleep(1000);
-                                })
-                                .then(() => resolve(null))
-                                .catch(err => reject(err));
-
-                            return;
-                        }
-                    }
-                }
-
-                // 2. start as new
-                if (device === null) {
-                    for (let i = 0; i < length; i++) {
-                        if (devices[i].isFree === true) {
-                            device = devices[i];
-                            break;
-                        }
-                    }
-                }
-
-                // 3. replace existing
-                if (device === null) {
-                    for (let i = 0; i < length; i++) {
-                        if (devices[i].isAvailable === true && devices[i].users.length === 0) {
-                            device = devices[i];
-                            break;
-                        }
-                    }
-                }
-
-                // 4. takeover existing
-                if (device === null) {
-                    devices.sort((t1, t2) => {
-                        return t1.getPriority() - t2.getPriority();
-                    });
-
-                    for (let i = 0; i < length; i++) {
-                        if (devices[i].isUsing === true && devices[i].getPriority() < user.priority) {
-                            device = devices[i];
-                            break;
-                        }
-                    }
-                }
-
-                if (device === null) {
-                    --tryCount;
-                    if (tryCount > 0) {
-                        setTimeout(find, 250);
-                    } else {
-                        reject(new Error("no available tuners"));
-                    }
+                await new Promise(resolve => setTimeout(resolve, 250));
+            } else {
+                // found
+                let output: Writable;
+                if (user.disableDecoder === true || device.decoder === null) {
+                    output = dest;
                 } else {
-                    let output: Writable;
-                    if (user.disableDecoder === true || device.decoder === null) {
-                        output = dest;
-                    } else {
-                        output = new TSDecoder({
-                            output: dest,
-                            command: device.decoder
-                        });
-                    }
-
-                    const tsFilter = new TSFilter({
-                        output,
-                        networkId: setting.networkId,
-                        serviceId: setting.serviceId,
-                        eventId: setting.eventId,
-                        parseNIT: setting.parseNIT,
-                        parseSDT: setting.parseSDT,
-                        parseEIT: setting.parseEIT,
-                        tsmfRelTs: setting.channel.tsmfRelTs
+                    output = new TSDecoder({
+                        output: dest,
+                        command: device.decoder
                     });
+                }
 
-                    Object.defineProperty(user, "streamInfo", {
-                        get: () => tsFilter.streamInfo
-                    });
+                const tsFilter = new TSFilter({
+                    output,
+                    networkId: setting.networkId,
+                    serviceId: setting.serviceId,
+                    eventId: setting.eventId,
+                    parseNIT: setting.parseNIT,
+                    parseSDT: setting.parseSDT,
+                    parseEIT: setting.parseEIT,
+                    tsmfRelTs: setting.channel.tsmfRelTs
+                });
 
-                    device.startStream(user, tsFilter, setting.channel)
-                        .then(() => {
-                            resolve(tsFilter);
-                        })
-                        .catch((err) => {
-                            tsFilter.end();
-                            reject(err);
-                        });
+                Object.defineProperty(user, "streamInfo", {
+                    get: () => tsFilter.streamInfo
+                });
+
+                try {
+                    await device.startStream(user, tsFilter, setting.channel);
+                    return tsFilter;
+                } catch (err) {
+                    tsFilter.end();
+                    throw err;
                 }
             }
-            find();
-        });
+        }
+    }
+
+    /**
+     * リモートデータ利用 (EPG)
+     */
+    private async _useRemoteData(
+        user: common.User,
+        devices: TunerDevice[]
+    ): Promise<boolean> {
+        const setting = user.streamSetting;
+
+        const remoteDevice = devices.find(device => device.isRemote);
+        if (remoteDevice && setting.networkId !== undefined && setting.parseEIT === true) {
+            try {
+                const programs = await remoteDevice.getRemotePrograms({ networkId: setting.networkId });
+                await common.sleep(1000);
+                _.program.findByNetworkIdAndReplace(setting.networkId, programs);
+                for (const service of _.service.findByNetworkId(setting.networkId)) {
+                    service.epgReady = true;
+                }
+                await common.sleep(1000);
+                return true;
+            } catch (err) {
+                throw err;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * チューナーデバイス探索
+     */
+    private _pickTunerDevice(
+        devices: TunerDevice[],
+        channel: ChannelItem,
+        priority: number
+    ): TunerDevice | null {
+        // 1. join to existing
+        for (const device of devices) {
+            if (device.isAvailable === true && device.channel === channel) {
+                return device;
+            }
+        }
+
+        // 2. start as new
+        for (const device of devices) {
+            if (device.isFree === true) {
+                return device;
+            }
+        }
+
+        // 3. replace existing
+        for (const device of devices) {
+            if (device.isAvailable === true && device.users.length === 0) {
+                return device;
+            }
+        }
+
+        // 4. takeover existing
+        if (priority >= 0) {
+            devices.sort((t1, t2) => t1.getPriority() - t2.getPriority());
+            for (const device of devices) {
+                if (device.isUsing === true && device.getPriority() < priority) {
+                    return device;
+                }
+            }
+        }
+
+        return null;
     }
 
     private _getDevicesByType(type: apid.ChannelType): TunerDevice[] {
