@@ -108,7 +108,10 @@ export default class ChannelItem {
 
                 log.info("ChannelItem#'%s' serviceId=%d check has finished", this.name, serviceId);
             },
-            readyFn: () => _.tuner.readyForJob(this),
+            readyFn: async () => {
+                await common.sleep(1000 * 5);
+                return _.tuner.readyForJob(this);
+            },
             retryOnFail: true,
             retryMax: (1000 * 60 * 60 * 12) / (1000 * 60 * 3), // (12時間 / retryDelay) = 12時間～
             retryDelay: 1000 * 60 * 3

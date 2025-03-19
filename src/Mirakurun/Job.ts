@@ -85,8 +85,8 @@ export interface ScheduleItem {
 }
 
 export class Job {
-    maxRunning: number = Math.max(1, os.cpus().length - 1);
-    maxWaitingForReady: number = 10; // 同時に ready チェックを行う最大数
+    maxRunning: number = Math.max(1, Math.floor(os.cpus().length / 2)); // todo: config
+    maxWaitingForReady: number = Math.max(1, Math.floor(os.cpus().length - 1)); // 同時に ready チェックを行う最大数
     maxHistory: number = 50;
 
     private _jobIdPrefix = Date.now().toString(36).toUpperCase() + ".";

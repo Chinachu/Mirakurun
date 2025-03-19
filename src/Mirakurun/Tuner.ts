@@ -26,6 +26,7 @@ import TSDecoder from "./TSDecoder";
 
 export class Tuner {
     private _devices: TunerDevice[] = [];
+    private _readyForJobPickedDeviceSet: Set<TunerDevice> = new Set();
 
     constructor() {
         this._load();
@@ -57,7 +58,12 @@ export class Tuner {
 
         while (true) {
             const device = this._pickTunerDevice(devices, channel, -1);
-            if (device) {
+            if (device && !this._readyForJobPickedDeviceSet.has(device)) {
+                // pick したチューナーを少し保持する
+                this._readyForJobPickedDeviceSet.add(device);
+                setTimeout(() => {
+                    this._readyForJobPickedDeviceSet.delete(device);
+                }, 1000 * 5);
                 return true;
             }
             await common.sleep(1000 * 10);
