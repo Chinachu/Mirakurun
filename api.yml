@@ -76,17 +76,6 @@ definitions:
         type: string
       name:
         type: string
-      satellite:
-        type: string
-      space:
-        type: integer
-      freq:
-        type: number
-      polarity:
-        type: string
-        enum:
-          - H
-          - V
       tsmfRelTs:
         type: integer
       services:
@@ -550,17 +539,10 @@ definitions:
         type: string
       serviceId:
         $ref: '#/definitions/ServiceId'
-      satellite:
-        type: string
-      space:
+      tsmfRelTs:
         type: integer
-      freq:
-        type: number
-      polarity:
-        type: string
-        enum:
-          - H
-          - V
+      commandVars:
+        type: object
       isDisabled:
         type: boolean
 

@@ -87,31 +87,6 @@ export class Channel {
                 return;
             }
 
-            if (channel.satelite && !channel.satellite) {
-                log.warn("renaming deprecated property name `satelite` to `satellite` in channel#%d (%s) configuration", i, channel.name);
-                (<any> channel).satellite = channel.satelite;
-            }
-
-            if (channel.satellite && typeof channel.satellite !== "string") {
-                log.error("invalid type of property `satellite` in channel#%d (%s) configuration", i, channel.name);
-                return;
-            }
-
-            if (channel.space && typeof channel.space !== "number") {
-                log.error("invalid type of property `space` in channel#%d (%s) configuration", i, channel.name);
-                return;
-            }
-
-            if (channel.freq !== undefined && typeof channel.freq !== "number") {
-                log.error("invalid type of property `freq` in channel#%d (%s) configuration", i, channel.name);
-                return;
-            }
-
-            if (channel.polarity && channel.polarity !== "H" && channel.polarity !== "V") {
-                log.error("invalid type of property `polarity` in channel#%d (%s) configuration", i, channel.name);
-                return;
-            }
-
             if (channel.serviceId && typeof channel.serviceId !== "number") {
                 log.error("invalid type of property `serviceId` in channel#%d (%s) configuration", i, channel.name);
                 return;
@@ -120,6 +95,48 @@ export class Channel {
             if (channel.tsmfRelTs && typeof channel.tsmfRelTs !== "number") {
                 log.error("invalid type of property `tsmfRelTs` in channel#%d (%s) configuration", i, channel.name);
                 return;
+            }
+
+            if (channel.commandVars && typeof channel.commandVars !== "object") {
+                log.error("invalid type of property `commandVars` in channel#%d (%s) configuration", i, channel.name);
+                return;
+            }
+            if (!channel.commandVars) {
+                channel.commandVars = {};
+            }
+            if (channel.satelite && !channel.satellite) {
+                log.warn("renaming deprecated property name `satelite` to `satellite` in channel#%d (%s) configuration", i, channel.name);
+                (<any> channel).satellite = channel.satelite;
+            }
+            if (channel.satellite) {
+                // deprecated but not planned to remove (soft migration)
+                if (!channel.commandVars.satellite) {
+                    channel.commandVars.satellite = channel.satellite;
+                }
+            }
+            if (channel.space) {
+                // deprecated but not planned to remove (soft migration)
+                if (!channel.commandVars.space) {
+                    channel.commandVars.space = channel.space;
+                }
+            }
+            if (channel.freq) {
+                // deprecated but not planned to remove (soft migration)
+                if (!channel.commandVars.freq) {
+                    channel.commandVars.freq = channel.freq;
+                }
+            }
+            if (channel.polarity) {
+                // deprecated but not planned to remove (soft migration)
+                if (!channel.commandVars.polarity) {
+                    channel.commandVars.polarity = channel.polarity;
+                }
+            }
+            for (const key in channel.commandVars) {
+                if (typeof channel.commandVars[key] !== "number" && typeof channel.commandVars[key] !== "string") {
+                    log.error("invalid type of property `commandVars.%s` in channel#%d (%s) configuration", key, i, channel.name);
+                    delete channel.commandVars[key];
+                }
             }
 
             if (channel.isDisabled === true) {

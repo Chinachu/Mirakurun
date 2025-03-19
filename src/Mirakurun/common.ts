@@ -63,7 +63,7 @@ export function updateObject<T extends any[], U extends any[]>(target: T, input:
         } else if (typeof target[k] === "object" && typeof input[k] === "object") {
             updated = updateObject(target[k], input[k]) || updated;
             continue;
-        } else  if (target[k] === input[k]) {
+        } else if (target[k] === input[k]) {
             continue;
         }
 
@@ -125,4 +125,54 @@ export function getTimeFromBCD24(buffer: Uint8Array | Buffer): number {
     time += (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);
 
     return time * 1000;
+}
+
+export function replaceCommandTemplate(template: string, vars: Record<string, string | number>): string {
+    return template.replace(/<([a-z0-9\-_\.]+)>/gi, (match, key) => {
+        return vars[key] !== undefined ? String(vars[key]) : "";
+    });
+}
+
+export function parseCommandForSpawn(cmdString: string): { command: string; args: string[] } {
+    let inQuote = false;
+    let quoteChar = "";
+    let current = "";
+    const parts: string[] = [];
+
+    // Parse the command string character by character
+    for (let i = 0; i < cmdString.length; i++) {
+        const char = cmdString[i];
+
+        if ((char === `"` || char === `'`) && (!inQuote || char === quoteChar)) {
+            // Toggle quote state if we encounter a quote character
+            inQuote = !inQuote;
+            quoteChar = inQuote ? char : "";
+        } else if (char === " " && !inQuote) {
+            // Space outside of quotes indicates a new part
+            if (current) {
+                parts.push(current);
+                current = "";
+            }
+        } else {
+            // Add character to the current part
+            current += char;
+        }
+    }
+
+    // Add the last part if there is one
+    if (current) {
+        parts.push(current);
+    }
+
+    if (parts.length === 0) {
+        throw new Error("Invalid command string");
+    }
+
+    // First part is the command, the rest are arguments
+    const result: { command: string; args: string[] } = {
+        command: parts[0],
+        args: parts.slice(1)
+    };
+
+    return result;
 }
