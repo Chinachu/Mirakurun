@@ -340,16 +340,12 @@ export class Job {
             setImmediate(() => this._retryJob(job));
         }
 
+        this._runningJobItemSet.delete(job);
+
         log.debug(`Job#_run() done "${job.key}" (id: ${job.id})`);
     }
 
     private _finishJob(job: RunningJobItem, ok: boolean, error?: Error): void {
-        if (!this._runningJobItemSet.has(job)) {
-            log.error(`Job#_finishJob() "${job.key}" (id: ${job.id}) not found in running`);
-            return;
-        }
-        this._runningJobItemSet.delete(job);
-
         const finishedAt = Date.now();
         const hasAborted = job.ac.signal.aborted;
         const hasFailed = !ok;
