@@ -412,7 +412,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                             }}
                         />
 
-                        {/* Command Args Section - Styled like other fields */}
+                        {/* Command Vars Section - Styled like other fields */}
                         <div style={{ flexGrow: 1 }}>
                             <div style={{ marginBottom: 5 }}>
                                 <label style={{
@@ -421,7 +421,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                                     paddingTop: 5,
                                     paddingBottom: 0,
                                     display: "block"
-                                }}>Command Args</label>
+                                }}>Command Vars</label>
                             </div>
 
                             {/* Auto-migrate from deprecated fields */}
@@ -474,15 +474,15 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                                                     if (!ch.commandVars) ch.commandVars = {};
 
                                                     // Create a new object with updated key
-                                                    const updatedArgs: Record<string, string | number> = {};
+                                                    const updatedVars: Record<string, string | number> = {};
                                                     Object.entries(ch.commandVars).forEach(([k, v]) => {
                                                         if (k === key) {
-                                                            updatedArgs[newKey || ""] = v;
+                                                            updatedVars[newKey || ""] = v;
                                                         } else {
-                                                            updatedArgs[k] = v;
+                                                            updatedVars[k] = v;
                                                         }
                                                     });
-                                                    ch.commandVars = updatedArgs;
+                                                    ch.commandVars = updatedVars;
                                                     setEditing([...editing]);
                                                 }}
                                             />
