@@ -88,6 +88,9 @@ import * as log from "./Mirakurun/log";
     _.program = new Program();
     _.server = new Server();
 
+    await _.service.load();
+    await _.program.load();
+
     if (process.env.SETUP === "true") {
         log.info("setup is done.");
         process.exit(0);

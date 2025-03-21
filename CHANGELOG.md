@@ -2,9 +2,20 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
-## 4.0.0-beta.11 (2025-03-20)
+## About 4.0.0
 
 **Important Notice**: Mirakurun 4.0.0 includes significant performance improvements, enhanced EPG processing, asynchronous file I/O operations, and new features. As announced in 3.9.0, the experimental Win32 support has been completely removed.
+
+## 4.0.0-beta.12 (2025-03-21)
+
+### Server Changes
+
+- **Server**:
+  - Wait the LISTEN until finishes loading the program and service db at startup.
+- **UI**:
+  - **TunersManager**: packet counter is now hidden when stream info is empty
+
+## 4.0.0-beta.11 (2025-03-20)
 
 ### Key Changes
 

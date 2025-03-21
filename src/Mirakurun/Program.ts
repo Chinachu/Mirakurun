@@ -35,8 +35,6 @@ export class Program {
     private _emitPrograms = new Map<db.Program, apid.EventType>();
 
     constructor() {
-        this._load();
-
         const gcJob: JobItem = {
             key: "Program.GC",
             name: "Program GC",
@@ -56,7 +54,6 @@ export class Program {
             schedule: "55 * * * *", // todo: config
             job: gcJob
         });
-
     }
 
     get itemMap(): Map<number, db.Program> {
@@ -194,7 +191,7 @@ export class Program {
         this._saveTimerId = setTimeout(() => this._save(), 1000 * 30);
     }
 
-    private async _load(): Promise<void> {
+    async load(): Promise<void> {
         log.debug("loading programs...");
 
         const now = Date.now();
