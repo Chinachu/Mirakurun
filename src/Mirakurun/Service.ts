@@ -102,10 +102,6 @@ export class Service {
     private _items: ServiceItem[] = [];
     private _saveTimerId: NodeJS.Timeout;
 
-    constructor() {
-        this._load();
-    }
-
     get items(): ServiceItem[] {
         return this._items;
     }
@@ -194,7 +190,7 @@ export class Service {
         this._saveTimerId = setTimeout(() => this._save(), 1000 * 10);
     }
 
-    private async _load(): Promise<void> {
+    async load(): Promise<void> {
         log.debug("loading services...");
 
         let updated = false;
