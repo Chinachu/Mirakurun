@@ -45,7 +45,7 @@ export class Channel {
 
             _.job.addSchedule({
                 key: "EPG",
-                schedule: "25,55 * * * *", // todo: config
+                schedule: "20,50 * * * *", // todo: config
                 job: epgJob
             });
         }
@@ -166,13 +166,8 @@ export class Channel {
                 return;
             }
 
-            const pre = this.get(channel.type, channel.channel);
-            if (pre) {
+            if (!this.get(channel.type, channel.channel)) {
                 if (channel.serviceId) {
-                    pre.addService(channel.serviceId);
-                }
-            } else {
-                if (channel.type !== "GR") {
                     (<any> channel).name = `${channel.type}:${channel.channel}`;
                 }
                 this.add(new ChannelItem(channel));

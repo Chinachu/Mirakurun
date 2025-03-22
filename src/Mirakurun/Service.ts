@@ -16,6 +16,7 @@
 import { join, dirname } from "path";
 import { existsSync } from "fs";
 import { stat, mkdir, readFile, writeFile } from "fs/promises";
+import { sleep } from "./common";
 import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
@@ -240,6 +241,74 @@ export class Service {
         if (updated) {
             this.save();
         }
+
+        await sleep(5000);
+
+        // add services from channel config
+        for (const channelConfig of _.config.channels) {
+            if (!channelConfig.serviceId) {
+                continue;
+            }
+            const channel = _.channel.get(channelConfig.type, channelConfig.channel);
+            if (!channel) {
+                continue;
+            }
+            const serviceId = channelConfig.serviceId;
+            if (this.findByChannel(channel).some(service => service.serviceId === serviceId)) {
+                continue;
+            }
+
+            this._queueCheckAndAdd(channel, serviceId);
+        }
+
+        // scan services (no service channel only)
+        _.job.add({
+            key: "Service.Scan-Add.Find-Channels",
+            name: "Service Scan (Add) [Find Targets]",
+            fn: async () => {
+                for (const channel of _.channel.items) {
+                    if (this.findByChannel(channel).length > 0) {
+                        continue;
+                    }
+
+                    this._queueScanAndAdd(channel);
+                }
+            },
+            readyFn: async () => {
+                // wait for all Service.Check-Add.* jobs to finish
+                while (true) {
+                    const jobItems = [..._.job.runningJobItems,
+                        ..._.job.queuedJobItems,
+                        ..._.job.waitingForReadyJobItems
+                    ];
+                    if (jobItems.some(jobItem => jobItem.key.includes("Service.Check-Add."))) {
+                        await sleep(1000);
+                        continue;
+                    }
+                    return true;
+                }
+            }
+        });
+
+        // schedule service scan
+        _.job.add({
+            key: "Service.Scan-Update.Add-Schedule",
+            name: "Service Scan (Update) [Add Schedule]",
+            fn: async () => {
+                for (const channel of _.channel.items) {
+                    _.job.addSchedule({
+                        key: `Service.Scan-Update.${channel.type}.${channel.channel}`,
+                        schedule: "5 6 * * *", // todo: config
+                        job: {
+                            key: `Service.Scan-Update.${channel.type}.${channel.channel}`,
+                            name: `Service Scan (Update) ${channel.type}/${channel.channel}`,
+                            fn: async () => this._scan(channel, false),
+                            readyFn: () => _.tuner.readyForJob(channel)
+                        }
+                    });
+                }
+            }
+        });
     }
 
     private _save(): void {
@@ -249,6 +318,99 @@ export class Service {
             this._items.map(service => service.export()),
             _.configIntegrity.channels
         );
+    }
+
+    private _queueCheckAndAdd(channel: ChannelItem, serviceId: number): void {
+        _.job.add({
+            key: `Service.Check-Add.${channel.type}.${channel.channel}.${serviceId}`,
+            name: `Service Check (Add) ${channel.type}/${channel.channel}/${serviceId}`,
+            fn: () => this._checkAndAdd(channel, serviceId),
+            readyFn: () => _.tuner.readyForJob(channel),
+            retryOnFail: true,
+            retryMax: (1000 * 60 * 60 * 12) / (1000 * 60 * 3), // (12時間 / retryDelay) = 12時間～
+            retryDelay: 1000 * 60 * 3
+        });
+    }
+
+    private _queueScanAndAdd(channel: ChannelItem): void {
+        _.job.add({
+            key: `Service.Scan-Add.${channel.type}.${channel.channel}`,
+            name: `Service Scan (Add) ${channel.type}/${channel.channel}`,
+            fn: async () => this._scan(channel, true),
+            readyFn: () => _.tuner.readyForJob(channel),
+            retryOnFail: true,
+            retryMax: (1000 * 60 * 60 * 12) / (1000 * 60 * 3), // (12時間 / retryDelay) = 12時間～
+            retryDelay: 1000 * 60 * 3
+        });
+    }
+
+    private async _checkAndAdd(channel: ChannelItem, serviceId: number): Promise<void> {
+        log.info("ChannelItem#'%s' serviceId=%d check has started", channel.name, serviceId);
+
+        let services: Awaited<ReturnType<typeof _.tuner.getServices>>;
+        try {
+            services = await _.tuner.getServices(channel);
+        } catch (e) {
+            log.warn("ChannelItem#'%s' serviceId=%d check has failed [%s]", channel.name, serviceId, e);
+            throw new Error("Service check failed");
+        }
+
+        const service = services.find(service => service.serviceId === serviceId);
+        if (!service) {
+            log.warn("ChannelItem#'%s' serviceId=%d check has failed [no service]", channel.name, serviceId);
+
+            // retry after 1 hour
+            setTimeout(() => this._queueCheckAndAdd(channel, serviceId), 3600000);
+            return;
+        }
+
+        log.debug("ChannelItem#'%s' serviceId=%d: %s", channel.name, serviceId, JSON.stringify(service, null, "  "));
+
+        this.add(
+            new ServiceItem(channel, service.networkId, service.serviceId, service.name, service.type, service.logoId)
+        );
+
+        log.info("ChannelItem#'%s' serviceId=%d check has finished", channel.name, serviceId);
+    }
+
+    private async _scan(channel: ChannelItem, add: boolean): Promise<void> {
+        log.info("ChannelItem#'%s' service scan has started", channel.name);
+
+        let services: Awaited<ReturnType<typeof _.tuner.getServices>>;
+        try {
+            services = await _.tuner.getServices(channel);
+        } catch (e) {
+            log.warn("ChannelItem#'%s' service scan has failed [%s]", channel.name, e);
+            throw new Error("Service scan failed");
+        }
+
+        log.debug("ChannelItem#'%s' services: %s", channel.name, JSON.stringify(services, null, "  "));
+
+        services.forEach(service => {
+            const item = this.get(service.networkId, service.serviceId);
+            if (item !== null) {
+                item.name = service.name;
+                item.type = service.type;
+                if (service.logoId > -1) {
+                    item.logoId = service.logoId;
+                }
+                item.remoteControlKeyId = service.remoteControlKeyId;
+            } else if (add === true) {
+                this.add(
+                    new ServiceItem(
+                        channel,
+                        service.networkId,
+                        service.serviceId,
+                        service.name,
+                        service.type,
+                        service.logoId,
+                        service.remoteControlKeyId
+                    )
+                );
+            }
+        });
+
+        log.info("ChannelItem#'%s' service scan has finished", channel.name);
     }
 }
 
