@@ -96,7 +96,7 @@ export class Job {
     private _standbyJobItems: QueuedJobItem[] = [];
     private _runningJobItemSet: Set<RunningJobItem> = new Set();
     private _scheduleItemSet: Set<ScheduleItem> = new Set();
-    private _pastJobItems: PastJobItem[] = [];
+    private _finishedJobItems: PastJobItem[] = [];
     private _scheduleInterval: NodeJS.Timeout;
     private _queueCheckTimeout: NodeJS.Timeout | null = null;
 
@@ -124,7 +124,7 @@ export class Job {
     }
 
     get pastJobItems(): PastJobItem[] {
-        return [...this._pastJobItems];
+        return [...this._finishedJobItems];
     }
 
     close(): void {
@@ -366,11 +366,11 @@ export class Job {
             finishedAt,
             error
         };
-        this._pastJobItems.unshift(pastJob);
+        this._finishedJobItems.unshift(pastJob);
 
         // 最大履歴数を超える古い履歴を削除
-        if (this._pastJobItems.length > this.maxHistory) {
-            this._pastJobItems.length = this.maxHistory;
+        if (this._finishedJobItems.length > this.maxHistory) {
+            this._finishedJobItems.length = this.maxHistory;
         }
 
         const duration = finishedAt - job.startedAt;
