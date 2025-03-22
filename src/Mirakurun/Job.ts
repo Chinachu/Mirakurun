@@ -60,6 +60,7 @@ export interface RunningJobItem extends QueuedJobItem {
 export interface PastJobItem extends Omit<RunningJobItem, "ac"> {
     ok: boolean;
     hasAborted: boolean;
+    hasSkipped: boolean;
     hasFailed: boolean;
     finishedAt: number;
     error?: Error;
@@ -86,13 +87,13 @@ export interface ScheduleItem {
 
 export class Job {
     maxRunning: number = Math.max(1, Math.floor(os.cpus().length / 2)); // todo: config
-    maxWaitingForReady: number = Math.max(1, Math.floor(os.cpus().length - 1)); // 同時に ready チェックを行う最大数
-    maxHistory: number = 50;
+    maxStandby: number = Math.max(1, Math.floor(os.cpus().length - 1)); // 同時に ready チェックを行う最大数
+    maxHistory: number = 50; // todo: config
 
     private _jobIdPrefix = Date.now().toString(36).toUpperCase() + ".";
     private _jobIdCounter = 0;
     private _queuedJobItems: QueuedJobItem[] = [];
-    private _waitingForReadyJobItems: QueuedJobItem[] = [];
+    private _standbyJobItems: QueuedJobItem[] = [];
     private _runningJobItemSet: Set<RunningJobItem> = new Set();
     private _scheduleItemSet: Set<ScheduleItem> = new Set();
     private _pastJobItems: PastJobItem[] = [];
@@ -105,6 +106,10 @@ export class Job {
 
     get queuedJobItems(): QueuedJobItem[] {
         return this._queuedJobItems;
+    }
+
+    get standbyJobItems(): QueuedJobItem[] {
+        return this._standbyJobItems;
     }
 
     get runningJobItems(): RunningJobItem[] {
@@ -140,7 +145,7 @@ export class Job {
         log.info(`Job#add() adding "${jobItem.key}"`);
 
         // ignore duplicated job by key
-        for (const job of [...this._queuedJobItems, ...this._waitingForReadyJobItems, ...this._runningJobItemSet]) {
+        for (const job of [...this._queuedJobItems, ...this._standbyJobItems, ...this._runningJobItemSet]) {
             if (job.key === jobItem.key) {
                 log.warn(`Job#add() ignore adding "${jobItem.key}" because already in the queue or running.`);
                 return;
@@ -223,10 +228,10 @@ export class Job {
     }
 
     private _checkQueue(): void {
-        log.debug(`Job#_checkQueue() queue=${this._queuedJobItems.length} waitingForReady=${this._waitingForReadyJobItems.length} running=${this._runningJobItemSet.size}`);
+        log.debug(`Job#_checkQueue() queue=${this._queuedJobItems.length} standby=${this._standbyJobItems.length} running=${this._runningJobItemSet.size}`);
 
-        if (this._waitingForReadyJobItems.length >= this.maxWaitingForReady) {
-            log.debug("Job#_checkQueue() waitingForReady is full [skip]");
+        if (this._standbyJobItems.length >= this.maxStandby) {
+            log.debug("Job#_checkQueue() standby is full [skip]");
             return;
         }
         if (this._queuedJobItems.length === 0) {
@@ -235,7 +240,7 @@ export class Job {
         }
 
         for (const job of this._queuedJobItems) {
-            if (this._waitingForReadyJobItems.length >= this.maxWaitingForReady) {
+            if (this._standbyJobItems.length >= this.maxStandby) {
                 break;
             }
 
@@ -250,12 +255,12 @@ export class Job {
             log.error(`Job#_checkReady() "${job.key}" (id: ${job.id}) not found in queue`);
             return;
         }
-        if (this._waitingForReadyJobItems.includes(job)) {
-            log.error(`Job#_checkReady() "${job.key}" (id: ${job.id}) already in waitingForReady`);
+        if (this._standbyJobItems.includes(job)) {
+            log.error(`Job#_checkReady() "${job.key}" (id: ${job.id}) already in standby`);
             return;
         }
-        if (this._waitingForReadyJobItems.length >= this.maxWaitingForReady) {
-            log.error(`Job#_checkReady() "${job.key}" (id: ${job.id}) waitingForReady is full`);
+        if (this._standbyJobItems.length >= this.maxStandby) {
+            log.error(`Job#_checkReady() "${job.key}" (id: ${job.id}) standby is full`);
             return;
         }
 
@@ -263,7 +268,7 @@ export class Job {
         if (index !== -1) {
             this._queuedJobItems.splice(index, 1);
         }
-        this._waitingForReadyJobItems.push(job);
+        this._standbyJobItems.push(job);
 
         let skip = false;
 
@@ -284,9 +289,9 @@ export class Job {
             }
         }
 
-        const waitingIndex = this._waitingForReadyJobItems.indexOf(job);
+        const waitingIndex = this._standbyJobItems.indexOf(job);
         if (waitingIndex !== -1) {
-            this._waitingForReadyJobItems.splice(waitingIndex, 1);
+            this._standbyJobItems.splice(waitingIndex, 1);
         }
 
         if (skip) {
@@ -348,6 +353,7 @@ export class Job {
     private _finishJob(job: RunningJobItem, ok: boolean, error?: Error): void {
         const finishedAt = Date.now();
         const hasAborted = job.ac.signal.aborted;
+        const hasSkipped = job.ac.signal.aborted && job.ac.signal.reason === "skipped";
         const hasFailed = !ok;
 
         // Add to history
@@ -355,6 +361,7 @@ export class Job {
             ...job,
             ok,
             hasAborted,
+            hasSkipped,
             hasFailed,
             finishedAt,
             error

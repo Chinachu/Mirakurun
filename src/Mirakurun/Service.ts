@@ -279,7 +279,7 @@ export class Service {
                 while (true) {
                     const jobItems = [..._.job.runningJobItems,
                         ..._.job.queuedJobItems,
-                        ..._.job.waitingForReadyJobItems
+                        ..._.job.standbyJobItems
                     ];
                     if (jobItems.some(jobItem => jobItem.key.includes("Service.Check-Add."))) {
                         await sleep(1000);
