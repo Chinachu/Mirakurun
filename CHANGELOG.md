@@ -2,9 +2,66 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
-## 4.0.0-beta.10 (2025-03-17)
+## About 4.0.0
 
 **Important Notice**: Mirakurun 4.0.0 includes significant performance improvements, enhanced EPG processing, asynchronous file I/O operations, and new features. As announced in 3.9.0, the experimental Win32 support has been completely removed.
+
+## 4.0.0-beta.12 (2025-03-21)
+
+### Server Changes
+
+- **Server**:
+  - Wait the LISTEN until finishes loading the program and service db at startup.
+- **UI**:
+  - **TunersManager**: packet counter is now hidden when stream info is empty
+
+## 4.0.0-beta.11 (2025-03-20)
+
+### Key Changes
+
+- **Channel Configuration**: Added new `commandVars` property to replace and extend the previous tuner command options
+  - Supports any custom command variables (not limited to predefined keys)
+  - Added support for arguments containing whitespace using quotes
+  - Previous options (`satellite`, `space`, `freq`, `polarity`) are now soft-deprecated but still work - Automatically migrates existing configurations to the new format
+
+  ```yaml
+  # Tuner Device Item Configuration
+  - name: Example-Tuner
+    types:
+      - GR
+    ...
+    command: cmd <channel> --arg1 --arg2 <exampleArg1> <exampleArg2> "<exampleArg3>" -
+
+  # Channel Item Configuration
+  - name: Example-Ch
+    type: GR
+    channel: '123'
+    ...
+    commandVars: # new
+      exampleArg1: -arg0 -arg1=example
+      exampleArg2: -arg2 "whitespace is now supported using quote"
+      exampleArg3: white space
+      ...
+  ```
+  - This implementation is inspired by the [extra-args already implemented in mirakc](https://github.com/mirakc/mirakc/blob/1fbbd9875bcb2de9143e2dc73be8ac6d54ed0965/docs/config.md#channels), but in a different way. This is so that appropriate arguments can be defined even in an environment where different tuner commands are mixed.
+
+### Server Changes
+
+- **API**:
+  - Deprecated several channel configuration properties in favor of the new `commandVars` property
+- **Channel**:
+  - Improved handling of tuner command parameters with expanded configuration options
+  - Migrated from hardcoded parameters to flexible variable substitution
+- **TunerDevice**:
+  - Enhanced command string handling with support for quoted arguments containing whitespace
+  - Improved command template variable substitution
+- **UI**:
+  - **ChannelsConfigurator**: Significantly improved the channel configuration interface
+    - Added visual editor for command arguments with dynamic add/remove capability
+    - Removed column headers for cleaner interface
+    - Automatically migrates deprecated configuration properties to the new format
+
+## 4.0.0-beta.10 (2025-03-17)
 
 ### Server Changes
 

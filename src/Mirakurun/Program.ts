@@ -36,8 +36,6 @@ export class Program {
     private _programGCInterval = _.config?.server?.programGCInterval || 1000 * 60 * 60; // 1 hour
 
     constructor() {
-        this._load();
-
         setTimeout(this._gc.bind(this), this._programGCInterval);
     }
 
@@ -176,7 +174,7 @@ export class Program {
         this._saveTimerId = setTimeout(() => this._save(), 1000 * 30);
     }
 
-    private async _load(): Promise<void> {
+    async load(): Promise<void> {
         log.debug("loading programs...");
 
         const now = Date.now();

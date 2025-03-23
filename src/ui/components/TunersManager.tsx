@@ -127,6 +127,13 @@ const summarizeStreamInfo = (streamInfo: StreamInfo) => {
     return `Dropped Pkts: ${drops} / ${packets}`;
 };
 
+const isEmptyStreamInfo = (streamInfo: StreamInfo): boolean => {
+    if (!streamInfo) {
+        return true;
+    }
+    return Object.keys(streamInfo).length === 0;
+};
+
 const TunersManager: React.FC<{ tuners: TunerDevice[], rpc: RPCClient }> = ({ tuners, rpc }) => {
     const [killTarget, setKillTarget] = useState<number>(null);
     const [tunersEx, setTunersEx] = useState<TunerDevice[]>([]);
@@ -227,7 +234,7 @@ const TunersManager: React.FC<{ tuners: TunerDevice[], rpc: RPCClient }> = ({ tu
                         <Text style={{ marginLeft: 8 }}>{user.streamSetting.serviceId ? `SID: 0x${user.streamSetting.serviceId.toString(16).toUpperCase()} (${user.streamSetting.serviceId})` : "-"}</Text>
                     </>
                 ),
-                streamInfo: (
+                streamInfo: isEmptyStreamInfo(user.streamInfo) ? undefined : (
                     <div
                         style={{ cursor: "pointer" }}
                         onClick={() => setStreamDetail({ userId: user.id, info: user.streamInfo })}
