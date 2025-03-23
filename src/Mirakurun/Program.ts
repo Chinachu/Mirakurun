@@ -182,7 +182,7 @@ export class Program {
         const now = Date.now();
         let dropped = false;
 
-        const programs = await db.loadPrograms(_.configIntegrity.channels);
+        const programs = await db.loadPrograms(_.configIntegrity.channels, true);
         programs.forEach(item => {
             if (item.networkId === undefined) {
                 dropped = true;
