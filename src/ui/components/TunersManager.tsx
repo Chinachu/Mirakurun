@@ -138,6 +138,9 @@ const TunersManager: React.FC<{ tuners: TunerDevice[], rpc: RPCClient }> = ({ tu
             if (document.hidden) {
                 return;
             }
+            if (rpc.isConnected() === false) {
+                return;
+            }
             try {
                 setTunersEx(await rpc.call("getTuners"));
             } catch (e) {
@@ -147,8 +150,6 @@ const TunersManager: React.FC<{ tuners: TunerDevice[], rpc: RPCClient }> = ({ tu
 
         return () => clearInterval(interval);
     }, []);
-
-
 
     const items: Item[] = [];
     for (const tuner of tuners) {
