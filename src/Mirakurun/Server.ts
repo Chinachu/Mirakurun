@@ -193,6 +193,9 @@ export class Server {
             const server = http.createServer(app);
             server.timeout = 1000 * 15; // 15 sec.
 
+            this._servers.add(server);
+            this._rpcs.add(createRPCServer(server));
+
             if (regexp.unixDomainSocket.test(address)) {
                 if (fs.existsSync(address)) {
                     fs.unlinkSync(address);
@@ -221,15 +224,6 @@ export class Server {
                     });
                 });
             }
-
-            if (!this._isRunning) {
-                const serverCloseAsync = promisify(server.close).bind(server);
-                await serverCloseAsync();
-                return;
-            }
-
-            this._servers.add(server);
-            this._rpcs.add(createRPCServer(server));
         }
 
         // event notifications for RPC
