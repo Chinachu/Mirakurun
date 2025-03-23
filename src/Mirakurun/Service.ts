@@ -196,7 +196,7 @@ export class Service {
 
         let updated = false;
 
-        const services = await db.loadServices(_.configIntegrity.channels);
+        const services = await db.loadServices(_.configIntegrity.channels, true);
         for (const service of services) {
             const channelItem = _.channel.get(service.channel.type, service.channel.channel);
 
