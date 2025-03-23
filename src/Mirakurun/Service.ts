@@ -246,7 +246,7 @@ export class Service {
 
         // add services from channel config
         for (const channelConfig of _.config.channels) {
-            if (!channelConfig.serviceId) {
+            if (channelConfig.isDisabled || !channelConfig.serviceId) {
                 continue;
             }
             const channel = _.channel.get(channelConfig.type, channelConfig.channel);
