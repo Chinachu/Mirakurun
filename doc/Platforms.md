@@ -103,13 +103,15 @@ if !(type "recpt1" > /dev/null 2>&1); then
   apt-get update
   apt-get install -y --no-install-recommends git autoconf automake
 
-  cd /tmp
+  mkdir /buildwork
+  cd /buildwork
   git clone https://github.com/stz2012/recpt1.git
   cd recpt1/recpt1
   ./autogen.sh
   ./configure --prefix /opt
   make
   make install
+  rm -rf /buildwork
 fi
 
 recpt1 -v
