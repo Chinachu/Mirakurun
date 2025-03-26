@@ -70,7 +70,7 @@ const columns: IColumn[] = [
         name: "Types",
         fieldName: "types",
         minWidth: 60,
-        maxWidth: 105
+        maxWidth: 140
     },
     {
         key: "col-options",
@@ -90,7 +90,7 @@ const columns: IColumn[] = [
 
 const dummySelection = new Selection(); // dummy
 
-const typesIndex = ["GR", "BS", "CS", "SKY"];
+const typesIndex = ["GR", "BS", "CS", "SKY", "BS4K"];
 function sortTypes(types: ChannelType[]): ChannelType[] {
     return types.sort((a, b) => typesIndex.indexOf(a) - typesIndex.indexOf(b));
 }
@@ -153,7 +153,8 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                         { key: "GR", text: "GR" },
                         { key: "BS", text: "BS" },
                         { key: "CS", text: "CS" },
-                        { key: "SKY", text: "SKY" }
+                        { key: "SKY", text: "SKY" },
+                        { key: "BS4K", text: "BS4K" }
                     ]}
                     selectedKeys={tuner.types}
                     onChange={(ev, option) => {
@@ -252,6 +253,20 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                                     delete tuner.decoder;
                                 } else {
                                     tuner.decoder = newValue;
+                                }
+                                setEditing([...editing]);
+                            }}
+                        />
+                    )}
+                    {(!tuner.remoteMirakurunHost || !tuner.remoteMirakurunDecoder) && tuner.types.some(t => t === "BS4K") && (
+                        <TextField
+                            label="TLVDecoder:"
+                            value={tuner.tlvDecoder || ""}
+                            onChange={(ev, newValue) => {
+                                if (newValue === "") {
+                                    delete tuner.tlvDecoder;
+                                } else {
+                                    tuner.tlvDecoder = newValue;
                                 }
                                 setEditing([...editing]);
                             }}

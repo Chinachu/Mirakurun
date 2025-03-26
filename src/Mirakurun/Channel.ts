@@ -77,7 +77,7 @@ export class Channel {
                 return;
             }
 
-            if (channel.type !== "GR" && channel.type !== "BS" && channel.type !== "CS" && channel.type !== "SKY") {
+            if (channel.type !== "GR" && channel.type !== "BS" && channel.type !== "CS" && channel.type !== "SKY" && channel.type !== "BS4K") {
                 log.error("invalid type of property `type` in channel#%d (%s) configuration", i, channel.name);
                 return;
             }
@@ -166,6 +166,10 @@ export class Channel {
             const networkIds = [...new Set(_.service.items.map(item => item.networkId))];
 
             networkIds.forEach(networkId => {
+
+                if (networkId === 0xB || networkId === 0xC) {
+                    return;
+                }
                 const services = _.service.findByNetworkId(networkId);
 
                 if (services.length === 0) {
@@ -213,6 +217,60 @@ export class Channel {
                 });
 
                 log.debug("Network#%d EPG gathering has queued", networkId);
+            });
+
+            _.channel.items.forEach(channel => {
+                if (channel.type !== "BS4K") {
+                    return;
+                }
+                const services = channel.getServices();
+
+                if (services.length === 0) {
+                    return;
+                }
+                const service = services[0];
+
+                queue.add(async () => {
+
+                    if (service.epgReady === true) {
+                        const now = Date.now();
+                        if (now - service.epgUpdatedAt < this._epgGatheringInterval) {
+                            log.info("Channel#%s EPG gathering has skipped by `epgGatheringInterval`", channel.name);
+                            return;
+                        }
+                        if (now - service.epgUpdatedAt > 1000 * 60 * 60 * 6) { // 6 hours
+                            log.info("Channel#%s EPG gathering is resuming forcibly because reached maximum pause time", channel.name);
+                            service.epgReady = false;
+                        } else {
+                            // const currentPrograms = _.program.findByNetworkIdAndTime(networkId, now)
+                            //     .filter(program => !!program.name && program.name !== "放送休止");
+                            // if (currentPrograms.length === 0) {
+                            //     const networkPrograms = _.program.findByNetworkId(networkId);
+                            //     if (networkPrograms.length > 0) {
+                            //         log.info("Channel#%s EPG gathering has skipped because broadcast is off", channel.name);
+                            //         return;
+                            //     }
+                            //     service.epgReady = false;
+                            // }
+                        }
+                    }
+
+                    if (status.epgByChannel[channel.channel] === true) {
+                        log.info("Channel#%s EPG gathering is already in progress on another stream", channel.name);
+                        return;
+                    }
+
+                    log.info("Channel#%s EPG gathering has started", channel.name);
+
+                    try {
+                        await _.tuner.getEPG(service.channel);
+                        log.info("Channel#%s EPG gathering has finished", channel.name);
+                    } catch (e) {
+                        log.warn("Channel#%s EPG gathering has failed [%s]", channel.name, e);
+                    }
+                });
+
+                log.debug("Channel#%s EPG gathering has queued", channel.name);
             });
 
             queue.add(async () => {

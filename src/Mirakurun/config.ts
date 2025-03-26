@@ -52,6 +52,7 @@ const {
 
 const IS_DOCKER = DOCKER === "YES";
 
+
 type Server = Readonly<apid.ConfigServer>;
 type Tuner = Readonly<apid.ConfigTunersItem>;
 type Channel = Readonly<apid.ConfigChannelsItem>;
@@ -105,6 +106,13 @@ export async function loadServer(): Promise<Server> {
     }
     if (!config.tsplayEndpoint) {
         config.tsplayEndpoint = "https://mirakurun-secure-contexts-api.pages.dev/tsplay/";
+    }
+
+    if (typeof config.useTSId !== "boolean") {
+        config.useTSId = false;
+    }
+    if (typeof config.useStreamId !== "boolean") {
+        config.useStreamId = true;
     }
 
     // Docker

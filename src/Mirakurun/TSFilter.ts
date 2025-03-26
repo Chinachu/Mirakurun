@@ -16,7 +16,7 @@
 import { Writable } from "stream";
 import EventEmitter = require("eventemitter3");
 import { TsStreamLite, TsCrc32, TsChar, TsLogo, tsDataModule } from "@chinachu/aribts";
-import { StreamInfo, getTimeFromMJD } from "./common";
+import { StreamInfo, getTimeFromMJD, ChannelType } from "./common";
 import * as log from "./log";
 import EPG from "./EPG";
 import status from "./status";
@@ -24,6 +24,7 @@ import _ from "./_";
 import { getProgramItemId } from "./Program";
 import Service from "./Service";
 import ServiceItem from "./ServiceItem";
+import * as db from "./db";
 
 interface TSFilterOptions {
     readonly output?: Writable;
@@ -557,6 +558,22 @@ export default class TSFilter extends EventEmitter {
             areaCode: -1,
             remoteControlKeyId: -1
         };
+
+        if (data.table_id !== 0x40) {
+            return;
+        }
+
+        const channelType: ChannelType | undefined = data.network_id === 4 ? "BS" : (data.network_id === 6 || data.network_id === 7 ? "CS" : undefined);
+        if (channelType != null) {
+            const tsIdList: number[] = data.transport_streams.map(ts => ts.transport_stream_id);
+            const channels: db.Channel[] = tsIdList.map(tsid => ({
+                type: channelType,
+                channel: `${tsid}`
+            }));
+            this.emit("networkStreams", channels);
+        } else {
+            this.emit("networkStreams", []);
+        }
 
         if (data.transport_streams[0]) {
             for (const desc of data.transport_streams[0].transport_descriptors) {

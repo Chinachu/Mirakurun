@@ -46,7 +46,7 @@ export interface StreamInfo {
     };
 }
 
-export const channelTypes: apid.ChannelType[] = ["GR", "BS", "CS", "SKY"];
+export const channelTypes: apid.ChannelType[] = ["GR", "BS", "CS", "SKY", "BS4K"];
 
 export const deepClone = rfdc();
 
@@ -127,6 +127,11 @@ export function getTimeFromBCD24(buffer: Uint8Array | Buffer): number {
     return time * 1000;
 }
 
+const textDecoder = new TextDecoder();
+
+export function decodeUTF8(buffer: Uint8Array) {
+    return textDecoder.decode(buffer, { stream: false });
+  
 export function replaceCommandTemplate(template: string, vars: Record<string, string | number>): string {
     return template.replace(/<([a-z0-9\-_\.]+)>/gi, (match, key) => {
         return vars[key] !== undefined ? String(vars[key]) : "";

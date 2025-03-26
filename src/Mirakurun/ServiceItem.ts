@@ -19,7 +19,7 @@ import _ from "./_";
 import * as apid from "../../api";
 import Event from "./Event";
 import ChannelItem from "./ChannelItem";
-import TSFilter from "./TSFilter";
+import { StreamFilter } from "./StreamFilter";
 
 export default class ServiceItem {
     static getId(networkId: number, serviceId: number): number {
@@ -156,7 +156,7 @@ export default class ServiceItem {
         return ret;
     }
 
-    getStream(userRequest: common.UserRequest, output: stream.Writable): Promise<TSFilter> {
+    getStream(userRequest: common.UserRequest, output: stream.Writable): Promise<StreamFilter> {
         return _.tuner.initServiceStream(this, userRequest, output);
     }
 
@@ -175,6 +175,9 @@ export default class ServiceItem {
                 break;
             case "SKY":
                 order = "4";
+                break;
+            case "BS4K":
+                order = "5";
                 break;
         }
 
