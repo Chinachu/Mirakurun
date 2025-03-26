@@ -76,7 +76,7 @@ stages:
         command: publish
         publishEndpoint: npm
 
-- stage: Docker
+- stage: DockerBuildAndPush
   condition: |
     and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
   jobs:
@@ -124,6 +124,11 @@ stages:
         tags: |
           $(ARCH)-$(tag)
           $(ARCH)-latest
+
+- stage: DockerManifestPush
+  condition: |
+    and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
+  jobs:
   - job: Manifest
     pool:
       vmImage: 'ubuntu-22.04'

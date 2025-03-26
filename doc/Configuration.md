@@ -31,6 +31,9 @@ allowIPv4CidrRanges: ["10.0.0.0/8", "127.0.0.0/8", "172.16.0.0/12", "192.168.0.0
 allowIPv6CidrRanges: ["fc00::/7"] # array of string
 useTSId: false
 useStreamId: true
+allowOrigins: ["https://mirakurun-secure-contexts-api.pages.dev"] # array of string
+allowPNA: true # boolean
+tsplayEndpoint: https://mirakurun-secure-contexts-api.pages.dev/tsplay/ # string
 ```
 
 ### Environment Variables (Docker)
@@ -49,6 +52,9 @@ DISABLE_EIT_PARSING
 DISABLE_WEB_UI
 ALLOW_IPV4_CIDR_RANGES
 ALLOW_IPV6_CIDR_RANGES
+ALLOW_ORIGINS
+ALLOW_PNA
+TSPLAY_ENDPOINT
 ```
 
 ## tuners.yml
@@ -68,7 +74,8 @@ ALLOW_IPV6_CIDR_RANGES
     - CS
     - SKY
   # for chardev/dvb
-  command: cmd <channel> --arg1 --arg2 ... # string
+  # "<template>" will replaced with `commandVars[template]` or "(empty)" *@4.0.0~
+  command: cmd <channel> --arg1 --arg2 <exampleArg1> <exampleArg2>... # string
   # for dvb
   dvbDevicePath: /dev/dvb/adapter/dvr/path # string
   # for multiplexing w/ remote Mirakurun
@@ -112,11 +119,14 @@ sudo npm install arib-b25-stream-test -g --unsafe-perm
   channel: '0' # string
   # below are optional
   serviceId: 1234 # integer
-  satellite: JCSAT4A # string: <satellite> in tuner command
-  space: 0 # integer: <space> as tuning space number in tuner command (default: 0)
-  freq: 12345 # number: <freq> in tuner command
-  polarity: H # enum [H|V]
   tsmfRelTs: 1 # number: 1~15
+  commandVars: # optional command variables *@4.0.0~
+    satellite: EXAMPLE-SAT4A
+    space: 0
+    freq: 12345
+    polarity: H
+    exampleArg1: -arg0 -arg1=example
+    exampleArg2: -arg2 "whitespace is now supported using quote"
   isDisabled: false # boolean
 ```
 

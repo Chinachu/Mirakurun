@@ -13,8 +13,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-import { Writable } from "stream";
+import rfdc from "rfdc";
 import ChannelItem from "./ChannelItem";
+import * as apid from "../../api";
 
 export interface User {
     readonly id: string;
@@ -45,19 +46,12 @@ export interface StreamInfo {
     };
 }
 
-export enum ChannelTypes {
-    "GR" = "GR",
-    "BS" = "BS",
-    "CS" = "CS",
-    "SKY" = "SKY",
-    "BS4K" = "BS4K"
-}
+export const channelTypes: apid.ChannelType[] = ["GR", "BS", "CS", "SKY", "BS4K"];
 
-export type ChannelType = keyof typeof ChannelTypes;
+export const deepClone = rfdc();
 
 export function updateObject<T, U>(target: T, input: U): boolean;
 export function updateObject<T extends any[], U extends any[]>(target: T, input: U): boolean {
-
     let updated = false;
 
     for (const k in input) {
@@ -69,7 +63,7 @@ export function updateObject<T extends any[], U extends any[]>(target: T, input:
         } else if (typeof target[k] === "object" && typeof input[k] === "object") {
             updated = updateObject(target[k], input[k]) || updated;
             continue;
-        } else  if (target[k] === input[k]) {
+        } else if (target[k] === input[k]) {
             continue;
         }
 
@@ -81,7 +75,6 @@ export function updateObject<T extends any[], U extends any[]>(target: T, input:
 }
 
 function updateArray<T extends any[], U extends any[]>(target: T, input: U): boolean {
-
     const length = target.length;
 
     if (length !== input.length) {
@@ -118,7 +111,6 @@ export function sleep(ms: number): Promise<void> {
 }
 
 export function getTimeFromMJD(buffer: Uint8Array | Buffer): number {
-
     const mjd = (buffer[0] << 8) | buffer[1];
     const h = (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);
     const i = (buffer[3] >> 4) * 10 + (buffer[3] & 0x0F);
@@ -128,7 +120,6 @@ export function getTimeFromMJD(buffer: Uint8Array | Buffer): number {
 }
 
 export function getTimeFromBCD24(buffer: Uint8Array | Buffer): number {
-
     let time = ((buffer[0] >> 4) * 10 + (buffer[0] & 0x0F)) * 3600;
     time += ((buffer[1] >> 4) * 10 + (buffer[1] & 0x0F)) * 60;
     time += (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);
@@ -140,4 +131,53 @@ const textDecoder = new TextDecoder();
 
 export function decodeUTF8(buffer: Uint8Array) {
     return textDecoder.decode(buffer, { stream: false });
+  
+export function replaceCommandTemplate(template: string, vars: Record<string, string | number>): string {
+    return template.replace(/<([a-z0-9\-_\.]+)>/gi, (match, key) => {
+        return vars[key] !== undefined ? String(vars[key]) : "";
+    });
+}
+
+export function parseCommandForSpawn(cmdString: string): { command: string; args: string[] } {
+    let inQuote = false;
+    let quoteChar = "";
+    let current = "";
+    const parts: string[] = [];
+
+    // Parse the command string character by character
+    for (let i = 0; i < cmdString.length; i++) {
+        const char = cmdString[i];
+
+        if ((char === `"` || char === `'`) && (!inQuote || char === quoteChar)) {
+            // Toggle quote state if we encounter a quote character
+            inQuote = !inQuote;
+            quoteChar = inQuote ? char : "";
+        } else if (char === " " && !inQuote) {
+            // Space outside of quotes indicates a new part
+            if (current) {
+                parts.push(current);
+                current = "";
+            }
+        } else {
+            // Add character to the current part
+            current += char;
+        }
+    }
+
+    // Add the last part if there is one
+    if (current) {
+        parts.push(current);
+    }
+
+    if (parts.length === 0) {
+        throw new Error("Invalid command string");
+    }
+
+    // First part is the command, the rest are arguments
+    const result: { command: string; args: string[] } = {
+        command: parts[0],
+        args: parts.slice(1)
+    };
+
+    return result;
 }

@@ -28,7 +28,6 @@ export const parameters = [
 ];
 
 export const get: Operation = async (req, res) => {
-
     const service = _.service.get(req.params.id as any as number);
 
     if (service === null || service === undefined) {

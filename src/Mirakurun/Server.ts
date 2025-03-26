@@ -15,9 +15,10 @@
 */
 import * as fs from "fs";
 import * as http from "http";
+import { promisify } from "util";
 import express from "express";
 import cors from "cors";
-import * as mime from "mime";
+import mime from "mime";
 import * as openapi from "express-openapi";
 import morgan from "morgan";
 import * as yaml from "js-yaml";
@@ -32,14 +33,23 @@ import { createRPCServer, initRPCNotifier } from "./rpc";
 
 const pkg = require("../../package.json");
 
-class Server {
+export class Server {
+    /** used for test */
+    testMode = false;
 
     private _isRunning = false;
     private _servers = new Set<http.Server>();
     private _rpcs = new Set<RPCServer>();
 
-    async init() {
+    get isRunning() {
+        return this._isRunning;
+    }
 
+    get servers() {
+        return this._servers;
+    }
+
+    async init() {
         if (this._isRunning === true) {
             throw new Error("Server is running");
         }
@@ -47,37 +57,37 @@ class Server {
 
         const serverConfig = _.config.server;
 
-        let addresses: string[] = [];
+        const addresses: string[] = [];
 
         if (serverConfig.path) {
             addresses.push(serverConfig.path);
         }
 
-        if (serverConfig.port) {
-            while (true) {
-                try {
-                    if (system.getIPv4AddressesForListen().length > 0) {
-                        break;
+        if (typeof serverConfig.port === "number") {
+            if (!this.testMode) {
+                while (true) {
+                    try {
+                        const systemIPv4s = system.getIPv4AddressesForListen();
+                        if (systemIPv4s.length > 0) {
+                            addresses.push(...systemIPv4s);
+                            break;
+                        }
+                    } catch (e) {
+                        console.error(e);
                     }
-                } catch (e) {
-                    console.error(e);
+                    log.warn("Server hasn't detected IPv4 addresses...");
+                    await sleep(5000);
                 }
-                log.warn("Server hasn't detected IPv4 addresses...");
-                await sleep(5000);
             }
 
-            addresses = [
-                ...addresses,
-                ...system.getIPv4AddressesForListen(),
-                "127.0.0.1"
-            ];
+            addresses.push("127.0.0.1");
 
             if (serverConfig.disableIPv6 !== true) {
-                addresses = [
-                    ...addresses,
-                    ...system.getIPv6AddressesForListen(),
-                    "::1"
-                ];
+                if (!this.testMode) {
+                    addresses.push(...system.getIPv6AddressesForListen());
+                }
+
+                addresses.push("::1");
             }
         }
 
@@ -86,19 +96,6 @@ class Server {
         app.disable("x-powered-by");
         app.disable("etag");
 
-        const corsOptions: cors.CorsOptions = {
-            origin: (origin, callback) => {
-                if (!origin) {
-                    return callback(null, true);
-                }
-                if (system.isPermittedHost(origin, serverConfig.hostname)) {
-                    return callback(null, true);
-                }
-                return callback(new Error("Not allowed by CORS"));
-            }
-        };
-        app.use(cors(corsOptions));
-
         app.use(morgan(":remote-addr :remote-user :method :url HTTP/:http-version :status :res[content-length] - :response-time ms :user-agent", {
             stream: log.event as any
         }));
@@ -106,14 +103,14 @@ class Server {
         app.use(express.json());
 
         app.use((req: express.Request, res: express.Response, next) => {
-
             if (req.ip && system.isPermittedIPAddress(req.ip) === false) {
                 req.socket.end();
                 return;
             }
 
-            if (req.get("Origin") !== undefined) {
-                if (!system.isPermittedHost(req.get("Origin"), serverConfig.hostname)) {
+            const origin = req.get("Origin");
+            if (origin !== undefined) {
+                if (!system.isPermittedHost(origin, serverConfig.hostname) && !serverConfig.allowOrigins.includes(origin)) {
                     res.status(403).end();
                     return;
                 }
@@ -126,9 +123,20 @@ class Server {
                 }
             }
 
+            if (serverConfig.allowPNA && req.get("Access-Control-Request-Method") && req.get("Access-Control-Request-Private-Network") === "true") {
+                res.setHeader("Access-Control-Allow-Private-Network", "true");
+                res.setHeader("Private-Network-Access-Name", `Mirakurun_${serverConfig.hostname}`);
+                res.setHeader("Private-Network-Access-ID", "00:00:00:00:00:00");
+            }
+
+            res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
             res.setHeader("Server", "Mirakurun/" + pkg.version);
             next();
         });
+
+        // do not place before the access control
+        app.use(cors());
 
         if (!serverConfig.disableWebUI) {
             app.use(express.static("lib/ui", {
@@ -138,8 +146,9 @@ class Server {
                     }
                 }
             }));
-            app.use("/swagger-ui", express.static("node_modules/swagger-ui-dist"));
-            app.use("/api/debug", express.static("lib/ui/swagger-ui.html"));
+            app.use("/redoc", express.static("node_modules/redoc/bundles"));
+            app.use("/redoc-try", express.static("node_modules/redoc-try/dist"));
+            app.use("/api/debug", express.static("lib/ui/redoc-ui.html"));
         }
 
         const api = yaml.load(fs.readFileSync("api.yml", "utf8")) as OpenAPIV2.Document;
@@ -153,7 +162,6 @@ class Server {
         });
 
         app.use((err, req, res: express.Response, next) => {
-
             if (err.message === "Not allowed by CORS") {
                 res.status(403).end();
                 return;
@@ -177,41 +185,71 @@ class Server {
             next();
         });
 
-        addresses.forEach(address => {
+        if (!this._isRunning) {
+            return;
+        }
 
+        for (const address of addresses) {
             const server = http.createServer(app);
-
             server.timeout = 1000 * 15; // 15 sec.
 
-            if (regexp.unixDomainSocket.test(address) === true) {
-                if (fs.existsSync(address) === true) {
+            this._servers.add(server);
+            this._rpcs.add(createRPCServer(server));
+
+            if (regexp.unixDomainSocket.test(address)) {
+                if (fs.existsSync(address)) {
                     fs.unlinkSync(address);
                 }
 
-                server.listen(address, () => {
-                    log.info("listening on http+unix://%s", address.replace(/\//g, "%2F"));
+                await new Promise<void>(resolve => {
+                    server.listen(address, () => {
+                        log.info("listening on http+unix://%s", address.replace(/\//g, "%2F"));
+                        resolve();
+                    });
                 });
 
                 fs.chmodSync(address, "777");
             } else {
-                server.listen(serverConfig.port, address, () => {
-                    if (address.includes(":") === true) {
-                        const [addr, iface] = address.split("%");
-                        log.info("listening on http://[%s]:%d (%s)", addr, serverConfig.port, iface);
-                    } else {
-                        log.info("listening on http://%s:%d", address, serverConfig.port);
-                    }
+                await new Promise<void>(resolve => {
+                    server.listen(serverConfig.port, address, () => {
+                        const serverAddr = server.address();
+                        const port = typeof serverAddr === "string" ? serverConfig.port : serverAddr.port;
+                        if (address.includes(":")) {
+                            const [addr, iface] = address.split("%");
+                            log.info("listening on http://[%s]:%d (%s)", addr, port, iface);
+                        } else {
+                            log.info("listening on http://%s:%d", address, port);
+                        }
+                        resolve();
+                    });
                 });
             }
-
-            this._servers.add(server);
-            this._rpcs.add(createRPCServer(server));
-        });
+        }
 
         // event notifications for RPC
         initRPCNotifier(this._rpcs);
 
         log.info("RPC interface is enabled");
+    }
+
+    async deinit() {
+        if (this._isRunning === false) {
+            return;
+        }
+
+        for (const rpc of this._rpcs) {
+            await rpc.close();
+        }
+
+        for (const server of this._servers) {
+            const serverCloseAsync = promisify(server.close).bind(server);
+            await serverCloseAsync();
+        }
+
+        this._rpcs.clear();
+        this._servers.clear();
+
+        this._isRunning = false;
     }
 }
 

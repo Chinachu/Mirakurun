@@ -1,7 +1,7 @@
 swagger: '2.0'
 info:
   title: Mirakurun
-  version: ~
+  version: '0.0.0'
   description: DVR Tuner Server for Japanese TV.
   contact:
     name: Chinachu Project
@@ -76,17 +76,6 @@ definitions:
         type: string
       name:
         type: string
-      satellite:
-        type: string
-      space:
-        type: integer
-      freq:
-        type: number
-      polarity:
-        type: string
-        enum:
-          - H
-          - V
       tsmfRelTs:
         type: integer
       services:
@@ -557,17 +546,10 @@ definitions:
         type: string
       serviceId:
         $ref: '#/definitions/ServiceId'
-      satellite:
-        type: string
-      space:
+      tsmfRelTs:
         type: integer
-      freq:
-        type: number
-      polarity:
-        type: string
-        enum:
-          - H
-          - V
+      commandVars:
+        type: object
       isDisabled:
         type: boolean
 
@@ -578,6 +560,55 @@ definitions:
         type: string
       latest:
         type: string
+
+  ChannelScanStatus:
+    type: object
+    description: "Current status of a channel scan operation"
+    properties:
+      status:
+        type: string
+        description: "Current scan status"
+        enum:
+          - not_started
+          - scanning
+          - completed
+          - cancelled
+          - error
+      isScanning:
+        type: boolean
+        description: "Whether a scan is currently in progress"
+      type:
+        $ref: '#/definitions/ChannelType'
+        description: "Channel type being scanned"
+      dryRun:
+        type: boolean
+        description: "Whether this is a dry run (no changes will be saved)"
+      progress:
+        type: integer
+        description: "Scan progress percentage (0-100)"
+      currentChannel:
+        type: string
+        description: "Channel currently being scanned"
+      scanLog:
+        type: array
+        description: "Log of scan events"
+        items:
+          type: string
+      newCount:
+        type: integer
+        description: "Number of new channels found"
+      takeoverCount:
+        type: integer
+        description: "Number of existing channels merged"
+      result:
+        type: array
+        description: "Complete channel configuration"
+        items:
+          $ref: "#/definitions/ConfigChannelsItem"
+      startTime:
+        $ref: '#/definitions/UnixtimeMS'
+      updateTime:
+        $ref: '#/definitions/UnixtimeMS'
 
   Status:
     type: object

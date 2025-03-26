@@ -15,18 +15,17 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../api";
-import { Status } from "../../../api";
+import * as apid from "../../../api";
 import status from "../status";
 import _ from "../_";
 
 const pkg = require("../../../package.json");
 
 export const get: Operation = (req, res) => {
-
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.status(200);
 
-    res.end(JSON.stringify(getStatus(), null, 2));
+    api.responseJSON(res, getStatus() as apid.Status);
 };
 
 get.apiDoc = {
@@ -49,9 +48,8 @@ get.apiDoc = {
     }
 };
 
-export function getStatus(): Status {
-
-    const ret: Status = {
+export function getStatus(): apid.Status {
+    const ret: apid.Status = {
         time: Date.now(),
         version: pkg.version,
         process: {

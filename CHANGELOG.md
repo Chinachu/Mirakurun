@@ -2,7 +2,203 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
-## 3.9.0 (2023-xx-xx)
+## About 4.0.0
+
+**Important Notice**: Mirakurun 4.0.0 includes significant performance improvements, enhanced EPG processing, asynchronous file I/O operations, and new features. As announced in 3.9.0, the experimental Win32 support has been completely removed.
+
+## 4.0.0-beta.12 (2025-03-21)
+
+### Server Changes
+
+- **Server**:
+  - Wait the LISTEN until finishes loading the program and service db at startup.
+- **UI**:
+  - **TunersManager**: packet counter is now hidden when stream info is empty
+
+## 4.0.0-beta.11 (2025-03-20)
+
+### Key Changes
+
+- **Channel Configuration**: Added new `commandVars` property to replace and extend the previous tuner command options
+  - Supports any custom command variables (not limited to predefined keys)
+  - Added support for arguments containing whitespace using quotes
+  - Previous options (`satellite`, `space`, `freq`, `polarity`) are now soft-deprecated but still work - Automatically migrates existing configurations to the new format
+
+  ```yaml
+  # Tuner Device Item Configuration
+  - name: Example-Tuner
+    types:
+      - GR
+    ...
+    command: cmd <channel> --arg1 --arg2 <exampleArg1> <exampleArg2> "<exampleArg3>" -
+
+  # Channel Item Configuration
+  - name: Example-Ch
+    type: GR
+    channel: '123'
+    ...
+    commandVars: # new
+      exampleArg1: -arg0 -arg1=example
+      exampleArg2: -arg2 "whitespace is now supported using quote"
+      exampleArg3: white space
+      ...
+  ```
+  - This implementation is inspired by the [extra-args already implemented in mirakc](https://github.com/mirakc/mirakc/blob/1fbbd9875bcb2de9143e2dc73be8ac6d54ed0965/docs/config.md#channels), but in a different way. This is so that appropriate arguments can be defined even in an environment where different tuner commands are mixed.
+
+### Server Changes
+
+- **API**:
+  - Deprecated several channel configuration properties in favor of the new `commandVars` property
+- **Channel**:
+  - Improved handling of tuner command parameters with expanded configuration options
+  - Migrated from hardcoded parameters to flexible variable substitution
+- **TunerDevice**:
+  - Enhanced command string handling with support for quoted arguments containing whitespace
+  - Improved command template variable substitution
+- **UI**:
+  - **ChannelsConfigurator**: Significantly improved the channel configuration interface
+    - Added visual editor for command arguments with dynamic add/remove capability
+    - Removed column headers for cleaner interface
+    - Automatically migrates deprecated configuration properties to the new format
+
+## 4.0.0-beta.10 (2025-03-17)
+
+### Server Changes
+
+- **Server**:
+  - Added test mode support for unit/integration testing
+  - Added deinit method (not used yet)
+  - Improved server init with proper async handling
+- **API**:
+  - **getTuner**: Fixed 500 error on not found (*bug*)
+
+### Client Changes
+
+- **getDocs**: Added to get API spec docs
+
+## 4.0.0-beta.9 (2025-03-16)
+
+### Server Changes
+
+- **UI**:
+  - **ChannelsConfigurator**: Fixed layout issue on initial view (*bug*)
+  - **TunersManager**: Added dropped packet counter
+
+## 4.0.0-beta.8 (2025-03-16)
+
+### Server Changes
+
+- **API**:
+  - **getTuner**: Fixed broken response (*bug*)
+  - **killTunerProcess**: The normal status code was changed to `204`. Response is now empty. (*breaking change*)
+  - **getChannelStream**,<br>
+    **getServiceStreamByChannel**,<br>
+    **getProgramStream**,<br>
+    **getServiceStream**:
+    - Fixed processing of HEAD requests; removed operationId because duplicated. (*bug*)
+
+### Client Changes
+
+- channelScan: (Note) Response spec may change. asynchronous support is under consideration.
+- **getChannelScanStatus**: Added
+- **stopChannelScan**: Added
+
+## 4.0.0-beta.7 (2025-03-14)
+
+**Important Notice**: Mirakurun 4.0.0 includes significant performance improvements, enhanced EPG processing, asynchronous file I/O operations, and new features. As announced in 3.9.0, the experimental Win32 support has been completely removed.
+
+### Key Changes
+
+- **Node.js**: Updated supported versions: `^18 || ^20 || ^22` (dropped support for Node.js 14 and 16)
+- **Win32**: Completely removed support
+- **UI**: Added UI for channel scanning
+- **Performance**: Eliminated blocking file I/O operations to improve real-time processing
+- **Configuration**: Reduced storage write frequency to minimize interruptions to real-time processing
+- **Docker**: Updated configuration files, improved commands, and added Node.js 22 support
+
+### Breaking Changes
+
+- **Win32**: Completely removed support
+- **Project Structure**: Changed global installation to be discouraged and removed PM2 support
+
+### Server Changes
+
+- **config/server**: Added new configuration options:
+  - `allowOrigins`: Specify CORS origins
+  - `allowPNA`: Allow Private Network Access (default: `true`)
+  - `tsplayEndpoint`: Endpoint for TSPlay feature
+- **CORS**: Support for multiple origins, Cross-Origin Resource Policy set to "cross-origin"
+- **Private Network Access**: Added PNA/LNA support, enabling secure access within private networks
+- **Memory Usage**: Increased Node.js `max-semi-space-size` to 64MB to improve memory performance (this may slight increase memory usage)
+- **config/channels/scan**: Added service type support, improved scanning capabilities
+  - Added `skipCh` parameter to skip specific channels
+  - Added asynchronous channel scanning with progress tracking
+  - Added DELETE endpoint for canceling scans
+- **UI**:
+  - Changed API documentation from Swagger UI to ReDoc
+  - Added new UI components and service type filtering options
+  - Added channel, service ID, and User-Agent columns to tuner manager
+  - Added UI for channel scanning with visual progress tracking
+- **TSPlay**: Added experimental TSPlay feature
+
+### Docker Changes
+
+- **Base Image**: Updated from `node:18.15.0-buster-slim` to `node:22.14.0-bookworm-slim`
+- **Build Process**: Changed from `npm install` to `npm ci` for more reliable builds
+- **Configuration**:
+  - Made Dockerfile and image tag configurable via environment variables (`DOCKERFILE`, `MIRAKURUN_IMAGE_TAG`)
+  - Added `tmpfs` mount for `/tmp` to improve I/O performance
+- **docker-compose.yml**:
+  - Simplified volume binding syntax
+  - Added configuration guidance for users not using card readers or DVB devices
+  - Added detailed comments for hostname settings
+- **Commands**: Added new npm scripts for developers:
+  - `docker:run-setup`: Run container in setup mode
+  - `docker:down`: Stop and remove container
+  - `docker:logs`: Display container logs
+  - `docker:bash`: Run Bash shell in container
+
+### Other Changes
+
+- **File I/O Processing**:
+  - Replaced synchronous file I/O operations with asynchronous ones to improve real-time processing performance
+  - Replaced synchronous methods from the `fs` module with asynchronous methods from `fs/promises`
+  - Introduced queues for config file I/O operations to prevent concurrent access issues
+  - Reduced storage write frequency (extended program info save interval from 10 seconds to 30 seconds)
+
+- **Performance Optimization**:
+  - Implemented asynchronous JSON processing to prevent interruptions to real-time stream processing
+  - Introduced `yieldable-json` package for asynchronous JSON parsing
+  - Increased Node.js `max-semi-space-size` to 64MB to improve garbage collection efficiency
+
+- **Packages and Frameworks**:
+  - Updated major dependencies:
+    - express: `4.17.3` → `4.21.2`
+    - glob: `7.2.3` → `11.0.1`
+    - semver: `7.3.5` → `7.7.1`
+    - rfdc: `1.3.0` → `1.4.1`
+    - React: `17.0.2` → `^18.3.1`
+    - React DOM: `17.0.2` → `^18.3.1`
+    - TypeScript: `4.7` → `5.7`
+  - Added new dependencies:
+    - redoc: `2.4.0` (as an alternative to Swagger UI)
+    - redoc-try: `1.4.10`
+    - yieldable-json: `^2.1.0`
+  - Removed dependencies:
+    - swagger-ui-dist (due to change in API documentation tool to ReDoc)
+
+- **Project Structure**:
+  - Removed global installation (`preferGlobal`) flag
+  - Removed PM2 support, added dummy CLI script for migration guidance
+  - Completely removed Win32-specific scripts and support
+  - Improved TypeScript configuration and consistency
+  - Updated Azure Pipelines configuration (updated to Ubuntu 22.04 base)
+
+- **Channels**:
+  - Updated default sample channel configuration
+  - Significantly improved and extended channel scanning functionality
+
+## 3.9.0-rc.4 (2023-04-09)
 
 Performance improvements, fixes for memory leaks and bugs related to EPG processing, etc.
 

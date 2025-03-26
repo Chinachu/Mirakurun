@@ -14,7 +14,7 @@
    limitations under the License.
 */
 import { Operation } from "express-openapi";
-import { Program } from "../../db";
+import { Program } from "../../../../api";
 import Service from "../../Service";
 import _ from "../../_";
 
@@ -216,7 +216,6 @@ function getDateTime(time: number): string {
 }
 
 function getGenreStrings(genres: Program["genres"]) {
-
     const stringSet = new Set<string>();
 
     for (const genre of genres) {
@@ -236,7 +235,6 @@ function getGenreStrings(genres: Program["genres"]) {
 }
 
 export const get: Operation = async (req, res) => {
-
     const apiRoot = `${req.protocol}://${req.headers.host}/api`;
 
     const services = [..._.service.items]; // shallow copy

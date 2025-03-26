@@ -16,7 +16,7 @@
 import EventEmitter from "eventemitter3";
 import * as React from "react";
 import { useState, useEffect } from "react";
-import * as ReactDOM from "react-dom";
+import * as ReactDOM from "react-dom/client";
 import {
     createTheme,
     loadTheme,
@@ -34,8 +34,7 @@ import {
 import { initializeIcons } from "@fluentui/react/lib/Icons";
 import { Client as RPCClient } from "jsonrpc2-ws";
 import { JoinParams, NotifyParams } from "../../lib/Mirakurun/rpc.d";
-import { EventMessage } from "../../lib/Mirakurun/Event.d";
-import { TunerDevice, Service, Status, Program } from "../../api.d";
+import { TunerDevice, Service, Status, Event } from "../../api.d";
 import ConnectionGuide from "./components/ConnectionGuide";
 import UpdateAlert from "./components/UpdateAlert";
 import Restart from "./components/Restart";
@@ -78,7 +77,6 @@ let statusRefreshInterval: any;
 let servicesRefreshInterval: any;
 
 function idleStatusChecker(): boolean {
-
     let statusName = "Standby";
     let statusIconName = "normal";
 
@@ -105,7 +103,6 @@ const rpc = new RPCClient(`${location.protocol === "https:" ? "wss:" : "ws:"}//$
 });
 
 rpc.on("connecting", () => {
-
     console.log("rpc:connecting");
 
     uiState.statusName = "Connecting";
@@ -113,10 +110,10 @@ rpc.on("connecting", () => {
 });
 
 rpc.on("connected", async () => {
-
     console.log("rpc:connected");
 
-    status: {
+    // status
+    {
         uiState.status = await rpc.call("getStatus");
 
         statusRefreshInterval = setInterval(async () => {
@@ -125,7 +122,7 @@ rpc.on("connected", async () => {
             }
             uiState.status = await rpc.call("getStatus");
             uiStateEvents.emit("update:status");
-        }, 1000 * 3);
+        }, 1000 * 5);
 
         if (uiState.version !== ".." && uiState.version !== uiState.status.version) {
             location.reload();
@@ -133,7 +130,8 @@ rpc.on("connected", async () => {
         }
         uiState.version = uiState.status.version;
     }
-    services: {
+    // services
+    {
         uiState.services = await (await fetch("/api/services")).json();
 
         servicesRefreshInterval = setInterval(async () => {
@@ -157,7 +155,6 @@ rpc.on("connected", async () => {
 });
 
 rpc.on("disconnect", () => {
-
     console.log("rpc:disconnected");
 
     clearInterval(statusRefreshInterval);
@@ -168,8 +165,7 @@ rpc.on("disconnect", () => {
     uiStateEvents.emit("update");
 });
 
-rpc.methods.set("events", async (socket, { array }: NotifyParams<EventMessage>) => {
-
+rpc.methods.set("events", async (socket, { array }: NotifyParams<Event>) => {
     let reloadServiceRequired = false;
 
     for (const event of array) {
@@ -206,18 +202,16 @@ rpc.methods.set("logs", (socket, { array }: NotifyParams<string> ) => {
 });
 
 const Content = () => {
-
     const [state, setState] = useState<UIState>(uiState);
 
     useEffect(() => {
-
         const title = `${state.statusName} - Mirakurun ${state.version}`;
         if (document.title !== title) {
             document.title = title;
         }
 
         const icon = document.getElementById("icon");
-        if (icon.getAttribute("href") !== iconSrcMap[state.statusIconName]) {
+        if (icon && icon.getAttribute("href") !== iconSrcMap[state.statusIconName]) {
             icon.setAttribute("href", iconSrcMap[state.statusIconName]);
         }
 
@@ -229,7 +223,7 @@ const Content = () => {
         return () => {
             uiStateEvents.removeListener("update", onStateUpdate);
         };
-    });
+    }, [state.statusName, state.version, state.statusIconName]);
 
     return (
         <Fabric style={{ margin: "16px" }}>
@@ -254,7 +248,7 @@ const Content = () => {
 
                 <Pivot>
                     <PivotItem itemIcon="GroupedList" headerText="Status">
-                        <StatusView uiState={uiState} uiStateEvents={uiStateEvents} />
+                        <StatusView uiState={uiState} uiStateEvents={uiStateEvents} rpc={rpc} />
                     </PivotItem>
                     <PivotItem itemIcon="EntitlementRedemption" headerText="Events">
                         <EventsView uiStateEvents={uiStateEvents} rpc={rpc} />
@@ -292,36 +286,34 @@ const Content = () => {
     );
 };
 
-ReactDOM.render(
-    <Content />,
-    document.getElementById("root")
-);
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<Content />);
 
 // dark theme
 const myTheme = createTheme({
     palette: {
-        themePrimary: '#ffd56c',
-        themeLighterAlt: '#0a0904',
-        themeLighter: '#292211',
-        themeLight: '#4d4020',
-        themeTertiary: '#998040',
-        themeSecondary: '#e0bc5e',
-        themeDarkAlt: '#ffd97a',
-        themeDark: '#ffdf8f',
-        themeDarker: '#ffe8ac',
-        neutralLighterAlt: '#2d2f37',
-        neutralLighter: '#34363f',
-        neutralLight: '#40424c',
-        neutralQuaternaryAlt: '#474a54',
-        neutralQuaternary: '#4e505b',
-        neutralTertiaryAlt: '#686b77',
-        neutralTertiary: '#f1f1f1',
-        neutralSecondary: '#f4f4f4',
-        neutralPrimaryAlt: '#f6f6f6',
-        neutralPrimary: '#ebebeb',
-        neutralDark: '#fafafa',
-        black: '#fdfdfd',
-        white: '#25272e',
+        themePrimary: "#ffd56c",
+        themeLighterAlt: "#0a0904",
+        themeLighter: "#292211",
+        themeLight: "#4d4020",
+        themeTertiary: "#998040",
+        themeSecondary: "#e0bc5e",
+        themeDarkAlt: "#ffd97a",
+        themeDark: "#ffdf8f",
+        themeDarker: "#ffe8ac",
+        neutralLighterAlt: "#2d2f37",
+        neutralLighter: "#34363f",
+        neutralLight: "#40424c",
+        neutralQuaternaryAlt: "#474a54",
+        neutralQuaternary: "#4e505b",
+        neutralTertiaryAlt: "#686b77",
+        neutralTertiary: "#f1f1f1",
+        neutralSecondary: "#f4f4f4",
+        neutralPrimaryAlt: "#f6f6f6",
+        neutralPrimary: "#ebebeb",
+        neutralDark: "#fafafa",
+        black: "#fdfdfd",
+        white: "#25272e",
     }
 });
 loadTheme(myTheme);

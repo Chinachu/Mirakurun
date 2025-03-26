@@ -30,7 +30,6 @@ export const parameters = [
 ];
 
 export const get: Operation = async (req, res) => {
-
     const serviceItem = _.service.get(req.params.id as any as number);
 
     if (serviceItem === null || serviceItem === undefined) {
@@ -42,7 +41,7 @@ export const get: Operation = async (req, res) => {
         ...serviceItem.export(),
         hasLogoData: await Service.isLogoDataExists(serviceItem.networkId, serviceItem.logoId)
     };
-    res.json(service);
+    api.responseJSON(res, service);
 };
 
 get.apiDoc = {

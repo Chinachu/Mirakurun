@@ -15,6 +15,7 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../../api";
+import * as apid from "../../../../api";
 import _ from "../../_";
 
 export const parameters = [
@@ -28,10 +29,9 @@ export const parameters = [
 ];
 
 export const get: Operation = (req, res) => {
+    const tuner: apid.TunerDevice = _.tuner.get(req.params.index as any as number)?.toJSON();
 
-    const tuner = _.tuner.get(req.params.index as any as number);
-
-    if (tuner === null) {
+    if (!tuner) {
         api.responseError(res, 404);
         return;
     }

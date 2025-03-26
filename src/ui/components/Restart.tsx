@@ -29,7 +29,6 @@ import {
 } from "@fluentui/react";
 
 const Restart: React.FC<{ uiStateEvents: EventEmitter }> = ({ uiStateEvents }) => {
-
     const [hideDialog, setHideDialog] = useState<boolean>(true);
     const [restartRequired, setRestartRequired] = useState<boolean>(false);
     const targetButton = useRef<HTMLDivElement>();

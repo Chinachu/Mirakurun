@@ -14,11 +14,9 @@
    limitations under the License.
 */
 import { Operation } from "express-openapi";
-import * as api from "../api";
 import { event } from "../log";
 
 export const get: Operation = (req, res) => {
-
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.status(200);
 

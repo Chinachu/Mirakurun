@@ -22,15 +22,20 @@ import {
     Icon,
     TooltipHost,
     ITooltipHostStyles,
-    ITooltipProps
+    ITooltipProps,
+    Checkbox
 } from "@fluentui/react";
+import { Client as RPCClient } from "jsonrpc2-ws";
 import { UIState } from "../index";
 import TunersManager from "./TunersManager";
+import { ConfigServer } from "../../../api";
 
 interface StatusItem {
     label: string;
     text: string;
 }
+
+const configAPI = "/api/config/server";
 
 const calloutProps = { gapSpace: 0 };
 const tooltipHostStyles: Partial<ITooltipHostStyles> = {
@@ -46,14 +51,33 @@ const tooltipProps: Partial<ITooltipProps> = {
     }
 };
 
-const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = ({ uiState, uiStateEvents }) => {
-
+const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter, rpc: RPCClient }> = ({ uiState, uiStateEvents, rpc }) => {
     const [status, setStatus] = useState<UIState["status"]>(uiState.status);
     const [services, setServices] = useState<UIState["services"]>(uiState.services);
     const [tuners, setTuners] = useState<UIState["tuners"]>(uiState.tuners);
 
-    useEffect(() => {
+    const [allowPNA, setAllowPNA] = useState<ConfigServer["allowPNA"]>(false);
+    const [tsplayEndpoint, setTsplayEndpoint] = useState<ConfigServer["tsplayEndpoint"]>("");
 
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await (await fetch(configAPI)).json();
+                console.log("StatusView", "GET", configAPI, "->", res);
+                setAllowPNA(res.allowPNA);
+                setTsplayEndpoint(res.tsplayEndpoint);
+            } catch (e) {
+                console.error(e);
+            }
+        })();
+    }, []);
+
+    // サービスタイプフィルター状態
+    const [showDTV, setShowDTV] = useState<boolean>(true);
+    const [showData, setShowData] = useState<boolean>(false);
+    const [showOthers, setShowOthers] = useState<boolean>(false);
+
+    useEffect(() => {
         const onStatusUpdate = () => {
             setStatus({ ...uiState.status });
         };
@@ -108,12 +132,19 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
         );
     }
 
-    const serviceList: JSX.Element[] = [];
-    for (let i = 0; i < services.length; i++) {
-        const service = services[i];
-        if (service.type !== 1 && service.type !== 173) {
-            continue;
+    // フィルタリングされたサービスリストを作成
+    const filteredServices = services.filter(service => {
+        if (service.type === 0x01 || service.type === 0xAD) {
+            return showDTV;
+        } else if (service.type === 0xC0) {
+            return showData;
         }
+        return showOthers;
+    });
+
+    const serviceList: JSX.Element[] = [];
+    for (let i = 0; i < filteredServices.length; i++) {
+        const service = filteredServices[i];
         const tooltipId = `service-list-item#${i}-tooltip`;
         serviceList.push(
             <div key={`service-list-item${i}`} className="ms-Grid-col ms-sm6 ms-xl3 ms-xxl2">
@@ -126,6 +157,7 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
                         `#${service.id}\n` +
                         `SID: 0x${service.serviceId.toString(16).toUpperCase()} (${service.serviceId})\n` +
                         `NID: 0x${service.networkId.toString(16).toUpperCase()} (${service.networkId})\n` +
+                        `Type: 0x${service.type.toString(16).toUpperCase()} (${service.type})\n` +
                         `Channel: ${service.channel.type} / ${service.channel.channel}`
                     )}
                 >
@@ -148,6 +180,18 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
                                         <Icon iconName="Clock" style={{ color: "#777" }} />
                                     }
                                 </span>
+                                {service.type === 0x01 && allowPNA && tsplayEndpoint && (
+                                    <span style={{ marginLeft: 4, fontSize: 13, verticalAlign: "middle", cursor: "pointer" }}>
+                                        <Icon
+                                            iconName="Play"
+                                            style={{ color: "#0078d4" }}
+                                            onClick={() => {
+                                                window.open(`${tsplayEndpoint}#${location.protocol}//${location.host}/api/services/${service.id}/stream?decode=1`, "_blank", "popup");
+                                            }}
+                                            title="TSPlay (Experimental)"
+                                        />
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -168,6 +212,25 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
             </Stack>
             <Stack>
                 <Separator alignContent="start">Services</Separator>
+                <div style={{ display: "flex", marginLeft: 12, marginTop: 8, marginBottom: 8 }}>
+                    <Checkbox
+                        label="DTV"
+                        checked={showDTV}
+                        onChange={(_, checked) => setShowDTV(!!checked)}
+                        styles={{ root: { marginRight: 16 } }}
+                    />
+                    <Checkbox
+                        label="Data"
+                        checked={showData}
+                        onChange={(_, checked) => setShowData(!!checked)}
+                        styles={{ root: { marginRight: 16 } }}
+                    />
+                    <Checkbox
+                        label="Others"
+                        checked={showOthers}
+                        onChange={(_, checked) => setShowOthers(!!checked)}
+                    />
+                </div>
                 <div className="ms-Grid" dir="ltr" style={{ marginLeft: 8 }}>
                     <div className="ms-Grid-row">
                         {serviceList}
@@ -176,7 +239,7 @@ const StatusView: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> = 
             </Stack>
             <Stack>
                 <Separator alignContent="start">Tuners</Separator>
-                <TunersManager tuners={tuners} />
+                <TunersManager tuners={tuners} rpc={rpc} />
             </Stack>
         </Stack>
     );

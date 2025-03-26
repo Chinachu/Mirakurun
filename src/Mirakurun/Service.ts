@@ -14,8 +14,8 @@
    limitations under the License.
 */
 import { join, dirname } from "path";
-import { promises as fsPromises } from "fs";
-import * as fs from "fs";
+import { existsSync } from "fs";
+import { stat, mkdir, readFile, writeFile } from "fs/promises";
 import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
@@ -25,10 +25,8 @@ import ServiceItem from "./ServiceItem";
 
 const { LOGO_DATA_DIR_PATH } = process.env;
 
-export default class Service {
-
+export class Service {
     static getLogoDataPath(networkId: number, logoId: number) {
-
         if (typeof logoId !== "number" || logoId < 0) {
             throw new Error("Invalid `logoId`");
         }
@@ -37,60 +35,56 @@ export default class Service {
     }
 
     static async getLogoDataMTime(networkId: number, logoId: number): Promise<number> {
-
         if (typeof logoId !== "number" || logoId < 0) {
             return 0;
         }
 
         try {
-            return (await fsPromises.stat(Service.getLogoDataPath(networkId, logoId))).mtimeMs;
+            return (await stat(Service.getLogoDataPath(networkId, logoId))).mtimeMs;
         } catch (e) {
             return 0;
         }
     }
 
     static async isLogoDataExists(networkId: number, logoId: number): Promise<boolean> {
-
         if (typeof logoId !== "number" || logoId < 0) {
             return false;
         }
 
         try {
-            return (await fsPromises.stat(Service.getLogoDataPath(networkId, logoId))).isFile();
+            return (await stat(Service.getLogoDataPath(networkId, logoId))).isFile();
         } catch (e) {
             return false;
         }
     }
 
     static async loadLogoData(networkId: number, logoId: number): Promise<Buffer> {
-
         if (typeof logoId !== "number" || logoId < 0) {
             return null;
         }
 
         try {
-            return await fsPromises.readFile(Service.getLogoDataPath(networkId, logoId));
+            return await readFile(Service.getLogoDataPath(networkId, logoId));
         } catch (e) {
             return null;
         }
     }
 
     static async saveLogoData(networkId: number, logoId: number, data: Uint8Array, retrying = false): Promise<void> {
-
         log.info("Service.saveLogoData(): saving... (networkId=%d logoId=%d)", networkId, logoId);
 
         const path = Service.getLogoDataPath(networkId, logoId);
 
         try {
-            await fsPromises.writeFile(path, data, { encoding: "binary" });
+            await writeFile(path, data, { encoding: "binary" });
         } catch (e) {
             if (retrying === false) {
                 // mkdir if not exists
                 const dirPath = dirname(path);
-                if (fs.existsSync(dirPath) === false) {
+                if (existsSync(dirPath) === false) {
                     log.warn("Service.saveLogoData(): making directory `%s`... (networkId=%d logoId=%d)", dirPath, networkId, logoId);
                     try {
-                        fs.mkdirSync(dirPath, { recursive: true });
+                        await mkdir(dirPath, { recursive: true });
                     } catch (e) {
                         throw e;
                     }
@@ -108,16 +102,11 @@ export default class Service {
     private _items: ServiceItem[] = [];
     private _saveTimerId: NodeJS.Timeout;
 
-    constructor() {
-        this._load();
-    }
-
     get items(): ServiceItem[] {
         return this._items;
     }
 
     add(item: ServiceItem): void {
-
         if (this.get(item.id) !== null) {
             return;
         }
@@ -132,7 +121,6 @@ export default class Service {
     get(id: number): ServiceItem;
     get(networkId: number, serviceId: number): ServiceItem;
     get(id: number, serviceId?: number) {
-
         if (serviceId === undefined) {
             const l = this._items.length;
             for (let i = 0; i < l; i++) {
@@ -159,7 +147,6 @@ export default class Service {
     }
 
     findByChannel(channel: ChannelItem): ServiceItem[] {
-
         const items = [];
 
         const l = this._items.length;
@@ -173,7 +160,6 @@ export default class Service {
     }
 
     findByNetworkId(networkId: number): ServiceItem[] {
-
         const items = [];
 
         const l = this._items.length;
@@ -187,7 +173,6 @@ export default class Service {
     }
 
     findByNetworkIdWithLogoId(networkId: number, logoId: number): ServiceItem[] {
-
         const items = [];
 
         const l = this._items.length;
@@ -202,16 +187,15 @@ export default class Service {
 
     save(): void {
         clearTimeout(this._saveTimerId);
-        this._saveTimerId = setTimeout(() => this._save(), 1000 * 3);
+        this._saveTimerId = setTimeout(() => this._save(), 1000 * 10);
     }
 
-    private _load(): void {
-
+    async load(): Promise<void> {
         log.debug("loading services...");
 
         let updated = false;
 
-        const services = db.loadServices(_.configIntegrity.channels);
+        const services = await db.loadServices(_.configIntegrity.channels, true);
         for (const service of services) {
             const channelItem = _.channel.get(service.channel.type, service.channel.channel);
 
@@ -259,7 +243,6 @@ export default class Service {
     }
 
     private _save(): void {
-
         log.debug("saving services...");
 
         db.saveServices(
@@ -268,3 +251,5 @@ export default class Service {
         );
     }
 }
+
+export default Service;

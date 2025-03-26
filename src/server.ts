@@ -45,6 +45,9 @@ process.on("unhandledRejection", err => {
     console.error(err);
 });
 
+function setEnv(name: string, value: string) {
+    process.env[name] = process.env[name] || value;
+}
 setEnv("SERVER_CONFIG_PATH", "/usr/local/etc/mirakurun/server.yml");
 setEnv("TUNERS_CONFIG_PATH", "/usr/local/etc/mirakurun/tuners.yml");
 setEnv("CHANNELS_CONFIG_PATH", "/usr/local/etc/mirakurun/channels.yml");
@@ -63,32 +66,33 @@ import Server from "./Mirakurun/Server";
 import * as config from "./Mirakurun/config";
 import * as log from "./Mirakurun/log";
 
-_.config.server = config.loadServer();
-_.config.channels = config.loadChannels();
-_.configIntegrity.channels = createHash("sha256").update(JSON.stringify(_.config.channels)).digest("base64");
-_.config.tuners = config.loadTuners();
+(async function top() {
+    _.config.server = await config.loadServer();
+    _.config.channels = await config.loadChannels();
+    _.configIntegrity.channels = createHash("sha256").update(JSON.stringify(_.config.channels)).digest("base64");
+    _.config.tuners = await config.loadTuners();
 
-if (typeof _.config.server.logLevel === "number") {
-    (<any> log).logLevel = _.config.server.logLevel;
-}
-if (typeof _.config.server.maxLogHistory === "number") {
-    (<any> log).maxLogHistory = _.config.server.maxLogHistory;
-}
+    if (typeof _.config.server.logLevel === "number") {
+        (<any> log).logLevel = _.config.server.logLevel;
+    }
+    if (typeof _.config.server.maxLogHistory === "number") {
+        (<any> log).maxLogHistory = _.config.server.maxLogHistory;
+    }
 
-_.event = new Event();
-_.tuner = new Tuner();
-_.channel = new Channel();
-_.service = new Service();
-_.program = new Program();
-_.server = new Server();
+    _.event = new Event();
+    _.tuner = new Tuner();
+    _.channel = new Channel();
+    _.service = new Service();
+    _.program = new Program();
+    _.server = new Server();
 
-if (process.env.SETUP === "true") {
-    log.info("setup is done.");
-    process.exit(0);
-}
+    await _.service.load();
+    await _.program.load();
 
-_.server.init();
+    if (process.env.SETUP === "true") {
+        log.info("setup is done.");
+        process.exit(0);
+    }
 
-function setEnv(name: string, value: string) {
-    process.env[name] = process.env[name] || value;
-}
+    _.server.init();
+})();

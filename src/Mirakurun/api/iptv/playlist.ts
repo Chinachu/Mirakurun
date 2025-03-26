@@ -18,7 +18,6 @@ import _ from "../../_";
 import Service from "../../Service";
 
 export const get: Operation = async (req, res) => {
-
     const apiRoot = `${req.protocol}://${req.headers.host}/api`;
 
     const services = [..._.service.items]; // shallow copy

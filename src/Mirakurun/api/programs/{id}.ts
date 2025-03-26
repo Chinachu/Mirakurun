@@ -15,6 +15,7 @@
 */
 import { Operation } from "express-openapi";
 import * as api from "../../api";
+import * as apid from "../../../../api";
 import _ from "../../_";
 
 export const parameters = [
@@ -29,15 +30,14 @@ export const parameters = [
 ];
 
 export const get: Operation = (req, res) => {
-
-    const program = _.program.get(req.params.id as any as number);
+    const program: apid.Program = _.program.get(req.params.id as any as number);
 
     if (program === null) {
         api.responseError(res, 404);
         return;
     }
 
-    res.json(program);
+    api.responseJSON(res, program);
 };
 
 get.apiDoc = {

@@ -40,8 +40,7 @@ export const parameters = [
     }
 ];
 
-export const head: Operation = (req, res) => {
-
+export const get: Operation = (req, res) => {
     const service = _.service.get(req.params.id as any as number);
 
     if (service === null || service === undefined) {
@@ -51,17 +50,11 @@ export const head: Operation = (req, res) => {
 
     const userId = (req.ip || "unix") + ":" + (req.socket.remotePort || Date.now());
 
-    res.setHeader("Content-Type", "video/MP2T");
-    res.setHeader("X-Mirakurun-Tuner-User-ID", userId);
-    res.status(200).end();
-};
-
-export const get: Operation = (req, res) => {
-
-    const service = _.service.get(req.params.id as any as number);
-
-    if (service === null || service === undefined) {
-        api.responseError(res, 404);
+    // HEAD request support
+    if (req.method === "HEAD") {
+        res.setHeader("Content-Type", "video/MP2T");
+        res.setHeader("X-Mirakurun-Tuner-User-ID", userId);
+        res.status(200).end();
         return;
     }
 
@@ -70,8 +63,6 @@ export const get: Operation = (req, res) => {
 
     (<any> res.socket)._writableState.highWaterMark = Math.max(res.writableHighWaterMark, 1024 * 1024 * 16);
     res.socket.setNoDelay(true);
-
-    const userId = (req.ip || "unix") + ":" + (req.socket.remotePort || Date.now());
 
     service.getStream({
         id: userId,
@@ -92,31 +83,6 @@ export const get: Operation = (req, res) => {
             res.status(200);
         })
         .catch((err) => api.responseStreamErrorHandler(res, err));
-};
-
-head.apiDoc = {
-    tags: ["services", "stream"],
-    operationId: "getServiceStream",
-    produces: ["video/MP2T"],
-    responses: {
-        200: {
-            description: "OK",
-            headers: {
-                "X-Mirakurun-Tuner-User-ID": {
-                    type: "string"
-                }
-            }
-        },
-        404: {
-            description: "Not Found"
-        },
-        503: {
-            description: "Tuner Resource Unavailable"
-        },
-        default: {
-            description: "Unexpected Error"
-        }
-    }
 };
 
 get.apiDoc = {
@@ -142,4 +108,12 @@ get.apiDoc = {
             description: "Unexpected Error"
         }
     }
+};
+
+// HEAD request support
+export const head: Operation = (...args) => get(...args);
+
+head.apiDoc = {
+    ...get.apiDoc,
+    operationId: undefined
 };

@@ -2,20 +2,32 @@ services:
   mirakurun:
     build:
       context: ../
-      dockerfile: docker/Dockerfile
-    image: chinachu/mirakurun:latest
+      dockerfile: docker/${DOCKERFILE:-Dockerfile}
+    # `latest` can be changed to fix the version
+    # `latest` の部分を編集するとバージョンを固定できます
+    # `MIRAKURUN_IMAGE_TAG` environment variable can also be used
+    # `MIRAKURUN_IMAGE_TAG` 環境変数でも固定できます
+    # available tags: https://hub.docker.com/r/chinachu/mirakurun/tags
+    image: chinachu/mirakurun:${MIRAKURUN_IMAGE_TAG:-latest}
     container_name: mirakurun
     cap_add:
       - SYS_ADMIN
       - SYS_NICE
     environment:
       TZ: Asia/Tokyo
+      # comment out below if you commented out `network_mode: host`
+      # `network_mode: host` をコメントアウトする場合はここもコメントアウト
       DOCKER_NETWORK: host
+      # you must set hostname if accesing by hostname (other than IP address)
+      # ブラウザから IP アドレス以外でアクセスする場合はホスト名を設定する必要があります
+      # hostname: localhost
+      # --
+      # for debug
       # LOG_LEVEL: "3"
       # DEBUG: "true"
     network_mode: host
     # comment out `devices:` if you commented out all devices
-    # device を全てコメントアウトした場合は devices: もコメントアウト
+    # `devices` を全てコメントアウトした場合は `devices:` もコメントアウト
     devices:
       # comment out below if you don't use card readers
       # カードリーダーを使わない場合は以下をコメントアウト
@@ -25,26 +37,12 @@ services:
       - /dev/dvb:/dev/dvb
     volumes:
       # you can change to any location if you want.
-      - type: bind
-        source: /opt/mirakurun/run
-        target: /var/run
-        bind:
-          create_host_path: true
-      - type: bind
-        source: /opt/mirakurun/opt
-        target: /opt
-        bind:
-          create_host_path: true
-      - type: bind
-        source: /opt/mirakurun/config
-        target: /app-config
-        bind:
-          create_host_path: true
-      - type: bind
-        source: /opt/mirakurun/data
-        target: /app-data
-        bind:
-          create_host_path: true
+      - /opt/mirakurun/run:/var/run
+      - /opt/mirakurun/opt:/opt
+      - /opt/mirakurun/config:/app-config
+      - /opt/mirakurun/data:/app-data
+    tmpfs:
+      - /tmp
     restart: always
     logging:
       driver: json-file
