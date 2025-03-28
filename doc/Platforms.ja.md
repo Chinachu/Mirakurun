@@ -10,7 +10,7 @@
   - **Ubuntu Server 24.10** / 他
   - ⚠️注意: デスクトップ環境 / VM (仮想マシン) はサポートせず、不安定です!
 
-- [Linux + PM2 (レガシー)](#linux-w-pm2-legacy)
+- [Linux + PM2 (レガシー)](#linux--pm2-レガシー)
   - [Node.js](https://nodejs.org/en/download) `^18 || ^20 || ^22`
   - [PM2](https://pm2.keymetrics.io/)
 
@@ -176,7 +176,7 @@ vim /opt/mirakurun/config/channels.yml
   - `bin/`
   - `bin/startup` - カスタム起動スクリプト (オプション)
 
-## PM2を使用したLinux (レガシー)
+## Linux + PM2 (レガシー)
 
 この方法は推奨されませんが、一部の古いユースケースの為に残されています。
 PM2 に特別対応するコードはすでに削除されており、エクスペリエンスは低下します。
