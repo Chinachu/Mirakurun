@@ -1,46 +1,66 @@
 services:
   mirakurun:
-    build:
-      context: ../
-      dockerfile: docker/${DOCKERFILE:-Dockerfile}
     # `latest` can be changed to fix the version
     # `latest` の部分を編集するとバージョンを固定できます
-    # `MIRAKURUN_IMAGE_TAG` environment variable can also be used
-    # `MIRAKURUN_IMAGE_TAG` 環境変数でも固定できます
     # available tags: https://hub.docker.com/r/chinachu/mirakurun/tags
     image: chinachu/mirakurun:${MIRAKURUN_IMAGE_TAG:-latest}
-    container_name: mirakurun
-    cap_add:
-      - SYS_ADMIN
-      - SYS_NICE
+
+    # 環境変数
     environment:
       TZ: Asia/Tokyo
+      # set to "1" to disable pcscd
+      # pcscd を無効にする場合は "1"
+      DISABLE_PCSCD: "${DISABLE_PCSCD:-0}"
+      # set to "1" to disable fetch/build the B25 test decoder command
+      # B25 テストコマンドの取得とビルドを無効にする場合は "1"
+      DISABLE_B25_TEST: "${DISABLE_B25_TEST:-0}"
       # comment out below if you commented out `network_mode: host`
       # `network_mode: host` をコメントアウトする場合はここもコメントアウト
       DOCKER_NETWORK: host
-      # you must set hostname if accesing by hostname (other than IP address)
-      # ブラウザから IP アドレス以外でアクセスする場合はホスト名を設定する必要があります
-      # hostname: localhost
+      # set hostname if accesing by hostname (other than IP address)
+      # ブラウザから IP アドレス以外でアクセスする場合はホスト名を設定
+      #hostname: localhost
       # --
       # for debug
-      # LOG_LEVEL: "3"
-      # DEBUG: "true"
-    network_mode: host
+      #LOG_LEVEL: "3"
+      #DEBUG: "true"
+
     # comment out `devices:` if you commented out all devices
     # `devices` を全てコメントアウトした場合は `devices:` もコメントアウト
-    devices:
-      # comment out below if you don't use card readers
-      # カードリーダーを使わない場合は以下をコメントアウト
-      - /dev/bus:/dev/bus
-      # comment out below if you don't use DVB devices
-      # DVB チューナーを使わない場合は以下をコメントアウト
-      - /dev/dvb:/dev/dvb
+    #devices:
+      # if you use card readers
+      # カードリーダーを使う場合
+      #- /dev/bus:/dev/bus
+
+      # if use DVB devices
+      # DVB チューナーを使う場合
+      #- /dev/dvb:/dev/dvb
+
     volumes:
       # you can change to any location if you want.
       - /opt/mirakurun/run:/var/run
       - /opt/mirakurun/opt:/opt
       - /opt/mirakurun/config:/app-config
       - /opt/mirakurun/data:/app-data
+
+      # if use host's pcscd (DISABLE_PCSCD=1)
+      # ホストの pcscd を使う場合 (DISABLE_PCSCD=1)
+      #- /var/run/pcscd/pcscd.comm:/var/run/pcscd/pcscd.comm
+
+      # add all devices (for development purposes)
+      # 全てのデバイスを追加 (開発用)
+      - /dev:/dev
+
+    container_name: mirakurun
+    build:
+      context: ../
+      dockerfile: docker/${DOCKERFILE:-Dockerfile}
+    network_mode: host
+    cap_add:
+      - SYS_ADMIN
+      - SYS_NICE
+    device_cgroup_rules:
+      - 'c *:* rmw'
     tmpfs:
       - /tmp
     restart: always
