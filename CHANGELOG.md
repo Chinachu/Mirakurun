@@ -10,9 +10,11 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
 
 ### Docker Changes
 
-- Added `DISABLE_PCSCD` environment variable to disable pcscd service
-- Added `DISABLE_B25_TEST` environment variable to disable B25 test decoder installation
+- Added `DISABLE_PCSCD` environment variable to disable pcscd service.
+- Added `DISABLE_B25_TEST` environment variable to disable B25 test decoder installation.
 - Updated `docker-compose.yml` - For testing purposes, all devices can be accessed without setting "devices" by default.
+  - **The previous default setting required a restart of the container when the card reader's USB was unplugged and plugged in, but the new default setting restores it automatically.** please check the [docker-compose.yml](docker/docker-compose.yml).
+  - **以前のデフォルト設定では、カードリーダーの USB を抜き差しすると、コンテナの再起動が必要でしたが、今回のデフォルト設定では、自動的に復旧するようになりました。** 設定例は [docker-compose.yml](docker/docker-compose.yml) をご確認ください。
 
 ## 4.0.0-beta.12 (2025-03-21)
 
