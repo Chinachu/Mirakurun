@@ -30,8 +30,8 @@ export class Channel {
 
         if (_.config.server.disableEITParsing !== true) {
             const epgJob: JobItem = {
-                key: "EPG",
-                name: "EPG",
+                key: "EPG.Gatherer",
+                name: "EPG Gatherer",
                 fn: this._epgGatherer.bind(this)
             };
 
@@ -44,7 +44,7 @@ export class Channel {
             });
 
             _.job.addSchedule({
-                key: "EPG",
+                key: epgJob.key,
                 schedule: "20,50 * * * *", // todo: config
                 job: epgJob
             });

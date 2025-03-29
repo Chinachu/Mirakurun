@@ -242,7 +242,11 @@ export class Service {
             this.save();
         }
 
-        await sleep(5000);
+        setTimeout(() => this._initJobs(), 10000);
+    }
+
+    private async _initJobs(): Promise<void> {
+        log.debug("init service jobs...");
 
         // add services from channel config
         for (const channelConfig of _.config.channels) {
@@ -258,26 +262,26 @@ export class Service {
                 continue;
             }
 
-            this._queueCheckAndAdd(channel, serviceId);
+            this._queueCheckToAdd(channel, serviceId);
         }
 
         // scan services (no service channel only)
         _.job.add({
-            key: "Service.Scan-Add.Find-Channels",
-            name: "Service Scan (Add) [Find Targets]",
+            key: "Service.Add.Scan.Find-Channels",
+            name: "Service Add Scan [Find Targets]",
             fn: async () => {
                 for (const channel of _.channel.items) {
                     if (this.findByChannel(channel).length > 0) {
                         continue;
                     }
 
-                    this._queueScanAndAdd(channel);
+                    this._queueScanToAdd(channel);
                 }
             },
             readyFn: async () => {
                 // wait for all Service.Check-Add.* jobs to finish
                 while (true) {
-                    if (_.job.jobs.some(job => job.status !== "finished" && job.key.includes("Service.Check-Add."))) {
+                    if (_.job.jobs.some(job => job.status !== "finished" && job.key.includes("Service.Add.Check."))) {
                         await sleep(1000);
                         continue;
                     }
@@ -288,21 +292,26 @@ export class Service {
 
         // schedule service scan
         _.job.add({
-            key: "Service.Scan-Update.Add-Schedule",
-            name: "Service Scan (Update) [Add Schedule]",
+            key: "Service.Updater.Add-Schedule",
+            name: "Service Updater [Add Schedule]",
             fn: async () => {
-                for (const channel of _.channel.items) {
-                    _.job.addSchedule({
-                        key: `Service.Scan-Update.${channel.type}.${channel.channel}`,
-                        schedule: "5 6 * * *", // todo: config
-                        job: {
-                            key: `Service.Scan-Update.${channel.type}.${channel.channel}`,
-                            name: `Service Scan (Update) ${channel.type}/${channel.channel}`,
-                            fn: async () => this._scan(channel, false),
-                            readyFn: () => _.tuner.readyForJob(channel)
+                _.job.addSchedule({
+                    key: "Service.Updater",
+                    schedule: "5 6 * * *", // todo: config
+                    job: {
+                        key: "Service.Updater",
+                        name: "Service Updater",
+                        fn: async () => {
+                            for (const channel of _.channel.items) {
+                                if (this.findByChannel(channel).length === 0) {
+                                    continue;
+                                }
+
+                                this._queueScanToUpdate(channel);
+                            }
                         }
-                    });
-                }
+                    }
+                });
             }
         });
     }
@@ -316,11 +325,11 @@ export class Service {
         );
     }
 
-    private _queueCheckAndAdd(channel: ChannelItem, serviceId: number): void {
+    private _queueCheckToAdd(channel: ChannelItem, serviceId: number): void {
         _.job.add({
-            key: `Service.Check-Add.${channel.type}.${channel.channel}.${serviceId}`,
-            name: `Service Check (Add) ${channel.type}/${channel.channel}/${serviceId}`,
-            fn: () => this._checkAndAdd(channel, serviceId),
+            key: `Service.Add.Check.${channel.type}.${channel.channel}.${serviceId}`,
+            name: `Service Add Check ${channel.type}/${channel.channel}/${serviceId}`,
+            fn: () => this._checkToAdd(channel, serviceId),
             readyFn: () => _.tuner.readyForJob(channel),
             retryOnFail: true,
             retryMax: (1000 * 60 * 60 * 12) / (1000 * 60 * 3), // (12時間 / retryDelay) = 12時間～
@@ -328,10 +337,10 @@ export class Service {
         });
     }
 
-    private _queueScanAndAdd(channel: ChannelItem): void {
+    private _queueScanToAdd(channel: ChannelItem): void {
         _.job.add({
-            key: `Service.Scan-Add.${channel.type}.${channel.channel}`,
-            name: `Service Scan (Add) ${channel.type}/${channel.channel}`,
+            key: `Service.Add.Scan.${channel.type}.${channel.channel}`,
+            name: `Service Add Scan ${channel.type}/${channel.channel}`,
             fn: async () => this._scan(channel, true),
             readyFn: () => _.tuner.readyForJob(channel),
             retryOnFail: true,
@@ -340,7 +349,16 @@ export class Service {
         });
     }
 
-    private async _checkAndAdd(channel: ChannelItem, serviceId: number): Promise<void> {
+    private _queueScanToUpdate(channel: ChannelItem): void {
+        _.job.add({
+            key: `Service.Update.Scan.${channel.type}.${channel.channel}`,
+            name: `Service Update Scan ${channel.type}/${channel.channel}`,
+            fn: async () => this._scan(channel, false),
+            readyFn: () => _.tuner.readyForJob(channel)
+        });
+    }
+
+    private async _checkToAdd(channel: ChannelItem, serviceId: number): Promise<void> {
         log.info("ChannelItem#'%s' serviceId=%d check has started", channel.name, serviceId);
 
         let services: Awaited<ReturnType<typeof _.tuner.getServices>>;
@@ -356,7 +374,7 @@ export class Service {
             log.warn("ChannelItem#'%s' serviceId=%d check has failed [no service]", channel.name, serviceId);
 
             // retry after 1 hour
-            setTimeout(() => this._queueCheckAndAdd(channel, serviceId), 3600000);
+            setTimeout(() => this._queueCheckToAdd(channel, serviceId), 3600000);
             return;
         }
 
