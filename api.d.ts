@@ -216,6 +216,37 @@ export interface TunerProcess {
     pid: number;
 }
 
+export interface JobScheduleItem {
+    key: string;
+    schedule: string;
+    job: Pick<JobItem, "key" | "name">;
+}
+
+export interface JobItem {
+    key: string;
+    name: string;
+    id: string;
+    status: "queued" | "standby" | "running" | "finished";
+    retryCount: number;
+
+    retryOnAbort?: boolean;
+    retryOnFail?: boolean;
+    retryMax?: number;
+    retryDelay?: number;
+
+    isAborting: boolean;
+    hasAborted?: boolean;
+    hasSkipped?: boolean;
+    hasFailed?: boolean;
+    error?: string;
+
+    createdAt: number;
+    updatedAt: number;
+    startedAt?: number;
+    finishedAt?: number;
+    duration?: number;
+}
+
 export interface Event<T = any> {
     resource: EventResource;
     type: EventType;
@@ -223,7 +254,7 @@ export interface Event<T = any> {
     time: UnixtimeMS;
 }
 
-export type EventResource = "program" | "service" | "tuner";
+export type EventResource = "program" | "service" | "tuner" | "job" | "job_schedule";
 
 export type EventType = "create" | "update" | "remove";
 

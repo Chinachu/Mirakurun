@@ -277,11 +277,7 @@ export class Service {
             readyFn: async () => {
                 // wait for all Service.Check-Add.* jobs to finish
                 while (true) {
-                    const jobItems = [..._.job.runningJobItems,
-                        ..._.job.queuedJobItems,
-                        ..._.job.standbyJobItems
-                    ];
-                    if (jobItems.some(jobItem => jobItem.key.includes("Service.Check-Add."))) {
+                    if (_.job.jobs.some(job => job.status !== "finished" && job.key.includes("Service.Check-Add."))) {
                         await sleep(1000);
                         continue;
                     }

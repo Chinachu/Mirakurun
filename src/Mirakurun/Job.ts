@@ -16,6 +16,8 @@
 import * as os from "os";
 import * as log from "./log";
 import { sleep } from "./common";
+import * as apid from "../../api";
+import Event from "./Event";
 
 export interface JobFnOptions {
     signal: AbortSignal;
@@ -48,17 +50,16 @@ export interface JobItem {
 
 export interface QueuedJobItem extends JobItem {
     id: string;
+    ac: AbortController;
     retryCount: number;
     createdAt: number;
 }
 
 export interface RunningJobItem extends QueuedJobItem {
-    ac: AbortController;
     startedAt: number;
 }
 
-export interface PastJobItem extends Omit<RunningJobItem, "ac"> {
-    ok: boolean;
+export interface FinishedJobItem extends Omit<RunningJobItem, "ac"> {
     hasAborted: boolean;
     hasSkipped: boolean;
     hasFailed: boolean;
@@ -96,7 +97,7 @@ export class Job {
     private _standbyJobItems: QueuedJobItem[] = [];
     private _runningJobItemSet: Set<RunningJobItem> = new Set();
     private _scheduleItemSet: Set<ScheduleItem> = new Set();
-    private _finishedJobItems: PastJobItem[] = [];
+    private _finishedJobItems: FinishedJobItem[] = [];
     private _scheduleInterval: NodeJS.Timeout;
     private _queueCheckTimeout: NodeJS.Timeout | null = null;
 
@@ -104,27 +105,41 @@ export class Job {
         this._scheduleInterval = setInterval(() => this._checkSchedule(), 1000 * 60);
     }
 
-    get queuedJobItems(): QueuedJobItem[] {
-        return this._queuedJobItems;
+    get schedules(): apid.JobScheduleItem[] {
+        return Array.from(this._scheduleItemSet).map(schedule => ({
+            key: schedule.key,
+            schedule: schedule.schedule,
+            job: {
+                key: schedule.job.key,
+                name: schedule.job.name
+            }
+        }));
     }
 
-    get standbyJobItems(): QueuedJobItem[] {
-        return this._standbyJobItems;
-    }
+    get jobs(): apid.JobItem[] {
+        const result: apid.JobItem[] = [];
 
-    get runningJobItems(): RunningJobItem[] {
-        return Array.from(this._runningJobItemSet).map(job => {
-            // acプロパティを除いた新しいオブジェクトを作成し、型安全性を確保
-            const { ac, ...jobWithoutAc } = job;
-            return {
-                ...jobWithoutAc,
-                ac: undefined as unknown as AbortController
-            };
-        });
-    }
+        // Add queued jobs
+        for (const job of this._queuedJobItems) {
+            result.push(jobToJSON("queued", job));
+        }
 
-    get pastJobItems(): PastJobItem[] {
-        return [...this._finishedJobItems];
+        // Add standby jobs
+        for (const job of this._standbyJobItems) {
+            result.push(jobToJSON("standby", job));
+        }
+
+        // Add running jobs
+        for (const job of this._runningJobItemSet) {
+            result.push(jobToJSON("running", job));
+        }
+
+        // Add finished jobs
+        for (const job of this._finishedJobItems) {
+            result.push(jobToJSON("finished", job));
+        }
+
+        return result;
     }
 
     close(): void {
@@ -152,24 +167,31 @@ export class Job {
             }
         }
 
-        this._queuedJobItems.push({
+        const queuedJob: QueuedJobItem = {
             ...jobItem,
             id: this._jobIdPrefix + (++this._jobIdCounter),
+            ac: new AbortController(),
             createdAt: Date.now(),
             retryCount: _retryCount
-        });
+        };
+
+        this._queuedJobItems.push(queuedJob);
+
+        // emit event
+        Event.emit("job", "create", jobToJSON("queued", queuedJob));
 
         this._checkQueue();
     }
 
-    abort(id: string): boolean {
-        for (const job of this._runningJobItemSet) {
-            if (job.id === id) {
-                job.ac.abort();
+    abort(id: string, reason: string): boolean {
+        for (const job of [...this._runningJobItemSet, ...this._standbyJobItems, ...this._queuedJobItems]) {
+            if (job.id === id && !job.ac.signal.aborted) {
+                job.ac.abort(reason);
                 log.info(`Job#abort() abort requested "${job.key}" (id: ${job.id})`);
                 return true;
             }
         }
+
         return false;
     }
 
@@ -185,6 +207,16 @@ export class Job {
         log.info(`Job#addSchedule() adding "${schedule.key}"`);
 
         this._scheduleItemSet.add(schedule);
+
+        // emit event
+        Event.emit("job_schedule", "create", {
+            key: schedule.key,
+            schedule: schedule.schedule,
+            job: {
+                key: schedule.job.key,
+                name: schedule.job.name
+            }
+        });
     }
 
     /**
@@ -270,6 +302,9 @@ export class Job {
         }
         this._standbyJobItems.push(job);
 
+        // emit event
+        Event.emit("job", "update", jobToJSON("standby", job));
+
         let skip = false;
 
         if (job.readyFn) {
@@ -294,23 +329,25 @@ export class Job {
             this._standbyJobItems.splice(waitingIndex, 1);
         }
 
-        if (skip) {
-            // skip
+        if (skip || job.ac.signal.aborted) {
+            // skip, abort
             const skippedJob: RunningJobItem = {
                 ...job,
-                ac: new AbortController(),
                 retryCount: job.retryCount || 0, // 既存のリトライカウントを使用
                 startedAt: Date.now()
             };
-            skippedJob.ac.abort("skipped");
+            if (skip) {
+                skippedJob.ac.abort("skipped");
+                log.debug(`Job#_checkReady() skipped "${job.key}" (id: ${job.id}) due to readyFn returning false`);
+            } else {
+                log.debug(`Job#_checkReady() aborted "${job.key}" (id: ${job.id}) due to abort signal`);
+            }
 
-            log.debug(`Job#_checkReady() skipped "${job.key}" (id: ${job.id}) due to readyFn returning false`);
             this._finishJob(skippedJob, true);
         } else {
             // run
             const runningJob: RunningJobItem = {
                 ...job,
-                ac: new AbortController(),
                 retryCount: job.retryCount || 0, // 既存のリトライカウントを使用
                 startedAt: Date.now()
             };
@@ -337,6 +374,9 @@ export class Job {
 
         this._runningJobItemSet.add(job);
 
+        // emit event
+        Event.emit("job", "update", jobToJSON("running", job));
+
         try {
             await job.fn({ signal: job.ac.signal });
             this._finishJob(job, true);
@@ -357,9 +397,8 @@ export class Job {
         const hasFailed = !ok;
 
         // Add to history
-        const pastJob: PastJobItem = {
+        const pastJob: FinishedJobItem = {
             ...job,
-            ok,
             hasAborted,
             hasSkipped,
             hasFailed,
@@ -377,6 +416,9 @@ export class Job {
         const statusMsg = ok ? "completed" : "failed";
         const abortMsg = hasAborted ? " (aborted)" : "";
         log.info(`Job#_finishJob() "${job.key}" ${statusMsg}${abortMsg} in ${duration}ms`);
+
+        // emit event
+        Event.emit("job", "update", jobToJSON("finished", pastJob));
     }
 
     private async _retryJob(job: RunningJobItem): Promise<void> {
@@ -497,6 +539,35 @@ function matchCronPart(cronPart: string, value: number, min: number, max: number
     }
 
     return values.has(value);
+}
+
+function jobToJSON(status: apid.JobItem["status"], job: Partial<QueuedJobItem & RunningJobItem & FinishedJobItem>): apid.JobItem {
+    const {
+        ac, // omit
+        fn, // omit
+        readyFn, // omit
+        key, // required
+        name, // required
+        id, // required
+        retryCount, // required
+        createdAt, // required
+        error,
+        ...safeJob
+    } = job;
+
+    return {
+        key,
+        name,
+        id,
+        status,
+        retryCount,
+        isAborting: ac?.signal.aborted,
+        createdAt,
+        updatedAt: job.finishedAt || job.startedAt || job.createdAt,
+        duration: job.finishedAt ? job.finishedAt - job.startedAt : 0,
+        error: error?.message,
+        ...safeJob
+    };
 }
 
 export default Job;

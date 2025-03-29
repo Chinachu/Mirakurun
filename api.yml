@@ -406,6 +406,86 @@ definitions:
       pid:
         type: integer
 
+  # job -----------------------------------------------------------------------
+
+  JobScheduleItem:
+    type: object
+    required:
+      - key
+      - schedule
+      - job
+    properties:
+      key:
+        type: string
+      schedule:
+        type: string
+      job:
+        type: object
+        required:
+          - key
+          - name
+        properties:
+          key:
+            type: string
+          name:
+            type: string
+
+  JobItem:
+    type: object
+    required:
+      - key
+      - name
+      - id
+      - status
+      - retryCount
+      - isAborting
+      - createdAt
+      - updatedAt
+    properties:
+      key:
+        type: string
+      name:
+        type: string
+      id:
+        type: string
+      status:
+        type: string
+        enum:
+          - queued
+          - standby
+          - running
+          - finished
+      retryCount:
+        type: integer
+      retryOnAbort:
+        type: boolean
+      retryOnFail:
+        type: boolean
+      retryMax:
+        type: integer
+      retryDelay:
+        type: integer
+      isAborting:
+        type: boolean
+      hasAborted:
+        type: boolean
+      hasSkipped:
+        type: boolean
+      hasFailed:
+        type: boolean
+      error:
+        type: string
+      createdAt:
+        $ref: '#/definitions/UnixtimeMS'
+      updatedAt:
+        $ref: '#/definitions/UnixtimeMS'
+      startedAt:
+        $ref: '#/definitions/UnixtimeMS'
+      finishedAt:
+        $ref: '#/definitions/UnixtimeMS'
+      duration:
+        type: integer
+
   # event ---------------------------------------------------------------------
 
   Event:
