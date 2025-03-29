@@ -1,3 +1,5 @@
+[**English**](Platforms.md) | [**日本語**](Platforms.ja.md)
+
 # Notes and Instructions on Platform Support
 
 ## Overview

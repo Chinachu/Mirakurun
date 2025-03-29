@@ -1,3 +1,5 @@
+[**English**](Platforms.md) | [**日本語**](Platforms.ja.md)
+
 # プラットフォーム / 環境構築手順
 
 ## 概要
@@ -140,7 +142,7 @@ docker compose logs [-f]
 ### ⚡設定
 
 - 主要な設定は Web UI から変更できます
-- 全ての設定は [Configuration.md](Configuration.md) を参照してください
+- 全ての設定は [Configuration.md](Configuration.ja.md) を参照してください
 
 ```
 vim /opt/mirakurun/config/server.yml

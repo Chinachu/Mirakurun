@@ -1,3 +1,5 @@
+[**English**](Configuration.md) | [**日本語**](Configuration.ja.md)
+
 # 設定
 
 - 🗒️[server.yml](#serveryml) - サーバー設定
