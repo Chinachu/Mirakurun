@@ -546,10 +546,10 @@ definitions:
       eventEndTimeout:
         type: integer
         minimum: 0
-      programGCInterval:
-        type: integer
-      epgGatheringInterval:
-        type: integer
+      programGCJobSchedule:
+        type: string
+      epgGatheringJobSchedule:
+        type: string
       epgRetrievalTime:
         type: integer
       logoDataInterval:

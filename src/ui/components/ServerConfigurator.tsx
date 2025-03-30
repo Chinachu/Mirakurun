@@ -15,7 +15,7 @@
 */
 import EventEmitter from "eventemitter3";
 import * as React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
     Stack,
     Separator,
@@ -33,7 +33,7 @@ import {
     DialogType,
     DialogFooter,
 } from "@fluentui/react";
-import { Validator as IPValidator } from "ip-num/Validator"
+import { Validator as IPValidator } from "ip-num/Validator";
 import { UIState } from "../index";
 import { ConfigServer } from "../../../api";
 
@@ -70,12 +70,23 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
     const changed = JSON.stringify(current) !== JSON.stringify(editing);
 
     let invalid = false;
+    let invalidEpgGatheringJobSchedule = false;
+    let invalidAllowIPv4CidrRanges = false;
+    let invalidAllowIPv6CidrRanges = false;
     if (editing) {
+        if (editing.epgGatheringJobSchedule) {
+            if (!isValidCronExpression(editing.epgGatheringJobSchedule)) {
+                invalid = true;
+                invalidEpgGatheringJobSchedule = true;
+            }
+        }
+
         if (editing.allowIPv4CidrRanges) {
             for (const range of editing.allowIPv4CidrRanges) {
                 const [valid] = IPValidator.isValidIPv4CidrRange(range);
                 if (!valid) {
                     invalid = true;
+                    invalidAllowIPv4CidrRanges = true;
                     break;
                 }
             }
@@ -85,6 +96,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                 const [valid] = IPValidator.isValidIPv6CidrRange(range);
                 if (!valid) {
                     invalid = true;
+                    invalidAllowIPv6CidrRanges = true;
                     break;
                 }
             }
@@ -147,18 +159,53 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                     <Separator alignContent="start">Advanced</Separator>
 
                     <TextField
-                        styles={{ fieldGroup: { "max-width": 200 } }}
-                        label="EPG Gathering Interval"
-                        suffix="ms"
-                        placeholder="1800000"
-                        value={`${editing.epgGatheringInterval || ""}`}
+                        styles={{ fieldGroup: { "max-width": 150 } }}
+                        label="EPG Gathering Job Schedule"
+                        placeholder="20,50 * * * *"
+                        value={`${editing.epgGatheringJobSchedule || ""}`}
                         onChange={(ev, newValue) => {
                             if (newValue === "") {
-                                delete editing.epgGatheringInterval;
+                                delete editing.epgGatheringJobSchedule;
+                            } else {
+                                editing.epgGatheringJobSchedule = newValue;
+                            }
+                            setEditing({ ...editing });
+                        }}
+                        invalid={invalidEpgGatheringJobSchedule}
+                    />
+
+                    <TextField
+                        styles={{ fieldGroup: { "max-width": 100 } }}
+                        label="Max Buffer Size Before Ready"
+                        suffix="MB"
+                        placeholder="8"
+                        value={`${editing.maxBufferBytesBeforeReady ? editing.maxBufferBytesBeforeReady / 1024 / 1024 : ""}`}
+                        onChange={(ev, newValue) => {
+                            if (newValue === "") {
+                                delete editing.maxBufferBytesBeforeReady;
                             } else if (/^[0-9]+$/.test(newValue)) {
                                 const int = parseInt(newValue, 10);
-                                if (int <= 1000 * 60 * 60 * 24 * 3 && int > 0) {
-                                    editing.epgGatheringInterval = int;
+                                if (int <= 64 && int > 0) {
+                                    editing.maxBufferBytesBeforeReady = int * 1024 * 1024;
+                                }
+                            }
+                            setEditing({ ...editing });
+                        }}
+                    />
+
+                    <TextField
+                        styles={{ fieldGroup: { "max-width": 100 } }}
+                        label="Event End Timeout"
+                        suffix="ms"
+                        placeholder="1000"
+                        value={`${editing.eventEndTimeout || ""}`}
+                        onChange={(ev, newValue) => {
+                            if (newValue === "") {
+                                delete editing.eventEndTimeout;
+                            } else if (/^[0-9]+$/.test(newValue)) {
+                                const int = parseInt(newValue, 10);
+                                if (int <= 10000 && int > 0) {
+                                    editing.eventEndTimeout = int;
                                 }
                             }
                             setEditing({ ...editing });
@@ -214,6 +261,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                                 setEditing({ ...editing, allowIPv4CidrRanges: newValue.split("\n").map(range => range.trim()) })
                             }
                         }}
+                        invalid={invalidAllowIPv4CidrRanges}
                     />
 
                     <TextField
@@ -242,6 +290,7 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                                 setEditing({ ...editing, allowIPv6CidrRanges: newValue.split("\n").map(range => range.trim()) })
                             }
                         }}
+                        invalid={invalidAllowIPv6CidrRanges}
                     />
 
                     <TextField
@@ -372,5 +421,40 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
         </>
     );
 };
+
+// (仮) src/Mirakurun/Job.ts にある関数と同じ
+function isValidCronExpression(cronExpression: string): boolean {
+    const cronParts = cronExpression.split(" ");
+    if (cronParts.length !== 5) {
+        return false;
+    }
+
+    try {
+        // 各部分のパターンを定義
+        const patterns = [
+            /^(\*|([0-9]|[1-5][0-9])((-([0-9]|[1-5][0-9]))?))(\/([1-9]|[1-5][0-9]))?$/, // 分 (0-59)
+            /^(\*|([0-9]|1[0-9]|2[0-3])((-([0-9]|1[0-9]|2[0-3]))?))(\/([1-9]|1[0-9]|2[0-3]))?$/, // 時 (0-23)
+            /^(\*|([1-9]|[12][0-9]|3[01])((-([1-9]|[12][0-9]|3[01]))?))(\/([1-9]|[12][0-9]|3[01]))?$/, // 日 (1-31)
+            /^(\*|([1-9]|1[0-2])((-([1-9]|1[0-2]))?))(\/([1-9]|1[0-2]))?$/, // 月 (1-12)
+            /^(\*|([0-6])((-([0-6]))?))(\/([1-6]))?$/ // 曜日 (0-6)
+        ];
+
+        // 各部分を検証
+        for (let i = 0; i < 5; i++) {
+            // カンマで区切られた値をすべて検証
+            const parts = cronParts[i].split(",");
+
+            for (const part of parts) {
+                if (part === "" || !patterns[i].test(part)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    } catch (err) {
+        return false;
+    }
+}
 
 export default Configurator;

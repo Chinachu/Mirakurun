@@ -23,6 +23,7 @@ import * as ipnum from "ip-num";
 import Queue from "promise-queue";
 import * as apid from "../../api";
 import * as log from "./log";
+import { isValidCronExpression } from "./Job";
 
 type Writable<T> = { -readonly [K in keyof T]: T[K] };
 
@@ -37,8 +38,8 @@ const {
     MAX_LOG_HISTORY,
     MAX_BUFFER_BYTES_BEFORE_READY,
     EVENT_END_TIMEOUT,
-    PROGRAM_GC_INTERVAL,
-    EPG_GATHERING_INTERVAL,
+    PROGRAM_GC_JOB_SCHEDULE,
+    EPG_GATHERING_JOB_SCHEDULE,
     EPG_RETRIEVAL_TIME,
     LOGO_DATA_INTERVAL,
     DISABLE_EIT_PARSING,
@@ -130,11 +131,11 @@ export async function loadServer(): Promise<Server> {
         if (typeof EVENT_END_TIMEOUT !== "undefined" && /^[0-9]+$/.test(EVENT_END_TIMEOUT)) {
             config.eventEndTimeout = parseInt(EVENT_END_TIMEOUT, 10);
         }
-        if (typeof PROGRAM_GC_INTERVAL !== "undefined" && /^[0-9]+$/.test(PROGRAM_GC_INTERVAL)) {
-            config.programGCInterval = parseInt(PROGRAM_GC_INTERVAL, 10);
+        if (typeof PROGRAM_GC_JOB_SCHEDULE !== "undefined" && isValidCronExpression(PROGRAM_GC_JOB_SCHEDULE)) {
+            config.programGCJobSchedule = PROGRAM_GC_JOB_SCHEDULE;
         }
-        if (typeof EPG_GATHERING_INTERVAL !== "undefined" && /^[0-9]+$/.test(EPG_GATHERING_INTERVAL)) {
-            config.epgGatheringInterval = parseInt(EPG_GATHERING_INTERVAL, 10);
+        if (typeof EPG_GATHERING_JOB_SCHEDULE !== "undefined" && isValidCronExpression(EPG_GATHERING_JOB_SCHEDULE)) {
+            config.epgGatheringJobSchedule = EPG_GATHERING_JOB_SCHEDULE;
         }
         if (typeof EPG_RETRIEVAL_TIME !== "undefined" && /^[0-9]+$/.test(EPG_RETRIEVAL_TIME)) {
             config.epgRetrievalTime = parseInt(EPG_RETRIEVAL_TIME, 10);

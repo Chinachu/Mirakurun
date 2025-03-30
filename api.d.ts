@@ -267,8 +267,8 @@ export interface ConfigServer {
     maxLogHistory?: number;
     maxBufferBytesBeforeReady?: number;
     eventEndTimeout?: number;
-    programGCInterval?: number;
-    epgGatheringInterval?: number;
+    programGCJobSchedule?: string;
+    epgGatheringJobSchedule?: string;
     epgRetrievalTime?: number;
     logoDataInterval?: number;
     disableEITParsing?: boolean;

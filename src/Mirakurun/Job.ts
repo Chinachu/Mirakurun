@@ -206,6 +206,10 @@ export class Job {
 
         log.info(`Job#addSchedule() adding "${schedule.key}"`);
 
+        if (!isValidCronExpression(schedule.schedule)) {
+            throw new Error(`Invalid schedule format: ${schedule.schedule}`);
+        }
+
         this._scheduleItemSet.add(schedule);
 
         // emit event
@@ -450,6 +454,40 @@ export class Job {
                 retryDelay: job.retryDelay
             }, nextRetryCount);
         }
+    }
+}
+
+export function isValidCronExpression(cronExpression: string): boolean {
+    const cronParts = cronExpression.split(" ");
+    if (cronParts.length !== 5) {
+        return false;
+    }
+
+    try {
+        // 各部分のパターンを定義
+        const patterns = [
+            /^(\*|([0-9]|[1-5][0-9])((-([0-9]|[1-5][0-9]))?))(\/([1-9]|[1-5][0-9]))?$/, // 分 (0-59)
+            /^(\*|([0-9]|1[0-9]|2[0-3])((-([0-9]|1[0-9]|2[0-3]))?))(\/([1-9]|1[0-9]|2[0-3]))?$/, // 時 (0-23)
+            /^(\*|([1-9]|[12][0-9]|3[01])((-([1-9]|[12][0-9]|3[01]))?))(\/([1-9]|[12][0-9]|3[01]))?$/, // 日 (1-31)
+            /^(\*|([1-9]|1[0-2])((-([1-9]|1[0-2]))?))(\/([1-9]|1[0-2]))?$/, // 月 (1-12)
+            /^(\*|([0-6])((-([0-6]))?))(\/([1-6]))?$/ // 曜日 (0-6)
+        ];
+
+        // 各部分を検証
+        for (let i = 0; i < 5; i++) {
+            // カンマで区切られた値をすべて検証
+            const parts = cronParts[i].split(",");
+
+            for (const part of parts) {
+                if (part === "" || !patterns[i].test(part)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    } catch (err) {
+        return false;
     }
 }
 

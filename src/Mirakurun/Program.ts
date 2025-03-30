@@ -51,7 +51,7 @@ export class Program {
 
         _.job.addSchedule({
             key: "Program.GC",
-            schedule: "45 * * * *", // todo: config
+            schedule: _.config.server.programGCJobSchedule || "45 * * * *",
             job: gcJob
         });
     }

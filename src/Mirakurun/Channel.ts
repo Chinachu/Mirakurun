@@ -23,7 +23,6 @@ import { JobItem } from "./Job";
 
 export class Channel {
     private _items: ChannelItem[] = [];
-    private _epgGatheringInterval: number = _.config.server.epgGatheringInterval || 1000 * 60 * 20; // 30 mins
 
     constructor() {
         this._load();
@@ -37,6 +36,7 @@ export class Channel {
 
             _.job.add({
                 ...epgJob,
+                fn: () => this._epgGatherer(true),
                 readyFn: async () => {
                     await common.sleep(1000 * 60);
                     return true;
@@ -45,7 +45,7 @@ export class Channel {
 
             _.job.addSchedule({
                 key: epgJob.key,
-                schedule: "20,50 * * * *", // todo: config
+                schedule: _.config.server.epgGatheringJobSchedule || "20,50 * * * *",
                 job: epgJob
             });
         }
@@ -175,7 +175,7 @@ export class Channel {
         });
     }
 
-    private async _epgGatherer(): Promise<void> {
+    private async _epgGatherer(startup = false): Promise<void> {
         const networkIds = [...new Set(_.service.items.map(item => item.networkId))];
 
         for (const networkId of networkIds) {
@@ -205,12 +205,12 @@ export class Channel {
                     }
                     if (service.epgReady === true) {
                         const now = Date.now();
-                        if (now - service.epgUpdatedAt < this._epgGatheringInterval) {
-                            log.info("Network#%d EPG gathering has skipped by `epgGatheringInterval`", networkId);
+                        if (startup && now - service.epgUpdatedAt < 1000 * 60 * 10) { // 10 mins
+                            log.info("Network#%d EPG gathering has skipped because EPG is already up to date (in 10 mins)", networkId);
                             return false;
                         }
                         if (now - service.epgUpdatedAt > 1000 * 60 * 60 * 12) { // 12 hours
-                            log.info("Network#%d EPG gathering is resuming forcibly because reached maximum pause time", networkId);
+                            log.info("Network#%d EPG gathering is resuming forcibly because reached maximum pause time (12 hours)", networkId);
                             service.epgReady = false;
                         } else {
                             const currentPrograms = _.program.findByNetworkIdAndTime(networkId, now)
