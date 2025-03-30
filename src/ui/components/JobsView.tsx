@@ -104,8 +104,8 @@ const jobColumns: IColumn[] = [
     }
 ];
 
-let jobs: JobItem[] = [];
-let schedules: JobScheduleItem[] = [];
+const jobs: JobItem[] = [];
+const schedules: JobScheduleItem[] = [];
 
 const JobsView: React.FC<{ uiStateEvents: EventEmitter, rpc: RPCClient }> = ({ uiStateEvents, rpc }) => {
     const [updated, setUpdated] = useState<number>(0);
@@ -114,8 +114,8 @@ const JobsView: React.FC<{ uiStateEvents: EventEmitter, rpc: RPCClient }> = ({ u
 
     useEffect(() => {
         const load = async () => {
-            schedules = await (await fetch("/api/job-schedules")).json();
-            jobs = await (await fetch("/api/jobs")).json();
+            schedules.splice(0, schedules.length, ...await (await fetch("/api/job-schedules")).json());
+            jobs.splice(0, jobs.length, ...await (await fetch("/api/jobs")).json());
             setUpdated(Date.now());
         };
 
@@ -143,7 +143,7 @@ const JobsView: React.FC<{ uiStateEvents: EventEmitter, rpc: RPCClient }> = ({ u
                 if (event.resource === "job") {
                     const job = event.data as JobItem;
 
-                    const index = jobs.findIndex(j => j.key === job.key);
+                    const index = jobs.findIndex(j => j.id === job.id);
                     if (index === -1) {
                         jobs.push(job);
                     } else {
