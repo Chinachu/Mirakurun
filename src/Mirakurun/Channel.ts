@@ -23,6 +23,7 @@ import { JobItem } from "./Job";
 
 export class Channel {
     private _items: ChannelItem[] = [];
+    private _startup: boolean = true;
 
     constructor() {
         this._load();
@@ -31,12 +32,11 @@ export class Channel {
             const epgJob: JobItem = {
                 key: "EPG.Gatherer",
                 name: "EPG Gatherer",
-                fn: this._epgGatherer.bind(this)
+                fn: () => this._epgGatherer()
             };
 
             _.job.add({
                 ...epgJob,
-                fn: () => this._epgGatherer(true),
                 readyFn: async () => {
                     await common.sleep(1000 * 60);
                     return true;
@@ -175,7 +175,12 @@ export class Channel {
         });
     }
 
-    private async _epgGatherer(startup = false): Promise<void> {
+    private async _epgGatherer(): Promise<void> {
+        const startup = this._startup;
+        if (this._startup === true) {
+            this._startup = false;
+        }
+
         const networkIds = [...new Set(_.service.items.map(item => item.networkId))];
 
         for (const networkId of networkIds) {
@@ -199,6 +204,8 @@ export class Channel {
                     }
                 },
                 readyFn: async () => {
+                    await common.sleep(100);
+
                     if (status.epg[networkId] === true) {
                         log.info("Network#%d EPG gathering is already in progress on another stream", networkId);
                         return false;

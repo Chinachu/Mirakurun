@@ -38,7 +38,7 @@ export class Program {
         const gcJob: JobItem = {
             key: "Program.GC",
             name: "Program GC",
-            fn: this._gc.bind(this)
+            fn: () => this._gc()
         };
 
         _.job.add({
