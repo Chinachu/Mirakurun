@@ -2,27 +2,52 @@
 
 # Configuration
 
-- 🗒️[server.yml](#serveryml) - Server Configuration
-- 🗒️[tuners.yml](#tunersyml) - Tuner Configuration
-- 🗒️[channels.yml](#channelsyml) - Channel Configuration
+- 🗒️[server.yml](#serveryml) - Server Settings
+- 🗒️[tuners.yml](#tunersyml) - Tuner Settings
+- 🗒️[channels.yml](#channelsyml) - Channel Settings
+
+## ⚠️Security Considerations (FYI)
+
+- Mirakurun is designed to be a LAN-only server.
+- By default, access is restricted to private IP addresses.
+- Access from arbitrary hostnames or domains is prohibited → **DNS Rebinding / CSRF protection**
+  - `hostname`: Set the hostname to access the Web UI.
+  - `allowOrigins`: Explicitly set allowed hostnames/domains if required.
+- Multiple techniques are used to mitigate attack risks.
+- Do not allow API access from all domains or deploy without a reverse proxy, as it may be vulnerable to:
+  - Attacks reusing authenticated BASIC credentials or session data.
+  - Although modern browsers offer protection, do not rely on them entirely.
+  - HTTPS reverse proxies might bypass certain browser and Mirakurun safeguards, increasing risk → [Secure Contexts](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts)
+  - Instead, use VPN, SSH tunnels, or tunnel services.
+    - Note: Some tunnel services require configuring `allowIPv4CidrRanges` to prevent third-party access.
+
+> **DNS Rebinding Attack**: An attacker controls a domain and initially serves a legitimate site. After the DNS TTL expires, they switch it to point to their malicious server. This bypasses the browser’s same-origin policy and enables unauthorized access to a LAN server via the browser.
+
+> **XSS/CSRF Attack**: An attacker embeds malicious code into a website to gain unauthorized access to a LAN server via the browser.
+
+- Examples of attacks:
+  - Execute arbitrary code via tuner commands
+  - Inject malicious code into the server and turn it into a botnet
+- The above are only a few examples; many others, exploiting browser or middleware vulnerabilities, are devised daily.
+- With more web-based applications emerging, they can be as vulnerable to similar attacks as browsers. Exercise caution.
 
 ## 🗒️server.yml
 
 📛 Partially supported in Web UI
 
-### File Path
+### File Paths
 
 - Environment Variable: `SERVER_CONFIG_PATH`
 - Docker Host (Default): `/opt/mirakurun/config/server.yml`
 - Linux (Legacy): `/usr/local/etc/mirakurun/server.yml`
 
-### Server Configuration List
+### Server Settings List
 
 | Property (🗒️server.yml) | Environment Variable (🐋Docker) | Type | Default | Description |
 |------------|------------------|-------|-----------|------|
 | `logLevel` | `LOG_LEVEL` | Integer | `2` | Log Level (`-1`: FATAL to `3`: DEBUG) |
 | `maxLogHistory` | `MAX_LOG_HISTORY` | Integer | `1000` | Maximum number of log lines to retain |
-| `path` | - | String, null | 🗒️`/var/run/mirakurun.sock` | Unix Socket Path **※Ignored in Docker (planned to be supported)** |
+| `path` | - | String, null | 🗒️`/var/run/mirakurun.sock` | Unix Socket Path **※Fixed to default in Docker** |
 | `port` | - | Integer, null | `40772` | Server Port **※Fixed at `40772` on the container side in Docker** |
 | `hostname` | `HOSTNAME` | String | `localhost` | Hostname |
 | `disableIPv6` | - | Boolean | `false` | Disable IPv6 **※Always disabled in Docker** |
