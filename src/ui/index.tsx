@@ -39,6 +39,7 @@ import ConnectionGuide from "./components/ConnectionGuide";
 import UpdateAlert from "./components/UpdateAlert";
 import Restart from "./components/Restart";
 import StatusView from "./components/StatusView";
+import JobsView from "./components/JobsView";
 import EventsView from "./components/EventsView";
 import LogsView from "./components/LogsView";
 import ConfigView from "./components/ConfigView";
@@ -145,7 +146,12 @@ rpc.on("connected", async () => {
     uiState.tuners = await (await fetch("/api/tuners")).json();
 
     await rpc.call("join", {
-        rooms: ["events:tuner", "events:service"]
+        rooms: [
+            "events:tuner",
+            "events:service",
+            "events:job",
+            "events:job_schedule"
+        ],
     } as JoinParams);
 
     uiStateEvents.emit("update");
@@ -249,6 +255,9 @@ const Content = () => {
                 <Pivot>
                     <PivotItem itemIcon="GroupedList" headerText="Status">
                         <StatusView uiState={uiState} uiStateEvents={uiStateEvents} rpc={rpc} />
+                    </PivotItem>
+                    <PivotItem itemIcon="Clock" headerText="Jobs">
+                        <JobsView uiStateEvents={uiStateEvents} rpc={rpc} />
                     </PivotItem>
                     <PivotItem itemIcon="EntitlementRedemption" headerText="Events">
                         <EventsView uiStateEvents={uiStateEvents} rpc={rpc} />

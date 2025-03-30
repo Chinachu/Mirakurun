@@ -204,11 +204,12 @@ const TunersManager: React.FC<{ tuners: TunerDevice[], rpc: RPCClient }> = ({ tu
         }
         items.push(item);
 
-        for (const user of tuner.users) {
+        for (let userIndex = 0; userIndex < tuner.users.length; userIndex++) {
+            const user = tuner.users[userIndex];
             items.push({
                 _group: item._group,
                 _kind: "user",
-                key: `${item.key}-user-${user.id}`,
+                key: `${item.key}-user-${userIndex}-${user.id}`,
                 name: user.id,
                 user: (
                     <>

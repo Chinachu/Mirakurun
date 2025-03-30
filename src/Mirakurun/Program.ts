@@ -20,7 +20,7 @@ import * as db from "./db";
 import * as apid from "../../api";
 import _ from "./_";
 import Event from "./Event";
-import queue from "./queue";
+import { JobItem } from "./Job";
 
 export function getProgramItemId(networkId: number, serviceId: number, eventId: number): number {
     return parseInt(`${networkId}${serviceId.toString(10).padStart(5, "0")}${eventId.toString(10).padStart(5, "0")}`, 10);
@@ -33,10 +33,27 @@ export class Program {
     private _emitTimerId: NodeJS.Timeout;
     private _emitRunning = false;
     private _emitPrograms = new Map<db.Program, apid.EventType>();
-    private _programGCInterval = _.config?.server?.programGCInterval || 1000 * 60 * 60; // 1 hour
 
     constructor() {
-        setTimeout(this._gc.bind(this), this._programGCInterval);
+        const gcJob: JobItem = {
+            key: "Program.GC",
+            name: "Program GC",
+            fn: this._gc.bind(this)
+        };
+
+        _.job.add({
+            ...gcJob,
+            readyFn: async () => {
+                await common.sleep(1000 * 5);
+                return true;
+            }
+        });
+
+        _.job.addSchedule({
+            key: "Program.GC",
+            schedule: _.config.server.programGCJobSchedule || "45 * * * *",
+            job: gcJob
+        });
     }
 
     get itemMap(): Map<number, db.Program> {
@@ -256,40 +273,36 @@ export class Program {
         );
     }
 
-    private _gc(): void {
-        log.debug("Program GC has queued");
+    private async _gc(): Promise<void> {
+        log.debug("Program GC has started");
 
-        queue.add(async () => {
-            const shortExp = Date.now() - 1000 * 60 * 60 * 3; // 3 hour
-            const longExp = Date.now() - 1000 * 60 * 60 * 24; // 24 hours
-            const maximum = Date.now() + 1000 * 60 * 60 * 24 * 9; // 9 days
-            let count = 0;
+        const shortExp = Date.now() - 1000 * 60 * 60 * 3; // 3 hour
+        const longExp = Date.now() - 1000 * 60 * 60 * 24; // 24 hours
+        const maximum = Date.now() + 1000 * 60 * 60 * 24 * 9; // 9 days
+        let count = 0;
 
-            for (const item of this._itemMap.values()) {
-                if (
-                    (item.duration === 1 ? longExp : shortExp) > (item.startAt + item.duration) ||
-                    maximum < item.startAt
-                ) {
-                    ++count;
-                    this.remove(item.id);
-                }
+        for (const item of this._itemMap.values()) {
+            if (
+                (item.duration === 1 ? longExp : shortExp) > (item.startAt + item.duration) ||
+                maximum < item.startAt
+            ) {
+                ++count;
+                this.remove(item.id);
             }
+        }
 
-            // Perform GC for the logically-deleted store
-            for (const item of this._itemMapDeleted.values()) {
-                if (
-                    (item.duration === 1 ? longExp : shortExp) > (item.startAt + item.duration) ||
-                    maximum < item.startAt
-                ) {
-                    ++count;
-                    this._itemMapDeleted.delete(item.id);
-                }
+        // Perform GC for the logically-deleted store
+        for (const item of this._itemMapDeleted.values()) {
+            if (
+                (item.duration === 1 ? longExp : shortExp) > (item.startAt + item.duration) ||
+                maximum < item.startAt
+            ) {
+                ++count;
+                this._itemMapDeleted.delete(item.id);
             }
+        }
 
-            setTimeout(this._gc.bind(this), this._programGCInterval);
-
-            log.info("Program GC has finished and removed %d programs", count);
-        });
+        log.info("Program GC has finished and removed %d programs", count);
     }
 }
 

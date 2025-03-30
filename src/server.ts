@@ -58,6 +58,7 @@ setEnv("LOGO_DATA_DIR_PATH", "/usr/local/var/db/mirakurun/logo-data");
 import _ from "./Mirakurun/_";
 import status from "./Mirakurun/status";
 import Event from "./Mirakurun/Event";
+import Job from "./Mirakurun/Job";
 import Tuner from "./Mirakurun/Tuner";
 import Channel from "./Mirakurun/Channel";
 import Service from "./Mirakurun/Service";
@@ -80,6 +81,7 @@ import * as log from "./Mirakurun/log";
     }
 
     _.event = new Event();
+    _.job = new Job();
     _.tuner = new Tuner();
     _.channel = new Channel();
     _.service = new Service();

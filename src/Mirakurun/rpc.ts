@@ -73,7 +73,9 @@ export function initRPCNotifier(rpcs: Set<RPCServer>): void {
     const eventsNMDict = {
         program: new NotifyManager<apid.Event>("events:program", "events", rpcs),
         service: new NotifyManager<apid.Event>("events:service", "events", rpcs),
-        tuner: new NotifyManager<apid.Event>("events:tuner", "events", rpcs)
+        tuner: new NotifyManager<apid.Event>("events:tuner", "events", rpcs),
+        job: new NotifyManager<apid.Event>("events:job", "events", rpcs),
+        job_schedule: new NotifyManager<apid.Event>("events:job_schedule", "events", rpcs)
     };
     function onEventListener(event: apid.Event) {
         eventsNMDict[event.resource].notify(event);
