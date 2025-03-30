@@ -6,6 +6,29 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
 
 **Important Notice**: Mirakurun 4.0.0 includes significant performance improvements, enhanced EPG processing, asynchronous file I/O operations, and new features. As announced in 3.9.0, the experimental Win32 support has been completely removed.
 
+## 4.0.0-beta.14 (2025-03-30)
+
+### Key Changes
+
+- **Job/Queue**: Improved background job mechanism for like EPG updates.
+  - **Users can now request EPG updates at any time.**
+  - Job execution schedules can now be set in a **cron-like format**.
+  - <u>Jobs are now executed in parallel</u> according to the number of CPU cores and resource availability.
+  - At the moment, the number of parallel executions is `Math.max(1, Math.floor(os.cpus().length / 2))`, but it will be made configurable in the future.
+
+### Server Changes
+
+- **Config**:
+  - Added: `programGCJobSchedule`, `epgGatheringJobSchedule` server configs.
+  - Removed: `programGCInterval`, `epgGatheringInterval` server configs. (*breaking change*)
+  - Settings are not migrated. If you have customized, you must re-configure them in cron-like format, which can be changed from the Web UI.
+  - see: [Configuration](doc/Configuration.md) ([日本語](doc/Configuration.ja.md))
+- **API**:
+  - Added: `runJobSchedule`, `abortJob` operations.
+- **UI**:
+  - Added: **Jobs** view.
+  - Update: **Config** view.
+
 ## 4.0.0-beta.13 (2025-03-29)
 
 ### Docker Changes
