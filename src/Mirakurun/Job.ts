@@ -188,6 +188,16 @@ export class Job {
             if (job.id === id && !job.ac.signal.aborted) {
                 job.ac.abort(reason);
                 log.info(`Job#abort() abort requested "${job.key}" (id: ${job.id})`);
+
+                // emit event
+                let status: apid.JobItem["status"] = "queued";
+                if (this._runningJobItemSet.has(job as RunningJobItem)) {
+                    status = "running";
+                } else if (this._standbyJobItems.includes(job)) {
+                    status = "standby";
+                }
+                Event.emit("job", "update", jobToJSON(status, job));
+
                 return true;
             }
         }
