@@ -457,6 +457,8 @@ definitions:
           - finished
       retryCount:
         type: integer
+      isRerunnable:
+        type: boolean
       retryOnAbort:
         type: boolean
       retryOnFail:

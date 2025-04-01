@@ -193,6 +193,7 @@ export class Channel {
             _.job.add({
                 key: `EPG.Gather.NID.${networkId}`,
                 name: `EPG Gather Network#${networkId}`,
+                isRerunnable: true,
                 fn: async () => {
                     log.info("Network#%d EPG gathering has started", networkId);
                     try {

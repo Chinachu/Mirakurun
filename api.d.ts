@@ -229,6 +229,7 @@ export interface JobItem {
     status: "queued" | "standby" | "running" | "finished";
     retryCount: number;
 
+    isRerunnable?: boolean;
     retryOnAbort?: boolean;
     retryOnFail?: boolean;
     retryMax?: number;

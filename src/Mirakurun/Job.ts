@@ -34,7 +34,8 @@ export interface JobItem {
     fn: JobFn;
     /** if return `false`, skip call fn */
     readyFn?: ReadyFn;
-
+    /** 再実行可能かどうか */
+    isRerunnable?: boolean;
     /** リトライするかどうか - abort時 */
     retryOnAbort?: boolean;
     /** リトライするかどうか - 失敗時 */
@@ -184,6 +185,36 @@ export class Job {
         this._checkQueue();
     }
 
+    rerun(id: string): boolean {
+        for (const job of [...this._finishedJobItems]) {
+            if (job.id === id) {
+                log.info(`Job#rerun() rerun requested "${job.key}" (id: ${job.id})`);
+
+                if (job.isRerunnable !== true) {
+                    log.warn(`Job#rerun() "${job.key}" (id: ${job.id}) is not rerunnable`);
+                    return false;
+                }
+
+                // Add new job to queue
+                this.add({
+                    key: job.key,
+                    name: job.name,
+                    fn: job.fn,
+                    readyFn: job.readyFn,
+                    isRerunnable: true,
+                    retryOnAbort: false,
+                    retryOnFail: false,
+                    retryMax: 0
+                }, 0);
+
+                return true;
+            }
+        }
+
+        log.warn(`Job#rerun() "${id}" not found in finished jobs`);
+        return false;
+    }
+
     abort(id: string, reason: string): boolean {
         for (const job of [...this._runningJobItemSet, ...this._standbyJobItems, ...this._queuedJobItems]) {
             if (job.id === id && !job.ac.signal.aborted) {
@@ -203,6 +234,7 @@ export class Job {
             }
         }
 
+        log.warn(`Job#abort() "${id}" not found in running or queued jobs`);
         return false;
     }
 
@@ -424,7 +456,15 @@ export class Job {
 
         // 最大履歴数を超える古い履歴を削除
         if (this._finishedJobItems.length > this.maxHistory) {
-            this._finishedJobItems.length = this.maxHistory;
+            const removedJobs = this._finishedJobItems.splice(this.maxHistory, this._finishedJobItems.length - this.maxHistory);
+
+            for (const removedJob of removedJobs) {
+                // remove ではなく update にして削除通知はしない (テスト中)
+                Event.emit("job", "update", jobToJSON("finished", {
+                    ...removedJob,
+                    isRerunnable: false
+                }));
+            }
         }
 
         const duration = finishedAt - job.startedAt;
@@ -459,6 +499,7 @@ export class Job {
                 name: job.name,
                 fn: job.fn,
                 readyFn: job.readyFn,
+                isRerunnable: job.isRerunnable,
                 retryOnAbort: job.retryOnAbort,
                 retryOnFail: job.retryOnFail,
                 retryMax: job.retryMax,

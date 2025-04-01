@@ -111,6 +111,7 @@ const JobsView: React.FC<{ uiStateEvents: EventEmitter, rpc: RPCClient }> = ({ u
     const [updated, setUpdated] = useState<number>(0);
     const [confirmToRunSchedule, setConfirmToRunSchedule] = useState<JobScheduleItem | null>(null);
     const [confirmToAbortJob, setConfirmToAbortJob] = useState<JobItem | null>(null);
+    const [confirmToRerunJob, setConfirmToRerunJob] = useState<JobItem | null>(null);
 
     useEffect(() => {
         const load = async () => {
@@ -318,13 +319,34 @@ const JobsView: React.FC<{ uiStateEvents: EventEmitter, rpc: RPCClient }> = ({ u
             case "col-timestamp":
                 return <Text style={{ lineHeight: "30px" }}>{new Date(job.updatedAt).toLocaleString()}</Text>;
             case "col-actions":
-                return job.status !== "finished" && !job.isAborting ? (
-                    <IconButton
-                        title="Abort..."
-                        iconProps={{ iconName: "Cancel" }}
-                        onClick={() => setConfirmToAbortJob(job)}
-                    />
-                ) : <></>;
+                if (job.status !== "finished") {
+                    if (job.isAborting) {
+                        return (
+                            <IconButton
+                                title="Aborting..."
+                                iconProps={{ iconName: "HourGlass" }}
+                                disabled
+                            />
+                        );
+                    } else {
+                        return (
+                            <IconButton
+                                title="Abort..."
+                                iconProps={{ iconName: "Cancel" }}
+                                onClick={() => setConfirmToAbortJob(job)}
+                            />
+                        );
+                    }
+                } else if (job.status === "finished" && job.isRerunnable) {
+                    return (
+                        <IconButton
+                            title="Rerun..."
+                            iconProps={{ iconName: "Rerun" }}
+                            onClick={() => setConfirmToRerunJob(job)}
+                        />
+                    );
+                }
+                return <></>;
             default:
                 return null;
         }
@@ -418,12 +440,38 @@ const JobsView: React.FC<{ uiStateEvents: EventEmitter, rpc: RPCClient }> = ({ u
         </Dialog>
 
         <Dialog
+            hidden={!confirmToRerunJob}
+            onDismiss={() => setConfirmToRerunJob(null)}
+            dialogContentProps={{
+                type: DialogType.largeHeader,
+                title: "Rerun Job",
+                subText: "Do you want to rerun the job?"
+            }}
+        >
+            <DialogFooter>
+                <PrimaryButton
+                    text="Rerun"
+                    onClick={() => {
+                        (async () => {
+                            await fetch(`/api/jobs/${confirmToRerunJob.id}/rerun`, { method: "PUT" });
+                        })();
+                        setConfirmToRerunJob(null);
+                    }}
+                />
+                <DefaultButton
+                    text="Cancel"
+                    onClick={() => setConfirmToRerunJob(null)}
+                />
+            </DialogFooter>
+        </Dialog>
+
+        <Dialog
             hidden={!confirmToAbortJob}
             onDismiss={() => setConfirmToAbortJob(null)}
             dialogContentProps={{
                 type: DialogType.largeHeader,
                 title: "Abort Job",
-                subText: "Would you like to request a abort?"
+                subText: "Would you like to request a abort? This only sends a request, and whether it can be aborted depends on the job."
             }}
         >
             <DialogFooter>
