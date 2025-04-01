@@ -36,6 +36,8 @@ const {
     HOSTNAME,
     LOG_LEVEL,
     MAX_LOG_HISTORY,
+    JOB_MAX_RUNNING,
+    JOB_MAX_STANDBY,
     MAX_BUFFER_BYTES_BEFORE_READY,
     EVENT_END_TIMEOUT,
     PROGRAM_GC_JOB_SCHEDULE,
@@ -125,6 +127,12 @@ export async function loadServer(): Promise<Server> {
         if (typeof MAX_LOG_HISTORY !== "undefined" && /^[0-9]+$/.test(MAX_LOG_HISTORY)) {
             config.maxLogHistory = parseInt(MAX_LOG_HISTORY, 10);
         }
+        if (typeof JOB_MAX_RUNNING !== "undefined" && /^[0-9]+$/.test(JOB_MAX_RUNNING)) {
+            config.jobMaxRunning = parseInt(JOB_MAX_RUNNING, 10);
+        }
+        if (typeof JOB_MAX_STANDBY !== "undefined" && /^[0-9]+$/.test(JOB_MAX_STANDBY)) {
+            config.jobMaxStandby = parseInt(JOB_MAX_STANDBY, 10);
+        }
         if (typeof MAX_BUFFER_BYTES_BEFORE_READY !== "undefined" && /^[0-9]+$/.test(MAX_BUFFER_BYTES_BEFORE_READY)) {
             config.maxBufferBytesBeforeReady = parseInt(MAX_BUFFER_BYTES_BEFORE_READY, 10);
         }
@@ -173,6 +181,22 @@ export async function loadServer(): Promise<Server> {
     if (!config.hostname) {
         config.hostname = hostname();
         log.info("detected hostname: %s", config.hostname);
+    }
+
+    // validate jobMaxRunning
+    if (typeof config.jobMaxRunning !== "undefined") {
+        if (typeof config.jobMaxRunning !== "number" || config.jobMaxRunning < 1 || config.jobMaxRunning > 100) {
+            log.error("invalid server config property `jobMaxRunning`: %s", config.jobMaxRunning);
+            delete config.jobMaxRunning;
+        }
+    }
+
+    // validate jobMaxStandby
+    if (typeof config.jobMaxStandby !== "undefined") {
+        if (typeof config.jobMaxStandby !== "number" || config.jobMaxStandby < 1 || config.jobMaxStandby > 100) {
+            log.error("invalid server config property `jobMaxStandby`: %s", config.jobMaxStandby);
+            delete config.jobMaxStandby;
+        }
     }
 
     // validate allowIPv4CidrRanges

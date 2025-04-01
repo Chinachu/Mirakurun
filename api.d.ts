@@ -265,6 +265,8 @@ export interface ConfigServer {
     disableIPv6?: boolean;
     logLevel?: LogLevel;
     maxLogHistory?: number;
+    jobMaxRunning?: number;
+    jobMaxStandby?: number;
     maxBufferBytesBeforeReady?: number;
     eventEndTimeout?: number;
     programGCJobSchedule?: string;

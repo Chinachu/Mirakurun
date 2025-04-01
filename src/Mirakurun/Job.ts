@@ -18,6 +18,7 @@ import * as log from "./log";
 import { sleep } from "./common";
 import * as apid from "../../api";
 import Event from "./Event";
+import _ from "./_";
 
 export interface JobFnOptions {
     signal: AbortSignal;
@@ -87,8 +88,8 @@ export interface ScheduleItem {
 }
 
 export class Job {
-    maxRunning: number = Math.max(1, Math.floor(os.cpus().length / 2)); // todo: config
-    maxStandby: number = Math.max(1, Math.floor(os.cpus().length - 1)); // 同時に ready チェックを行う最大数
+    maxRunning: number = _.config.server.jobMaxRunning || Math.min(100, Math.max(1, Math.floor(os.cpus().length / 2))); // 同時に実行する最大数
+    maxStandby: number = _.config.server.jobMaxStandby || Math.min(100, Math.max(1, Math.floor(os.cpus().length - 1))); // 同時に ready チェックを行う最大数
     maxHistory: number = 50; // todo: config
 
     private _jobIdPrefix = Date.now().toString(36).toUpperCase() + ".";

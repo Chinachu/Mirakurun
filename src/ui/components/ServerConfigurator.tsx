@@ -159,6 +159,44 @@ const Configurator: React.FC<{ uiState: UIState, uiStateEvents: EventEmitter }> 
                     <Separator alignContent="start">Advanced</Separator>
 
                     <TextField
+                        styles={{ fieldGroup: { "max-width": 100 } }}
+                        label="Job Max Running"
+                        suffix="jobs"
+                        placeholder="(auto)"
+                        value={`${editing.jobMaxRunning || ""}`}
+                        onChange={(ev, newValue) => {
+                            if (newValue === "") {
+                                delete editing.jobMaxRunning;
+                            } else if (/^[0-9]+$/.test(newValue)) {
+                                const int = parseInt(newValue, 10);
+                                if (int <= 100 && int > 0) {
+                                    editing.jobMaxRunning = int;
+                                }
+                            }
+                            setEditing({ ...editing });
+                        }}
+                    />
+
+                    <TextField
+                        styles={{ fieldGroup: { "max-width": 100 } }}
+                        label="Job Max Standby"
+                        suffix="jobs"
+                        placeholder="(auto)"
+                        value={`${editing.jobMaxStandby || ""}`}
+                        onChange={(ev, newValue) => {
+                            if (newValue === "") {
+                                delete editing.jobMaxStandby;
+                            } else if (/^[0-9]+$/.test(newValue)) {
+                                const int = parseInt(newValue, 10);
+                                if (int <= 100 && int > 0) {
+                                    editing.jobMaxStandby = int;
+                                }
+                            }
+                            setEditing({ ...editing });
+                        }}
+                    />
+
+                    <TextField
                         styles={{ fieldGroup: { "max-width": 150 } }}
                         label="EPG Gathering Job Schedule"
                         placeholder="20,50 * * * *"
