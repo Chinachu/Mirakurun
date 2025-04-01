@@ -6,6 +6,21 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
 
 **Important Notice**: Mirakurun 4.0.0 includes significant performance improvements, enhanced EPG processing, asynchronous file I/O operations, and new features. As announced in 3.9.0, the experimental Win32 support has been completely removed.
 
+## 4.0.0-beta.16 (2025-04-01)
+
+### Server Changes
+
+- **Job**:
+  - Jobs can now be rerun.
+  - Maximum number of runs can now be set.
+- **Config**:
+  - Added: `jobMaxRunning`, `jobMaxStandby` server configs.
+- **API**:
+  - Added: `rerunJob` operations.
+- **UI**:
+  - **JobsView**: Added support to rerun Job.
+  - **ServerConfigurator**: Added job settings.
+
 ## 4.0.0-beta.15 (2025-03-30)
 
 Bugfix of `@4.0.0-beta.14`.
@@ -18,7 +33,7 @@ Bugfix of `@4.0.0-beta.14`.
   - **Users can now request EPG updates at any time.**
   - Job execution schedules can now be set in a **cron-like format**.
   - <u>Jobs are now executed in parallel</u> according to the number of CPU cores and resource availability.
-  - At the moment, the number of parallel executions is `Math.max(1, Math.floor(os.cpus().length / 2))`, but it will be made configurable in the future.
+  - At the moment, the number of parallel executions is `Math.max(1, Math.floor(os.cpus().length / 2))`, but it will be made configurable in the ~~future~~. → `@4.0.0-beta.16`
 
 ### Server Changes
 
@@ -30,8 +45,8 @@ Bugfix of `@4.0.0-beta.14`.
 - **API**:
   - Added: `runJobSchedule`, `abortJob` operations.
 - **UI**:
-  - Added: **Jobs** view.
-  - Update: **Config** view.
+  - **JobsView**: added.
+  - **ServerConfigurator**: updated.
 
 ## 4.0.0-beta.13 (2025-03-29)
 
