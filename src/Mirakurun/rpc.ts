@@ -129,7 +129,7 @@ function serverOnUpgrade(this: RPCServer["wss"], req: http.IncomingMessage, sock
     }
 
     if (req.headers.origin !== undefined) {
-        if (!isPermittedHost(req.headers.origin, _.config.server.hostname)) {
+        if (!isPermittedHost(req.headers.origin, _.config.server.hostname) && !_.config.server.allowOrigins.includes(req.headers.origin)) {
             socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
             socket.destroy();
             return;

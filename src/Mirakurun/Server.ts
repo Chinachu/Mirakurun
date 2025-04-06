@@ -116,8 +116,9 @@ export class Server {
                 }
             }
 
-            if (req.get("Referer") !== undefined) {
-                if (!system.isPermittedHost(req.get("Referer"), serverConfig.hostname)) {
+            const referer = req.get("Referer");
+            if (referer !== undefined) {
+                if (!system.isPermittedHost(referer, serverConfig.hostname) && serverConfig.allowOrigins.every(o => !referer.startsWith(o))) {
                     res.status(403).end();
                     return;
                 }
