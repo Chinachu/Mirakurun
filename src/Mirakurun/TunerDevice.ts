@@ -262,6 +262,7 @@ export default class TunerDevice extends EventEmitter {
 
         cmd = common.replaceCommandTemplate(cmd, {
             channel: ch.channel,
+            type: ch.type,
             satelite: ch.commandVars?.satellite || "", // deprecated, for backward compatibility
             space: 0, // default value for backward compatibility
             ...ch.commandVars
