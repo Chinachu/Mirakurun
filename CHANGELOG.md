@@ -6,6 +6,20 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
 
 **Important Notice**: Mirakurun 4.0.0 includes significant performance improvements, enhanced EPG processing, asynchronous file I/O operations, and new features. As announced in 3.9.0, the experimental Win32 support has been completely removed.
 
+## 4.0.0-beta.17 (2025-04-10)
+
+### Server Changes
+
+- **Server**:
+  - Allow access to the Web UI through the allowOrigins setting.
+- **Channel**:
+  - Fixed a bug in the readyFn of EPG gatherer job.
+- **Tuner**:
+  - Improved readyForJob logic for better tuner selection.
+  - Added logging for tuner selection process.
+- **TunerDevice**:
+  - Added channel type to command template replacement.
+
 ## 4.0.0-beta.16 (2025-04-01)
 
 ### Server Changes
