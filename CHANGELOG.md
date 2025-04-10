@@ -6,6 +6,13 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
 
 **Important Notice**: Mirakurun 4.0.0 includes significant performance improvements, enhanced EPG processing, asynchronous file I/O operations, and new features. As announced in 3.9.0, the experimental Win32 support has been completely removed.
 
+## 4.0.0-beta.17 (2025-04-11)
+
+### Server Changes
+
+- **Service**:
+  - Fixed a bug in the loading services.
+
 ## 4.0.0-beta.17 (2025-04-10)
 
 ### Server Changes
