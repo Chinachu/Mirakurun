@@ -53,20 +53,34 @@ export class Tuner {
     async readyForJob(channel: ChannelItem): Promise<boolean> {
         const devices = this._getDevicesByType(channel.type);
         if (devices.length === 0) {
+            log.error("readyForJob: no tuners for channel type: %s", channel.type);
             return false;
         }
 
         while (true) {
-            const device = this._pickTunerDevice(devices, channel, -1);
-            if (device && !this._readyForJobPickedDeviceSet.has(device)) {
-                // pick したチューナーを少し保持する
-                this._readyForJobPickedDeviceSet.add(device);
-                setTimeout(() => {
-                    this._readyForJobPickedDeviceSet.delete(device);
-                }, 1000 * 5);
-                return true;
+            const pickableDevices = devices.filter(device => !this._readyForJobPickedDeviceSet.has(device));
+            if (pickableDevices.length === 0) {
+                log.debug("readyForJob: no pickable tuners for channel type: %s", channel.type);
+                await common.sleep(1000 * 10);
+                continue;
             }
-            await common.sleep(1000 * 10);
+            const device = this._pickTunerDevice(pickableDevices, channel, -1);
+            if (device === null) {
+                // log.debug("readyForJob: no available tuners for channel type: %s", channel.type);
+                await common.sleep(1000 * 10);
+                continue;
+            }
+            // pick したチューナーを少し保持する
+            this._readyForJobPickedDeviceSet.add(device);
+            log.debug("readyForJob: picked device: #%d (%s)", device.config.name);
+
+            setTimeout(() => {
+                // 開放
+                this._readyForJobPickedDeviceSet.delete(device);
+                log.debug("readyForJob: released device: #%d (%s)", device.index, device.config.name);
+            }, 1000 * 5);
+
+            return true;
         }
     }
 
@@ -425,10 +439,9 @@ export class Tuner {
     private _getDevicesByType(type: apid.ChannelType): TunerDevice[] {
         const devices = [];
 
-        const l = this._devices.length;
-        for (let i = 0; i < l; i++) {
-            if (this._devices[i].config.types.includes(type) === true) {
-                devices.push(this._devices[i]);
+        for (const device of this._devices) {
+            if (device.config.types.includes(type) === true) {
+                devices.push(device);
             }
         }
 
