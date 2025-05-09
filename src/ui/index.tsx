@@ -13,316 +13,87 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-import EventEmitter from "eventemitter3";
 import * as React from "react";
 import { useState, useEffect } from "react";
-import * as ReactDOM from "react-dom/client";
-import {
-    createTheme,
-    loadTheme,
-    Fabric,
-    Stack,
-    ActionButton,
-    Pivot,
-    PivotItem,
-    Separator,
-    Text,
-    Link,
-    Icon,
-    ColorClassNames
-} from "@fluentui/react";
-import { initializeIcons } from "@fluentui/react/lib/Icons";
-import { Client as RPCClient } from "jsonrpc2-ws";
-import { JoinParams, NotifyParams } from "../../lib/Mirakurun/rpc.d";
-import { TunerDevice, Service, Status, Event } from "../../api.d";
-import ConnectionGuide from "./components/ConnectionGuide";
-import UpdateAlert from "./components/UpdateAlert";
-import Restart from "./components/Restart";
-import StatusView from "./components/StatusView";
-import JobsView from "./components/JobsView";
-import EventsView from "./components/EventsView";
-import LogsView from "./components/LogsView";
-import ConfigView from "./components/ConfigView";
-import HeartView from "./components/HeartView";
-import "./index.css";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { FocusStyleManager } from "@blueprintjs/core";
+FocusStyleManager.onlyShowFocusOnTabs();
+import { DateTime, Settings as LuxonSettings } from "luxon";
+LuxonSettings.defaultZone = "Asia/Tokyo";
+LuxonSettings.defaultLocale = "ja";
 
-initializeIcons();
+import { state } from "./modules/state";
+import * as ui from "./modules/ui";
+import * as at from "./modules/at";
+at.init(5000);
 
-export interface UIState {
-    version: string;
-    statusName: string;
-    statusIconName: string;
-    tuners: TunerDevice[];
-    services: Service[];
-    status: Status;
-}
+import { Nav } from "./components/Nav";
+import { EPGView } from "./routes/EPGView";
+import { ProgramView } from "./routes/ProgramView";
+import { SearchView } from "./routes/SearchView";
+import { JobsView } from "./routes/JobsView";
 
-const uiState: UIState = {
-    version: "..",
-    statusName: "Loading",
-    statusIconName: "offline",
-    tuners: [],
-    services: [],
-    status: null
-};
+import "normalize.css";
+import "@blueprintjs/core/lib/css/blueprint.css";
+import "@blueprintjs/icons/lib/css/blueprint-icons.css";
+import "./index.sass";
 
-const uiStateEvents = new EventEmitter();
+const Index: React.FC = () => {
+    console.debug("Index");
 
-const iconSrcMap = {
-    normal: "icon.svg",
-    offline: "icon-gray.svg",
-    active: "icon-active.svg"
-};
-
-let statusRefreshInterval: any;
-let servicesRefreshInterval: any;
-
-function idleStatusChecker(): boolean {
-    let statusName = "Standby";
-    let statusIconName = "normal";
-
-    const isActive = uiState.tuners.some(tuner => tuner.isUsing === true && tuner.users.some(user => user.priority !== -1));
-    if (isActive) {
-        statusName = "Active";
-        statusIconName = "active";
-    }
-
-    if (uiState.statusName === statusName) {
-        return false;
-    }
-
-    uiState.statusName = statusName;
-    uiState.statusIconName = statusIconName;
-    uiStateEvents.emit("update");
-
-    return true;
-}
-uiStateEvents.on("update:tuners", idleStatusChecker);
-
-const rpc = new RPCClient(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/rpc`, {
-    protocols: null
-});
-
-rpc.on("connecting", () => {
-    console.log("rpc:connecting");
-
-    uiState.statusName = "Connecting";
-    uiStateEvents.emit("update");
-});
-
-rpc.on("connected", async () => {
-    console.log("rpc:connected");
-
-    // status
-    {
-        uiState.status = await rpc.call("getStatus");
-
-        statusRefreshInterval = setInterval(async () => {
-            if (document.hidden) {
-                return;
-            }
-            uiState.status = await rpc.call("getStatus");
-            uiStateEvents.emit("update:status");
-        }, 1000 * 5);
-
-        if (uiState.version !== ".." && uiState.version !== uiState.status.version) {
-            location.reload();
-            return;
-        }
-        uiState.version = uiState.status.version;
-    }
-    // services
-    {
-        uiState.services = await (await fetch("/api/services")).json();
-
-        servicesRefreshInterval = setInterval(async () => {
-            if (document.hidden) {
-                return;
-            }
-            uiState.services = await (await fetch("/api/services")).json();
-            uiStateEvents.emit("update:services");
-        }, 1000 * 60);
-    }
-    uiState.tuners = await (await fetch("/api/tuners")).json();
-
-    await rpc.call("join", {
-        rooms: [
-            "events:tuner",
-            "events:service",
-            "events:job",
-            "events:job_schedule"
-        ],
-    } as JoinParams);
-
-    uiStateEvents.emit("update");
-    uiStateEvents.emit("update:status");
-    uiStateEvents.emit("update:services");
-    uiStateEvents.emit("update:tuners");
-});
-
-rpc.on("disconnect", () => {
-    console.log("rpc:disconnected");
-
-    clearInterval(statusRefreshInterval);
-    clearInterval(servicesRefreshInterval);
-
-    uiState.statusName = "Disconnected";
-    uiState.statusIconName = "offline";
-    uiStateEvents.emit("update");
-});
-
-rpc.methods.set("events", async (socket, { array }: NotifyParams<Event>) => {
-    let reloadServiceRequired = false;
-
-    for (const event of array) {
-        if (event.resource === "service") {
-            const service: Service = event.data;
-            reloadServiceRequired = true;
-
-            for (const _service of uiState.services) {
-                if (_service.id === service.id) {
-                    Object.assign(_service, service);
-                    uiStateEvents.emit("update:services");
-                    reloadServiceRequired = false;
-                    break;
-                }
-            }
-        } else if (event.resource === "tuner") {
-            const tuner: TunerDevice = event.data;
-
-            uiState.tuners[uiState.tuners.findIndex(value => value.index === tuner.index)] = tuner;
-            uiStateEvents.emit("update:tuners");
-        }
-    }
-
-    if (reloadServiceRequired) {
-        uiState.services = await (await fetch("/api/services")).json();
-        uiStateEvents.emit("update:services");
-    }
-
-    uiStateEvents.emit("data:events", array);
-});
-
-rpc.methods.set("logs", (socket, { array }: NotifyParams<string> ) => {
-    uiStateEvents.emit("data:logs", array);
-});
-
-const Content = () => {
-    const [state, setState] = useState<UIState>(uiState);
+    const navigate = state.navigate = useNavigate();
+    const location = state.location = useLocation();
+    const searchParams = state.searchParams = new URLSearchParams(location.search);
+    const pathname = state.pathname = location.pathname;
+    const pathLv1 = pathname.split("/")[1];
 
     useEffect(() => {
-        const title = `${state.statusName} - Mirakurun ${state.version}`;
-        if (document.title !== title) {
-            document.title = title;
-        }
+        ui.blur();
+    }, [location.pathname]);
 
-        const icon = document.getElementById("icon");
-        if (icon && icon.getAttribute("href") !== iconSrcMap[state.statusIconName]) {
-            icon.setAttribute("href", iconSrcMap[state.statusIconName]);
-        }
+    return <>
+        {state.isDev && /* 開発用 */ <>
+            <div id="dev-header">
+                [dev] {JSON.stringify({
+                    pathname,
+                    pathLv1,
+                    searchParams: searchParams.toString()
+                })}
+            </div>
+        </>}
 
-        const onStateUpdate = () => {
-            setState({ ...uiState });
-        };
-        uiStateEvents.on("update", onStateUpdate);
+        <Nav pathLv1={pathLv1} />
 
-        return () => {
-            uiStateEvents.removeListener("update", onStateUpdate);
-        };
-    }, [state.statusName, state.version, state.statusIconName]);
+        <div id="main">
+            <div id="page">
+                <Routes>
+                    <Route path="/*" element={<div>not found</div>} />
 
-    return (
-        <Fabric style={{ margin: "16px" }}>
-            <Stack tokens={{ childrenGap: "8 0" }}>
-                <UpdateAlert />
+                    <Route path="/" element={<div>home</div>} />
 
-                <Stack horizontal verticalAlign="center" tokens={{ childrenGap: "0 8" }}>
-                    <img style={{ height: "96px" }} src={iconSrcMap[state.statusIconName]} />
-                    <div className="ms-fontSize-42">Mirakurun</div>
-                    <Text variant="mediumPlus" nowrap block className={ColorClassNames.themePrimary}>{state.status?.version}</Text>
-                    <Text variant="medium" nowrap block className={ColorClassNames.neutralTertiaryAlt}>({state.statusName})</Text>
-                    <Stack.Item grow disableShrink>&nbsp;</Stack.Item>
-                    <ConnectionGuide />
-                    <ActionButton
-                        iconProps={{ iconName: "KnowledgeArticle" }}
-                        text="API Docs"
-                        target="_blank"
-                        href="/api/debug"
-                    />
-                    <Restart uiStateEvents={uiStateEvents} />
-                </Stack>
+                    <Route path="epg" element={<EPGView />} />
+                    <Route path="epg/services/:globalServiceId" element={<EPGView />} />
+                    <Route path="epg/programs/:programId" element={<ProgramView />} />
+                    <Route path="epg/search" element={<SearchView />} />
+                    <Route path="jobs" element={<JobsView />} />
 
-                <Pivot>
-                    <PivotItem itemIcon="GroupedList" headerText="Status">
-                        <StatusView uiState={uiState} uiStateEvents={uiStateEvents} rpc={rpc} />
-                    </PivotItem>
-                    <PivotItem itemIcon="Clock" headerText="Jobs">
-                        <JobsView uiStateEvents={uiStateEvents} rpc={rpc} />
-                    </PivotItem>
-                    <PivotItem itemIcon="EntitlementRedemption" headerText="Events">
-                        <EventsView uiStateEvents={uiStateEvents} rpc={rpc} />
-                    </PivotItem>
-                    <PivotItem itemIcon="ComplianceAudit" headerText="Logs">
-                        <LogsView uiStateEvents={uiStateEvents} rpc={rpc} />
-                    </PivotItem>
-                    <PivotItem itemIcon="Settings" headerText="Config">
-                        <ConfigView uiState={uiState} uiStateEvents={uiStateEvents} />
-                    </PivotItem>
-                    <PivotItem itemIcon="Heart" headerText="Special Thanks">
-                        <HeartView />
-                    </PivotItem>
-                </Pivot>
+                    // todo:
 
-                <Stack>
-                    <Separator />
-                    <Text>
-                        <Link href="https://github.com/Chinachu/Mirakurun" target="_blank">Mirakurun</Link> {state.version}
-                        &nbsp;&copy; 2016- <Link href="https://github.com/kanreisa" target="_blank">kanreisa</Link>.
-                    </Text>
-                    <Text>
-                        <Icon iconName="Heart" /> <Link href="https://chinachu.moe/" target="_blank">Chinachu Project</Link>
-                        &nbsp;(<Link href="https://github.com/Chinachu" target="_blank">GitHub</Link>)
-                    </Text>
-                </Stack>
+                    <Route path="logs" element={<div></div>} />
+                    <Route path="config/server" element={<div></div>} />
+                    <Route path="config/tuners" element={<div></div>} />
+                    <Route path="config/channels" element={<div></div>} />
 
-                <Stack>
-                    <Text variant="xSmall" className={ColorClassNames.neutralTertiaryAlt}>
-                        Mirakurun comes with ABSOLUTELY NO WARRANTY. USE AT YOUR OWN RISK.
-                    </Text>
-                </Stack>
-            </Stack>
-        </Fabric>
-    );
+                    <Route path="about" element={<div>about</div>} />
+                </Routes>
+            </div>
+        </div>
+    </>;
 };
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<Content />);
-
-// dark theme
-const myTheme = createTheme({
-    palette: {
-        themePrimary: "#ffd56c",
-        themeLighterAlt: "#0a0904",
-        themeLighter: "#292211",
-        themeLight: "#4d4020",
-        themeTertiary: "#998040",
-        themeSecondary: "#e0bc5e",
-        themeDarkAlt: "#ffd97a",
-        themeDark: "#ffdf8f",
-        themeDarker: "#ffe8ac",
-        neutralLighterAlt: "#2d2f37",
-        neutralLighter: "#34363f",
-        neutralLight: "#40424c",
-        neutralQuaternaryAlt: "#474a54",
-        neutralQuaternary: "#4e505b",
-        neutralTertiaryAlt: "#686b77",
-        neutralTertiary: "#f1f1f1",
-        neutralSecondary: "#f4f4f4",
-        neutralPrimaryAlt: "#f6f6f6",
-        neutralPrimary: "#ebebeb",
-        neutralDark: "#fafafa",
-        black: "#fdfdfd",
-        white: "#25272e",
-    }
-});
-loadTheme(myTheme);
+{
+    const basename = state.isDev ? "/dev/" : "";
+    const root = createRoot(document.getElementById("root"));
+    root.render(<BrowserRouter basename={basename}><Index /></BrowserRouter>);
+}

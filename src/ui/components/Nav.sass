@@ -1,0 +1,82 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+@use "../vars"
+
+.component-nav.bp5-navbar
+  > .bp5-navbar-group
+    > img.product-icon
+      width: 28px
+      height: 28px
+      margin-right: 10px
+
+    > .bp5-navbar-heading.product-name
+      font-size: 18px
+      font-weight: 300
+
+      > .version
+        font-size: 10px
+        font-weight: 400
+        top: -1em
+        color: vars.$theme-light-primary
+
+        .bp5-dark &
+          color: vars.$theme-dark-primary
+
+    > .bp5-input-group
+      .bp5-input
+        &:not(:hover,:focus)
+          box-shadow: none
+
+    > .bp5-button
+      span.badge
+        margin-left: 5px
+        font-size: 11px
+        color: vars.$theme-light-primary
+
+        .bp5-dark &
+          color: vars.$theme-dark-primary
+
+    > .bp5-button.active
+      border-bottom-right-radius: 0
+      border-bottom-left-radius: 0
+      box-shadow: 0 2px vars.$theme-light-primary
+
+      .bp5-dark &
+        box-shadow: 0 2px vars.$theme-dark-primary
+
+      //&:hover:not(.bp5-popover-target)
+      //  background: none
+      //  cursor: default
+
+// responsive
+
+.component-nav.bp5-navbar
+  > .bp5-navbar-group.bp5-align-left
+    .bp5-navbar-heading
+      @media (max-width: 800px)
+        display: none
+
+    .bp5-input-group
+      width: 200px
+
+      @media (max-width: 1000px)
+        width: 150px
+
+      @media (max-width: 600px)
+        width: 100px
+
+  > .bp5-navbar-group.bp5-align-right
+    @media (max-width: 950px)
+      button
+        .bp5-icon:not(:last-child)
+          margin: 0 -7px
+
+        .bp5-button-text
+          display: none
+
+    @media (max-width: 950px) and (min-width: 600px)
+      button:hover
+        .bp5-icon:not(:last-child)
+          margin: 0 7px 0 0
+
+        .bp5-button-text
+          display: block

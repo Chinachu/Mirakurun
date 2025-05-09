@@ -13,12 +13,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+import * as path from "path";
 import * as fs from "fs";
 import * as http from "http";
 import { promisify } from "util";
 import express from "express";
 import cors from "cors";
-import mime from "mime";
 import * as openapi from "express-openapi";
 import morgan from "morgan";
 import * as yaml from "js-yaml";
@@ -125,14 +125,21 @@ export class Server {
             }
 
             if (serverConfig.allowPNA && req.get("Access-Control-Request-Method") && req.get("Access-Control-Request-Private-Network") === "true") {
-                res.setHeader("Access-Control-Allow-Private-Network", "true");
-                res.setHeader("Private-Network-Access-Name", `Mirakurun_${serverConfig.hostname}`);
-                res.setHeader("Private-Network-Access-ID", "00:00:00:00:00:00");
+                res.set({
+                    "Access-Control-Allow-Private-Network": "true",
+                    "Private-Network-Access-Name": `Mirakurun_${serverConfig.hostname}`,
+                    "Private-Network-Access-ID": "00:00:00:00:00"
+                });
             }
 
-            res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+            res.set({
+                "Cross-Origin-Resource-Policy": "cross-origin",
+                "Cross-Origin-Embedder-Policy": "require-corp",
+                "Server": "Mirakurun/" + pkg.version,
+                "X-Content-Type-Options": "nosniff",
+                "X-Your-IP": req.ip
+            });
 
-            res.setHeader("Server", "Mirakurun/" + pkg.version);
             next();
         });
 
@@ -140,16 +147,15 @@ export class Server {
         app.use(cors());
 
         if (!serverConfig.disableWebUI) {
-            app.use(express.static("lib/ui", {
-                setHeaders: (res, path) => {
-                    if (mime.getType(path) === "image/svg+xml") {
-                        res.setHeader("Cache-Control", "public, max-age=86400");
-                    }
-                }
-            }));
+            app.use(express.static("lib/ui"));
             app.use("/redoc", express.static("node_modules/redoc/bundles"));
             app.use("/redoc-try", express.static("node_modules/redoc-try/dist"));
             app.use("/api/debug", express.static("lib/ui/redoc-ui.html"));
+
+            const indexPath = path.join(__dirname, "..", "ui", "index.html");
+            app.get(/^\/(?!(api|assets|redoc))/, (request, response) => {
+                response.sendFile(indexPath);
+            });
         }
 
         const api = yaml.load(fs.readFileSync("api.yml", "utf8")) as OpenAPIV2.Document;

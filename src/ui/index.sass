@@ -1,0 +1,217 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+@use "./vars"
+
+.bp5-spinner
+  animation: 0.2s ease 0.3s 1 normal forwards running fade-in
+
+.bp5-navbar
+  display: flex
+
+  .bp5-navbar-group
+    &.bp5-align-left
+      flex: 1 1 0
+
+      &,
+      .bp5-navbar-heading
+        overflow: hidden
+        text-overflow: ellipsis
+        white-space: nowrap
+
+.bp5-non-ideal-state
+  position: absolute
+  z-index: 2
+  top: 0
+  left: 0
+  right: 0
+  bottom: 0
+  width: auto
+  height: auto
+  overflow: auto
+  background: colors.$light-gray4
+
+  .bp5-dark &
+    background: colors.$dark-gray4
+
+body
+  font-family: vars.$font-base
+  overflow: hidden
+
+  &.indiana-dragging
+    cursor: default
+
+.bp5-button > .bp5-button-text,
+.bp5-menu-item
+  font-family: vars.$font-ui
+
+select,
+button,
+.bp5-tabs
+  user-select: none
+
+button:not(.bp5-button)
+  border: none
+  background: inherit
+
+  &:not(:disabled)
+    cursor: pointer
+
+a[target="_blank"]::after
+  font-family: "blueprint-icons-16"
+  content: ""
+  margin-left: 4px
+  font-size: 10px
+
+.font-bolder
+  font-weight: bolder !important
+
+.color-warning
+  color: colors.$orange3 !important
+.color-danger
+  color: colors.$red3 !important
+
+.color-dow-6
+  color: colors.$blue3 !important
+.color-dow-7
+  color: colors.$red3 !important
+
+.bg-genre-lv1-0
+  background: rgb(255,255,224) !important
+.bg-genre-lv1-1
+  background: rgb(224,224,255) !important
+.bg-genre-lv1-2
+  background: rgb(255,224,240) !important
+.bg-genre-lv1-3
+  background: rgb(255,224,224) !important
+.bg-genre-lv1-4
+  background: rgb(224,255,224) !important
+.bg-genre-lv1-5
+  background: rgb(224,255,255) !important
+.bg-genre-lv1-6
+  background: rgb(255,240,224) !important
+.bg-genre-lv1-7
+  background: rgb(255,224,255) !important
+.bg-genre-lv1-8
+  background: rgb(255,255,224) !important
+.bg-genre-lv1-9
+  background: rgb(255,240,224) !important
+.bg-genre-lv1-10
+  background: rgb(224,240,255) !important
+.bg-genre-lv1-11
+  background: rgb(224,240,255) !important
+.bg-genre-lv1-15
+  background: rgb(240,240,240) !important
+
+.bg-attribute-新
+  background: colors.$forest3 !important
+.bg-attribute-再
+  background: colors.$cerulean3 !important
+.bg-attribute-終
+  background: colors.$vermilion3 !important
+.bg-attribute-生
+  background: colors.$rose4 !important
+.bg-attribute-多
+  background: colors.$rose3 !important
+.bg-attribute-解
+  background: colors.$sepia4 !important
+.bg-attribute-初
+  background: colors.$lime3 !important
+.bg-attribute-手
+  background: colors.$sepia3 !important
+.bg-attribute-字
+  background: colors.$gray3 !important
+.bg-attribute-デ,
+.bg-attribute-双
+  background: colors.$violet3 !important
+.bg-attribute-二
+  background: colors.$gold3 !important
+.bg-attribute-無
+  background: colors.$turquoise3 !important
+
+#root
+  display: flex
+  flex-direction: column
+  width: 100vw
+  height: 100vh
+  overflow: hidden
+
+#dev-header
+  position: absolute
+  top: 0
+  left: 5px
+  font-size: 10px
+  z-index: 9999
+  opacity: 0.5
+
+#main
+  flex-direction: column
+  flex-grow: 1
+  // overflow-y: auto
+  position: relative
+
+#page
+  position: absolute
+  top: 0
+  right: 0
+  bottom: 0
+  left: 0
+  background: colors.$light-gray4
+
+  .bp5-dark &
+    background: colors.$dark-gray4
+
+  > .route
+    position: absolute
+    top: 0
+    right: 0
+    bottom: 0
+    left: 0
+    display: flex
+    flex-direction: column
+    flex-grow: 1
+
+    > .toolbar.bp5-navbar
+      z-index: 9
+      background: none
+      box-shadow: none
+
+      .bp5-navbar-heading
+        font-weight: 400
+        font-size: 18px
+
+        font-feature-settings: "palt" 1
+
+        .component-program-title
+          .name
+            font-weight: inherit
+          .attribute
+            font-size: 12px
+            vertical-align: 14%
+
+        .bp5-breadcrumb
+          font-weight: inherit
+          font-size: inherit
+
+      > .bp5-navbar-group
+        &.bp5-align-right
+          column-gap: 10px
+
+          .bp5-tab-list
+            column-gap: 20px
+
+            > .bp5-tab
+              &[aria-selected="true"]
+                cursor: default
+
+              sup[class*="color-dow-"]
+                font-weight: 600
+                margin-left: 2px
+
+    > .content
+      flex-grow: 1
+      overflow: auto
+      position: relative
+      margin: 0
+      padding: 10px 25px
+
+      &.no-margin
+        padding: 0

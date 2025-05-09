@@ -1,0 +1,44 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+
+.component-program-card-base
+  > div:not(:last-child):not(:first-child)
+    margin: 10px 0
+
+  .component-service-link
+    margin-bottom: 10px
+
+  p.title
+    margin-top: 0
+
+  .component-program-title
+    font-size: 14px
+    line-height: 17px
+
+  p.datetime
+    font-size: 12px
+    font-weight: 600
+    color: colors.$gray2
+
+    .bp5-dark &
+      color: colors.$gray4
+
+  p.description
+    font-size: 13px
+    font-feature-settings: "palt" 1
+
+    .bp5-dark &
+      color: colors.$light-gray2
+
+  .actions
+    margin-top: 15px
+
+    > div
+      display: flex
+      column-gap: 5px
+      margin-top: 10px
+
+      > a.more
+        flex-grow: 2
+
+        > button
+          width: 100%

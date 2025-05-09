@@ -1,0 +1,333 @@
+@use "sass:color"
+@use "~@blueprintjs/colors/lib/scss/colors"
+
+$header-height: 40px
+$timescale-width: 24px
+$block-width: 170px
+$block-height: 240px
+$timetable-border-color: colors.$gray5
+
+.component-epg-table
+  position: absolute
+  top: 0
+  right: 0
+  bottom: 0
+  left: 0
+  background: colors.$light-gray2
+
+  .hide
+    opacity: 0
+    pointer-events: none
+
+  > *
+    position: absolute
+
+  > button.bp5-button
+    z-index: 2
+    backdrop-filter: blur(8px) brightness(1.1)
+    border-color: colors.$gray1 !important
+    transition: all 0.1s ease 0s
+    box-shadow: 0 0 0 1px rgba(colors.$white, 0.5) !important
+    color: colors.$black !important
+
+    .bp5-icon > svg:not([fill])
+      color: colors.$gray1 !important
+
+    &.jump-to-timeline
+      right: 25px
+      bottom: 25px
+
+  > .header
+    z-index: 1
+    top: 0
+    right: 0
+    left: 0
+    height: $header-height
+    white-space: nowrap
+    overflow: hidden
+    padding-left: $timescale-width
+    margin-left: 0px // for scroll
+    background: colors.$dark-gray5
+
+    .bp5-dark &
+      background: colors.$dark-gray1
+
+  .epg-table-header-item
+    vertical-align: top
+    display: inline-flex
+    align-items: center
+    overflow: hidden
+    font-size: 13px
+    font-weight: 500
+    line-height: $header-height
+    width: $block-width
+    height: $header-height
+    padding: 0 5px
+    color: colors.$light-gray4
+
+    &.date
+      font-weight: 600
+
+    .bp5-dark &
+      color: colors.$light-gray3
+
+    &:last-child
+      margin-right: 24px
+
+    &:not(.loading)
+      opacity: 0
+      animation: 0.4s ease 0.2s 1 normal forwards running fade-in
+
+      &:hover
+        background: color.adjust(colors.$dark-gray5, $lightness: -8%)
+
+        .bp5-dark &
+          background: color.adjust(colors.$dark-gray1, $lightness: 7%)
+
+    > img,
+    > div.img
+      width: 32px
+      height: 18px
+      margin-right: 5px
+      border-radius: 1px
+      filter: saturate(80%)
+
+    &:hover:not(.loading) > img
+      filter: none
+
+    > span
+      text-overflow: ellipsis
+      font-feature-settings: "palt" 1
+      overflow: hidden
+
+      &.bp5-skeleton
+        display: inline-block
+        width: 100px
+        height: 14px
+
+  > .timescale
+    z-index: 1
+    top: $header-height
+    right: 0
+    bottom: 0
+    left: 0
+    overflow: hidden
+    user-select: none
+    pointer-events: none
+    margin-top: 0px // for scroll
+
+  .timeline
+    position: absolute
+    top: -2px
+    right: 0
+    left: calc($timescale-width)
+    height: 2px
+    opacity: 0.5
+    pointer-events: all
+    box-shadow: 0 0 4px colors.$gray3
+    background: colors.$gray4
+
+    &.today
+      background: colors.$orange5
+
+    &,
+    > .clock
+      transition: all 0.4s ease 4s
+
+    &:hover,
+    &.show,
+    &:hover > .clock,
+    &.show > .clock
+      opacity: 1
+      transition: opacity 0.1s linear 0s
+
+    > .clock
+      position: absolute
+      top: -8px
+      left: 0
+      padding: 0 8px
+      line-height: 18px
+      font-size: 13px
+      font-weight: 500
+      background: inherit
+      opacity: 0
+      pointer-events: none
+      color: colors.$black
+
+  .timescale-item
+    height: $block-height
+    border-bottom: 1px dashed rgba($timetable-border-color, 0.5)
+
+    > div
+      width: $timescale-width
+      height: calc(100% + 1px)
+      padding-top: 6px
+      writing-mode: vertical-rl
+      text-orientation: sideways
+      font-size: 13px
+      font-weight: 400
+      letter-spacing: 0.1em
+      line-height: $timescale-width
+      pointer-events: all
+      border-bottom: 1px solid colors.$gray3
+      color: colors.$light-gray5
+      background: colors.$black
+
+    &:first-child > div
+      border-top: 1px solid colors.$gray3
+
+    // todo: to variables
+    &.hour-0 > div,
+    &.hour-1 > div,
+    &.hour-2 > div
+      background: rgb(0,51,127)
+    &.hour-3 > div,
+    &.hour-4 > div,
+    &.hour-5 > div
+      background: rgb(0,102,127)
+    &.hour-6 > div,
+    &.hour-7 > div,
+    &.hour-8 > div
+      background: rgb(0,127,102)
+    &.hour-9 > div,
+    &.hour-10 > div,
+    &.hour-11 > div
+      background: rgb(102,127,0)
+    &.hour-12 > div,
+    &.hour-13 > div,
+    &.hour-14 > div
+      background: rgb(127,102,0)
+    &.hour-15 > div,
+    &.hour-16 > div,
+    &.hour-17 > div
+      background: rgb(127,51,0)
+    &.hour-18 > div,
+    &.hour-19 > div,
+    &.hour-20 > div
+      background: rgb(127,0,102)
+    &.hour-21 > div,
+    &.hour-22 > div,
+    &.hour-23 > div
+      background: rgb(102,0,127)
+
+  > .timetable
+    display: flex
+    position: absolute
+    top: $header-height
+    left: $timescale-width
+    right: 0
+    bottom: 0
+    overflow: auto
+
+    > .bp5-spinner
+      position: absolute
+      top: calc(50% - 20px)
+      left: calc(50% - 20px)
+      opacity: 0
+
+      .bp5-spinner-track
+        stroke: rgba(95, 107, 124, 0.2)
+
+      .bp5-spinner-head
+        stroke: rgba(95, 107, 124, 0.8)
+
+  .timetable-col
+    position: relative
+    width: $block-width // for skeleton
+    flex-shrink: 0
+    overflow: hidden
+    border-right: 1px solid $timetable-border-color
+    background: colors.$light-gray3
+    opacity: 0
+    animation: 0.2s ease 0.1s 1 normal forwards running fade-in
+
+  button.timetable-cell
+    position: absolute
+    width: 100%
+    border: 0 transparent
+    text-align: left
+    padding: 0
+    overflow: hidden
+    border-bottom: 1px solid $timetable-border-color
+    background: #fff
+    color: colors.$dark-gray2
+
+    &.no-data
+      cursor: default
+
+      &:last-child
+        height: auto !important
+        bottom: 0
+
+    &:not(.no-data):hover
+      filter: brightness(0.97)
+
+    &.bp5-active
+      z-index: 2
+      box-shadow: inset 0 0 0 4px rgba(colors.$black, 0.15)
+
+    &.event-group-shared
+      color: colors.$blue2
+
+    &.event-group-shared,
+    &.no-data
+      opacity: 0.45
+
+    > div
+      position: absolute
+      top: 8px
+      right: 8px
+      bottom: 8px
+      left: 8px
+      line-height: 16px
+      font-size: 13px
+      word-break: break-all
+      overflow: hidden
+
+      time
+        margin-right: 4px
+        font-size: 10px
+        font-weight: 700
+        vertical-align: top
+        color: colors.$gray2
+
+      .description
+        margin-top: 4px
+        font-size: 12px
+        font-weight: 400
+        font-feature-settings: "palt" 1, "pwid" 1
+        line-height: 1.5
+        color: colors.$dark-gray5
+
+      .component-program-genres
+        margin-top: 4px
+
+        .caution
+          padding: 0
+          background: none
+          color: colors.$orange4
+
+    &.short > div
+      position: relative
+      top: auto
+      right: auto
+      bottom: auto
+      left: auto
+      margin: 0 8px
+      white-space: nowrap
+      font-size: 11px
+
+    &.x-short > div
+      top: 0
+      font-size: 10px
+      line-height: 10px
+
+      time
+        vertical-align: inherit
+
+    &.xx-short > div
+      > *
+        display: none
+
+    &.long > div
+      word-break: normal

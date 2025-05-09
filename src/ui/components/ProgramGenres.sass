@@ -1,0 +1,20 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+@use "../vars"
+
+.component-program-genres
+  display: flex
+  flex-wrap: wrap
+  gap: 5px
+  font-size: 11px
+  font-weight: 600
+  font-feature-settings: "palt" 1
+  color: #000
+
+  span
+    padding: 2px 4px
+    border-radius: 2px
+    filter: vars.$invert-filter
+
+    &.caution
+      filter: none
+      background: colors.$orange5

@@ -1,0 +1,33 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+
+.component-date-time-range
+  position: relative
+  display: inline-block
+
+  span.relative
+    opacity: 0.7
+
+  span.progress
+    position: absolute
+    display: block
+    left: 0
+    right: 0
+    bottom: 0
+    height: 16%
+    opacity: 0.7
+    background-color: rgba(colors.$black, 0.25)
+
+    span
+      position: absolute
+      top: 0
+      left: 0
+      bottom: 0
+      width: 0
+      transition: width 0.5s ease
+      background-color: colors.$orange4
+
+    .bp5-dark &
+      background-color: rgba(colors.$white, 0.25)
+
+      span
+        background-color: colors.$orange5

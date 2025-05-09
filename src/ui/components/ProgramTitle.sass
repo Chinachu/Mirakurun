@@ -1,0 +1,38 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+
+.component-program-title
+  font-size: inherit
+  line-height: inherit
+
+  .attribute,
+  .name,
+  .bp5-icon
+    margin-right: 2px
+
+    .bp5-alert-body &
+      margin-right: 2px
+
+  .name
+    font-weight: 600
+    font-feature-settings: "palt" 1
+
+  .attribute
+    border-radius: 1px
+    padding: 0 1px
+    font-size: 80%
+    font-weight: 500
+    vertical-align: 1px
+    background: colors.$gray2
+    color: #fff
+
+  .bp5-icon
+    vertical-align: -10%
+
+    &-tick
+      color: colors.$green4
+    &-flag
+      color: colors.$red4
+    &-record
+      color: colors.$vermilion4
+    &-small-cross
+      color: colors.$gray3

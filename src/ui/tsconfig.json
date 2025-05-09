@@ -18,6 +18,11 @@
     "allowSyntheticDefaultImports": true,
     "outDir": "../../lib/ui"
   },
+  "include": [
+    "./**/*.ts",
+    "./**/*.tsx",
+    "./custom.d.ts"
+  ],
   "exclude": [
     "node_modules"
   ]

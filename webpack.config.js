@@ -29,8 +29,19 @@ module.exports = {
                 ]
             },
             {
-                test: /\.css$/,
-                use: ["style-loader", "css-loader"]
+                test: /\.s?[ac]ss$/,
+                use: ["style-loader", "css-loader", "sass-loader"]
+            },
+            {
+                test: /\.(png|woff|woff2|eot|ttf)$/,
+                type: "asset/resource",
+                generator: {
+                    filename: "assets/[hash][ext]"
+                }
+            },
+            {
+                test: /\.svg$/,
+                type: "asset/inline"
             }
         ]
     },

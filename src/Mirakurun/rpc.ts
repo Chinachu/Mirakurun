@@ -21,10 +21,11 @@ import * as apid from "../../api";
 import _ from "./_";
 import status from "./status";
 import Event from "./Event";
+import { Service } from "./Service";
 import { event as logEvent } from "./log";
 import { isPermittedHost, isPermittedIPAddress } from "./system";
-import { getStatus } from "./api/status";
 import { sleep } from "./common";
+import { getStatus } from "./api/status";
 
 export interface JoinParams {
     rooms: string[];
@@ -63,7 +64,10 @@ export function createRPCServer(server: http.Server): RPCServer {
     rpc.methods.set("join", onJoin);
     rpc.methods.set("leave", onLeave);
     rpc.methods.set("getStatus", getStatus);
+    rpc.methods.set("getServices", getServices);
     rpc.methods.set("getTuners", getTuners);
+    rpc.methods.set("getJobs", getJobs);
+    rpc.methods.set("getJobSchedules", getJobSchedules);
 
     return rpc;
 }
@@ -105,7 +109,7 @@ class NotifyManager<T> {
             return;
         }
         this._active = true;
-        await sleep(100);
+        await sleep(8);
         if (status.rpcCount > 0) {
             const params: NotifyParams<T> = {
                 array: [...this._items.values()]
@@ -180,6 +184,30 @@ function onLeave(socket: Socket, params: JoinParams) {
     }
 }
 
+async function getServices() {
+    const serviceItems = [..._.service.items]; // shallow copy
+    serviceItems.sort((a, b) => a.getOrder() - b.getOrder());
+
+    const services: apid.Service[] = [];
+
+    for (const serviceItem of serviceItems) {
+        services.push({
+            ...serviceItem.export(),
+            hasLogoData: await Service.isLogoDataExists(serviceItem.networkId, serviceItem.logoId)
+        });
+    }
+
+    return services;
+}
+
 function getTuners() {
     return _.tuner.devices;
+}
+
+function getJobs() {
+    return _.job.jobs;
+}
+
+function getJobSchedules() {
+    return _.job.schedules;
 }

@@ -1,0 +1,42 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+
+#route-program-view
+  .content
+    > *
+      margin: 20px 0
+
+      &:first-child
+        margin-top: 0
+
+    > .flex
+      display: flex
+      gap: 15px
+      align-items: center
+
+      > .component-date-time-range
+        color: colors.$gray2
+
+        .bp5-dark &
+          color: colors.$gray4
+
+    > p,
+    > .extended > p
+      max-width: 650px
+      white-space: pre-wrap
+      font-feature-settings: "palt" 1
+
+    > .extended
+      h4
+        font-size: 13px
+        font-weight: 600
+        margin: 15px 0 10px
+
+      p
+        margin-left: 15px
+
+      h4 + p
+        margin-top: 10px
+
+    > p.meta
+      font-size: 11px
+      opacity: 0.5
