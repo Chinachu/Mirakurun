@@ -1,0 +1,62 @@
+{
+  "services": [
+    {
+      "id": 12345,
+      "networkId": 1,
+      "serviceId": 101,
+      "name": "テストチャンネル & Co.",
+      "type": 1,
+      "logoId": -1,
+      "remoteControlKeyId": 5
+    },
+    {
+      "id": 12346,
+      "networkId": 1,
+      "serviceId": 102,
+      "name": "サブチャンネル",
+      "type": 1,
+      "logoId": -1,
+      "remoteControlKeyId": 5
+    },
+    {
+      "id": 12347,
+      "networkId": 1,
+      "serviceId": 999,
+      "name": "キーなしチャンネル",
+      "type": 173,
+      "logoId": -1
+    }
+  ],
+  "programs": [
+    {
+      "id": 1000,
+      "networkId": 1,
+      "serviceId": 101,
+      "startAt": 1610000000000,
+      "duration": 3600000,
+      "name": "テスト番組 <こんにちは>",
+      "description": "テスト説明 & \"引用\" 'シングル'",
+      "genres": [
+        { "lv1": 0, "lv2": 0, "un1": 0, "un2": 0 },
+        { "lv1": 0, "lv2": 0, "un1": 0, "un2": 0 },
+        { "lv1": 14, "lv2": 1, "un1": 2, "un2": 3 },
+        { "lv1": 14, "lv2": 9, "un1": 9, "un2": 9 }
+      ]
+    },
+    {
+      "id": 1001,
+      "networkId": 1,
+      "serviceId": 102,
+      "startAt": 1610003600000,
+      "duration": 1800000
+    },
+    {
+      "id": 1002,
+      "networkId": 1,
+      "serviceId": 9991,
+      "startAt": 1610005400000,
+      "duration": 1800000,
+      "name": "存在しないサービス"
+    }
+  ]
+}
