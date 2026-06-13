@@ -20,6 +20,7 @@ type StateEventTypes = {
     "jobs": [JobItem[]];
     "jobSchedules": [JobScheduleItem[]];
     "programs": [Program[]];
+    "logs": [string[], boolean];
 };
 
 import normalIcon from "../icon.svg";
@@ -340,6 +341,12 @@ class State extends EventEmitter<StateEventTypes> {
             if (jobSchedulesUpdated) {
                 this.emit("jobSchedules", this.jobSchedules);
             }
+        });
+
+        // ログイベントの処理
+        rpc.methods.set("logs", async (socket, { array }: NotifyParams<string>) => {
+            // 配列から文字列を抽出し、unshift=false（末尾に追加）でイベントを発行
+            this.emit("logs", array, false);
         });
     }
 

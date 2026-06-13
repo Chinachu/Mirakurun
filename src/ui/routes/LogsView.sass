@@ -1,0 +1,44 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+
+#route-logs-view
+  position: absolute
+  top: 0
+  right: 0
+  bottom: 0
+  left: 0
+  overflow: scroll
+  overflow-x: hidden
+  background: colors.$dark-gray2
+
+  .logs
+    padding: 8px 0
+    font-family: 'Courier New', Courier, monospace
+    font-size: 12px
+    color: colors.$gray3
+
+    > div
+      padding: 2px 16px
+      word-break: break-all
+      white-space: break-spaces
+
+      &:hover
+        background: colors.$dark-gray1
+
+    > div.latest
+      padding: 0
+
+    > div.level-debug
+      color: colors.$indigo5
+
+    > div.level-info
+      color: colors.$light-gray1
+
+    > div.level-warn
+      color: colors.$orange3
+
+    > div.level-error
+      color: colors.$red4
+
+    > div.level-fatal
+      color: colors.$white
+      background: colors.$red3
