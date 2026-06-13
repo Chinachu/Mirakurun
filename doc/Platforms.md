@@ -96,14 +96,14 @@ curl -sSL https://get.docker.com/ | CHANNEL=stable sh
 ### ⚡Installation / Uninstallation / Update
 
 ```sh
-# Create: /opt/mirakurun/
-sudo mv -vf /usr/local/mirakurun /opt/mirakurun
-sudo mkdir -p /opt/mirakurun/run /opt/mirakurun/opt /opt/mirakurun/config /opt/mirakurun/data
+# Default data store
+sudo mkdir -p /opt/mirakurun
 
 # Installation
-mkdir ~/mirakurun/
+mkdir ~/mirakurun/ # example
 cd ~/mirakurun/
 wget https://raw.githubusercontent.com/Chinachu/Mirakurun/refs/heads/release/4.0.0/docker/docker-compose.yml
+vim docker-compose.yml # edit as appropriate for your environment
 docker compose pull
 docker compose run --rm -e SETUP=true mirakurun
 docker compose up -d
@@ -114,7 +114,6 @@ docker compose down --rmi all
 
 # Update
 cd ~/mirakurun/
-docker compose down --rmi all
 docker compose pull
 docker compose up -d
 ```
@@ -202,11 +201,14 @@ pm2 start processes.json
 pm2 save
 
 # Stop
-pm2 stop processes.json
-pm2 save
+pm2 stop mirakurun-server
+
+# Restart
+pm2 restart mirakurun-server
 
 # Update
 git pull
+npm install
 npm run clean
 npm run build
 pm2 restart processes.json
