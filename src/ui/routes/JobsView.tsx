@@ -280,7 +280,7 @@ export const JobsView: React.FC = () => {
 
                     <Tooltip content={DateTime.fromMillis(job.updatedAt).toFormat("yyyy/MM/dd HH:mm:ss")}>
                         <span className="bp5-text-muted">
-                            {DateTime.fromMillis(job.updatedAt).toRelativeCalendar()}
+                            {DateTime.fromMillis(job.updatedAt).toRelative()}
                         </span>
                     </Tooltip>
 
@@ -296,7 +296,7 @@ export const JobsView: React.FC = () => {
                         />
                     )}
 
-                    {job.status === "finished" && job.isRerunnable && (
+                    {job.status === "finished" && (
                         <Button
                             minimal
                             small
@@ -304,6 +304,7 @@ export const JobsView: React.FC = () => {
                             intent="primary"
                             onClick={() => openDialog("rerun_job", job.id)}
                             title="ジョブを再実行"
+                            style={{ visibility: job.isRerunnable ? undefined : "hidden" }}
                         />
                     )}
                 </Navbar.Group>
