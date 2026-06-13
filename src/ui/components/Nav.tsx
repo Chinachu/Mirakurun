@@ -116,7 +116,6 @@ export const Nav: React.FC<NavProps> = ({ pathLv1 }) => {
                 } />
                 <Navbar.Divider />
                 <Button variant="minimal" {...getNavbarButtonProps("logs")} icon="pulse" title="ログ" />
-                <Button variant="minimal" icon="document" title="API Docs" />
                 <Popover
                     minimal
                     interactionKind="hover"
@@ -132,6 +131,8 @@ export const Nav: React.FC<NavProps> = ({ pathLv1 }) => {
                             <MenuItem onClick={() => { state.navigate("/config/server"); }} icon="wrench" text="サーバー設定" />
                             <MenuItem onClick={() => { state.navigate("/config/tuners"); }} icon="wrench" text="チューナー設定" />
                             <MenuItem onClick={() => { state.navigate("/config/channels"); }} icon="wrench" text="チャンネル設定" />
+                            <MenuDivider />
+                            <MenuItem onClick={() => { window.open("/api/debug", "_blank"); }} icon="document" text="API Docs" />
                             <MenuDivider />
                             <MenuItem onClick={() => { state.navigate("/about"); }} icon="info-sign" textClassName="product-name" text={`Mirakurun ${version} について`} />
                             <MenuItem icon="updated" text="最新版を実行中です" disabled />
