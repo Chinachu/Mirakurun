@@ -1,0 +1,48 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+
+#route-jobs-view
+  .content
+    display: flex
+    flex-direction: column
+    gap: 20px
+
+    > *
+      flex-shrink: 0
+
+    .bp5-section
+      background: rgba(colors.$light-gray5, 0.2)
+
+      .bp5-dark &
+        background: rgba(colors.$black, 0.2)
+
+    .bp5-section-header
+
+      .bp5-dark &
+
+        &:hover,
+        &:active
+          background: rgba(colors.$black, 0.1)
+
+    .bp5-collapse-body
+      display: flex
+      flex-direction: column
+      gap: 10px
+      padding: 10px
+
+    .bp5-navbar,
+    .bp5-navbar-group
+      height: 30px
+
+    .bp5-navbar
+      box-shadow: none
+      background: none
+      padding: 0 5px
+
+      .bp5-navbar-group
+        gap: 10px
+
+        > span
+          opacity: 0.75
+
+      &:hover .bp5-navbar-group > span
+        opacity: 1
