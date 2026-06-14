@@ -37,6 +37,7 @@ import {
 import equal from "fast-deep-equal";
 import { Validator as IPValidator } from "ip-num/Validator";
 import { state } from "../modules/state";
+import * as ui from "../modules/ui";
 import { ConfigServer, LogLevel } from "../../../api.d";
 
 import "./ServerConfigView.sass";
@@ -61,7 +62,9 @@ export const ServerConfigView: React.FC = () => {
     const [showSaveDialog, setShowSaveDialog] = useState(false);
     const [saved, setSaved] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    const [showAdvanced, setShowAdvanced] = useState(false);
+
+    ui.setTitle("サーバー設定", isLoading);
+
     const [allowIPv4CidrRangesText, setAllowIPv4CidrRangesText] = useState("");
     const [allowIPv6CidrRangesText, setAllowIPv6CidrRangesText] = useState("");
     const [allowOriginsText, setAllowOriginsText] = useState("");

@@ -18,6 +18,7 @@ import { useState, useEffect, useRef } from "react";
 import { Client as RPCClient } from "jsonrpc2-ws";
 import { JoinParams } from "../../../lib/Mirakurun/rpc.d";
 import { state } from "../modules/state";
+import * as ui from "../modules/ui";
 
 import "./LogsView.sass";
 
@@ -26,6 +27,8 @@ let logListCache: JSX.Element[] = [];
 
 export const LogsView: React.FC = () => {
     console.debug("routes", "LogsView");
+
+    ui.setTitle("ログ");
 
     const [logList, setLogList] = useState<JSX.Element[]>([]);
     const latestRef = useRef<HTMLDivElement>(null);
