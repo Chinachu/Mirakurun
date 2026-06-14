@@ -1,5 +1,5 @@
 /*
-   Copyright 2020 kanreisa
+   Copyright 2026 kanreisa
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import { ProgramView } from "./routes/ProgramView";
 import { SearchView } from "./routes/SearchView";
 import { JobsView } from "./routes/JobsView";
 import { LogsView } from "./routes/LogsView";
+import { ServerConfigView } from "./routes/ServerConfigView";
 
 import "normalize.css";
 import "@blueprintjs/core/lib/css/blueprint.css";
@@ -79,10 +80,10 @@ const Index: React.FC = () => {
                     <Route path="epg/search" element={<SearchView />} />
                     <Route path="jobs" element={<JobsView />} />
                     <Route path="logs" element={<LogsView />} />
+                    <Route path="config/server" element={<ServerConfigView />} />
 
                     // todo:
 
-                    <Route path="config/server" element={<div></div>} />
                     <Route path="config/tuners" element={<div></div>} />
                     <Route path="config/channels" element={<div></div>} />
 

@@ -1,0 +1,86 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+
+#route-server-config-view
+  .content
+    display: flex
+    flex-direction: column
+    gap: 16px
+    padding-top: 20px
+
+    .config-section
+      flex-shrink: 0
+      background: rgba(colors.$light-gray5, 0.2)
+
+      &:last-child
+        margin-bottom: 20px
+
+      .bp5-dark &
+        background: rgba(colors.$black, 0.2)
+
+      .bp5-collapse-body
+        padding: 0
+
+      > .bp5-section-card
+        padding: 0
+
+    .bp5-section-header
+      min-height: 44px
+
+      .bp5-dark &
+
+        &:hover,
+        &:active
+          background: rgba(colors.$black, 0.1)
+
+    .config-form-grid
+      display: flex
+      flex-direction: column
+
+      .bp5-form-group
+        padding: 14px 20px 16px
+        margin: 0
+        border-top: 1px solid rgba(colors.$light-gray1, 0.65)
+
+        .bp5-dark &
+          border-top-color: rgba(colors.$dark-gray5, 0.7)
+
+      .bp5-label
+        margin-bottom: 5px
+        font-weight: 600
+
+      .bp5-html-select,
+      .bp5-input-group
+        width: min(100%, 200px)
+
+      .bp5-numeric-input
+        width: min(100%, 100px)
+
+      textarea.bp5-input
+        width: min(100%, 400px)
+        min-height: 88px
+        resize: vertical
+
+      .bp5-html-select select,
+      .bp5-input,
+      .bp5-numeric-input .bp5-input-group
+        width: 100%
+
+      .bp5-numeric-input
+        .bp5-button-group
+          flex-shrink: 0
+
+      .bp5-control
+        display: flex
+        align-items: center
+        min-height: 30px
+        margin-bottom: 0
+
+      .bp5-form-helper-text
+        max-width: 680px
+        margin-top: 6px
+        line-height: 1.45
+
+    .config-switch-group
+      .bp5-control
+        width: fit-content
+
