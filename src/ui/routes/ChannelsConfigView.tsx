@@ -133,7 +133,7 @@ export const ChannelsConfigView: React.FC = () => {
             const res: ChannelScanStatus = await (await fetch("/api/config/channels/scan")).json();
             console.log("ChannelsConfigView", "GET", "/api/config/channels/scan", "->", res);
             setScanStatus(res);
-            
+
             setScanInProgress(prev => {
                 if (res.status === "completed" && prev && !res.isScanning) {
                     setShowScanResultDialog(true);
@@ -345,7 +345,7 @@ export const ChannelsConfigView: React.FC = () => {
         const newEditing = [...editing];
         const ch = { ...newEditing[chIndex] };
         const commandVars = { ...(ch.commandVars || {}) };
-        
+
         const updatedVars: Record<string, string | number> = {};
         Object.entries(commandVars).forEach(([k, v]) => {
             if (k === oldKey) {
@@ -364,7 +364,7 @@ export const ChannelsConfigView: React.FC = () => {
         const newEditing = [...editing];
         const ch = { ...newEditing[chIndex] };
         const commandVars = { ...(ch.commandVars || {}) };
-        
+
         if (newValue === "") {
             commandVars[key] = "";
         } else if (newValue === "0") {
@@ -399,7 +399,7 @@ export const ChannelsConfigView: React.FC = () => {
         const newEditing = [...editing];
         const ch = { ...newEditing[chIndex] };
         const commandVars = { ...(ch.commandVars || {}) };
-        
+
         let newKey = "arg";
         let counter = 1;
         while (commandVars[newKey] !== undefined) {
@@ -440,6 +440,9 @@ export const ChannelsConfigView: React.FC = () => {
                     onClick={() => setShowScanDialog(true)}
                     disabled={scanInProgress}
                 />
+
+                <Navbar.Divider />
+
                 <Button
                     minimal
                     intent="danger"
@@ -497,7 +500,7 @@ export const ChannelsConfigView: React.FC = () => {
                 )}
 
                 {!scanInProgress && scanStatus && (scanStatus.status === "completed" || (scanStatus.scanLog && scanStatus.scanLog.length > 0)) && (
-                    <Callout 
+                    <Callout
                         intent={scanStatus.status === "completed" ? "success" : "warning"}
                         title={`前回のスキャン結果 (${scanStatus.type})`}
                     >
@@ -760,8 +763,8 @@ export const ChannelsConfigView: React.FC = () => {
                             </FormGroup>
                         </div>
 
-                        <FormGroup 
-                            label="Skip Channels (comma separated integers)" 
+                        <FormGroup
+                            label="Skip Channels (comma separated integers)"
                             helperText="Enter channel numbers to skip. Range notation (e.g. 14-16) is supported."
                         >
                             <InputGroup
@@ -809,7 +812,7 @@ export const ChannelsConfigView: React.FC = () => {
                         />
 
                         {scanChannelNameFormatEnabled && (
-                            <FormGroup 
+                            <FormGroup
                                 label="Channel Name Format"
                                 helperText="Format to use for channel names. Supports placeholders like {ch}, {ch00}, {subch}."
                             >
@@ -867,10 +870,10 @@ export const ChannelsConfigView: React.FC = () => {
                                 </Callout>
                             )}
 
-                            <div style={{ 
-                                maxHeight: "300px", 
-                                overflowY: "auto", 
-                                border: "1px solid rgba(0,0,0,0.1)", 
+                            <div style={{
+                                maxHeight: "300px",
+                                overflowY: "auto",
+                                border: "1px solid rgba(0,0,0,0.1)",
                                 padding: "8px",
                                 fontFamily: "monospace",
                                 fontSize: "12px",

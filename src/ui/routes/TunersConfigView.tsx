@@ -181,6 +181,9 @@ export const TunersConfigView: React.FC = () => {
                     text="Add Tuner"
                     onClick={handleAddTuner}
                 />
+
+                <Navbar.Divider />
+
                 <Button
                     minimal
                     intent="danger"
