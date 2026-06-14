@@ -1,0 +1,79 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+
+#route-channels-config-view
+  .content
+    display: flex
+    flex-direction: column
+    gap: 16px
+    padding: 20px
+    overflow-y: auto
+    max-height: calc(100vh - 120px)
+
+  .channels-table
+    width: 100%
+    border-collapse: collapse
+
+    th, td
+      vertical-align: top !important
+      padding: 12px 8px !important
+
+    td
+      .bp5-form-group
+        margin-bottom: 8px
+        &:last-child
+          margin-bottom: 0
+
+      .bp5-label
+        margin-bottom: 3px
+        font-weight: 600
+        font-size: 11px
+        color: colors.$gray1
+
+        .bp5-dark &
+          color: colors.$gray4
+
+  .channel-options-grid
+    display: flex
+    gap: 12px
+    align-items: flex-start
+    flex-wrap: wrap
+
+  .cmd-vars-container
+    display: flex
+    flex-direction: column
+    gap: 4px
+    min-width: 200px
+    flex: 1
+
+  .cmd-vars-title
+    font-weight: 600
+    font-size: 11px
+    margin-bottom: 4px
+    color: colors.$gray1
+    .bp5-dark &
+      color: colors.$gray4
+
+  .cmd-vars-list
+    display: flex
+    flex-wrap: wrap
+    gap: 6px
+    align-items: center
+
+  .cmd-var-pair
+    display: flex
+    align-items: center
+    gap: 4px
+    background-color: rgba(colors.$light-gray1, 0.4)
+    padding: 2px 6px
+    border-radius: 4px
+    .bp5-dark &
+      background-color: rgba(colors.$dark-gray5, 0.4)
+
+    .cmd-var-key, .cmd-var-value
+      width: 75px
+
+  .controls-cell
+    display: flex
+    gap: 4px
+    justify-content: flex-end
+    align-items: center
