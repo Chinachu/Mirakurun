@@ -1,0 +1,108 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+
+#route-about-view
+  .about-container
+    max-width: 922px // opencollective img width is 890 + card padding
+    margin: 0 auto
+    display: flex
+    flex-direction: column
+    gap: 16px
+    padding-bottom: 24px
+
+  .about-card, .heart-card
+    padding: 24px
+
+  .about-header
+    display: flex
+    align-items: center
+    gap: 16px
+    margin-bottom: 16px
+
+    .product-icon
+      width: 48px
+      height: 48px
+
+    h3
+      margin: 0
+
+  .about-info
+    margin-top: 16px
+    margin-bottom: 16px
+
+    .info-table
+      width: 100%
+      td:first-child
+        width: 150px
+        font-weight: bold
+
+  .warranty-warning
+    background: colors.$light-gray5
+    border-left: 4px solid colors.$red3
+    padding: 12px 16px
+    margin-bottom: 16px
+    border-radius: 0 4px 4px 0
+
+    .warranty-text
+      font-weight: bold
+      color: colors.$red2
+
+  .links
+    display: flex
+    gap: 8px
+
+  .consent
+    margin-top: 16px
+    padding: 16px
+    background: colors.$light-gray5
+    border-radius: 4px
+    p
+      margin-bottom: 12px
+
+  .contributors-list
+    margin-top: 16px
+    display: flex
+    flex-direction: column
+    gap: 24px
+
+    .section
+      h5
+        margin-bottom: 8px
+        display: flex
+        align-items: center
+        gap: 8px
+
+      .text-small
+        font-size: 0.85em
+
+      .image-container
+        margin-top: 12px
+        overflow-x: auto
+
+      .opencollective-img
+        max-width: 100%
+        height: auto
+        display: block
+
+      .sponsors-avatars
+        margin-top: 12px
+        display: flex
+        flex-wrap: wrap
+        gap: 8px
+
+        .sponsor-avatar
+          padding: 4px
+          transition: transform 0.2s, box-shadow 0.2s
+
+          &:hover
+            transform: scale(1.05)
+
+body.bp5-dark
+  #route-about-view
+    .warranty-warning
+      background: colors.$dark-gray4
+      .warranty-text
+        color: colors.$red4
+
+    .consent
+      background: colors.$dark-gray4
+

@@ -18,6 +18,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Alignment, Button, ButtonProps, Navbar, Menu, MenuItem, MenuDivider, Popover, PopoverTargetProps } from "@blueprintjs/core";
 import { state } from "../modules/state";
 import { useLocalStorageState } from "../hooks/useWebStorageState";
+import { VersionStatus } from "./VersionStatus";
 
 import "./Nav.sass";
 
@@ -150,7 +151,7 @@ export const Nav: React.FC<NavProps> = ({ pathLv1 }) => {
                             <MenuItem onClick={() => { window.open("/api/debug", "_blank"); }} icon="document" text="API Docs" />
                             <MenuDivider />
                             <MenuItem onClick={() => { state.navigate("/about"); }} icon="info-sign" textClassName="product-name" text={`Mirakurun ${version} について`} />
-                            <MenuItem icon="updated" text="最新版を実行中です" disabled />
+                            <VersionStatus asMenuItem />
                             <MenuItem icon="power" intent="danger" text="再起動..." />
                         </Menu>
                     }

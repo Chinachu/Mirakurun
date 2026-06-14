@@ -37,6 +37,7 @@ import { LogsView } from "./routes/LogsView";
 import { ServerConfigView } from "./routes/ServerConfigView";
 import { TunersConfigView } from "./routes/TunersConfigView";
 import { ChannelsConfigView } from "./routes/ChannelsConfigView";
+import { AboutView } from "./routes/AboutView";
 
 import "normalize.css";
 import "@blueprintjs/core/lib/css/blueprint.css";
@@ -85,11 +86,7 @@ const Index: React.FC = () => {
                     <Route path="config/server" element={<ServerConfigView />} />
                     <Route path="config/tuners" element={<TunersConfigView />} />
                     <Route path="config/channels" element={<ChannelsConfigView />} />
-
-                    // todo:
-
-
-                    <Route path="about" element={<div>about</div>} />
+                    <Route path="about" element={<AboutView />} />
                 </Routes>
             </div>
         </div>
