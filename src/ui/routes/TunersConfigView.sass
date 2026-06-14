@@ -1,0 +1,62 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+
+#route-tuners-config-view
+  .content
+    display: flex
+    flex-direction: column
+    gap: 16px
+    padding: 20px
+    overflow-y: auto
+    max-height: calc(100vh - 120px)
+
+  .tuner-table
+    width: 100%
+    border-collapse: collapse
+
+    th, td
+      vertical-align: top !important
+      padding: 12px 8px !important
+
+    td
+      .bp5-form-group
+        margin-bottom: 8px
+        &:last-child
+          margin-bottom: 0
+
+      .bp5-label
+        margin-bottom: 3px
+        font-weight: 600
+        font-size: 11px
+        color: colors.$gray1
+
+        .bp5-dark &
+          color: colors.$gray4
+
+  .types-checkboxes
+    display: flex
+    flex-direction: column
+    gap: 4px
+    margin-top: 6px
+
+    .bp5-control
+      margin-bottom: 0
+
+  .remote-mirakurun-group
+    display: flex
+    gap: 8px
+    align-items: flex-end
+    margin-bottom: 8px
+
+    .bp5-form-group
+      margin-bottom: 0 !important
+
+  .tuner-options-grid
+    display: flex
+    flex-direction: column
+    gap: 8px
+
+  .controls-cell
+    display: flex
+    gap: 4px
+    justify-content: flex-end
+    align-items: center
