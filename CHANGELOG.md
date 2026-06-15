@@ -2,7 +2,7 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
-## 4.1.0 (2026-06-15)
+## 4.1.1 (2026-06-15)
 
 動作環境やユースケースを鑑みて、このバージョンから、このプロジェクトは基本的に日本語を使用します。ドキュメントや UI 等も順次日本語となります。何卒ご了承下さい 🙏
 
