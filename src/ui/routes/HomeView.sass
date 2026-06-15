@@ -1,0 +1,227 @@
+@use "~@blueprintjs/colors/lib/scss/colors"
+@use "../vars"
+
+#route-home-view
+  .home-container
+    display: flex
+    flex-direction: column
+    gap: 16px
+
+  .home-section
+    flex-shrink: 0
+    background: rgba(colors.$light-gray5, 0.2)
+
+    &:last-child
+      margin-bottom: 20px
+
+    .bp5-dark &
+      background: rgba(colors.$black, 0.2)
+
+  .home-section-content
+    padding: 16px 20px
+
+  .bp5-section-header
+    min-height: 44px
+
+  // --- Status Section ---
+  .status-grid
+    display: grid
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))
+    gap: 12px
+
+  .status-item
+    display: flex
+    flex-direction: column
+    gap: 4px
+    padding: 8px 12px
+    border-radius: 4px
+
+  .status-label
+    font-size: 12px
+    color: colors.$gray3
+    font-weight: 500
+
+    .bp5-dark &
+      color: colors.$gray5
+
+  .status-value
+    font-size: 14px
+    font-family: vars.$font-ui
+    word-break: break-all
+
+  // --- Services Section ---
+  .service-filters
+    display: flex
+    gap: 16px
+    margin-bottom: 16px
+    padding-bottom: 8px
+
+  .service-grid
+    display: grid
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr))
+    gap: 8px
+
+  .service-item
+    display: flex
+    align-items: center
+    gap: 8px
+    padding: 8px 12px
+    border-radius: 4px
+    cursor: default
+    transition: background 0.15s
+
+    &:hover
+      background: colors.$light-gray3
+
+      .bp5-dark &
+        background: colors.$dark-gray2
+
+  .service-logo
+    width: 24px
+    height: 24px
+    border-radius: 4px
+    flex-shrink: 0
+    object-fit: cover
+
+  .service-name
+    flex: 1
+    min-width: 0
+    font-size: 13px
+    font-weight: 500
+    white-space: nowrap
+    overflow: hidden
+    text-overflow: ellipsis
+
+  .service-epg-status
+    flex-shrink: 0
+
+  .service-play
+    flex-shrink: 0
+    padding: 4px
+    border-radius: 4px
+    cursor: pointer
+    transition: background 0.15s
+
+    &:hover
+      background: colors.$light-gray3
+
+      .bp5-dark &
+        background: colors.$dark-gray2
+
+  .service-tooltip
+    display: flex
+    flex-direction: column
+    gap: 4px
+    font-size: 12px
+    font-family: vars.$font-ui
+    line-height: 1.5
+
+    .bp5-dark &
+      color: colors.$gray1
+
+  // --- Tuners Section ---
+  .tuner-tree
+
+    .bp5-tree-node
+      .bp5-tree-node-content
+        height: 32px
+
+      .bp5-tree-node-content:hover
+        background: none
+
+    .bp5-tree-node-label
+      display: flex
+      align-items: center
+      gap: 8px
+
+  .tuner-label
+    font-size: 13px
+    font-weight: 600
+    white-space: nowrap
+
+  .tuner-device-info
+    display: flex
+    align-items: center
+    gap: 6px
+    font-size: 12px
+    font-family: vars.$font-ui
+    color: colors.$gray1
+    white-space: nowrap
+
+    .bp5-button
+      margin-left: 4px
+      padding: 0 4px
+      min-width: unset
+      min-height: unset
+
+    .bp5-dark &
+      color: colors.$gray2
+
+  .tuner-user-info
+    display: flex
+    align-items: center
+    gap: 16px
+    font-size: 12px
+    font-family: vars.$font-ui
+    white-space: nowrap
+
+  .tuner-user-info-item
+    display: inline-flex
+    align-items: center
+    gap: 4px
+
+  .stream-info-link
+    color: colors.$blue3
+    text-decoration: none
+    cursor: pointer
+
+    &:hover
+      text-decoration: underline
+
+  // --- EPG Ready Color ---
+  .color-epg-ready
+    color: colors.$green3 !important
+
+// Stream Info Dialog (rendered via Portal outside #route-home-view)
+.stream-info-table
+  width: 100%
+  table-layout: fixed
+  font-size: 12px
+  border-collapse: collapse
+
+  th, td
+    padding: 4px 12px
+
+  th:nth-child(1), td:nth-child(1)
+    text-align: left
+
+  th:nth-child(2), td:nth-child(2),
+  th:nth-child(3), td:nth-child(3)
+    text-align: right
+    font-variant-numeric: tabular-nums
+
+  td.color-danger
+    color: colors.$red3
+
+// Dark mode adjustments
+body.bp5-dark
+  #route-home-view
+    .service-item
+
+      &:hover
+        background: colors.$dark-gray2
+
+    .service-tooltip
+      color: colors.$gray1
+
+    .tuner-device-info
+      color: colors.$gray2
+
+    .color-epg-ready
+      color: colors.$green4 !important
+
+    .stream-info-link
+      color: colors.$blue4
+
+  .stream-info-table td.color-danger
+    color: colors.$red4

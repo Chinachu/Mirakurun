@@ -37,6 +37,7 @@ import { LogsView } from "./routes/LogsView";
 import { ServerConfigView } from "./routes/ServerConfigView";
 import { TunersConfigView } from "./routes/TunersConfigView";
 import { ChannelsConfigView } from "./routes/ChannelsConfigView";
+import { HomeView } from "./routes/HomeView";
 import { AboutView } from "./routes/AboutView";
 
 import "normalize.css";
@@ -75,7 +76,7 @@ const Index: React.FC = () => {
                 <Routes>
                     <Route path="/*" element={<div>not found</div>} />
 
-                    <Route path="/" element={<div>home</div>} />
+                    <Route path="/" element={<HomeView />} />
 
                     <Route path="epg" element={<EPGView />} />
                     <Route path="epg/services/:globalServiceId" element={<EPGView />} />
