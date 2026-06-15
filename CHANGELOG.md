@@ -2,11 +2,29 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
-## 4.1.0+dev
+## 4.1.0 (2026-06-15)
 
-### Server Changes
+動作環境やユースケースを鑑みて、このバージョンから、このプロジェクトは基本的に日本語を使用します。ドキュメントや UI 等も順次日本語となります。何卒ご了承下さい 🙏
 
-- **package**: Updated Node.js engine requirement to `^22 || ^24` and Docker base image to `node:24.16.0-bookworm`.
+### Known Issues
+
+- **UI**
+  - Home: 旧 UI からの仮移植です。表示崩れや余白不足、局ロゴの見切れがあります。
+
+### Docker
+
+- 🆙 ベースイメージを `node:22.14.0-bookworm` → `node:24.16.0-bookworm` に更新
+
+### Server
+
+- 🆙 Node.js エンジン要件: `^18 || ^20 || ^22` → `^22 || ^24`
+- 👾 Config: allowPNA の型チェックを修正 (*bug*)
+
+### UI
+
+- ✨ Fluent UI から Blueprint へ UI ベースコンポーネントを変更し、UI を刷新
+- 🆕 ライトテーマ / ダークテーマ の切り替え
+- 🆕 EPG, 番組検索, 番組詳細表示
 
 ## About 4.0.0
 
