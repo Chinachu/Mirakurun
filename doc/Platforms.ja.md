@@ -13,7 +13,7 @@
   - ⚠️注意: デスクトップ環境 / VM (仮想マシン) はサポートせず、不安定です!
 
 - [Linux + PM2 (レガシー)](#linux--pm2-レガシー)
-  - [Node.js](https://nodejs.org/en/download) `^18 || ^20 || ^22`
+  - [Node.js](https://nodejs.org/en/download) `^22 || ^24`
   - [PM2](https://pm2.keymetrics.io/)
 
 ## Docker on Linux

@@ -90,7 +90,7 @@
     "@types/js-yaml": "^4.0.2",
     "@types/luxon": "^3.6.2",
     "@types/morgan": "^1.9.3",
-    "@types/node": "18",
+    "@types/node": "22",
     "@types/promise-queue": "^2.2.0",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
@@ -120,7 +120,7 @@
     "webpack-cli": "^4.9.2"
   },
   "engines": {
-    "node": "^18 || ^20 || ^22"
+    "node": "^22 || ^24"
   },
   "engineStrict": true,
   "os": [

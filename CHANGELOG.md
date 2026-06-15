@@ -2,6 +2,12 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 4.1.0+dev
+
+### Server Changes
+
+- **package**: Updated Node.js engine requirement to `^22 || ^24` and Docker base image to `node:24.16.0-bookworm`.
+
 ## About 4.0.0
 
 **Important Notice**: Mirakurun 4.0.0 includes significant performance improvements, enhanced EPG processing, asynchronous file I/O operations, and new features. As announced in 3.9.0, the experimental Win32 support has been completely removed.

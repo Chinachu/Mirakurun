@@ -13,7 +13,7 @@
   - ⚠️Note: Desktop environments / VM are not supported and are unstable!
 
 - [Linux + PM2 (Legacy)](#linux-with-pm2-legacy)
-  - [Node.js](https://nodejs.org/en/download) `^18 || ^20 || ^22`
+  - [Node.js](https://nodejs.org/en/download) `^22 || ^24`
   - [PM2](https://pm2.keymetrics.io/)
 
 ## Docker on Linux

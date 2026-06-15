@@ -25,16 +25,13 @@ stages:
   - job: Build
     strategy:
       matrix:
-        v18:
-          NODE_VERSION_SPEC: '18.x'
-          NPM_VERSION: '10'
-        v20:
-          NODE_VERSION_SPEC: '20.x'
-          NPM_VERSION: '11'
         v22:
           NODE_VERSION_SPEC: '22.x'
           NPM_VERSION: '11'
-      maxParallel: '3'
+        v24:
+          NODE_VERSION_SPEC: '24.x'
+          NPM_VERSION: '11'
+      maxParallel: '2'
     pool:
       vmImage: 'ubuntu-22.04'
     steps:
@@ -148,7 +145,7 @@ stages:
       submodules: 'true'
     - task: NodeTool@0
       inputs:
-        versionSpec: '22.x'
+        versionSpec: '24.x'
     - script: npm ci
       displayName: npm ci
     - task: Npm@1
