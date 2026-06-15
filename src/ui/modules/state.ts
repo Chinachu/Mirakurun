@@ -127,7 +127,7 @@ class State extends EventEmitter<StateEventTypes> {
 
     async fetchTuners(): Promise<TunerDevice[]> {
         this.tuners.splice(0, this.tuners.length, ...await this._rpc.call("getTuners"));
-        if (this.jobs.length > 0) {
+        if (this.tuners.length > 0) {
             this.emit("tuners", this.tuners);
         }
         return this.tuners;
