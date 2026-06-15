@@ -22,7 +22,7 @@ import { ProgramCardBase } from "./ProgramCardBase";
 
 import "./ProgramPopover.sass";
 
-type ProgramPopoverProps<T = Element> = {
+type ProgramPopoverProps<T = {}> = {
     program: Program;
     key?: string;
     className?: string;
