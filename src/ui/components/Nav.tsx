@@ -19,6 +19,7 @@ import { Alignment, Button, ButtonProps, Navbar, Menu, MenuItem, MenuDivider, Po
 import { state } from "../modules/state";
 import { useLocalStorageState } from "../hooks/useWebStorageState";
 import { VersionStatus } from "./VersionStatus";
+import { Restart } from "./Restart";
 
 import "./Nav.sass";
 
@@ -80,6 +81,8 @@ export const Nav: React.FC<NavProps> = ({ pathLv1 }) => {
     }, [searchQuery]);
 
     const [runningJobs, setRunningJobs] = useState<number>(state.jobs.filter((job) => job.status === "running").length);
+
+    const [restartDialogOpen, setRestartDialogOpen] = useState<boolean>(false);
     useEffect(() => {
         const onJobs = () => {
             setRunningJobs(state.jobs.filter((job) => job.status === "running").length);
@@ -152,13 +155,14 @@ export const Nav: React.FC<NavProps> = ({ pathLv1 }) => {
                             <MenuDivider />
                             <MenuItem onClick={() => { state.navigate("/about"); }} icon="info-sign" textClassName="product-name" text={`Mirakurun ${version} について`} />
                             <VersionStatus asMenuItem />
-                            <MenuItem icon="power" intent="danger" text="再起動..." />
+                            <MenuItem icon="power" intent="danger" text="再起動..." onClick={() => setRestartDialogOpen(true)} />
                         </Menu>
                     }
                     renderTarget={({ isOpen, ref, ...props }: PopoverTargetProps) => (
                         <Button {...props} active={isOpen} ref={ref} variant="minimal" icon="cog" />
                     )}
                 />
+                <Restart isOpen={restartDialogOpen} onClose={() => setRestartDialogOpen(false)} />
             </Navbar.Group>
         </Navbar>
     );
