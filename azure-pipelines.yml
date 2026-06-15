@@ -62,13 +62,10 @@ stages:
         AMD64:
           ARCH: 'amd64'
           PLATFORM: 'linux/amd64'
-        ARMv7:
-          ARCH: 'arm32v7'
-          PLATFORM: 'linux/arm/v7'
         ARMv8:
           ARCH: 'arm64v8'
           PLATFORM: 'linux/arm64/v8'
-      maxParallel: '3'
+      maxParallel: '2'
     pool:
       vmImage: 'ubuntu-22.04'
     steps:
@@ -118,12 +115,10 @@ stages:
         export DOCKER_CLI_EXPERIMENTAL=enabled
         docker manifest create $REPOSITORY_NAME:$(tag) \
           $REPOSITORY_NAME:amd64-$(tag) \
-          $REPOSITORY_NAME:arm32v7-$(tag) \
           $REPOSITORY_NAME:arm64v8-$(tag)
         docker manifest push $REPOSITORY_NAME:$(tag)
         docker manifest create $REPOSITORY_NAME:latest \
           $REPOSITORY_NAME:amd64-latest \
-          $REPOSITORY_NAME:arm32v7-latest \
           $REPOSITORY_NAME:arm64v8-latest
         docker manifest push $REPOSITORY_NAME:latest
       # see: https://docs.docker.com/engine/reference/commandline/manifest/#create-and-push-a-manifest-list
