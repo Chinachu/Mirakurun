@@ -101,7 +101,10 @@ export default class TunerDevice extends EventEmitter {
         });
     }
 
-    get decoder(): string {
+    get decoder(): string | null {
+        if (this._isRemote && this._config.remoteMirakurunDecoder === true) {
+            return null;
+        }
         return this._config.decoder || null;
     }
 
