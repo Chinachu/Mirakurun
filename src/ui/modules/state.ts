@@ -229,6 +229,7 @@ class State extends EventEmitter<StateEventTypes> {
         });
 
         let _statusRefreshInterval: NodeJS.Timeout | undefined;
+        let _servicesRefreshInterval: NodeJS.Timeout | undefined;
         rpc.on("connected", async () => {
             console.debug("rpc:connected");
 
@@ -253,6 +254,18 @@ class State extends EventEmitter<StateEventTypes> {
             await this.fetchTuners();
             await this.fetchJobs();
             await this.fetchJobSchedules();
+
+            // periodic refresh (every 5s)
+            _statusRefreshInterval = setInterval(async () => {
+                if (document.hidden) { return; }
+                await this.fetchStatus();
+            }, 1000 * 5);
+
+            // periodic refresh (every 60s, for data not covered by push events like logo)
+            _servicesRefreshInterval = setInterval(async () => {
+                if (document.hidden) { return; }
+                await this.fetchServices();
+            }, 1000 * 60);
         });
 
         rpc.on("disconnect", () => {
@@ -261,6 +274,10 @@ class State extends EventEmitter<StateEventTypes> {
             if (_statusRefreshInterval) {
                 clearInterval(_statusRefreshInterval);
                 _statusRefreshInterval = undefined;
+            }
+            if (_servicesRefreshInterval) {
+                clearInterval(_servicesRefreshInterval);
+                _servicesRefreshInterval = undefined;
             }
 
             this.statusName = "Disconnected";
