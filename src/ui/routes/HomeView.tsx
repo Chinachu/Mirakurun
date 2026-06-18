@@ -15,6 +15,7 @@
 */
 import * as React from "react";
 import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import {
     Alignment,
     Breadcrumbs,
@@ -153,21 +154,23 @@ const ServicesSection: React.FC<{
                         hoverOpenDelay={300}
                     >
                         <div className="service-item">
-                            {service.hasLogoData && (
-                                <img
-                                    className="service-logo"
-                                    src={`/api/services/${service.id}/logo`}
-                                    alt=""
-                                />
-                            )}
-                            <span className="service-name">{service.name}</span>
-                            <span className="service-epg-status">
-                                {
-                                    status?.epg.gatheringNetworks.includes(service.networkId) && <Icon icon="refresh" className="color-warning" size={12} /> ||
-                                    service.epgReady && <Icon icon="tick" className="color-epg-ready" size={12} /> ||
-                                    <Icon icon="time" className="bp5-text-muted" size={12} />
-                                }
-                            </span>
+                            <Link className="service-item-main" to={`/epg/services/${service.id}`}>
+                                {service.hasLogoData && (
+                                    <img
+                                        className="service-logo"
+                                        src={`/api/services/${service.id}/logo`}
+                                        alt=""
+                                    />
+                                )}
+                                <span className="service-name">{service.name}</span>
+                                <span className="service-epg-status">
+                                    {
+                                        status?.epg.gatheringNetworks.includes(service.networkId) && <Icon icon="refresh" className="color-warning" size={12} /> ||
+                                        service.epgReady && <Icon icon="tick" className="color-epg-ready" size={12} /> ||
+                                        <Icon icon="time" className="bp5-text-muted" size={12} />
+                                    }
+                                </span>
+                            </Link>
                             {service.type === 0x01 && allowPNA && tsplayEndpoint && (
                                 <span
                                     className="service-play"
