@@ -2,6 +2,17 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 4.1.2 (2026-06-19)
+
+### Server
+
+- 🐛 TunerDevice: remote decoder を有効にしている場合でも decoder が定義されている場合は remote/local 両方で decoder 処理をしてしまうバグの修正
+
+### UI
+
+- ✨ HomeView: 局ロゴ見切れの修正とその他スタイルの調整
+- ✨ HomeView: サービス一覧から EPG 番組表へのリンクを追加
+
 ## 4.1.1 (2026-06-15)
 
 動作環境やユースケースを鑑みて、このバージョンから、このプロジェクトは基本的に日本語を使用します。ドキュメントや UI 等も順次日本語となります。何卒ご了承下さい 🙏
