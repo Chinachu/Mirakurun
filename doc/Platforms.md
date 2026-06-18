@@ -102,7 +102,7 @@ sudo mkdir -p /opt/mirakurun
 # Installation
 mkdir ~/mirakurun/ # example
 cd ~/mirakurun/
-wget https://raw.githubusercontent.com/Chinachu/Mirakurun/refs/heads/release/4.0.0/docker/docker-compose.yml
+wget https://raw.githubusercontent.com/Chinachu/Mirakurun/refs/heads/master/docker/docker-compose.yml
 vim docker-compose.yml # edit as appropriate for your environment
 docker compose pull
 docker compose run --rm -e SETUP=true mirakurun
