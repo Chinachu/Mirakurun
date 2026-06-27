@@ -280,22 +280,36 @@ export default class EPG {
                                 break;
                             }
 
-                            const extended: any = {};
+                            const extendedBuffers: { [key: string]: Buffer[] } = {};
 
                             let current = "";
                             for (const descs of state.extended._descs) {
                                 for (const desc of descs) {
-                                    const key = desc.item_description_length === 0
+                                    const isContinuation = desc.item_description_length === 0;
+                                    const key = isContinuation
                                                 ? current
                                                 : new TsChar(desc.item_description_char).decode();
                                     current = key;
-                                    extended[key] = extended[key] ?
-                                        Buffer.concat([extended[key], desc.item_char]) :
-                                        desc.item_char;
+                                    if (!extendedBuffers[key]) {
+                                        extendedBuffers[key] = [];
+                                    }
+                                    if (isContinuation && extendedBuffers[key].length > 0) {
+                                        const last = extendedBuffers[key].length - 1;
+                                        extendedBuffers[key][last] = Buffer.concat([
+                                            extendedBuffers[key][last],
+                                            desc.item_char
+                                        ]);
+                                    } else {
+                                        extendedBuffers[key].push(desc.item_char);
+                                    }
                                 }
                             }
-                            for (const key of Object.keys(extended)) {
-                                extended[key] = new TsChar(extended[key]).decode();
+
+                            const extended: any = {};
+                            for (const key of Object.keys(extendedBuffers)) {
+                                extended[key] = extendedBuffers[key]
+                                    .map(buf => new TsChar(buf).decode())
+                                    .join("\n\n");
                             }
 
                             _.program.set(state.programId, {
