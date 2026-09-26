@@ -2,6 +2,12 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 4.1.5 (2026-09-27)
+
+### UI
+
+- 🐛 production ビルドで、非 ASCII を含む CSS の先頭に BOM が付き先頭セレクタが適用されない問題を修正
+
 ## 4.1.4 (2026-09-27)
 
 ### Docker
