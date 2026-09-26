@@ -30,7 +30,18 @@ module.exports = {
             },
             {
                 test: /\.s?[ac]ss$/,
-                use: ["style-loader", "css-loader", "sass-loader"]
+                use: [
+                    "style-loader",
+                    "css-loader",
+                    {
+                        loader: "sass-loader",
+                        options: {
+                            sassOptions: {
+                                charset: false
+                            }
+                        }
+                    }
+                ]
             },
             {
                 test: /\.(png|woff|woff2|eot|ttf)$/,
