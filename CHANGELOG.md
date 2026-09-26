@@ -2,6 +2,27 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 4.1.4 (2026-09-27)
+
+### Docker
+
+- 🆙 ベースイメージを `node:24.18.0-bookworm` → `node:24.21.0-bookworm` に更新
+
+### Server
+
+- 🐛 番組・チャンネル・サービスのクエリに `$where` が含まれる場合（入れ子のキーを含む）は HTTP 400 を返す
+
+### Dependencies
+
+- 🆙 express `4.22.2` → `4.22.3`
+- 🆙 js-yaml `4.1.1` → `4.3.2`
+- 🆙 morgan `1.11.0` → `1.12.1`
+- 🆙 sift `15.1.3` → `17.1.3`
+
+### npm
+
+- 🧪 `.npmrc` の registry を `https://npm.flatt.tech/` に設定（試験運用）
+
 ## 4.1.3 (2026-06-28)
 
 ### Docker
