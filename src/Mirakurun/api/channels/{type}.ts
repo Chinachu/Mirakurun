@@ -18,7 +18,7 @@ import sift from "sift";
 import * as api from "../../api";
 import * as apid from "../../../../api";
 import _ from "../../_";
-import { deepClone, channelTypes } from "../../common";
+import { deepClone, channelTypes, rejectWhere, WhereQueryError } from "../../common";
 
 export const parameters = [
     {
@@ -31,21 +31,30 @@ export const parameters = [
 ];
 
 export const get: Operation = (req, res) => {
-    const channels: apid.Channel[] = _.channel.findByType(req.params.type as apid.ChannelType).map(channel => {
-        const ch: apid.Channel = deepClone(channel);
+    try {
+        rejectWhere(req.query);
 
-        ch.services = channel.getServices().map(service => ({
-            id: service.id,
-            serviceId: service.serviceId,
-            networkId: service.networkId,
-            name: service.name,
-            type: service.type
-        }));
+        const channels: apid.Channel[] = _.channel.findByType(req.params.type as apid.ChannelType).map(channel => {
+            const ch: apid.Channel = deepClone(channel);
 
-        return ch;
-    }).filter(sift(req.query));
+            ch.services = channel.getServices().map(service => ({
+                id: service.id,
+                serviceId: service.serviceId,
+                networkId: service.networkId,
+                name: service.name,
+                type: service.type
+            }));
 
-    api.responseJSON(res, channels);
+            return ch;
+        }).filter(sift(req.query));
+
+        api.responseJSON(res, channels);
+    } catch (err) {
+        if (err instanceof WhereQueryError) {
+            return api.responseError(res, 400);
+        }
+        throw err;
+    }
 };
 
 get.apiDoc = {

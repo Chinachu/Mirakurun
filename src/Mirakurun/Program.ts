@@ -135,6 +135,7 @@ export class Program {
     }
 
     findByQuery(query: object): db.Program[] {
+        common.rejectWhere(query);
         return Array.from(this._itemMap.values()).filter(sift(query));
     }
 

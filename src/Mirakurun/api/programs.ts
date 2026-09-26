@@ -17,18 +17,28 @@ import { Operation } from "express-openapi";
 import * as api from "../api";
 import * as apid from "../../../api";
 import _ from "../_";
+import { rejectWhere, WhereQueryError } from "../common";
 
 export const get: Operation = (req, res) => {
-    let programs: apid.Program[];
+    try {
+        rejectWhere(req.query);
 
-    // tslint:disable-next-line:prefer-conditional-expression
-    if (Object.keys(req.query).length !== 0) {
-        programs = _.program.findByQuery(req.query);
-    } else {
-        programs = Array.from(_.program.itemMap.values());
+        let programs: apid.Program[];
+
+        // tslint:disable-next-line:prefer-conditional-expression
+        if (Object.keys(req.query).length !== 0) {
+            programs = _.program.findByQuery(req.query);
+        } else {
+            programs = Array.from(_.program.itemMap.values());
+        }
+
+        api.responseJSON(res, programs);
+    } catch (err) {
+        if (err instanceof WhereQueryError) {
+            return api.responseError(res, 400);
+        }
+        throw err;
     }
-
-    api.responseJSON(res, programs);
 };
 
 get.apiDoc = {
