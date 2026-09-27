@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tv SYSTEM "xmltv.dtd">
+<tv source-info-name="Mirakurun">
+<channel id="12345">
+<display-name>テストチャンネル &amp; Co.</display-name>
+<display-name>5.1</display-name>
+</channel>
+<channel id="12346">
+<display-name>サブチャンネル</display-name>
+<display-name>5.2</display-name>
+</channel>
+<channel id="12347">
+<display-name>キーなしチャンネル</display-name>
+<display-name>999.1</display-name>
+</channel>
+<programme start="20210107061320 +0000" stop="20210107071320 +0000" channel="12345">
+<title>テスト番組 &lt;こんにちは&gt;</title>
+<desc>テスト説明 &amp; &quot;引用&quot; &apos;シングル&apos;</desc>
+<category>ニュース／報道 - 定時・総合</category>
+<category>邦画 - サスペンス／ミステリー</category>
+</programme>
+<programme start="20210107071320 +0000" stop="20210107074320 +0000" channel="12346">
+<title></title>
+<desc></desc>
+</programme>
+</tv>
