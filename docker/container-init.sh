@@ -72,7 +72,7 @@ fi
 function start() {
   if [ "$DEBUG" != "true" ]; then
     export NODE_ENV=production
-    node -r source-map-support/register lib/server.js &
+    node --max-semi-space-size=2 -r source-map-support/register lib/server.js &
   else
     npm run debug &
   fi
