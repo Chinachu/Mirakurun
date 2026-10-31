@@ -31,7 +31,10 @@ stages:
         v24:
           NODE_VERSION_SPEC: '24.x'
           NPM_VERSION: '11'
-      maxParallel: '2'
+        v26:
+          NODE_VERSION_SPEC: '26.x'
+          NPM_VERSION: '11'
+      maxParallel: '3'
     pool:
       vmImage: 'ubuntu-22.04'
     steps:
@@ -140,7 +143,7 @@ stages:
       submodules: 'true'
     - task: NodeTool@0
       inputs:
-        versionSpec: '24.x'
+        versionSpec: '26.x'
     - script: npm ci
       displayName: npm ci
     - task: Npm@1
