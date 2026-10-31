@@ -19,7 +19,8 @@ import * as apid from "../../../api";
 import Event from "../Event";
 
 export const get: Operation = (req, res) => {
-    api.responseJSON(res, Event.log as apid.Event[]);
+    // 書き出しの途中でも新しいイベントで中身が変わるため、複製して渡す
+    api.responseJSON(res, Event.log.slice() as apid.Event[]);
 };
 
 get.apiDoc = {

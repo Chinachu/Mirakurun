@@ -139,6 +139,31 @@ export function sleep(ms: number): Promise<void> {
     });
 }
 
+const JSON_ARRAY_CHUNK_LENGTH = 16 * 1024;
+
+/** 配列を連結した JSON 配列を、全体を 1 つの文字列にせず一定の長さごとに文字列化する */
+export function* stringifyJSONArray(...arrays: readonly unknown[][]): Generator<string> {
+    let chunk = "[";
+    let first = true;
+    for (const array of arrays) {
+        for (const item of array) {
+            const json = JSON.stringify(item);
+            // JSON にできない要素 (undefined や関数) は、従来 (yieldable-json) と同じく出力しない
+            // (要素の中にある配列では、JSON.stringify と同じく null になる)
+            if (json === undefined) {
+                continue;
+            }
+            chunk += (first ? "" : ",") + json;
+            first = false;
+            if (chunk.length >= JSON_ARRAY_CHUNK_LENGTH) {
+                yield chunk;
+                chunk = "";
+            }
+        }
+    }
+    yield chunk + "]";
+}
+
 export function getTimeFromMJD(buffer: Uint8Array | Buffer): number {
     const mjd = (buffer[0] << 8) | buffer[1];
     const h = (buffer[2] >> 4) * 10 + (buffer[2] & 0x0F);

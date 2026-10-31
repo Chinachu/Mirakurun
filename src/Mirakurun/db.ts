@@ -24,6 +24,7 @@ const parseAsync = promisify(yieldableJSON.parseAsync);
 import Queue from "promise-queue";
 import * as apid from "../../api";
 import * as log from "./log";
+import { stringifyJSONArray } from "./common";
 
 interface Service extends apid.Service {
     /** @deprecated */
@@ -94,7 +95,7 @@ async function save(path: string, data: any[], integrity: string): Promise<void>
         try {
             await mkdir(dirname(path), { recursive: true });
             await pipeline(
-                Readable.from(stringifyArray({ __integrity__: integrity }, data)),
+                Readable.from(stringifyJSONArray([{ __integrity__: integrity }], data)),
                 createWriteStream(tmpPath)
             );
             try {
@@ -112,20 +113,6 @@ async function save(path: string, data: any[], integrity: string): Promise<void>
             await rm(tmpPath, { force: true });
         }
     });
-}
-
-const STRINGIFY_CHUNK_LENGTH = 16 * 1024;
-
-function* stringifyArray(head: object, items: any[]): Generator<string> {
-    let chunk = "[" + JSON.stringify(head);
-    for (const item of items) {
-        chunk += "," + (JSON.stringify(item) ?? "null");
-        if (chunk.length >= STRINGIFY_CHUNK_LENGTH) {
-            yield chunk;
-            chunk = "";
-        }
-    }
-    yield chunk + "]";
 }
 
 process.on("beforeExit", () => {
