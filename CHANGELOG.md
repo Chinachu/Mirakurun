@@ -2,6 +2,58 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 4.2.0 (2026-11-01)
+
+メモリ使用量と CPU 負荷を削減しました。TS 配信中のメモリ使用量は 4.1.5 の半分以下になり、番組一覧 (`GET /api/programs`) の応答時間は約 1/9 になります。
+
+### 比較
+
+各バージョンの最終版を同じ条件で計測した結果です。
+
+| | 3.8.1 | 3.9.0-rc.4 | 4.0.0-beta.18 | 4.1.5 | **4.2.0** |
+|---|--:|--:|--:|--:|--:|
+| 起動直後のメモリ | 96MB | 95MB | 105MB | 107MB | **78MB** |
+| TS 配信中のメモリ (平均 / 最大) | 172 / 209MB | 125 / 162MB | 182 / 326MB | 194 / 270MB | **82 / 88MB** |
+| TS 配信中の CPU 使用率 (平均 / 最大) | 9.0 / 21% | 8.5 / 19% | 9.2 / 69% | 9.4 / 60% | **6.6 / 16%** |
+| `GET /api/programs` の応答時間 | 18〜29ms | 19〜29ms | 328〜376ms | 335〜390ms | **37〜43ms** |
+| `GET /api/programs` の応答時間 (TS 配信中) | 13〜31ms | 28〜49ms | 495〜748ms | 378〜463ms | **42〜49ms** |
+| 計測終了時のメモリ | 205MB | 133MB | 310MB | 366MB | **95MB** |
+
+- メモリは RssAnon (Node.js 本体のファイル領域を除く常駐メモリ) です。
+- 計測条件: Node.js 26.12.1、地上デジタル放送の実 TS (約 17Mbps) を 12 本同時に 120 秒配信、番組データ 14,216 件 (8.2MB)、起動オプションは各バージョンの既定値です。
+- 3.9 と 4.0 は npm で公開された最終版を使用しています。
+
+### Docker
+
+- 🆙 ベースイメージを `node:24.21.0-bookworm` → `node:26.13.0-bookworm` に更新
+
+### Server
+
+- 🆙 Node.js エンジン要件: `^22 || ^24` → `^22 || ^24 || ^26`
+- ⚡ Node.js の起動オプションを `--max-semi-space-size=64` → `--max-semi-space-size=2` に変更し、常駐メモリと CPU 使用率を削減
+  - `npm start` / pm2 (`processes.json`) / Docker のいずれも変更しています。独自の起動スクリプトで `--max-semi-space-size=64` を指定している場合は、`2` に変更するか削除してください。
+- ⚡ TSFilter: 連続するパケットをまとめて出力し、パケットごとのメモリ確保とコピーを削減
+- ⚡ API: 配列の JSON 応答 (`GET /api/programs` など) を分割して書き出し、応答時間とメモリ使用量を削減
+  - 応答の途中でも他の処理 (TS 配信など) を止めないようにしました。
+  - 大きな応答は `Content-Length` を付けずに chunked で送ります。
+- ⚡ DB: 番組・サービスの DB を分割して書き出し、保存時のメモリ使用量を削減
+- 🐛 DB: 保存に失敗した場合に既存の DB ファイルが壊れる問題を修正 (一時ファイルに書き出してから置き換えます)
+- 🐛 DB: 保存先のディレクトリがない場合に保存処理が止まる問題を修正
+
+### Dependencies
+
+npm audit で検出された脆弱性に対応しました。
+
+- 🆙 body-parser `1.20.8` → `1.20.9`
+- 🆙 proxy-addr `2.0.7` → `2.0.8`
+- 🆙 qs `6.16.0` → `6.16.2`
+- 🆙 glob `13.0.6` → `14.0.3`
+- 🆙 minimatch `10.2.5` → `11.0.3`
+- 🆙 dompurify `3.4.16` → `3.4.17`
+- 🆙 @redocly/openapi-core `1.34.20` → `1.34.22`
+- 🆙 開発用: concurrently、fast-uri、postcss-selector-parser、serialize-javascript、shell-quote、source-map-js
+- 🔧 tslint が使う glob と minimatch を、修正済みのバージョンに置き換え (`overrides`)
+
 ## 4.1.5 (2026-09-27)
 
 ### UI
