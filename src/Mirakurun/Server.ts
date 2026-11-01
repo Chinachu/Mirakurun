@@ -33,6 +33,8 @@ import { createRPCServer, initRPCNotifier } from "./rpc";
 
 const pkg = require("../../package.json");
 
+const DISABLE_RESPONSE_VALIDATION = "x-express-openapi-disable-response-validation-middleware";
+
 export class Server {
     /** used for test */
     testMode = false;
@@ -147,7 +149,15 @@ export class Server {
         app.use(cors());
 
         if (!serverConfig.disableWebUI) {
-            app.use(express.static("lib/ui"));
+            // API のリクエストでは lib/ui のファイルを探さない
+            const serveUI = express.static("lib/ui");
+            app.use((req, res, next) => {
+                if (req.path === "/api" || req.path.startsWith("/api/")) {
+                    next();
+                    return;
+                }
+                serveUI(req, res, next);
+            });
             app.use("/redoc", express.static("node_modules/redoc/bundles"));
             app.use("/redoc-try", express.static("node_modules/redoc-try/dist"));
             app.use("/api/debug", express.static("lib/ui/redoc-ui.html"));
@@ -161,12 +171,20 @@ export class Server {
         const api = yaml.load(fs.readFileSync("api.yml", "utf8")) as OpenAPIV2.Document;
         api.info.version = pkg.version;
 
-        openapi.initialize({
+        // 応答の検証 (res.validateResponse) は使っていないため、検証器を組み立てない
+        api[DISABLE_RESPONSE_VALIDATION] = true;
+
+        const framework = openapi.initialize({
             app: app,
             apiDoc: api,
             docsPath: "/docs",
             paths: "./lib/Mirakurun/api"
         });
+
+        // 公開する API 定義 (/api/docs) は従来のままにする
+        delete framework.apiDoc[DISABLE_RESPONSE_VALIDATION];
+        // API 定義の検証器は初期化の後に使わないため、常駐させない
+        (framework as unknown as { validator: unknown }).validator = null;
 
         app.use((err, req, res: express.Response, next) => {
             if (err.message === "Not allowed by CORS") {
