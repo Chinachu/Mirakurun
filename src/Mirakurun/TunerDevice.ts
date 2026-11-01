@@ -27,6 +27,10 @@ import ChannelItem from "./ChannelItem";
 import TSFilter from "./TSFilter";
 import Client, { ProgramsQuery } from "../client";
 
+/** 出力をまとめて書き出すまでに保留する入力の上限 (バイト数とミリ秒) */
+const FLUSH_BYTES = 128 * 1024;
+const FLUSH_INTERVAL = 50;
+
 interface User extends common.User {
     _stream?: TSFilter;
 }
@@ -52,6 +56,11 @@ export default class TunerDevice extends EventEmitter {
     private _stream: stream.Readable = null;
 
     private _users = new Set<User>();
+
+    // 書き出しを保留している入力のバイト数と、保留の期限のタイマー
+    private _pendingBytes = 0;
+    private _flushTimer: NodeJS.Timeout = null;
+    private _flushUsersBound = this._flushUsers.bind(this);
 
     private _isAvailable = true;
     private _isRemote = false;
@@ -342,12 +351,32 @@ export default class TunerDevice extends EventEmitter {
     }
 
     private _streamOnData(chunk: Buffer): void {
+        // 入力のたびに書き出さず、全ストリームの出力をまとめて書き出す (書き出しの回数を減らすため)
         for (const user of this._users) {
-            user._stream.write(chunk);
+            user._stream.write(chunk, true);
+        }
+
+        this._pendingBytes += chunk.length;
+        if (this._pendingBytes >= FLUSH_BYTES) {
+            this._flushUsers();
+        } else if (this._flushTimer === null) {
+            this._flushTimer = setTimeout(this._flushUsersBound, FLUSH_INTERVAL);
+        }
+    }
+
+    private _flushUsers(): void {
+        clearTimeout(this._flushTimer);
+        this._flushTimer = null;
+        this._pendingBytes = 0;
+
+        for (const user of this._users) {
+            user._stream.flush();
         }
     }
 
     private _end(): void {
+        this._flushUsers();
+
         this._isAvailable = false;
 
         this._stream.removeAllListeners("data");
