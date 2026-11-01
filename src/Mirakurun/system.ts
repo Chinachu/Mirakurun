@@ -62,7 +62,38 @@ export function getIPv6AddressesForListen(): string[] {
     return addresses;
 }
 
+/** アドレスごとの判定結果 (許可範囲の設定が変わったら破棄する) */
+const permittedIPAddressCache = new Map<string, boolean>();
+const PERMITTED_IP_ADDRESS_CACHE_MAX = 1024;
+// IP アドレスの文字列 (IPv6 の最長表記 45 文字) より長いものは保持しない
+const PERMITTED_IP_ADDRESS_CACHE_KEY_MAX_LENGTH = 45;
+let permittedIPAddressCacheRanges = "";
+
 export function isPermittedIPAddress(addr: string): boolean {
+    const { allowIPv4CidrRanges, allowIPv6CidrRanges } = _.config.server;
+    const ranges = allowIPv4CidrRanges.join(",") + "|" + allowIPv6CidrRanges.join(",");
+    if (ranges !== permittedIPAddressCacheRanges) {
+        permittedIPAddressCache.clear();
+        permittedIPAddressCacheRanges = ranges;
+    }
+
+    if (addr.length > PERMITTED_IP_ADDRESS_CACHE_KEY_MAX_LENGTH) {
+        return checkPermittedIPAddress(addr);
+    }
+
+    let permitted = permittedIPAddressCache.get(addr);
+    if (permitted === undefined) {
+        permitted = checkPermittedIPAddress(addr);
+        if (permittedIPAddressCache.size >= PERMITTED_IP_ADDRESS_CACHE_MAX) {
+            permittedIPAddressCache.clear();
+        }
+        permittedIPAddressCache.set(addr, permitted);
+    }
+
+    return permitted;
+}
+
+function checkPermittedIPAddress(addr: string): boolean {
     const [isIPv4] = Validator.isValidIPv4String(addr);
     if (isIPv4) {
         const ipv4 = new IPv4CidrRange(new IPv4(addr), new IPv4Prefix(32));
@@ -96,7 +127,31 @@ export function isPermittedHost(url: string, allowedHostname?: string): boolean 
     return false;
 }
 
-export async function getLatestVersion(): Promise<string> {
+/** 最新版の確認結果を使い回す時間 (呼び出しのたびに npm を起動しないため) */
+const LATEST_VERSION_CACHE_TTL = 1000 * 60 * 10;
+let latestVersionCache: { version: Promise<string>, expiresAt: number } = null;
+
+export function getLatestVersion(): Promise<string> {
+    const now = Date.now();
+    if (latestVersionCache === null || latestVersionCache.expiresAt <= now) {
+        const cache = {
+            version: fetchLatestVersion(),
+            expiresAt: now + LATEST_VERSION_CACHE_TTL
+        };
+        latestVersionCache = cache;
+
+        // 失敗した結果は使い回さない
+        cache.version.catch(() => {
+            if (latestVersionCache === cache) {
+                latestVersionCache = null;
+            }
+        });
+    }
+
+    return latestVersionCache.version;
+}
+
+async function fetchLatestVersion(): Promise<string> {
     const { stdout } = await asyncExec("npm view mirakurun version", { encoding: "utf8" });
     const latestVersion = stdout.trim();
 
