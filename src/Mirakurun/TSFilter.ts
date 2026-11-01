@@ -39,6 +39,9 @@ interface TSFilterOptions {
 
 const PACKET_SIZE = 188;
 
+/** 出力をコピーせずに書き出す、送信待ちのバイト数の上限 */
+const MAX_PENDING_BYTES_WITHOUT_COPY = 1024 * 1024;
+
 const PROVIDE_PIDS = [
     0x0000, // PAT
     0x0001, // CAT
@@ -120,6 +123,14 @@ export default class TSFilter extends EventEmitter {
     private _offset = -1;
     private _buffer: Buffer[] = [];
     private _bufferBytes = 0;
+    // `_buffer` の要素が参照している元のメモリの大きさの合計 (送信待ちで抱え込むメモリの見積もり)
+    private _bufferSourceBytes = 0;
+    private _bufferLastSource: Buffer = null;
+    // 書き出せずに保持するため、コピー済みの `_buffer` の要素数
+    private _bufferRetainedCount = 0;
+    // 直前のパケットの PID と streamInfo
+    private _lastInfoPid = -1;
+    private _lastInfo: StreamInfo[string] = null;
     // 出力する連続したパケットの範囲 (`_runSource[_runStart.._runEnd]`)
     private _runSource: Buffer = null;
     private _runStart = 0;
@@ -242,7 +253,10 @@ export default class TSFilter extends EventEmitter {
         return this._closed;
     }
 
-    write(chunk: Buffer): void {
+    /**
+     * @param defer true の場合は出力を保留する (同じチューナーの全ストリームの出力をまとめて `flush()` するため)
+     */
+    write(chunk: Buffer, defer = false): void {
         if (this._closed) {
             throw new Error("TSFilter has closed already");
         }
@@ -293,27 +307,45 @@ export default class TSFilter extends EventEmitter {
             });
         }
 
-        if (this._buffer.length !== 0) {
-            if (this._ready && this._output.writableLength < this._output.writableHighWaterMark) {
-                this._output.write(
-                    this._buffer.length === 1 ? this._buffer[0] : Buffer.concat(this._buffer, this._bufferBytes)
-                );
-                this._buffer.length = 0;
-                this._bufferBytes = 0;
-            } else {
-                // 上限を超えた分を古いパケットから破棄する
-                let excess = this._bufferBytes - this._maxBufferBytesBeforeReady;
-                if (excess > 0) {
-                    this._bufferBytes -= excess;
-                    let head = 0;
-                    while (this._buffer[head].length <= excess) {
-                        excess -= this._buffer[head++].length;
-                    }
-                    this._buffer.splice(0, head);
-                    if (excess > 0) {
-                        this._buffer[0] = this._buffer[0].subarray(excess);
-                    }
-                }
+        if (defer === false) {
+            this.flush();
+        }
+    }
+
+    /** 保留している出力を書き出す (書き出せない間は保持し、上限を超えた分を古いパケットから破棄する) */
+    flush(): void {
+        if (this._closed || this._buffer.length === 0) {
+            return;
+        }
+
+        if (this._ready && this._output.writableLength < this._output.writableHighWaterMark) {
+            this._writeBuffer();
+            return;
+        }
+
+        // 入力のチャンクを参照したまま保持すると、出力しないパケットの分までメモリを抱え込むため、保持する分はコピーする
+        // (他のサービスのストリームと共有しているチャンクには書き込まない)
+        if (this._bufferRetainedCount < this._buffer.length) {
+            const retained = Buffer.concat(this._buffer.splice(this._bufferRetainedCount));
+            this._buffer.push(retained);
+            this._bufferRetainedCount = this._buffer.length;
+            this._bufferSourceBytes = this._bufferBytes;
+            this._bufferLastSource = null;
+        }
+
+        // 上限を超えた分を古いパケットから破棄する
+        let excess = this._bufferBytes - this._maxBufferBytesBeforeReady;
+        if (excess > 0) {
+            this._bufferBytes -= excess;
+            this._bufferSourceBytes = this._bufferBytes;
+            let head = 0;
+            while (this._buffer[head].length <= excess) {
+                excess -= this._buffer[head++].length;
+            }
+            this._buffer.splice(0, head);
+            this._bufferRetainedCount -= head;
+            if (excess > 0) {
+                this._buffer[0] = this._buffer[0].subarray(excess);
             }
         }
     }
@@ -328,7 +360,8 @@ export default class TSFilter extends EventEmitter {
 
     /** `source[offset..offset + PACKET_SIZE]` のパケットを処理する (必要な場合以外は切り出さない) */
     private _processPacket(source: Buffer, offset: number, parsingBuffers: Buffer[]): void {
-        const pid = source.readUInt16BE(offset + 1) & 0x1FFF;
+        const header1 = source[offset + 1];
+        const pid = ((header1 & 0x1F) << 8) | source[offset + 2];
 
         // tsmf
         if (this._tsmfEnableTsmfSplit) {
@@ -365,7 +398,7 @@ export default class TSFilter extends EventEmitter {
         }
 
         // transport_error_indicator
-        if ((source[offset + 1] & 0x80) >> 7 === 1) {
+        if ((header1 & 0x80) !== 0) {
             if (this.streamInfo[pid]) {
                 ++this.streamInfo[pid].drop;
             }
@@ -387,7 +420,12 @@ export default class TSFilter extends EventEmitter {
                 parsingBuffers.push(source.subarray(offset, offset + PACKET_SIZE));
             }
         } else if (
-            (pid === 0x12 && (this._parseEIT || this._provideEventId !== null)) ||
+            // EIT の結果を EPG に書き込むのはネットワークごとに 1 つのフィルターだけなので、他のフィルターでは解析しない
+            // (書き込むフィルターが閉じると status.epg が false に戻り、他のフィルターが引き継ぐ)
+            (pid === 0x12 && (
+                this._provideEventId !== null ||
+                (this._parseEIT && (this._epg !== undefined || status.epg[this._targetNetworkId] !== true))
+            )) ||
             pid === 0x14 ||
             this._parsePids.has(pid)
         ) {
@@ -402,13 +440,19 @@ export default class TSFilter extends EventEmitter {
         }
 
         // packet counter
-        if (this.streamInfo[pid] === undefined) {
-            this.streamInfo[pid] = {
-                packet: 0,
-                drop: 0
-            };
+        let info = this._lastInfo;
+        if (pid !== this._lastInfoPid) {
+            info = this.streamInfo[pid];
+            if (info === undefined) {
+                info = this.streamInfo[pid] = {
+                    packet: 0,
+                    drop: 0
+                };
+            }
+            this._lastInfoPid = pid;
+            this._lastInfo = info;
         }
-        ++this.streamInfo[pid].packet;
+        ++info.packet;
 
         // PAT (0) rewriting
         if (pid === 0 && this._pmtPid !== -1) {
@@ -439,9 +483,43 @@ export default class TSFilter extends EventEmitter {
             return;
         }
 
-        this._buffer.push(this._runSource.subarray(this._runStart, this._runEnd));
+        const source = this._runSource;
+        this._buffer.push(source.subarray(this._runStart, this._runEnd));
         this._bufferBytes += this._runEnd - this._runStart;
         this._runSource = null;
+
+        // 参照する入力のチャンクは、同じものを 1 回だけ数える
+        // (PAT の書き換えなどで作った 1 パケットの Buffer は、間に挟まっても入力のチャンクを数え直さない)
+        if (source.length === PACKET_SIZE) {
+            this._bufferSourceBytes += PACKET_SIZE;
+        } else if (source !== this._bufferLastSource) {
+            this._bufferSourceBytes += source.length;
+            this._bufferLastSource = source;
+        }
+    }
+
+    private _writeBuffer(): void {
+        const buffer = this._buffer;
+
+        if (buffer.length === 1) {
+            this._output.write(buffer[0]);
+        } else if (this._bufferBytes * 2 >= this._bufferSourceBytes && this._output.writableLength < MAX_PENDING_BYTES_WITHOUT_COPY) {
+            // 入力のチャンクの半分以上を出力し、送信待ちが少ない場合は、コピーせずにまとめて書き出す
+            // (送信の遅いストリームが入力のチャンクを抱え込まないよう、送信待ちが多い場合はコピーする)
+            this._output.cork();
+            for (const run of buffer) {
+                this._output.write(run);
+            }
+            this._output.uncork();
+        } else {
+            this._output.write(Buffer.concat(buffer, this._bufferBytes));
+        }
+
+        buffer.length = 0;
+        this._bufferBytes = 0;
+        this._bufferSourceBytes = 0;
+        this._bufferLastSource = null;
+        this._bufferRetainedCount = 0;
     }
 
     private _onPAT(pid: number, data: any): void {
@@ -690,6 +768,8 @@ export default class TSFilter extends EventEmitter {
                     const eventId = this._provideEventId;
                     this._provideEventId = null;
                     setTimeout(() => {
+                        // 番組の終了までに出力すると決まっていたパケットは、保留していても書き出す
+                        this.flush();
                         this._ready = false;
                         this._provideEventId = eventId;
                         this._close();
@@ -1103,6 +1183,16 @@ export default class TSFilter extends EventEmitter {
 
         // clear output stream
         if (this._output) {
+            // 保留していた出力は、書き出せる状態なら閉じる前に書き出す
+            if (
+                this._buffer.length !== 0 &&
+                this._ready &&
+                this._output.writableEnded === false &&
+                this._output.destroyed === false &&
+                this._output.writableLength < this._output.writableHighWaterMark
+            ) {
+                this._writeBuffer();
+            }
             if (this._output.writableEnded === false) {
                 this._output.end();
             }

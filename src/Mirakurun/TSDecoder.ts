@@ -84,6 +84,21 @@ export default class TSDecoder extends stream.Writable {
         callback();
     }
 
+    /** cork() してまとめて書き込まれた出力を、1 回でデコーダーに渡す */
+    _writev(chunks: { chunk: Buffer }[], callback: Function) {
+        if (!this._writable) {
+            callback();
+            return;
+        }
+
+        this._writable.cork();
+        for (const { chunk } of chunks) {
+            this._write(chunk, null, () => { /* 最後にまとめて呼ぶ */ });
+        }
+        this._writable.uncork();
+        callback();
+    }
+
     _final() {
         this._close();
     }
