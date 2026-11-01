@@ -22,6 +22,9 @@ import _ from "./_";
 import Event from "./Event";
 import { JobItem } from "./Job";
 
+/** findByQuery() で sift を使わずに絞り込める条件 */
+const SIMPLE_QUERY_KEYS = new Set(["networkId", "serviceId", "eventId"]);
+
 export function getProgramItemId(networkId: number, serviceId: number, eventId: number): number {
     return parseInt(`${networkId}${serviceId.toString(10).padStart(5, "0")}${eventId.toString(10).padStart(5, "0")}`, 10);
 }
@@ -136,6 +139,24 @@ export class Program {
 
     findByQuery(query: object): db.Program[] {
         common.rejectWhere(query);
+
+        // networkId / serviceId / eventId の数値だけの条件は、sift を使わずに絞り込む
+        const keys = Object.keys(query);
+        if (keys.length !== 0 && keys.every(key => SIMPLE_QUERY_KEYS.has(key) && typeof query[key] === "number")) {
+            const { networkId, serviceId, eventId } = query as { networkId?: number, serviceId?: number, eventId?: number };
+            const items: db.Program[] = [];
+            for (const item of this._itemMap.values()) {
+                if (
+                    (networkId === undefined || item.networkId === networkId) &&
+                    (serviceId === undefined || item.serviceId === serviceId) &&
+                    (eventId === undefined || item.eventId === eventId)
+                ) {
+                    items.push(item);
+                }
+            }
+            return items;
+        }
+
         return Array.from(this._itemMap.values()).filter(sift(query));
     }
 
