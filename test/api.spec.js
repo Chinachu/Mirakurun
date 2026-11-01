@@ -244,7 +244,7 @@ describe("[api.spec] api.ts: responseJSON()", () => {
       result = api.responseJSON(res, body);
     };
 
-    // 最初のデータを受け取った時点で切断する (サーバー側は 16KB ごとに順番を譲るため、全体を書き出す前に検知できる)
+    // 最初のデータを受け取った時点で切断する (サーバー側は 32K 文字ごとに順番を譲るため、全体を書き出す前に検知できる)
     await new Promise(resolve => {
       const req = http.get({ host: "127.0.0.1", port, path: "/", agent: false }, res => {
         res.once("data", () => {
