@@ -287,6 +287,11 @@ export class Tuner {
                 return;
             }
 
+            if (tuner.disableDvbDirect !== undefined && typeof tuner.disableDvbDirect !== "boolean") {
+                log.error("invalid type of property `disableDvbDirect` in tuner#%s configuration", i);
+                return;
+            }
+
             if (tuner.isDisabled) {
                 return;
             }
@@ -310,6 +315,7 @@ export class Tuner {
 
         const devices = this._getDevicesByType(setting.channel.type);
         let tryCount = 50;
+        const startedAt = Date.now();
 
         if (!dest) {
             const remoteResult = await this._useRemoteData(user, devices);
@@ -330,6 +336,8 @@ export class Tuner {
                 await new Promise(resolve => setTimeout(resolve, 250));
             } else {
                 // found
+                log.debug("Tuner: picked TunerDevice#%d for user `%s` in %dms", device.index, user.id, Date.now() - startedAt);
+
                 let output: Writable;
                 if (user.disableDecoder === true || device.decoder === null) {
                     output = dest;

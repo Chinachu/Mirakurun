@@ -305,6 +305,8 @@ export interface ConfigTunersItem {
     command?: string;
     /** [dvb] dvr adapter device path */
     dvbDevicePath?: string;
+    /** [dvb] `true` to run the dvbv5-zap command instead of accessing the DVB device directly. */
+    disableDvbDirect?: boolean;
     /** [remote] specify to use remote Mirakurun host like as `192.168.1.x`. */
     remoteMirakurunHost?: string;
     /** [remote] specify to use remote Mirakurun port number (default: 40772). */

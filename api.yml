@@ -598,6 +598,8 @@ definitions:
         type: string
       dvbDevicePath:
         type: string
+      disableDvbDirect:
+        type: boolean
       remoteMirakurunHost:
         type: string
       remoteMirakurunPort:

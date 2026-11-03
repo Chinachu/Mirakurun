@@ -92,6 +92,7 @@
   command: cmd <channel> --arg1 --arg2 <exampleArg1> <exampleArg2>... # String
   # For dvb
   dvbDevicePath: /dev/dvb/adapter/dvr/path # String
+  disableDvbDirect: false # Boolean
   # For multiplexing with remote Mirakurun
   remoteMirakurunHost: 192.168.x.x # String
   remoteMirakurunPort: 40772 # Integer
@@ -100,6 +101,17 @@
   decoder: cmd # String
   isDisabled: false # Boolean
 ```
+
+#### DVB device direct access
+
+If `command` is `dvbv5-zap`, Mirakurun tunes by accessing the DVB device directly instead of running the command. Tuning is faster because it does not wait for the process to start and exit.
+
+- The values of `-a`, `-f`, `-d` and `-c` are used. `-P` is required. `-r`, `-o -`, `-s`, `-v` and `-N` are ignored.
+- For satellite, the LNBf (`-l`), DiSEqC (`-S`, `-W`), SCR/Unicable (`-U`) and `LNB`, `POLARIZATION`, `SAT_NUMBER` in the channels file are handled the same as `dvbv5-zap` (frequency conversion, LNB power, 22kHz tone and DiSEqC). Without the LNBf, the frequency is used as is and the LNB power is not turned on.
+- LNA (`-w`) is set the same as `dvbv5-zap` regardless of the delivery system.
+- If any other option (such as `-t`) is specified, `dvbDevicePath` is not the dvr of `-a` and `-d`, or the channels file of `-c` has unsupported properties, the command is run as before.
+- Supported delivery systems are ISDB-T and ISDB-S.
+- Set `disableDvbDirect: true` to run the command as before.
 
 #### decoder
 

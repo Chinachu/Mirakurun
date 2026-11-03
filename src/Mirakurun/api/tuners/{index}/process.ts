@@ -69,7 +69,8 @@ get.apiDoc = {
 export const del: Operation = async (req, res) => {
     const tuner = _.tuner.get(req.params.index as any as number);
 
-    if (tuner === null || Number.isInteger(tuner.pid) === false) {
+    // DVB デバイスを直接操作するチューナーはプロセスがない (pid が null) ため、選局中 (command がある) かで判断する
+    if (tuner === null || (Number.isInteger(tuner.pid) === false && (tuner.pid !== null || tuner.command === null))) {
         api.responseError(res, 404);
         return;
     }

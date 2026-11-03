@@ -155,6 +155,9 @@ export default class TSFilter extends EventEmitter {
     private _logoDataTimer: NodeJS.Timeout;
     private _provideEventLastDetectedAt = -1;
     private _provideEventTimeout: NodeJS.Timeout = null;
+    // 作成してから準備完了と最初の出力までの時間を計測するための作成時刻
+    private _createdAt = Date.now();
+    private _outputStarted = false;
 
     /** Number divisible by a multiple of 188 */
     private _maxBufferBytesBeforeReady: number = (() => {
@@ -501,6 +504,11 @@ export default class TSFilter extends EventEmitter {
     private _writeBuffer(): void {
         const buffer = this._buffer;
 
+        if (this._outputStarted === false) {
+            this._outputStarted = true;
+            log.debug("TSFilter: first output in %dms (serviceId=%d)", Date.now() - this._createdAt, this._provideServiceId);
+        }
+
         if (buffer.length === 1) {
             this._output.write(buffer[0]);
         } else if (this._bufferBytes * 2 >= this._bufferSourceBytes && this._output.writableLength < MAX_PENDING_BYTES_WITHOUT_COPY) {
@@ -646,7 +654,7 @@ export default class TSFilter extends EventEmitter {
         if (this._ready === false && this._provideServiceId !== null && this._provideEventId === null) {
             this._ready = true;
 
-            log.info("TSFilter#_onPMT: now ready for serviceId=%d", this._provideServiceId);
+            log.info("TSFilter#_onPMT: now ready for serviceId=%d in %dms", this._provideServiceId, Date.now() - this._createdAt);
         }
 
         if (data.program_info[0]) {
@@ -759,7 +767,7 @@ export default class TSFilter extends EventEmitter {
                 if (this._ready === false) {
                     this._ready = true;
 
-                    log.info("TSFilter#_onEIT: now ready for eventId=%d", this._provideEventId);
+                    log.info("TSFilter#_onEIT: now ready for eventId=%d in %dms", this._provideEventId, Date.now() - this._createdAt);
                 }
             } else {
                 if (this._ready) {

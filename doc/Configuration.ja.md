@@ -92,6 +92,7 @@
   command: cmd <channel> --arg1 --arg2 <exampleArg1> <exampleArg2>... # String
   # dvb用
   dvbDevicePath: /dev/dvb/adapter/dvr/path # String
+  disableDvbDirect: false # Boolean
   # リモートMirakurunとの多重化用
   remoteMirakurunHost: 192.168.x.x # String
   remoteMirakurunPort: 40772 # Integer
@@ -100,6 +101,17 @@
   decoder: cmd # String
   isDisabled: false # Boolean
 ```
+
+#### DVB デバイスの直接操作
+
+`command` が `dvbv5-zap` の場合は、コマンドを実行せずに Mirakurun が DVB デバイスを直接操作して選局します。プロセスの起動と終了を待たないため、選局が速くなります。
+
+- `-a`, `-f`, `-d`, `-c` の値を使います。`-P` が必要です。`-r`, `-o -`, `-s`, `-v`, `-N` は無視します。
+- 衛星では、LNBf (`-l`)、DiSEqC (`-S`, `-W`)、SCR/Unicable (`-U`) と、チャンネル設定ファイルの `LNB`, `POLARIZATION`, `SAT_NUMBER` を `dvbv5-zap` と同じく扱います (周波数の変換、LNB への給電、22kHz トーン、DiSEqC)。LNBf の指定がない場合は、周波数をそのまま使い、LNB に給電しません。
+- LNA (`-w`) は伝送方式に関係なく `dvbv5-zap` と同じく設定します。
+- これら以外のオプション (`-t` など) がある場合や、`dvbDevicePath` が `-a` と `-d` の dvr と異なる場合、`-c` のチャンネル設定ファイルに未対応の項目がある場合は、従来どおりコマンドを実行します。
+- 対応する伝送方式は ISDB-T と ISDB-S です。
+- `disableDvbDirect: true` で、従来どおりコマンドを実行します。
 
 #### decoder
 
