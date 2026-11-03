@@ -1,6 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
+    "typeRoots": ["./node_modules/@types"],
     "alwaysStrict": true,
     "lib": [
       "es2022"
