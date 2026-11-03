@@ -250,6 +250,17 @@ describe("[tsfilter.spec] TSFilter.ts: write()", () => {
     assert.ok(output.result().equals(Buffer.concat(packets)));
   });
 
+  it("starts the stream after both the PAT and the output", () => {
+    const filter = new TSFilter({ output: collector(1024 * 1024) });
+
+    // PAT より前のパケットを出力しただけでは始めたとしない
+    filter.write(packet(0x100, 0));
+    assert.strictEqual(filter.streamStarted, false);
+    filter.write(patPacket(1));
+    assert.strictEqual(filter.streamStarted, true);
+    filter.close();
+  });
+
   it("writes the deferred packets when the provided event has ended", async () => {
     const output = collector(1024 * 1024);
     const filter = new TSFilter({ output, serviceId: 1, eventId: 1 });

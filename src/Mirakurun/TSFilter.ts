@@ -158,6 +158,7 @@ export default class TSFilter extends EventEmitter {
     // 作成してから準備完了と最初の出力までの時間を計測するための作成時刻
     private _createdAt = Date.now();
     private _outputStarted = false;
+    private _patReceived = false;
 
     /** Number divisible by a multiple of 188 */
     private _maxBufferBytesBeforeReady: number = (() => {
@@ -254,6 +255,11 @@ export default class TSFilter extends EventEmitter {
 
     get closed(): boolean {
         return this._closed;
+    }
+
+    /** PAT を受け取り、出力を始めたかどうか (PAT より前のパケットを出力しただけでは始めたとしない) */
+    get streamStarted(): boolean {
+        return this._patReceived && this._outputStarted;
     }
 
     /**
@@ -418,6 +424,7 @@ export default class TSFilter extends EventEmitter {
                 }
                 return; // drop
             }
+            this._patReceived = true;
             if (this._patCRC.compare(source, offset + targetStart, offset + targetStart + 4) !== 0) {
                 source.copy(this._patCRC, 0, offset + targetStart, offset + targetStart + 4);
                 parsingBuffers.push(source.subarray(offset, offset + PACKET_SIZE));

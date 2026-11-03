@@ -534,8 +534,9 @@ export default class TunerDevice extends EventEmitter {
         }
 
         // 入力のたびに書き出さず、全ストリームの出力をまとめて書き出す (書き出しの回数を減らすため)
+        // (選局や合流の直後は、最初の PAT を含む出力を遅らせないため、出力を始めるまですぐに書き出す)
         for (const user of this._users) {
-            user._stream.write(chunk, true);
+            user._stream.write(chunk, user._stream.streamStarted);
         }
 
         this._pendingBytes += chunk.length;

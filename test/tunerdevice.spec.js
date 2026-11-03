@@ -14,8 +14,9 @@ require.cache[statusPath] = {
 const log = require("../lib/Mirakurun/log");
 let TunerDevice;
 
-function fakeStream() {
+function fakeStream(streamStarted = true) {
   return {
+    streamStarted,
     writes: [],
     flushes: 0,
     write(chunk, defer) {
@@ -70,6 +71,19 @@ describe("[tunerdevice.spec] TunerDevice.ts: _streamOnData()", () => {
     await new Promise(resolve => setTimeout(resolve, 500));
     assert.strictEqual(stream.flushes, 1);
     assert.strictEqual(d._flushTimer, null);
+  });
+
+  it("writes immediately to streams that have not started output", () => {
+    const streams = [fakeStream(false), fakeStream()];
+    const d = device(streams);
+
+    d._streamOnData(Buffer.alloc(188));
+    assert.deepStrictEqual(streams.map(s => s.writes[0].defer), [false, true]);
+
+    streams[0].streamStarted = true;
+    d._streamOnData(Buffer.alloc(188));
+    assert.strictEqual(streams[0].writes[1].defer, true);
+    d._end();
   });
 
   it("flushes the pending output when the tuner process ends", () => {
