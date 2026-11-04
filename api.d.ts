@@ -177,7 +177,8 @@ export interface TunerDevice {
     name: string;
     types: ChannelType[];
     command: string;
-    pid: number;
+    /** `null` when no process is running (including when the tuner accesses the DVB device directly). */
+    pid: number | null;
     users: TunerUser[];
     isAvailable: boolean;
     isRemote: boolean;
@@ -215,7 +216,8 @@ export interface StreamInfo {
 }
 
 export interface TunerProcess {
-    pid: number;
+    /** `null` when the tuner accesses the DVB device directly (no process). */
+    pid: number | null;
 }
 
 export interface JobScheduleItem {

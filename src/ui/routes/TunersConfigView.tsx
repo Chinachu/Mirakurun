@@ -35,6 +35,7 @@ import equal from "fast-deep-equal";
 import { state } from "../modules/state";
 import * as ui from "../modules/ui";
 import { ConfigTuners, ConfigTunersItem, ChannelType } from "../../../api.d";
+import { parseCommandForSpawn } from "../../Mirakurun/command";
 
 import "./TunersConfigView.sass";
 
@@ -43,6 +44,16 @@ const typesIndex = ["GR", "BS", "CS", "SKY"];
 
 function sortTypes(types: ChannelType[]): ChannelType[] {
     return types.sort((a, b) => typesIndex.indexOf(a) - typesIndex.indexOf(b));
+}
+
+// サーバーと同じく、コマンドを解釈したファイル名で dvbv5-zap かを判定する
+function isDvbv5ZapCommand(command: string): boolean {
+    try {
+        return parseCommandForSpawn(command).command.split("/").pop() === "dvbv5-zap";
+    } catch {
+        // 空のコマンド
+        return false;
+    }
 }
 
 export const TunersConfigView: React.FC = () => {
@@ -305,7 +316,7 @@ export const TunersConfigView: React.FC = () => {
                                                         }}
                                                     />
                                                 </FormGroup>
-                                                {/^(\S*\/)?dvbv5-zap(\s|$)/.test((tuner.command || "").trim()) && (
+                                                {isDvbv5ZapCommand(tuner.command || "") && (
                                                     <div style={{ marginBottom: "8px" }}>
                                                         <Checkbox
                                                             label="Disable DVB Direct"

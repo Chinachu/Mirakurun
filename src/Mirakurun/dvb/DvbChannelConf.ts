@@ -14,8 +14,7 @@
    limitations under the License.
 */
 import * as fs from "fs";
-import * as path from "path";
-import * as apid from "../../../api";
+import { toAsciiLowerCase, toAsciiUpperCase } from "./ascii";
 import { DTV, SYS } from "./constants";
 import { Lnb, findLnb, POLARIZATION_NAMES } from "./DvbSat";
 
@@ -29,12 +28,13 @@ export interface DvbChannelParams {
     readonly satNumber?: number;
 }
 
-const CONF_DIR = path.resolve(__dirname, "../../../config/dvbconf-for-isdb/conf");
-
 const DELIVERY_SYSTEMS = new Map<string, number>([
     ["ISDBT", SYS.ISDBT],
     ["ISDBS", SYS.ISDBS]
 ]);
+
+// libdvbv5 がチャンネルの情報として読み、frontend には設定しない項目 (PID_* も同じ)
+const ENTRY_KEYS = new Set(["SERVICE_ID", "VIDEO_PID", "AUDIO_PID", "CHANNEL", "VCHANNEL", "NETWORK_ID", "TRANSPORT_ID"]);
 
 const NUMERIC_KEYS: { [key: string]: number } = {
     FREQUENCY: DTV.FREQUENCY,
@@ -43,61 +43,138 @@ const NUMERIC_KEYS: { [key: string]: number } = {
     STREAM_ID: DTV.STREAM_ID
 };
 
-// 設定ファイルを編集した場合に読み直すため、更新日時と一緒に保持する
-const cache = new Map<string, { mtimeMs: number; channels: Map<string, DvbChannelParams> }>();
+// 設定ファイルを編集した場合に読み直すため、ファイルの状態と一緒に保持する
+const cache = new Map<string, { version: string; channels: DvbChannels }>();
+
+// 更新日時を保ったまま置き換えた場合 (`cp -p` など) も読み直すよう、ctime、大きさ、inode も比べる
+function fileVersion(stat: fs.Stats): string {
+    return `${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}:${stat.ino}`;
+}
+
+interface DvbChannelEntry {
+    /** `[...]` の名前 (libdvbv5 と同じく `[CHANNEL]` は名前なし) */
+    readonly name: string | null;
+    readonly vchannel: string | null;
+    readonly params: DvbChannelParams;
+}
+
+const INT64_MAX = (1n << 63n) - 1n;
+const INT64_MIN = -(1n << 63n);
+
+// atoi() (strtol()) と同じく、long の範囲に収める
+function clampInt64(value: bigint): bigint {
+    return value > INT64_MAX ? INT64_MAX : value < INT64_MIN ? INT64_MIN : value;
+}
+
+/** チャンネル設定ファイルのチャンネル (ファイルの順) */
+export class DvbChannels {
+    constructor(private readonly _entries: readonly DvbChannelEntry[]) {}
+
+    /** 名前が一致する最初のチャンネル */
+    get(name: string): DvbChannelParams | undefined {
+        return this._entries.find(entry => entry.name === name)?.params;
+    }
+
+    /**
+     * dvbv5-zap と同じくチャンネルを探す
+     * (名前か VCHANNEL が一致する最初のチャンネル、なければ大文字と小文字を区別せずに名前が一致する最初のチャンネル。
+     * `byFrequency` の場合は、さらに数値として読んだ値と周波数が一致する最初のチャンネル)
+     */
+    find(channel: string, byFrequency: boolean): DvbChannelParams | undefined {
+        let entry = this._entries.find(e => e.name === channel || e.vchannel === channel);
+        if (!entry) {
+            const lower = toAsciiLowerCase(channel);
+            entry = this._entries.find(e => e.name !== null && toAsciiLowerCase(e.name) === lower);
+        }
+        if (!entry && byFrequency) {
+            // dvbv5-zap は atoi() で読んだ値を uint32_t にし、0 の場合は探さない (先頭の空白は C の isspace() と同じ)
+            const frequency = /^[ \t\n\v\f\r]*([+-]?\d+)/.exec(channel);
+            const value = frequency ? Number(BigInt.asUintN(32, clampInt64(BigInt(frequency[1])))) : 0;
+            if (value !== 0) {
+                entry = this._entries.find(e => e.params.properties.find(([cmd]) => cmd === DTV.FREQUENCY)?.[1] === value);
+            }
+        }
+        return entry?.params;
+    }
+}
 
 /** dvbv5 形式のチャンネル設定 (dvbv5_channels_*.conf) を読む */
-export function parseDvbv5ChannelsConf(text: string): Map<string, DvbChannelParams> {
-    const channels = new Map<string, DvbChannelParams>();
-    let name: string = null;
+export function parseDvbv5ChannelsConf(text: string): DvbChannels {
+    const entries: DvbChannelEntry[] = [];
+    let started = false;
+    let name: string | null = null;
+    let vchannel: string | null = null;
     let deliverySystem: number = null;
     let properties: [number, number][] = [];
     let sat: { lnb?: Lnb; polarization?: number; satNumber?: number } = {};
+    let keys = new Set<string>();
 
+    const label = () => name ?? "CHANNEL";
     const commit = () => {
-        if (name === null) {
+        if (started === false) {
             return;
         }
         if (deliverySystem === null) {
-            throw new Error(`DELIVERY_SYSTEM is missing in [${name}]`);
+            throw new Error(`DELIVERY_SYSTEM is missing in [${label()}]`);
         }
-        // dvbv5-zap と同じく、同じ名前のチャンネルは先のものを使う
-        if (channels.has(name) === false) {
-            channels.set(name, { deliverySystem, properties, ...sat });
+        if (keys.has("FREQUENCY") === false) {
+            throw new Error(`FREQUENCY is missing in [${label()}]`);
         }
+        entries.push({ name, vchannel, params: { deliverySystem, properties, ...sat } });
     };
 
-    for (const rawLine of text.split(/\r?\n/)) {
-        const line = rawLine.trim();
+    // libdvbv5 と同じく、行の先頭の空白だけを除く (値の末尾の空白や CR は値の一部になる)
+    for (const rawLine of text.split("\n")) {
+        const line = rawLine.replace(/^[ \t]+/, "");
         if (line === "" || line.startsWith("#")) {
             continue;
         }
 
-        const section = /^\[(.+)\]$/.exec(line);
+        // libdvbv5 と同じく、名前は最初の `]` まで (`CHANNEL` は名前なし、先頭の空白は除く)
+        const section = /^\[([^\]]*)\]/.exec(line);
         if (section) {
+            if (section[1] === "") {
+                throw new Error(`invalid line: ${line}`);
+            }
             commit();
-            name = section[1];
+            started = true;
+            name = (toAsciiUpperCase(section[1]) === "CHANNEL" ? "" : section[1]).replace(/^[ \t]+/, "") || null;
+            vchannel = null;
             deliverySystem = null;
             properties = [];
             sat = {};
+            keys = new Set();
             continue;
         }
 
-        const pair = /^([A-Z0-9_]+)\s*=\s*(.+)$/.exec(line);
-        if (!pair || name === null) {
+        // libdvbv5 は PID_* の番号を小文字の 16 進数で書く
+        // (libdvbv5 は `=` の前の最後の 1 文字を消すため、`=` の前に空白がないとキーが変わる)
+        const pair = /^([A-Za-z0-9_]+)[ \t]+=[ \t]*([^]*)$/.exec(line);
+        if (!pair || started === false) {
             throw new Error(`invalid line: ${line}`);
         }
         const [, key, value] = pair;
+        // libdvbv5 は値の末尾の空白を除かず、文字列の値は一致しなくなるため
+        if (value === "" || /[ \t\v\f\r]$/.test(value)) {
+            throw new Error(`invalid value of ${key} in [${label()}]`);
+        }
+
+        // 同じ項目が重複すると、libdvbv5 は項目によって先の値と後の値のどちらかを使うため
+        if (keys.has(key)) {
+            throw new Error(`duplicate property ${key} in [${label()}]`);
+        }
+        keys.add(key);
 
         const lnb = key === "LNB" ? findLnb(value) : null;
-        const polarization = key === "POLARIZATION" ? POLARIZATION_NAMES[value.toUpperCase()] : undefined;
+        const polarization = key === "POLARIZATION" ? POLARIZATION_NAMES[toAsciiUpperCase(value)] : undefined;
 
         if (key === "DELIVERY_SYSTEM") {
             if (DELIVERY_SYSTEMS.has(value) === false) {
-                throw new Error(`unsupported DELIVERY_SYSTEM ${value} in [${name}]`);
+                throw new Error(`unsupported DELIVERY_SYSTEM ${value} in [${label()}]`);
             }
             deliverySystem = DELIVERY_SYSTEMS.get(value);
-        } else if (NUMERIC_KEYS[key] !== undefined && /^\d+$/.test(value)) {
+        } else if (NUMERIC_KEYS[key] !== undefined && /^\d+$/.test(value) && parseInt(value, 10) <= 0xFFFFFFFF) {
+            // libdvbv5 は 32 ビットに収まらない値を切り詰めるため、収まる値に限る
             properties.push([NUMERIC_KEYS[key], parseInt(value, 10)]);
         } else if (lnb !== null) {
             sat.lnb = lnb;
@@ -107,53 +184,52 @@ export function parseDvbv5ChannelsConf(text: string): Map<string, DvbChannelPara
             sat.satNumber = parseInt(value, 10);
         } else if ((key === "DISEQC_WAIT" || key === "FREQ_BPF") && /^\d+$/.test(value)) {
             // dvbv5-zap はチャンネル設定のこれらの値を使わない (`-W`, `-U` だけを使う)
+        } else if (key === "VCHANNEL") {
+            vchannel = value;
+        } else if (ENTRY_KEYS.has(key) || key.startsWith("PID_")) {
+            // dvbv5-scan が出力するサービスの情報 (libdvbv5 は選局に使わない)
         } else {
             // 未対応の項目を無視すると、意図と異なる設定で選局するため
-            throw new Error(`unsupported property ${key} = ${value} in [${name}]`);
+            throw new Error(`unsupported property ${key} = ${value} in [${label()}]`);
         }
     }
     commit();
 
-    return channels;
-}
-
-export function getDefaultConfPath(type: apid.ChannelType): string {
-    switch (type) {
-        case "GR":
-            return path.join(CONF_DIR, "dvbv5_channels_isdbt.conf");
-        case "BS":
-        case "CS":
-            return path.join(CONF_DIR, "dvbv5_channels_isdbs.conf");
-        default:
-            throw new Error(`channel type ${type} is not supported by DVB tuning`);
-    }
+    return new DvbChannels(entries);
 }
 
 /** チャンネル設定ファイルを読む (更新されていなければ前回の結果を返す) */
-export function loadChannelsConf(confPath: string): Map<string, DvbChannelParams> {
-    const { mtimeMs } = fs.statSync(confPath);
-    let cached = cache.get(confPath);
-    if (!cached || cached.mtimeMs !== mtimeMs) {
-        cached = { mtimeMs, channels: parseDvbv5ChannelsConf(fs.readFileSync(confPath, "utf8")) };
-        cache.set(confPath, cached);
+export function loadChannelsConf(confPath: string): DvbChannels {
+    const version = fileVersion(fs.statSync(confPath));
+    const cached = cache.get(confPath);
+    if (cached && cached.version === version) {
+        return cached.channels;
     }
-    return cached.channels;
+    return cacheChannels(confPath, version, fs.readFileSync(confPath, "utf8"));
 }
 
-/** チャンネル (`ChannelItem.channel`) の選局パラメーターを返す */
-export function getChannelParams(type: apid.ChannelType, channel: string, confPath = getDefaultConfPath(type)): DvbChannelParams {
-    const channels = loadChannelsConf(confPath);
-    let params = channels.get(channel);
-    if (!params) {
-        // dvbv5-zap と同じく、見つからなければ大文字と小文字を区別せずに探す
-        const lower = channel.toLowerCase();
-        for (const [name, value] of channels) {
-            if (name.toLowerCase() === lower) {
-                params = value;
-                break;
-            }
-        }
+/** `loadChannelsConf()` と同じく読む (選局のたびに読むため、イベントループを止めない) */
+export async function readChannelsConf(confPath: string): Promise<DvbChannels> {
+    const version = fileVersion(await fs.promises.stat(confPath));
+    const cached = cache.get(confPath);
+    if (cached && cached.version === version) {
+        return cached.channels;
     }
+    return cacheChannels(confPath, version, await fs.promises.readFile(confPath, "utf8"));
+}
+
+function cacheChannels(confPath: string, version: string, text: string): DvbChannels {
+    const channels = parseDvbv5ChannelsConf(text);
+    cache.set(confPath, { version, channels });
+    return channels;
+}
+
+/**
+ * 読んだチャンネル設定から、チャンネル (`ChannelItem.channel`) の選局パラメーターを探す
+ * @param byFrequency 見つからない場合に周波数でも探すか (dvbv5-zap は `-r` がない場合に探す)
+ */
+export function findChannelParams(channels: DvbChannels, channel: string, confPath: string, byFrequency = false): DvbChannelParams {
+    const params = channels.find(channel, byFrequency);
     if (!params) {
         throw new Error(`channel ${channel} is not found in ${confPath}`);
     }

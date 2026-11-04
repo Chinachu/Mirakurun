@@ -18,6 +18,7 @@
 
 import * as path from "path";
 import * as common from "../common";
+import { toAsciiLowerCase, toAsciiUpperCase } from "./ascii";
 import { LNA_AUTO } from "./constants";
 import { Lnb, findLnb } from "./DvbSat";
 
@@ -28,6 +29,8 @@ export interface DvbDirectOptions {
     readonly dvr: number;
     /** dvbv5 形式のチャンネル設定ファイル (-c) */
     readonly channelsConfPath: string;
+    /** チャンネルが見つからない場合に周波数でも探すか (dvbv5-zap は -r も -o もない場合に探す) */
+    readonly channelByFrequency: boolean;
     /** LNBf (-l)。null の場合はチャンネル設定の LNB を使う */
     readonly lnb: Lnb | null;
     /** 衛星の番号 (-S)。負の場合はチャンネル設定の SAT_NUMBER を使う */
@@ -129,7 +132,7 @@ export function parseDvbv5ZapCommand(command: string, dvbDevicePath?: string): D
     if (!flags.has("P")) {
         throw new Error("`-P` is required");
     }
-    if (values.I !== undefined && values.I.toUpperCase() !== "DVBV5") {
+    if (values.I !== undefined && toAsciiUpperCase(values.I) !== "DVBV5") {
         throw new Error(`unsupported input format \`${values.I}\``);
     }
     if (values.o !== undefined && values.o !== "-") {
@@ -156,7 +159,7 @@ export function parseDvbv5ZapCommand(command: string, dvbDevicePath?: string): D
             throw new Error(`unknown LNBf \`${values.l}\``);
         }
     }
-    if (values.S !== undefined && /^-?\d+$/.test(values.S) === false) {
+    if (values.S !== undefined && /^-?(0|[1-9]\d{0,8})$/.test(values.S) === false) {
         throw new Error(`invalid value of \`-S ${values.S}\``);
     }
 
@@ -166,6 +169,8 @@ export function parseDvbv5ZapCommand(command: string, dvbDevicePath?: string): D
         demux,
         dvr,
         channelsConfPath: path.resolve(values.c),
+        // dvbv5-zap は -o も -r と同じく dvr から読むため、周波数では探さない
+        channelByFrequency: flags.has("r") === false && values.o === undefined,
         lnb,
         satNumber: values.S === undefined ? -1 : parseInt(values.S, 10),
         diseqcWait: parseIndex("W", values.W),
@@ -176,16 +181,16 @@ export function parseDvbv5ZapCommand(command: string, dvbDevicePath?: string): D
 
 /** `-w` の値 (on, off, auto または数値。dvbv5-zap と同じく 0 は off、正は on、負は auto) */
 function parseLna(value: string | undefined): number {
-    if (value === undefined || value.toLowerCase() === "auto") {
+    if (value === undefined || toAsciiLowerCase(value) === "auto") {
         return LNA_AUTO;
     }
-    if (value.toLowerCase() === "on") {
+    if (toAsciiLowerCase(value) === "on") {
         return 1;
     }
-    if (value.toLowerCase() === "off") {
+    if (toAsciiLowerCase(value) === "off") {
         return 0;
     }
-    if (/^-?\d+$/.test(value) === false) {
+    if (isDecimal(value.replace(/^-/, "")) === false) {
         throw new Error(`invalid value of \`-w ${value}\``);
     }
     const n = parseInt(value, 10);
@@ -212,8 +217,13 @@ function parseIndex(short: string, value: string | undefined): number {
     if (value === undefined) {
         return 0;
     }
-    if (/^\d+$/.test(value) === false) {
+    if (isDecimal(value) === false) {
         throw new Error(`invalid value of \`-${short} ${value}\``);
     }
     return parseInt(value, 10);
+}
+
+// dvbv5-zap は数値を strtoul(value, NULL, 0) で読むため、8 進数と読む先頭の 0 と、int に収まらない桁数は受け付けない
+function isDecimal(value: string): boolean {
+    return /^(0|[1-9]\d{0,8})$/.test(value);
 }

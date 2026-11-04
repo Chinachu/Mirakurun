@@ -16,6 +16,14 @@
 Buffer.poolSize = 0; // disable memory pool
 
 require("dotenv").config();
+
+// DVB デバイスの ioctl と dvr の読み出しは libuv のスレッドプールで実行するため、既定の 4 から増やす
+// (複数のチューナーを同時に選局する間も、配信中の読み出しを待たせないため。スレッドプールを使う前に設定する)
+// (.env で指定した値を優先するため、dotenv の後に設定する)
+if (!process.env.UV_THREADPOOL_SIZE) {
+    process.env.UV_THREADPOOL_SIZE = "16";
+}
+
 import { execSync } from "child_process";
 import { createHash } from "crypto";
 

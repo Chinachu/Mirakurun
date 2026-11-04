@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { EventEmitter } = require("events");
+const child_process = require("child_process");
 
 // status.ts のタイマーでテストのプロセスが終了しなくなるため差し替える
 const statusPath = path.join(__dirname, "../lib/Mirakurun/status.js");
@@ -49,13 +50,25 @@ class FakeDvb extends EventEmitter {
       return new Promise((resolve, reject) => this.pendings.push({ resolve, reject }));
     });
   }
+  // チャンネル設定ファイルを非同期で読んでから start() を呼ぶため、呼ばれるまで待つ (呼ばれない場合は止まらずに失敗する)
+  // (設定ファイルはスレッドプールで読むため、回数ではなく時間で区切る。setTimeout は mock.timers で止めているため使わない)
+  async waitStart() {
+    const startedAt = performance.now();
+    while (this.pendings.length === 0) {
+      if (performance.now() - startedAt > 5000) {
+        throw new Error("start() has not been called");
+      }
+      await flush();
+    }
+  }
+
   async resolveStart() {
-    await flush();
+    await this.waitStart();
     this.pendings.shift().resolve();
     await flush();
   }
   async rejectStart(err) {
-    await flush();
+    await this.waitStart();
     this.pendings.shift().reject(err);
     await flush();
   }
@@ -267,7 +280,8 @@ describe("[tunerdevice-dvb.spec] TunerDevice.ts: DVB device direct access", () =
     const [device, dvb] = createDevice();
     const low = fakeStream();
     const started = device.startStream(user("low", 0), low, channel("27"));
-    await flush();
+    // 選局の途中 (start() の完了待ち) で横取りする
+    await dvb.waitStart();
 
     const switched = device.startStream(user("high", 1), fakeStream(), channel("26"));
     await dvb.resolveStart();
@@ -297,6 +311,12 @@ describe("[tunerdevice-dvb.spec] TunerDevice.ts: DVB device direct access", () =
     await started;
 
     dvb.emit("error", Object.assign(new Error("read ENODEV"), { code: "ENODEV" }));
+    await flush();
+    // 失敗し続ける場合に待たずに選局し直し続けないよう、待ってから選局し直す
+    mock.timers.tick(999);
+    await flush();
+    assert.deepStrictEqual(dvb.calls, [["start", 557142857], ["close"]]);
+    mock.timers.tick(1);
     await dvb.resolveStart();
     assert.deepStrictEqual(dvb.calls, [["start", 557142857], ["close"], ["start", 557142857]]);
 
@@ -307,9 +327,16 @@ describe("[tunerdevice-dvb.spec] TunerDevice.ts: DVB device direct access", () =
 
     // 選局し直した後に再び失敗した場合も、同じく選局し直す
     dvb.emit("error", Object.assign(new Error("read ENODEV"), { code: "ENODEV" }));
+    await flush();
+    mock.timers.tick(1000);
     await dvb.resolveStart();
     assert.deepStrictEqual(dvb.calls.slice(3), [["close"], ["start", 557142857]]);
     assert.strictEqual(stream.ended, false);
+
+    // 選局し直した後は、他のユーザーも合流できる
+    assert.strictEqual(device.isAvailable, true);
+    await device.startStream(user("b"), fakeStream(), channel("27"));
+    assert.deepStrictEqual(device.users.map(u => u.id), ["a", "b"]);
   });
 
   it("releases once when stopped while reopening after a read error", async () => {
@@ -329,6 +356,172 @@ describe("[tunerdevice-dvb.spec] TunerDevice.ts: DVB device direct access", () =
     assert.strictEqual(stream.ended, true);
     assert.strictEqual(device.isFree, true);
     assert.deepStrictEqual(dvb.calls, [["start", 557142857], ["close"], ["stopStream"]]);
+  });
+
+  it("does not retune when stopped while waiting to retune after a read error", async () => {
+    const [device, dvb] = createDevice();
+    const stream = fakeStream();
+    const started = device.startStream(user("a"), stream, channel("27"));
+    await dvb.resolveStart();
+    await started;
+
+    let released = 0;
+    device.on("release", () => ++released);
+    dvb.emit("error", Object.assign(new Error("read ENODEV"), { code: "ENODEV" }));
+    await flush();
+    await device.kill();
+    mock.timers.tick(1000);
+    await flush();
+
+    assert.strictEqual(released, 1);
+    assert.strictEqual(stream.ended, true);
+    assert.strictEqual(device.isFree, true);
+    assert.deepStrictEqual(dvb.calls, [["start", 557142857], ["close"], ["stopStream"]]);
+  });
+
+  it("runs the command only for the tuning when the channels file can not be used after start", async () => {
+    const changedConfPath = path.join(dir, "changed.conf");
+    fs.copyFileSync(confPath, changedConfPath);
+    const [device, dvb] = createDevice();
+    device._dvbChannelsConfPath = changedConfPath;
+    const started = device.startStream(user("a"), fakeStream(), channel("27"));
+    await dvb.resolveStart();
+    await started;
+    await device.kill();
+
+    fs.writeFileSync(changedConfPath, "[27]\n\tDELIVERY_SYSTEM = ISDBT\n\tMODULATION = QAM/AUTO\n");
+    fs.utimesSync(changedConfPath, new Date(), new Date(Date.now() + 1000));
+    const processes = [];
+    const spawn = mock.method(child_process, "spawn", (command, args) => {
+      const p = new EventEmitter();
+      p.pid = 1000 + processes.length;
+      p.stdout = new EventEmitter();
+      p.stderr = new EventEmitter();
+      p.kill = () => p.emit("close", null, "SIGTERM");
+      processes.push([command, ...args]);
+      return p;
+    });
+    try {
+      await device.startStream(user("b"), fakeStream(), channel("27"));
+    } finally {
+      spawn.mock.restore();
+    }
+
+    assert.deepStrictEqual(dvb.calls, [["start", 557142857], ["stopStream"], ["close"]]);
+    assert.deepStrictEqual(processes, [["recpt1", "27", "-", "-"]]);
+    assert.strictEqual(device.pid, 1000);
+
+    // コマンドを止めた後に設定ファイルを直せば、次の選局は DVB デバイスを直接操作する
+    const killed = device.kill();
+    mock.timers.tick(100);
+    await killed;
+    fs.copyFileSync(confPath, changedConfPath);
+    fs.utimesSync(changedConfPath, new Date(), new Date(Date.now() + 2000));
+    const restarted = device.startStream(user("c"), fakeStream(), channel("26"));
+    await dvb.resolveStart();
+    await restarted;
+    assert.deepStrictEqual(dvb.calls.slice(3), [["start", 551142857]]);
+    assert.strictEqual(device.pid, null);
+  });
+
+  it("does not close the frontend of a newer tuning when reading the channels file fails late", async () => {
+    const conf = require("../lib/Mirakurun/dvb/DvbChannelConf");
+    const [device, dvb] = createDevice();
+    let rejectFirst;
+    let reads = 0;
+    const read = mock.method(conf, "readChannelsConf", () => {
+      if (++reads === 1) {
+        return new Promise((resolve, reject) => rejectFirst = reject);
+      }
+      return Promise.resolve(conf.loadChannelsConf(confPath));
+    });
+    try {
+      const low = device.startStream(user("low", 0), fakeStream(), channel("27"));
+      await flush();
+
+      // 設定を読む間に、優先度の高いユーザーが別のチャンネルを選局する
+      const high = device.startStream(user("high", 1), fakeStream(), channel("26"));
+      await dvb.resolveStart();
+      await high;
+
+      // 後から前の選局の読み込みが失敗しても、新しい選局の frontend は閉じない
+      rejectFirst(new Error("unsupported property"));
+      await low;
+      await flush();
+      assert.deepStrictEqual(dvb.calls, [["stopStream"], ["start", 551142857]]);
+      assert.deepStrictEqual(device.users.map(u => u.id), ["high"]);
+      assert.strictEqual(device.channel.channel, "26");
+    } finally {
+      read.mock.restore();
+    }
+  });
+
+  it("ends the users who joined when the command can not be started instead", async () => {
+    const brokenConfPath = path.join(dir, "broken.conf");
+    fs.writeFileSync(brokenConfPath, "[27]\n\tDELIVERY_SYSTEM = ISDBT\n\tMODULATION = QAM/AUTO\n");
+    const [device, dvb] = createDevice();
+    device._dvbChannelsConfPath = brokenConfPath;
+    const spawn = mock.method(child_process, "spawn", () => {
+      throw new TypeError("The argument 'file' must be a string without null bytes");
+    });
+    try {
+      const a = fakeStream();
+      const b = fakeStream();
+      const started = device.startStream(user("a"), a, channel("27"));
+      // 設定ファイルを読む間に合流する
+      const joined = device.startStream(user("b"), b, channel("27"));
+      await assert.rejects(started, /null bytes/);
+      await joined;
+      await flush();
+
+      assert.strictEqual(a.ended, true);
+      assert.strictEqual(b.ended, true);
+      assert.deepStrictEqual(device.users, []);
+      assert.strictEqual(device.isFree, true);
+      assert.strictEqual(device.command, null);
+      assert.deepStrictEqual(dvb.calls, [["close"]]);
+    } finally {
+      spawn.mock.restore();
+    }
+  });
+
+  it("releases once when the command fails to start (error and close)", async () => {
+    const device = new TunerDevice(8, { name: "command", types: ["GR"], command: "recpt1 <channel> - -" });
+    let spawned = 0;
+    const spawn = mock.method(child_process, "spawn", () => {
+      const p = new EventEmitter();
+      p.stdout = new EventEmitter();
+      p.stderr = new EventEmitter();
+      p.kill = () => {};
+      ++spawned;
+      // Node と同じく、起動できない場合は "error" の後に "close" も発生する
+      process.nextTick(() => {
+        p.emit("error", Object.assign(new Error("spawn recpt1 ENOENT"), { code: "ENOENT" }));
+        p.emit("close", -2, null);
+      });
+      return p;
+    });
+    try {
+      const stream = fakeStream();
+      await device.startStream(user("a"), stream, channel("27"));
+      await flush();
+      mock.timers.tick(100);
+      await flush();
+      // 後処理が 2 回あると、1 回の失敗で 2 回起動し直す
+      assert.strictEqual(spawned, 2);
+
+      mock.timers.tick(100);
+      await flush();
+      assert.strictEqual(spawned, 3);
+      // 3 回失敗すると故障として扱い、ユーザーを終了させる
+      mock.timers.tick(100);
+      await flush();
+      assert.strictEqual(spawned, 3);
+      assert.strictEqual(stream.ended, true);
+      assert.strictEqual(device.isFault, true);
+    } finally {
+      spawn.mock.restore();
+    }
   });
 
   it("uses the command when the channels file can not be used", () => {

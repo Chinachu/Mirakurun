@@ -66,6 +66,7 @@
     },
     "no-empty-interface": true,
     "no-eval": true,
+    "no-implicit-dependencies": [true, "optional"],
     "no-internal-module": true,
     "no-invalid-this": false,
     "no-misused-new": true,

@@ -28,7 +28,7 @@ import TSFilter from "./TSFilter";
 import Client, { ProgramsQuery } from "../client";
 import type DvbDevice from "./dvb/DvbDevice";
 import { parseDvbv5ZapCommand } from "./dvb/dvbv5-zap";
-import { getChannelParams, loadChannelsConf } from "./dvb/DvbChannelConf";
+import { DvbChannels, findChannelParams, loadChannelsConf, readChannelsConf } from "./dvb/DvbChannelConf";
 
 /** 出力をまとめて書き出すまでに保留する入力の上限 (バイト数とミリ秒) */
 const FLUSH_BYTES = 128 * 1024;
@@ -38,6 +38,8 @@ const FLUSH_INTERVAL = 50;
 const END_STREAM_DELAY = 3000;
 /** DVB デバイスを直接操作する場合に、止めてから frontend を閉じるまでの時間 (ミリ秒) */
 const DVB_CLOSE_DELAY = 1000;
+/** DVB デバイスの読み出しに失敗した場合に、閉じてから選局し直すまでの時間 (ミリ秒。コマンドのプロセスが終了した場合と同じ) */
+const DVB_RESPAWN_DELAY = 1000;
 /** DVB デバイスを開けない場合のうち、デバイスがないことを示すエラー */
 const DVB_MISSING_DEVICE_ERRORS = ["ENOENT", "ENODEV", "ENXIO"];
 
@@ -94,7 +96,8 @@ export default class TunerDevice extends EventEmitter {
     // dvbv5-zap のコマンドの代わりに、DVB デバイスを直接操作する場合
     private _dvb: DvbDevice = null;
     private _dvbChannelsConfPath: string = null;
-    // 選局してから止めるまでの間 (コマンドのプロセスがある間に相当)
+    private _dvbChannelByFrequency = false;
+    // DVB デバイスで選局してから止めるまでの間 (コマンドのプロセスがある間に相当)
     private _dvbActive = false;
     // 選局の途中で止めた場合に、選局の結果を無視するための世代
     private _dvbGeneration = 0;
@@ -179,7 +182,7 @@ export default class TunerDevice extends EventEmitter {
     }
 
     private get _isRunning(): boolean {
-        return this._dvb !== null ? this._dvbActive : this._stream !== null;
+        return this._dvbActive || this._stream !== null;
     }
 
     getPriority(): number {
@@ -329,7 +332,8 @@ export default class TunerDevice extends EventEmitter {
             // 読めないチャンネル設定ファイルでは選局のたびに失敗するため、先に読んで確かめる
             loadChannelsConf(options.channelsConfPath);
         } catch (err) {
-            log.info("TunerDevice#%d uses the command instead of DVB device direct access (%s)", this._index, err.message);
+            // dvbv5-zap なのにコマンドを実行する場合は、選局が遅くなるため警告する
+            log.warn("TunerDevice#%d uses the command instead of DVB device direct access (%s)", this._index, err.message);
             return;
         }
 
@@ -340,6 +344,7 @@ export default class TunerDevice extends EventEmitter {
 
         this._dvb = new DvbDeviceClass(options);
         this._dvbChannelsConfPath = options.channelsConfPath;
+        this._dvbChannelByFrequency = options.channelByFrequency;
         this._dvb.on("data", this._streamOnData.bind(this));
         this._dvb.on("overflow", () => {
             log.warn("TunerDevice#%d DVB device buffer overflow", this._index);
@@ -353,7 +358,10 @@ export default class TunerDevice extends EventEmitter {
         if (this._dvb !== null) {
             return this._spawnDvb(ch);
         }
+        return this._spawnCommand(ch);
+    }
 
+    private async _spawnCommand(ch: ChannelItem): Promise<void> {
         log.debug("TunerDevice#%d spawn...", this._index);
 
         if (this._process) {
@@ -419,6 +427,17 @@ export default class TunerDevice extends EventEmitter {
 
         this._process.once("exit", () => this._exited = true);
 
+        // 起動に失敗した場合は "error" の後に "close" も発生するため、後処理は 1 回だけにする
+        let ended = false;
+        const end = () => {
+            if (ended) {
+                return;
+            }
+            ended = true;
+            this._end();
+            setTimeout(this._release.bind(this), this._config.dvbDevicePath ? 1000 : 100);
+        };
+
         this._process.once("error", (err) => {
             log.fatal("TunerDevice#%d process error `%s` (pid=%d)", this._index, err.name, this._process.pid);
 
@@ -429,8 +448,7 @@ export default class TunerDevice extends EventEmitter {
                 this._isFault = true;
                 this._closing = true;
             }
-            this._end();
-            setTimeout(this._release.bind(this), this._config.dvbDevicePath ? 1000 : 100);
+            end();
         });
 
         this._process.once("close", (code, signal) => {
@@ -439,8 +457,7 @@ export default class TunerDevice extends EventEmitter {
                 this._index, code, signal, this._process.pid
             );
 
-            this._end();
-            setTimeout(this._release.bind(this), this._config.dvbDevicePath ? 1000 : 100);
+            end();
         });
 
         this._process.stderr.on("data", data => {
@@ -471,8 +488,20 @@ export default class TunerDevice extends EventEmitter {
         this._updated();
 
         const generation = ++this._dvbGeneration;
+        let channels: DvbChannels;
         try {
-            await this._dvb.start(getChannelParams(ch.type, ch.channel, this._dvbChannelsConfPath));
+            channels = await readChannelsConf(this._dvbChannelsConfPath);
+        } catch (err) {
+            // 起動後にチャンネル設定ファイルを読めなくなった場合は、その選局だけコマンドを実行する (次の選局で読み直す)
+            return this._spawnCommandInsteadOfDvb(ch, generation, err);
+        }
+
+        try {
+            // 設定を読む間に止めた場合は、止めた側で後処理している
+            if (generation !== this._dvbGeneration) {
+                return;
+            }
+            await this._dvb.start(findChannelParams(channels, ch.channel, this._dvbChannelsConfPath, this._dvbChannelByFrequency));
         } catch (err) {
             // 選局の途中で止めた場合は、止めた側で後処理している
             if (generation === this._dvbGeneration) {
@@ -505,6 +534,31 @@ export default class TunerDevice extends EventEmitter {
         }
     }
 
+    private async _spawnCommandInsteadOfDvb(ch: ChannelItem, generation: number, err: Error): Promise<void> {
+        // 設定を読む間に止めた場合は、止めた側で後処理している (後から始めた選局の frontend を閉じないよう、閉じる前に確かめる)
+        if (generation !== this._dvbGeneration) {
+            return;
+        }
+        log.warn("TunerDevice#%d uses the command for this tuning because the channels file can not be used (%s)", this._index, err.message);
+        // コマンドが DVB デバイスを開けるよう、frontend を閉じる
+        await this._dvb.close().catch(log.error);
+        // 閉じる間に止めた場合は、止めた側で後処理している
+        if (generation !== this._dvbGeneration) {
+            return;
+        }
+
+        this._dvbActive = false;
+        try {
+            await this._spawnCommand(ch);
+        } catch (err) {
+            // 選局に失敗した場合と同じく、選局の間に合流したユーザーも終了させる
+            this._closing = true;
+            this._end();
+            this._release();
+            throw err;
+        }
+    }
+
     private _dvbOnError(err: Error): void {
         log.error("TunerDevice#%d DVB device read error `%s`", this._index, err.message);
 
@@ -523,7 +577,15 @@ export default class TunerDevice extends EventEmitter {
                 return;
             }
             this._end();
-            this._release();
+
+            // 読み出しに失敗し続ける場合に、待たずに選局し直し続けないよう、待ってから選局し直す
+            setTimeout(() => {
+                // 待つ間に止めた場合は、止めた側で後処理している
+                if (generation !== this._dvbGeneration) {
+                    return;
+                }
+                this._release();
+            }, DVB_RESPAWN_DELAY);
         });
     }
 
@@ -534,9 +596,9 @@ export default class TunerDevice extends EventEmitter {
         }
 
         // 入力のたびに書き出さず、全ストリームの出力をまとめて書き出す (書き出しの回数を減らすため)
-        // (選局や合流の直後は、最初の PAT を含む出力を遅らせないため、出力を始めるまですぐに書き出す)
+        // (選局や合流の直後に最初の出力を遅らせないよう、出力を始めるまでは TSFilter がすぐに書き出す)
         for (const user of this._users) {
-            user._stream.write(chunk, user._stream.streamStarted);
+            user._stream.write(chunk, true);
         }
 
         this._pendingBytes += chunk.length;
@@ -577,7 +639,7 @@ export default class TunerDevice extends EventEmitter {
     private async _kill(close: boolean): Promise<void> {
         log.debug("TunerDevice#%d kill...", this._index);
 
-        if (this._dvb !== null ? this._dvbActive === false : (!this._process || !this._process.pid)) {
+        if (this._dvbActive === false && (!this._process || !this._process.pid)) {
             throw new Error(util.format("TunerDevice#%d has not process", this._index));
         } else if (this._closing) {
             log.debug("TunerDevice#%d return because it is closing", this._index);
@@ -590,7 +652,7 @@ export default class TunerDevice extends EventEmitter {
         this._updated();
 
         const killedAt = Date.now();
-        if (this._dvb !== null) {
+        if (this._dvbActive) {
             // 選局し直す場合に備えて、frontend は開いたまま配信だけを止める
             ++this._dvbGeneration;
             await this._dvb.stopStream().catch(log.error);
@@ -628,6 +690,7 @@ export default class TunerDevice extends EventEmitter {
             this._stream.removeAllListeners();
         }
 
+        const dvbReleased = this._dvbActive;
         this._command = null;
         this._process = null;
         this._stream = null;
@@ -637,13 +700,26 @@ export default class TunerDevice extends EventEmitter {
             log.warn("TunerDevice#%d respawning because request has not closed", this._index);
             ++status.errorCount.tunerDeviceRespawn;
 
-            // 失敗した場合は _spawn() の中で後処理している
-            this._spawn(this._channel).catch(err => log.error("TunerDevice#%d respawn failed `%s`", this._index, err.message));
+            // 残ったユーザーが使い続けるため、_end() で使用不可にしたチューナーを戻す (他のユーザーも合流できるように)
+            if (this._isFault === false) {
+                this._isAvailable = true;
+            }
+
+            this._spawn(this._channel).catch(err => {
+                log.error("TunerDevice#%d respawn failed `%s`", this._index, err.message);
+
+                // DVB デバイスの選局に失敗した場合は _spawnDvb() の中で後処理しているため、コマンドを起動できずにユーザーが残った場合だけ終了させる
+                if (this._isRunning === false && this._users.size !== 0 && this._closing === false) {
+                    this._closing = true;
+                    this._end();
+                    this._release();
+                }
+            });
             return;
         }
 
         // DVB デバイスを直接操作する場合は、選局に成功した時点で戻す (選局の失敗を数え続けるため)
-        if (this._dvb === null) {
+        if (dvbReleased === false) {
             this._fatalCount = 0;
         }
         this._channel = null;

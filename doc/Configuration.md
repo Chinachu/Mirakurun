@@ -104,13 +104,16 @@
 
 #### DVB device direct access
 
-If `command` is `dvbv5-zap`, Mirakurun tunes by accessing the DVB device directly instead of running the command. Tuning is faster because it does not wait for the process to start and exit.
+If `command` is `dvbv5-zap`, Mirakurun tunes by accessing the DVB device directly instead of running the command. Tuning is faster because it does not wait for the process to start and exit. The command is judged by its file name, so a wrapper script named `dvbv5-zap` is not run either.
 
-- The values of `-a`, `-f`, `-d` and `-c` are used. `-P` is required. `-r`, `-o -`, `-s`, `-v` and `-N` are ignored.
+- The values of `-a`, `-f`, `-d` and `-c` are used. `-c` and `-P` are required, and the only argument other than options must be `<channel>`. `-I DVBV5` and the long forms of these options (such as `--adapter`) can also be used. Numbers must be decimal without leading zeros. `-r`, `-o -`, `-s`, `-v` and `-N` are ignored.
 - For satellite, the LNBf (`-l`), DiSEqC (`-S`, `-W`), SCR/Unicable (`-U`) and `LNB`, `POLARIZATION`, `SAT_NUMBER` in the channels file are handled the same as `dvbv5-zap` (frequency conversion, LNB power, 22kHz tone and DiSEqC). Without the LNBf, the frequency is used as is and the LNB power is not turned on.
 - LNA (`-w`) is set the same as `dvbv5-zap` regardless of the delivery system.
-- If any other option (such as `-t`) is specified, `dvbDevicePath` is not the dvr of `-a` and `-d`, or the channels file of `-c` has unsupported properties, the command is run as before.
+- If any other option (such as `-t`) is specified, `dvbDevicePath` is not the dvr of `-a` and `-d`, or the channels file of `-c` has unsupported or duplicate properties, the command is run as before. Each channel requires `FREQUENCY`. Lines that libdvbv5 reads differently (no space before `=`, trailing spaces in a value, CRLF line endings) are also unsupported.
+- If the channels file can no longer be read after start (e.g. an unsupported property is added), the command is run for that tuning only.
 - Supported delivery systems are ISDB-T and ISDB-S.
+- While tuning directly, `command` of the tuner in the API is `/dev/dvb/adapter<n> <channel>` and `pid` is `null`. The frontend is kept open for 1 second after the tuner is released, to tune again quickly.
+- If the tuning fails (e.g. the device can not be opened or the channel is not found), the stream request fails instead of retrying. If the device can not be opened 3 times in a row because it does not exist, the tuner is treated as faulty and is not used until Mirakurun is restarted (a restart is also required after reconnecting a USB tuner).
 - Set `disableDvbDirect: true` to run the command as before.
 
 #### decoder

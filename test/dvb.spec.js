@@ -57,6 +57,70 @@ describe("[dvb.spec] DvbChannelConf.ts: parseDvbv5ChannelsConf()", () => {
     assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = ISDBS\n POLARIZATION = X\n"), /unsupported property POLARIZATION/);
   });
 
+  it("rejects channels that libdvbv5 would tune differently", () => {
+    // 同じ項目の重複 (libdvbv5 は項目によって先の値と後の値のどちらかを使う)
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = ISDBS\n FREQUENCY = 1\n FREQUENCY = 2\n"), /duplicate property FREQUENCY/);
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = ISDBS\n DELIVERY_SYSTEM = ISDBT\n FREQUENCY = 1\n"), /duplicate property DELIVERY_SYSTEM/);
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = ISDBS\n"), /FREQUENCY is missing/);
+    // libdvbv5 は 32 ビットに収まらない値を切り詰める
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = ISDBS\n FREQUENCY = 4294967296\n"), /unsupported property FREQUENCY/);
+    // libdvbv5 は `=` の前の最後の 1 文字を消すため、`=` の前に空白がないとキーが変わる
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = ISDBS\n FREQUENCY=1049480\n"), /invalid line/);
+    // libdvbv5 は値の末尾の空白と CR を除かない
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = ISDBS\n FREQUENCY = 1049480\n VCHANNEL = 101 \n"), /invalid value of VCHANNEL/);
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\r\n DELIVERY_SYSTEM = ISDBS\r\n FREQUENCY = 1049480\r\n"), /invalid value of DELIVERY_SYSTEM/);
+    // 帯域幅がなければ、libdvbv5 と同じく既定値で選局する
+    assert.deepStrictEqual(conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = ISDBT\n FREQUENCY = 557142857\n").get("1").properties, [[DTV.FREQUENCY, 557142857]]);
+    // libdvbv5 は空の名前をエラーにする
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[]\n DELIVERY_SYSTEM = ISDBS\n FREQUENCY = 1\n"), /invalid line/);
+  });
+
+  it("finds the channel by VCHANNEL and frequency in the same way as dvbv5-zap", () => {
+    const channels = conf.parseDvbv5ChannelsConf([
+      "[CHANNEL]", " DELIVERY_SYSTEM = ISDBS", " FREQUENCY = 1049480", " VCHANNEL = 101",
+      "[ NHK BS1]x", " DELIVERY_SYSTEM = ISDBS", " FREQUENCY = 1087840",
+      "[101]", " DELIVERY_SYSTEM = ISDBS", " FREQUENCY = 1",
+      "[2]", " DELIVERY_SYSTEM = ISDBS", " FREQUENCY = 2"
+    ].join("\n"));
+
+    // 名前か VCHANNEL が一致する最初のチャンネル (`[CHANNEL]` は名前なし、名前は `]` まで、先頭の空白を除く)
+    assert.deepStrictEqual(conf.findChannelParams(channels, "101", "ch.conf").properties, [[DTV.FREQUENCY, 1049480]]);
+    assert.strictEqual(channels.get("CHANNEL"), undefined);
+    assert.deepStrictEqual(conf.findChannelParams(channels, "nhk bs1", "ch.conf").properties, [[DTV.FREQUENCY, 1087840]]);
+
+    // `-r` がない場合は、数値として読んだ値と周波数が一致するチャンネルも探す
+    assert.throws(() => conf.findChannelParams(channels, "1087840", "ch.conf"), /not found/);
+    assert.deepStrictEqual(conf.findChannelParams(channels, "1087840", "ch.conf", true).properties, [[DTV.FREQUENCY, 1087840]]);
+    assert.deepStrictEqual(conf.findChannelParams(channels, " 1087840abc", "ch.conf", true).properties, [[DTV.FREQUENCY, 1087840]]);
+    assert.deepStrictEqual(conf.findChannelParams(channels, "4294967298", "ch.conf", true).properties, [[DTV.FREQUENCY, 2]]);
+    assert.throws(() => conf.findChannelParams(channels, "0", "ch.conf", true), /not found/);
+    // strcasecmp() と isspace() と同じく、ASCII 以外の文字は区別し、空白として扱わない
+    const wide = conf.parseDvbv5ChannelsConf("[ＮＨＫ]\n DELIVERY_SYSTEM = ISDBS\n FREQUENCY = 1049480\n");
+    assert.throws(() => conf.findChannelParams(wide, "ｎｈｋ", "ch.conf"), /not found/);
+    assert.throws(() => conf.findChannelParams(channels, "\u30001087840", "ch.conf", true), /not found/);
+  });
+
+  it("ignores the service information written by dvbv5-scan", () => {
+    const channels = conf.parseDvbv5ChannelsConf([
+      "[NHK]",
+      "\tSERVICE_ID = 1024",
+      "\tVIDEO_PID = 273",
+      "\tAUDIO_PID = 274 275",
+      "\tPID_0d = 4096",
+      "\tVCHANNEL = 1.1",
+      "\tNETWORK_ID = 32736",
+      "\tTRANSPORT_ID = 32736",
+      "\tFREQUENCY = 557142857",
+      "\tBANDWIDTH_HZ = 6000000",
+      "\tDELIVERY_SYSTEM = ISDBT"
+    ].join("\n"));
+
+    assert.deepStrictEqual(channels.get("NHK"), {
+      deliverySystem: SYS.ISDBT,
+      properties: [[DTV.FREQUENCY, 557142857], [DTV.BANDWIDTH_HZ, 6000000]]
+    });
+  });
+
   it("parses LNB settings", () => {
     const channels = conf.parseDvbv5ChannelsConf([
       "[BS01_0]",
@@ -83,13 +147,51 @@ describe("[dvb.spec] DvbChannelConf.ts: parseDvbv5ChannelsConf()", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mirakurun-dvbconf-"));
     try {
       const file = path.join(dir, "channels.conf");
-      fs.writeFileSync(file, "[27]\n DELIVERY_SYSTEM = ISDBT\n FREQUENCY = 557142857\n");
+      fs.writeFileSync(file, "[27]\n DELIVERY_SYSTEM = ISDBT\n FREQUENCY = 557142857\n BANDWIDTH_HZ = 6000000\n");
       const channels = conf.loadChannelsConf(file);
       assert.strictEqual(conf.loadChannelsConf(file), channels);
 
       fs.writeFileSync(file, "[27]\n DELIVERY_SYSTEM = ISDBT\n MODULATION = QAM/AUTO\n");
       fs.utimesSync(file, new Date(), new Date(Date.now() + 1000));
       assert.throws(() => conf.loadChannelsConf(file), /unsupported property MODULATION/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("reloads the file replaced with the same modification time", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mirakurun-dvbconf-"));
+    try {
+      const file = path.join(dir, "channels.conf");
+      const mtime = new Date(Date.now() - 60000);
+      fs.writeFileSync(file, "[27]\n DELIVERY_SYSTEM = ISDBT\n FREQUENCY = 557142857\n BANDWIDTH_HZ = 6000000\n");
+      fs.utimesSync(file, mtime, mtime);
+      assert.deepStrictEqual(conf.loadChannelsConf(file).get("27").properties, [[DTV.FREQUENCY, 557142857], [DTV.BANDWIDTH_HZ, 6000000]]);
+
+      // `cp -p` と同じく、更新日時を保ったまま置き換える
+      const replaced = path.join(dir, "replaced.conf");
+      fs.writeFileSync(replaced, "[27]\n DELIVERY_SYSTEM = ISDBT\n FREQUENCY = 551142857\n BANDWIDTH_HZ = 6000000\n");
+      fs.utimesSync(replaced, mtime, mtime);
+      fs.renameSync(replaced, file);
+      assert.deepStrictEqual(conf.loadChannelsConf(file).get("27").properties, [[DTV.FREQUENCY, 551142857], [DTV.BANDWIDTH_HZ, 6000000]]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("reads the file asynchronously with the same cache", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mirakurun-dvbconf-"));
+    try {
+      const file = path.join(dir, "channels.conf");
+      fs.writeFileSync(file, "[27]\n DELIVERY_SYSTEM = ISDBT\n FREQUENCY = 557142857\n BANDWIDTH_HZ = 6000000\n");
+      const channels = await conf.readChannelsConf(file);
+      assert.strictEqual(conf.loadChannelsConf(file), channels);
+      assert.deepStrictEqual(conf.findChannelParams(channels, "27", file).properties, [[DTV.FREQUENCY, 557142857], [DTV.BANDWIDTH_HZ, 6000000]]);
+      assert.throws(() => conf.findChannelParams(channels, "26", file), /not found/);
+
+      fs.writeFileSync(file, "[27]\n DELIVERY_SYSTEM = ISDBT\n MODULATION = QAM/AUTO\n");
+      fs.utimesSync(file, new Date(), new Date(Date.now() + 1000));
+      await assert.rejects(conf.readChannelsConf(file), /unsupported property MODULATION/);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -107,24 +209,23 @@ describe("[dvb.spec] DvbChannelConf.ts: parseDvbv5ChannelsConf()", () => {
       ].join("\n"));
 
       // 同じ名前は先のもの、見つからなければ大文字と小文字を区別しない
-      assert.deepStrictEqual(conf.getChannelParams("BS", "BS01_0", file).properties, [[DTV.FREQUENCY, 1049480]]);
-      assert.deepStrictEqual(conf.getChannelParams("BS", "bs01_0", file).properties, [[DTV.FREQUENCY, 1049480]]);
-      assert.deepStrictEqual(conf.getChannelParams("BS", "BS03_0", file).properties, [[DTV.FREQUENCY, 2]]);
-      assert.deepStrictEqual(conf.getChannelParams("BS", "Bs03_0", file).properties, [[DTV.FREQUENCY, 1087840]]);
+      const channels = conf.loadChannelsConf(file);
+      assert.deepStrictEqual(conf.findChannelParams(channels, "BS01_0", file).properties, [[DTV.FREQUENCY, 1049480]]);
+      assert.deepStrictEqual(conf.findChannelParams(channels, "bs01_0", file).properties, [[DTV.FREQUENCY, 1049480]]);
+      assert.deepStrictEqual(conf.findChannelParams(channels, "BS03_0", file).properties, [[DTV.FREQUENCY, 2]]);
+      assert.deepStrictEqual(conf.findChannelParams(channels, "Bs03_0", file).properties, [[DTV.FREQUENCY, 1087840]]);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("does not support SKY", () => {
-    assert.throws(() => conf.getDefaultConfPath("SKY"), /not supported/);
-  });
-
-  const confExists = fs.existsSync(conf.getDefaultConfPath("GR"));
-  it("loads dvbconf-for-isdb", { skip: !confExists && "config/dvbconf-for-isdb is not checked out" }, () => {
-    assert.deepStrictEqual(conf.getChannelParams("GR", "27").properties, [[DTV.FREQUENCY, 557142857], [DTV.BANDWIDTH_HZ, 6000000]]);
-    assert.strictEqual(conf.getChannelParams("BS", "BS01_0").deliverySystem, SYS.ISDBS);
-    assert.throws(() => conf.getChannelParams("GR", "99"), /not found/);
+  const confDir = path.join(__dirname, "../config/dvbconf-for-isdb/conf");
+  const isdbt = path.join(confDir, "dvbv5_channels_isdbt.conf");
+  const isdbs = path.join(confDir, "dvbv5_channels_isdbs.conf");
+  it("loads dvbconf-for-isdb", { skip: !fs.existsSync(isdbt) && "config/dvbconf-for-isdb is not checked out" }, () => {
+    assert.deepStrictEqual(conf.findChannelParams(conf.loadChannelsConf(isdbt), "27", isdbt).properties, [[DTV.FREQUENCY, 557142857], [DTV.BANDWIDTH_HZ, 6000000]]);
+    assert.strictEqual(conf.findChannelParams(conf.loadChannelsConf(isdbs), "BS01_0", isdbs).deliverySystem, SYS.ISDBS);
+    assert.throws(() => conf.findChannelParams(conf.loadChannelsConf(isdbt), "99", isdbt), /not found/);
   });
 });
 
@@ -162,6 +263,14 @@ describe("[dvb.spec] linux-dvb.ts", { skip: !isVerifiedArch && "x64 / arm64 only
     } finally {
       fs.closeSync(fd);
     }
+    assert.strictEqual(linuxDvb.getPendingIoctlCount(), 0);
+  });
+
+  it("releases the buffers when the call fails before the ioctl", async () => {
+    const linuxDvb = require("../lib/Mirakurun/dvb/linux-dvb");
+    // 整数に変換できない fd では、koffi が ioctl を呼ばずに例外を投げる
+    await assert.rejects(linuxDvb.ioctl("bad", linuxDvb.requests.FE_GET_PROPERTY, Buffer.alloc(16), [Buffer.alloc(16)]));
+    assert.strictEqual(linuxDvb.getPendingIoctlCount(), 0);
   });
 });
 
@@ -244,6 +353,20 @@ describe("[dvb.spec] DvbDevice.ts: LNB", { skip: !isSupportedArch && `${process.
   });
   after(() => Object.assign(linuxDvb, originals));
 
+  // libdvbv5 (dvbv5-zap) が送る ISDB-T の項目 (dvb-v5-std.c の順と、dvb-file.c の dvbv5_default_value() の値)
+  const isdbtProperties = (frequency, bandwidth) => [
+    [DTV.FREQUENCY, frequency], [DTV.BANDWIDTH_HZ, bandwidth],
+    [6 /* INVERSION */, 2 /* AUTO */], [38 /* GUARD_INTERVAL */, 4 /* AUTO */], [39 /* TRANSMISSION_MODE */, 2 /* AUTO */],
+    [41 /* ISDBT_LAYER_ENABLED */, 7], [18 /* PARTIAL_RECEPTION */, 0], [19 /* SOUND_BROADCASTING */, 0],
+    [20 /* SB_SUBCHANNEL_ID */, 0], [21 /* SB_SEGMENT_IDX */, 0], [22 /* SB_SEGMENT_COUNT */, 0],
+    // 各階層の FEC (AUTO)、変調 (QAM_AUTO)、セグメント数 (-1)、時間インターリーブ (AUTO)
+    [23, 9], [24, 6], [25, 0xFFFFFFFF], [26, 1],
+    [27, 9], [28, 6], [29, 0xFFFFFFFF], [30, 1],
+    [31, 9], [32, 6], [33, 0xFFFFFFFF], [34, 1],
+    [DTV.DELIVERY_SYSTEM, SYS.ISDBT],
+    [DTV.TUNE, 0]
+  ];
+
   function openDevice(options, deliverySystem) {
     calls = [];
     const device = new DvbDevice({ adapter: 0, ...options });
@@ -254,17 +377,17 @@ describe("[dvb.spec] DvbDevice.ts: LNB", { skip: !isSupportedArch && `${process.
 
   it("sets the voltage and tone in the same order as dvbv5-zap", async () => {
     const device = openDevice({ lnb: sat.findLnb("UNIVERSAL"), satNumber: 0, lna: 1 }, SYS.ISDBT);
-    await device._tune({ deliverySystem: SYS.DVBS, properties: [[DTV.FREQUENCY, 12000000], [DTV.SYMBOL_RATE, 27500000]], polarization: sat.POLARIZATION.V });
+    await device._tune({ deliverySystem: SYS.ISDBS, properties: [[DTV.FREQUENCY, 12000000]], polarization: sat.POLARIZATION.V });
 
     assert.deepStrictEqual(calls, [
-      ["setProperties", [[DTV.DELIVERY_SYSTEM, SYS.DVBS]]],
+      ["setProperties", [[DTV.DELIVERY_SYSTEM, SYS.ISDBS]]],
       ["setProperties", [[DTV.LNA, 1]]],
       ["setVoltage", SEC_VOLTAGE.V13],
       ["setTone", SEC_TONE.OFF],
       ["sendDiseqcCommand", [0xE0, 0x10, 0x38, 0xF1]],
       ["sendDiseqcBurst", SEC_MINI.A],
       ["setTone", SEC_TONE.ON],
-      ["setProperties", [[DTV.CLEAR, 0], [DTV.DELIVERY_SYSTEM, SYS.DVBS], [DTV.FREQUENCY, 1400000], [DTV.SYMBOL_RATE, 27500000], [DTV.TUNE, 0]]]
+      ["setProperties", [[DTV.FREQUENCY, 1400000], [DTV.STREAM_ID, 0], [DTV.DELIVERY_SYSTEM, SYS.ISDBS], [DTV.TUNE, 0]]]
     ]);
 
     // 衛星から地上に切り替える場合と、衛星で閉じる場合は給電を止める
@@ -275,7 +398,7 @@ describe("[dvb.spec] DvbDevice.ts: LNB", { skip: !isSupportedArch && `${process.
       ["setVoltage", SEC_VOLTAGE.OFF],
       ["setProperties", [[DTV.DELIVERY_SYSTEM, SYS.ISDBT]]],
       ["setProperties", [[DTV.LNA, 1]]],
-      ["setProperties", [[DTV.CLEAR, 0], [DTV.DELIVERY_SYSTEM, SYS.ISDBT], [DTV.FREQUENCY, 557142857], [DTV.TUNE, 0]]]
+      ["setProperties", isdbtProperties(557142857, 0)]
     ]);
   });
 
@@ -288,7 +411,25 @@ describe("[dvb.spec] DvbDevice.ts: LNB", { skip: !isSupportedArch && `${process.
       ["setVoltage", SEC_VOLTAGE.V18],
       ["setTone", SEC_TONE.OFF],
       ["setTone", SEC_TONE.OFF],
-      ["setProperties", [[DTV.CLEAR, 0], [DTV.DELIVERY_SYSTEM, SYS.ISDBS], [DTV.FREQUENCY, 1049480], [DTV.STREAM_ID, 16400], [DTV.TUNE, 0]]],
+      ["setProperties", [[DTV.FREQUENCY, 1049480], [DTV.STREAM_ID, 16400], [DTV.DELIVERY_SYSTEM, SYS.ISDBS], [DTV.TUNE, 0]]],
+      ["setVoltage", SEC_VOLTAGE.OFF]
+    ]);
+  });
+
+  it("sends the same properties as libdvbv5 without DTV_CLEAR", async () => {
+    const device = openDevice({}, SYS.ISDBT);
+    await device._tune({ deliverySystem: SYS.ISDBT, properties: [[DTV.FREQUENCY, 557142857], [DTV.BANDWIDTH_HZ, 6000000], [DTV.STREAM_ID, 1]] });
+    // ISDB-S で STREAM_ID がない場合は、NO_STREAM_ID_FILTER ではなく libdvbv5 と同じく 0 を送る
+    await device._tune({ deliverySystem: SYS.ISDBS, properties: [[DTV.FREQUENCY, 1049480]] });
+    // 送る項目がわからない伝送方式では、何も設定せずに失敗する
+    await assert.rejects(device._tune({ deliverySystem: SYS.DVBS, properties: [[DTV.FREQUENCY, 12000000]] }), /not supported/);
+    await device.close();
+
+    assert.deepStrictEqual(calls, [
+      // ISDB-T では使わない STREAM_ID は、libdvbv5 と同じく送らない
+      ["setProperties", isdbtProperties(557142857, 6000000)],
+      ["setProperties", [[DTV.DELIVERY_SYSTEM, SYS.ISDBS]]],
+      ["setProperties", [[DTV.FREQUENCY, 1049480], [DTV.STREAM_ID, 0], [DTV.DELIVERY_SYSTEM, SYS.ISDBS], [DTV.TUNE, 0]]],
       ["setVoltage", SEC_VOLTAGE.OFF]
     ]);
   });
@@ -325,7 +466,7 @@ describe("[dvb.spec] DvbDevice.ts: LNB", { skip: !isSupportedArch && `${process.
     await device.close();
 
     assert.deepStrictEqual(calls, [
-      ["setProperties", [[DTV.CLEAR, 0], [DTV.DELIVERY_SYSTEM, SYS.ISDBS], [DTV.FREQUENCY, 1049480], [DTV.STREAM_ID, 16400], [DTV.TUNE, 0]]],
+      ["setProperties", [[DTV.FREQUENCY, 1049480], [DTV.STREAM_ID, 16400], [DTV.DELIVERY_SYSTEM, SYS.ISDBS], [DTV.TUNE, 0]]],
       // libdvbv5 と同じく、衛星の伝送方式で閉じる場合は給電を止める
       ["setVoltage", SEC_VOLTAGE.OFF]
     ]);
@@ -388,15 +529,30 @@ describe("[dvb.spec] dvbv5-zap.ts: parseDvbv5ZapCommand()", () => {
   it("parses the command generated by the tuner detection", () => {
     assert.deepStrictEqual(
       parseDvbv5ZapCommand("dvbv5-zap -a 2 -c ./config/dvbconf-for-isdb/conf/dvbv5_channels_isdbs.conf -r -P <channel>", "/dev/dvb/adapter2/dvr0"),
-      { adapter: 2, frontend: 0, demux: 0, dvr: 0, channelsConfPath: conf, ...noSat }
+      { adapter: 2, frontend: 0, demux: 0, dvr: 0, channelsConfPath: conf, channelByFrequency: false, ...noSat }
     );
   });
 
   it("accepts output to stdout, long options, clustered flags and attached values", () => {
     assert.deepStrictEqual(
       parseDvbv5ZapCommand("/usr/bin/dvbv5-zap --adapter=3 -f1 -d 1 --channels ./config/dvbconf-for-isdb/conf/dvbv5_channels_isdbs.conf -sPo - -I dvbv5 <channel>"),
-      { adapter: 3, frontend: 1, demux: 1, dvr: 1, channelsConfPath: conf, ...noSat }
+      { adapter: 3, frontend: 1, demux: 1, dvr: 1, channelsConfPath: conf, channelByFrequency: false, ...noSat }
     );
+  });
+
+  it("finds the channel by frequency only without -r and -o (same as dvbv5-zap)", () => {
+    assert.strictEqual(parseDvbv5ZapCommand("dvbv5-zap -c ch.conf -P <channel>").channelByFrequency, true);
+    assert.strictEqual(parseDvbv5ZapCommand("dvbv5-zap -c ch.conf -P -r <channel>").channelByFrequency, false);
+    assert.strictEqual(parseDvbv5ZapCommand("dvbv5-zap -c ch.conf -P -o - <channel>").channelByFrequency, false);
+  });
+
+  it("does not accept numbers that dvbv5-zap reads differently", () => {
+    // dvbv5-zap は strtoul(value, NULL, 0) で読むため、先頭の 0 は 8 進数になる
+    for (const option of ["-a 010", "-a 08", "-f 01", "-d 0x1", "-S 010", "-W 0100", "-U 01210", "-w 08", "-a 4294967296"]) {
+      assert.throws(() => parseDvbv5ZapCommand(`dvbv5-zap ${option} -c ch.conf -P <channel>`), /invalid value/, option);
+    }
+    assert.strictEqual(parseDvbv5ZapCommand("dvbv5-zap -a 0 -c ch.conf -P <channel>").adapter, 0);
+    assert.strictEqual(parseDvbv5ZapCommand("dvbv5-zap -c ch.conf -P -S -1 <channel>").satNumber, -1);
   });
 
   it("returns null for other commands", () => {

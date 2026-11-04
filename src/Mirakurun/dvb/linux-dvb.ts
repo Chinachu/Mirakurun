@@ -17,6 +17,8 @@
 // Linux DVB API の ioctl を koffi (FFI) で呼び出す。koffi を使うのはこのファイルだけにする。
 
 import * as util from "util";
+// koffi は optionalDependencies のため、インストールできない環境でもビルドできるよう、ない場合の型のエラーは無視する
+// @ts-ignore
 import type * as Koffi from "koffi" with { "resolution-mode": "import" };
 import { DTV, MAX_DTV_STATS } from "./constants";
 
@@ -108,10 +110,25 @@ const libc = koffi.load(null);
 const ioctlPointer = libc.func("ioctl", "int", ["int", "unsigned long", "void *"]);
 const ioctlValue = libc.func("ioctl", "int", ["int", "unsigned long", "unsigned long"]);
 
-/** ioctl を別スレッドで呼ぶ (ドライバーの処理を待つ間、イベントループを止めないため) */
-export function ioctl(fd: number, request: number, arg: Buffer | number = 0): Promise<number> {
+// 呼び出し中の ioctl のバッファー (別スレッドで使い終わるまで GC で解放させないため保持する)
+const pendingBuffers = new Set<readonly Buffer[]>();
+
+/** 呼び出し中の ioctl の数 (バッファーを保持し続けていないかの確認用) */
+export function getPendingIoctlCount(): number {
+    return pendingBuffers.size;
+}
+
+/**
+ * ioctl を別スレッドで呼ぶ (ドライバーの処理を待つ間、イベントループを止めないため)
+ * @param retained `arg` の中からポインターで参照するバッファー (呼び出しが終わるまで保持する)
+ */
+export function ioctl(fd: number, request: number, arg: Buffer | number = 0, retained: readonly Buffer[] = []): Promise<number> {
+    const buffers = Buffer.isBuffer(arg) ? [arg, ...retained] : retained;
+    pendingBuffers.add(buffers);
+
     return new Promise((resolve, reject) => {
         const callback = (err: Error, result: number) => {
+            pendingBuffers.delete(buffers);
             if (err) {
                 reject(err);
             } else if (result < 0) {
@@ -121,10 +138,16 @@ export function ioctl(fd: number, request: number, arg: Buffer | number = 0): Pr
             }
         };
 
-        if (Buffer.isBuffer(arg)) {
-            ioctlPointer.async(fd, request, arg, callback);
-        } else {
-            ioctlValue.async(fd, request, arg, callback);
+        try {
+            if (Buffer.isBuffer(arg)) {
+                ioctlPointer.async(fd, request, arg, callback);
+            } else {
+                ioctlValue.async(fd, request, arg, callback);
+            }
+        } catch (err) {
+            // 引数を変換できない場合などは呼び出さずに例外を投げる (コールバックは呼ばれない)
+            pendingBuffers.delete(buffers);
+            reject(err);
         }
     });
 }
@@ -144,7 +167,7 @@ export async function setProperties(fd: number, properties: readonly (readonly [
         koffi.encode(props, offset + PROPERTY_U, "uint32", data);
     });
 
-    await ioctl(fd, requests.FE_SET_PROPERTY, encodeProperties(props, properties.length));
+    await ioctl(fd, requests.FE_SET_PROPERTY, encodeProperties(props, properties.length), [props]);
 }
 
 /** FE_GET_PROPERTY で cmd を 1 つ取得し、結果の dtv_property を返す */
@@ -152,7 +175,7 @@ async function getProperty(fd: number, cmd: number): Promise<Buffer> {
     const props = Buffer.alloc(sizes.dtvProperty);
     koffi.encode(props, 0, "uint32", cmd);
 
-    await ioctl(fd, requests.FE_GET_PROPERTY, encodeProperties(props, 1));
+    await ioctl(fd, requests.FE_GET_PROPERTY, encodeProperties(props, 1), [props]);
     return props;
 }
 

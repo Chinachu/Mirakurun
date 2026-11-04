@@ -332,6 +332,8 @@ definitions:
         type: string
       pid:
         type: integer
+        x-nullable: true
+        description: "`null` when no process is running (including when the tuner accesses the DVB device directly)."
       users:
         type: array
         items:
@@ -405,6 +407,8 @@ definitions:
     properties:
       pid:
         type: integer
+        x-nullable: true
+        description: "`null` when the tuner accesses the DVB device directly (no process)."
 
   # job -----------------------------------------------------------------------
 

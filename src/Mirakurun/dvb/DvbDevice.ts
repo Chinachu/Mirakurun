@@ -22,6 +22,13 @@ import { DvbChannelParams } from "./DvbChannelConf";
 import { Lnb, POLARIZATION, SecCommands, getSatTuning } from "./DvbSat";
 import {
     DTV,
+    SYS,
+    INVERSION_AUTO,
+    FEC_AUTO,
+    QAM_AUTO,
+    GUARD_INTERVAL_AUTO,
+    TRANSMISSION_MODE_AUTO,
+    INTERLEAVING_AUTO,
     SATELLITE_SYSTEMS,
     SEC_TONE,
     SEC_VOLTAGE,
@@ -37,12 +44,50 @@ const open = util.promisify(fs.open);
 const close = util.promisify(fs.close);
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-/** dvr のバッファー (dvbv5-zap の DVB_BUF_SIZE と同じ。24Mbps で約 2 秒分) */
+/**
+ * dvr のバッファー (24Mbps で約 2 秒分)
+ * (dvbv5-zap は同じ大きさ (DVB_BUF_SIZE) を demux に設定するが、TS_TAP の出力には使われず、dvr はカーネルの既定の大きさになる)
+ */
 const DVR_BUFFER_SIZE = 188 * 4096 * 8;
 /** 1 回の read で読む上限 */
 const READ_SIZE = 188 * 1024;
 /** dvr が空の場合に、次に読むまでの間隔 (ミリ秒) */
 const READ_INTERVAL = 10;
+
+const ISDBT_AUTO_LAYER = (fec: number, modulation: number, segmentCount: number, timeInterleaving: number) => [
+    [fec, FEC_AUTO],
+    [modulation, QAM_AUTO],
+    [segmentCount, 0xFFFFFFFF],
+    [timeInterleaving, INTERLEAVING_AUTO]
+] as const;
+
+/**
+ * libdvbv5 (dvbv5-zap) が選局で送る項目と、チャンネル設定にない場合の値
+ * (`dvb-v5-std.c` の項目の順と、`dvb-file.c` の `dvbv5_default_value()` の値。
+ * ISDB-T の PARTIAL_RECEPTION, SOUND_BROADCASTING, LAYER_ENABLED は、dvbv5-zap がチャンネル設定に関係なく 0, 0, 7 にする)
+ */
+const TUNING_PROPERTIES = new Map<number, readonly (readonly [number, number])[]>([
+    [SYS.ISDBT, [
+        [DTV.FREQUENCY, 0xFFFFFFFF],
+        [DTV.BANDWIDTH_HZ, 0],
+        [DTV.INVERSION, INVERSION_AUTO],
+        [DTV.GUARD_INTERVAL, GUARD_INTERVAL_AUTO],
+        [DTV.TRANSMISSION_MODE, TRANSMISSION_MODE_AUTO],
+        [DTV.ISDBT_LAYER_ENABLED, 7],
+        [DTV.ISDBT_PARTIAL_RECEPTION, 0],
+        [DTV.ISDBT_SOUND_BROADCASTING, 0],
+        [DTV.ISDBT_SB_SUBCHANNEL_ID, 0],
+        [DTV.ISDBT_SB_SEGMENT_IDX, 0],
+        [DTV.ISDBT_SB_SEGMENT_COUNT, 0],
+        ...ISDBT_AUTO_LAYER(DTV.ISDBT_LAYERA_FEC, DTV.ISDBT_LAYERA_MODULATION, DTV.ISDBT_LAYERA_SEGMENT_COUNT, DTV.ISDBT_LAYERA_TIME_INTERLEAVING),
+        ...ISDBT_AUTO_LAYER(DTV.ISDBT_LAYERB_FEC, DTV.ISDBT_LAYERB_MODULATION, DTV.ISDBT_LAYERB_SEGMENT_COUNT, DTV.ISDBT_LAYERB_TIME_INTERLEAVING),
+        ...ISDBT_AUTO_LAYER(DTV.ISDBT_LAYERC_FEC, DTV.ISDBT_LAYERC_MODULATION, DTV.ISDBT_LAYERC_SEGMENT_COUNT, DTV.ISDBT_LAYERC_TIME_INTERLEAVING)
+    ]],
+    [SYS.ISDBS, [
+        [DTV.FREQUENCY, 0xFFFFFFFF],
+        [DTV.STREAM_ID, 0]
+    ]]
+]);
 
 export interface DvbDeviceOptions {
     readonly adapter: number;
@@ -146,6 +191,10 @@ export default class DvbDevice extends EventEmitter {
     private async _tune(params: DvbChannelParams): Promise<void> {
         const fd = this._getFrontendFd();
         const { deliverySystem } = params;
+        const tuningProperties = TUNING_PROPERTIES.get(deliverySystem);
+        if (!tuningProperties) {
+            throw new Error(`delivery system ${deliverySystem} is not supported`);
+        }
 
         if (deliverySystem !== this._deliverySystem) {
             if (this._isSatellite() && this._isSatellite(deliverySystem) === false) {
@@ -165,9 +214,9 @@ export default class DvbDevice extends EventEmitter {
             });
         }
 
-        let properties = params.properties;
+        const values = new Map(params.properties);
         if (this._isSatellite(deliverySystem)) {
-            const frequency = properties.find(([cmd]) => cmd === DTV.FREQUENCY)?.[1] ?? 0;
+            const frequency = values.get(DTV.FREQUENCY) ?? 0;
             const satNumber = this._options.satNumber ?? -1;
             const tuning = getSatTuning(deliverySystem, frequency, params.polarization ?? POLARIZATION.OFF, {
                 lnb: this._options.lnb ?? params.lnb ?? null,
@@ -183,14 +232,14 @@ export default class DvbDevice extends EventEmitter {
                         log.debug("DvbDevice: %s failed to control LNB (%s)", this.path, err.code || err.message);
                     });
                 }
-                properties = properties.map(prop => prop[0] === DTV.FREQUENCY ? [DTV.FREQUENCY, tuning.frequency] as const : prop);
+                values.set(DTV.FREQUENCY, tuning.frequency);
             }
         }
 
+        // libdvbv5 と同じく、DTV_CLEAR で既定値に戻さず、伝送方式の全項目を送る (チャンネル設定にない項目は libdvbv5 の値)
         await linuxDvb.setProperties(fd, [
-            [DTV.CLEAR, 0],
+            ...tuningProperties.map(([cmd, value]) => [cmd, values.get(cmd) ?? value] as const),
             [DTV.DELIVERY_SYSTEM, deliverySystem],
-            ...properties,
             [DTV.TUNE, 0]
         ]);
     }

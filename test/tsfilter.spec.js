@@ -242,22 +242,72 @@ describe("[tsfilter.spec] TSFilter.ts: write()", () => {
     }
     const output = collector(1024 * 1024);
     const filter = new TSFilter({ output });
+    filter.write(patPacket(0));
 
     filter.write(Buffer.concat(packets), true);
-    assert.strictEqual(output.result().length, 0);
+    assert.ok(output.result().equals(patPacket(0)));
     filter.close();
 
-    assert.ok(output.result().equals(Buffer.concat(packets)));
+    assert.ok(output.result().equals(Buffer.concat([patPacket(0), ...packets])));
   });
 
-  it("starts the stream after both the PAT and the output", () => {
-    const filter = new TSFilter({ output: collector(1024 * 1024) });
+  it("does not defer the output until the PAT is written", () => {
+    const output = collector(1024 * 1024);
+    const filter = new TSFilter({ output });
 
-    // PAT より前のパケットを出力しただけでは始めたとしない
-    filter.write(packet(0x100, 0));
-    assert.strictEqual(filter.streamStarted, false);
-    filter.write(patPacket(1));
-    assert.strictEqual(filter.streamStarted, true);
+    // PAT より前のパケットを出力しただけでは、出力を始めたとしない
+    filter.write(packet(0x100, 0), true);
+    filter.write(patPacket(1), true);
+    assert.ok(output.result().equals(Buffer.concat([packet(0x100, 0), patPacket(1)])));
+
+    filter.write(packet(0x100, 2), true);
+    assert.strictEqual(output.result().length, 188 * 2);
+    filter.close();
+  });
+
+  it("counts only the PAT queued after ready and not trimmed", async () => {
+    // 準備ができる前の PAT は、上限を超えて破棄される場合があるため数えない
+    const waiting = new TSFilter({ output: collector(1024 * 1024), serviceId: 1024 });
+    waiting.write(patPacket(0), true);
+    assert.strictEqual(waiting._patBuffered, false);
+    waiting.close();
+
+    // 出力が詰まっている間に上限を超えて破棄した場合は、PAT を書き出したとしない
+    const output = new Writable({ highWaterMark: 188, write() { /* 書き終えない */ } });
+    const filter = new TSFilter({ output });
+    filter.write(packet(0x100, 0), true);
+    filter.write(patPacket(1), true);
+    assert.strictEqual(filter._patBuffered, true);
+    for (let i = 2; i < 10; i++) {
+      filter.write(packet(0x100, i), true);
+    }
+    assert.strictEqual(filter._patBuffered, false);
+    filter.close();
+
+    // 最初の PAT を書き出した後は、詰まって破棄しても最初の PAT を書き出したままとする (入力ごとに書き出さない)
+    const stalled = new Writable({ highWaterMark: 188, write() { /* 書き終えない */ } });
+    const started = new TSFilter({ output: stalled });
+    started.write(patPacket(0), true);
+    assert.strictEqual(started._patWritten, true);
+    for (let i = 1; i < 10; i++) {
+      started.write(packet(0x100, i), true);
+    }
+    assert.strictEqual(started._bufferBytes, 188 * 9);
+    started.flush();
+    assert.ok(started._bufferBytes < 188 * 9);
+    assert.strictEqual(started._patWritten, true);
+    assert.strictEqual(started._patBuffered, true);
+    started.close();
+  });
+
+  it("defers the output while waiting for the event", () => {
+    const filter = new TSFilter({ output: collector(1024 * 1024), serviceId: 1, eventId: 1 });
+
+    // 準備ができるまでは出力できないため、入力ごとに保持するためのコピーをしない
+    filter.write(packet(0x11, 0), true);
+    filter.write(packet(0x11, 1), true);
+    assert.ok(Buffer.concat(filter._buffer).equals(Buffer.concat([packet(0x11, 0), packet(0x11, 1)])));
+    assert.strictEqual(filter._bufferRetainedCount, 0);
     filter.close();
   });
 

@@ -20,6 +20,7 @@
 // 出典: v4l-utils (https://git.linuxtv.org/v4l-utils.git) の lib/libdvbv5/dvb-sat.c
 // LNBf の周波数の表と、周波数の変換と LNB の操作の手順を参考に、TypeScript で書き直した。
 
+import { toAsciiUpperCase } from "./ascii";
 import { SEC_MINI, SEC_VOLTAGE, SYS } from "./constants";
 
 /** 偏波 (チャンネル設定の POLARIZATION。libdvbv5 の `enum dvb_sat_polarization`) */
@@ -85,7 +86,7 @@ const LNBS: readonly Lnb[] = [
 
 /** LNBf を別名で探す (大文字と小文字を区別しない) */
 export function findLnb(alias: string): Lnb | null {
-    const upper = alias.toUpperCase();
+    const upper = toAsciiUpperCase(alias);
     return LNBS.find(lnb => lnb.alias === upper) || null;
 }
 
