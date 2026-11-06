@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tv SYSTEM "xmltv.dtd">
+<tv source-info-name="Mirakurun">
+<channel id="54321">
+<display-name>ロゴチャンネル</display-name>
+<display-name>7.1</display-name>
+<icon src="http://localhost:40772/api/services/54321/logo" /></channel>
+</tv>

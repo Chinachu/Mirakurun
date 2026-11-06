@@ -1,0 +1,14 @@
+{
+  "services": [
+    {
+      "id": 12346,
+      "networkId": 1,
+      "serviceId": 102,
+      "name": "非表示チャンネル",
+      "type": 0,
+      "logoId": -1,
+      "remoteControlKeyId": 6
+    }
+  ],
+  "programs": []
+}

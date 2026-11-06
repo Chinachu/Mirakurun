@@ -1,0 +1,14 @@
+{
+  "services": [
+    {
+      "id": 54321,
+      "networkId": 2,
+      "serviceId": 202,
+      "name": "ロゴチャンネル",
+      "type": 173,
+      "logoId": 10,
+      "remoteControlKeyId": 7
+    }
+  ],
+  "programs": []
+}
