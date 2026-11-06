@@ -18,7 +18,7 @@ import sift from "sift";
 import * as api from "../../api";
 import * as apid from "../../../../api";
 import _ from "../../_";
-import { deepClone, channelTypes, rejectWhere, WhereQueryError } from "../../common";
+import { channelTypes, rejectWhere, WhereQueryError } from "../../common";
 
 export const parameters = [
     {
@@ -35,12 +35,13 @@ export const get: Operation = (req, res) => {
         rejectWhere(req.query);
 
         const channels: apid.Channel[] = _.channel.findByType(req.params.type as apid.ChannelType).map(channel => {
-            const ch: apid.Channel = deepClone(channel);
+            const ch: apid.Channel = channel.toJSON();
 
             ch.services = channel.getServices().map(service => ({
                 id: service.id,
                 serviceId: service.serviceId,
                 networkId: service.networkId,
+                streamId: service.streamId,
                 name: service.name,
                 type: service.type
             }));

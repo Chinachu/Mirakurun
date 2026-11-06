@@ -14,7 +14,7 @@ function createPrograms(count) {
   const programs = [];
   for (let i = 0; i < count; i++) {
     programs.push({
-      id: 3273601024 * 100000 + i,
+      id: 3275201024 * 100000 + i,
       eventId: i,
       name: `番組${i}`,
       description: "説明\n\"引用\"".repeat(20),
@@ -127,6 +127,24 @@ describe("[api.spec] api.ts: responseJSON()", () => {
     const res = await request();
     assert.strictEqual(res.body, JSON.stringify(object));
     assert.strictEqual(res.headers["content-length"], String(Buffer.byteLength(res.body)));
+  });
+
+  it("keeps a metadata-rich listing in one write with the same JSON", async () => {
+    const body = createPrograms(200);
+    const expected = JSON.stringify(body);
+    assert.ok(expected.length > 32 * 1024 && expected.length < 128 * 1024);
+    handler = (req, res) => api.responseJSON(res, body);
+    const res = await request();
+    assert.strictEqual(res.body, expected);
+    assert.strictEqual(res.headers["content-length"], String(Buffer.byteLength(expected)));
+  });
+
+  it("streams a small number of large items after the single-write limit", async () => {
+    const body = Array.from({ length: 8 }, (_, id) => ({ id, description: "x".repeat(32 * 1024) }));
+    handler = (req, res) => api.responseJSON(res, body);
+    const res = await request();
+    assert.strictEqual(res.body, JSON.stringify(body));
+    assert.strictEqual(res.headers["transfer-encoding"], "chunked");
   });
 
   it("writes a large array in chunks with the same JSON", async () => {

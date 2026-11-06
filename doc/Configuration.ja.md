@@ -87,8 +87,12 @@
     - BS
     - CS
     - SKY
+  routes: # (TER|SAT|CATV|HIKARI)[] - 受信できる経路。省略した場合はすべての経路
+    - TER
+    - CATV
   # chardev/dvb用
   # "<template>"は`commandVars[template]`または"(空)"に置き換えられます *@4.0.0~
+  # "<route>"は選局するチャンネルの経路の小文字 (ter|sat|catv|hikari) に置き換えられます
   command: cmd <channel> --arg1 --arg2 <exampleArg1> <exampleArg2>... # String
   # dvb用
   dvbDevicePath: /dev/dvb/adapter/dvr/path # String
@@ -101,6 +105,12 @@
   decoder: cmd # String
   isDisabled: false # Boolean
 ```
+
+#### routes
+
+チューナーが受信できる経路です。チャンネルの `route` が `routes` に含まれるチューナーだけで選局します。省略した場合は、すべての経路を受信できるものとして扱います (従来と同じ)。
+
+たとえば、BS を CATV のトランスモジュレーションで受信するチューナーには、`types` に `BS` を、`routes` に `CATV` を指定します。衛星のアンテナに接続したチューナーには `routes` に `SAT` を指定すると、CATV のチャンネルの選局には使われません。
 
 #### DVB デバイスの直接操作
 
@@ -124,6 +134,8 @@
 衛星では、LNB 給電、22kHz トーン、DiSEqC、周波数の変換を `dvbv5-zap` と同じように行い、チャンネル設定ファイルの `LNB`, `POLARIZATION`, `SAT_NUMBER` も同じように使います。LNBf を `-l` とチャンネル設定ファイルの `LNB` のどちらでも指定していない場合は、周波数を変換せず、LNB にも給電しません。
 
 対応している伝送方式は ISDB-T と ISDB-S です。
+
+`-c` には `<route>` を使えます (`-c ./conf/dvbv5_channels_<route>.conf` など)。この場合は、`routes` (省略した場合はすべての経路) のそれぞれのチャンネル設定ファイルを読み、選局するチャンネルの経路のファイルを使います。
 
 ##### コマンドを実行する場合
 
@@ -183,6 +195,7 @@ sudo npm install arib-b25-stream-test -g --unsafe-perm
   type: GR # 列挙型 [GR|BS|CS|SKY]
   channel: '0' # String
   # 以下はオプション
+  route: TER # 列挙型 [TER|SAT|CATV|HIKARI] - 受信する経路。省略した場合、GR は TER、それ以外は SAT
   serviceId: 1234 # Integer - 指定しない場合、サービスは自動的にスキャンされます。
   tsmfRelTs: 1 # 数値: 1~15
   commandVars: # オプションのコマンド変数 *@4.0.0~
@@ -194,3 +207,9 @@ sudo npm install arib-b25-stream-test -g --unsafe-perm
     exampleArg2: -arg2 "引用符を使用して空白を含むことができます"
   isDisabled: false # Boolean
 ```
+
+#### route
+
+チャンネルを受信する経路です。BS を衛星アンテナと CATV のトランスモジュレーションの両方で受信する場合などは、同じ放送を別の経路のチャンネルとしても設定できます。
+
+サービスは、受信したストリーム (`networkId` と `transport_stream_id`) で受信経路と結び付けます。同じストリームを受信できるチャンネルが複数ある場合は、空いているチューナーがある経路で選局します (先にスキャンしたチャンネルを優先します)。各チャンネルで受信したストリームは `channels.json` (環境変数: `CHANNELS_DB_PATH`) に保存します。

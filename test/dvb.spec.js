@@ -78,7 +78,7 @@ describe("[dvb.spec] DvbChannelConf.ts: parseDvbv5ChannelsConf()", () => {
   it("finds the channel by VCHANNEL and frequency in the same way as dvbv5-zap", () => {
     const channels = conf.parseDvbv5ChannelsConf([
       "[CHANNEL]", " DELIVERY_SYSTEM = ISDBS", " FREQUENCY = 1049480", " VCHANNEL = 101",
-      "[ NHK BS1]x", " DELIVERY_SYSTEM = ISDBS", " FREQUENCY = 1087840",
+      "[ Test BS1]x", " DELIVERY_SYSTEM = ISDBS", " FREQUENCY = 1087840",
       "[101]", " DELIVERY_SYSTEM = ISDBS", " FREQUENCY = 1",
       "[2]", " DELIVERY_SYSTEM = ISDBS", " FREQUENCY = 2"
     ].join("\n"));
@@ -86,7 +86,7 @@ describe("[dvb.spec] DvbChannelConf.ts: parseDvbv5ChannelsConf()", () => {
     // 名前か VCHANNEL が一致する最初のチャンネル (`[CHANNEL]` は名前なし、名前は `]` まで、先頭の空白を除く)
     assert.deepStrictEqual(conf.findChannelParams(channels, "101", "ch.conf").properties, [[DTV.FREQUENCY, 1049480]]);
     assert.strictEqual(channels.get("CHANNEL"), undefined);
-    assert.deepStrictEqual(conf.findChannelParams(channels, "nhk bs1", "ch.conf").properties, [[DTV.FREQUENCY, 1087840]]);
+    assert.deepStrictEqual(conf.findChannelParams(channels, "test bs1", "ch.conf").properties, [[DTV.FREQUENCY, 1087840]]);
 
     // `-r` がない場合は、数値として読んだ値と周波数が一致するチャンネルも探す
     assert.throws(() => conf.findChannelParams(channels, "1087840", "ch.conf"), /not found/);
@@ -108,8 +108,8 @@ describe("[dvb.spec] DvbChannelConf.ts: parseDvbv5ChannelsConf()", () => {
       "\tAUDIO_PID = 274 275",
       "\tPID_0d = 4096",
       "\tVCHANNEL = 1.1",
-      "\tNETWORK_ID = 32736",
-      "\tTRANSPORT_ID = 32736",
+      "\tNETWORK_ID = 32752",
+      "\tTRANSPORT_ID = 32752",
       "\tFREQUENCY = 557142857",
       "\tBANDWIDTH_HZ = 6000000",
       "\tDELIVERY_SYSTEM = ISDBT"

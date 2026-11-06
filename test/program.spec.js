@@ -13,17 +13,17 @@ function programStore(items) {
 describe("[program.spec] Program.ts: findByQuery()", () => {
   const items = [];
   for (let i = 0; i < 60; i++) {
-    items.push({ id: i, networkId: 32736 + (i % 2), serviceId: 1024 + (i % 3), eventId: i % 7, name: `p${i}` });
+    items.push({ id: i, networkId: 32752 + (i % 2), serviceId: 1024 + (i % 3), eventId: i % 7, name: `p${i}` });
   }
   const store = programStore(items);
 
   it("returns the same programs as sift for networkId / serviceId / eventId", () => {
     const queries = [
-      { networkId: 32736 },
+      { networkId: 32752 },
       { serviceId: 1025 },
       { eventId: 3 },
-      { networkId: 32737, serviceId: 1026 },
-      { networkId: 32736, serviceId: 1024, eventId: 6 },
+      { networkId: 32753, serviceId: 1026 },
+      { networkId: 32752, serviceId: 1024, eventId: 6 },
       { networkId: 1 }
     ];
     for (const query of queries) {

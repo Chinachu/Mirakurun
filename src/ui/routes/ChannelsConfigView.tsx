@@ -36,7 +36,7 @@ import {
 import equal from "fast-deep-equal";
 import { state } from "../modules/state";
 import * as ui from "../modules/ui";
-import { ConfigChannels, ConfigChannelsItem, ChannelType, ChannelScanStatus } from "../../../api.d";
+import { ConfigChannels, ConfigChannelsItem, ChannelType, ChannelRoute, ChannelScanStatus } from "../../../api.d";
 
 import "./ChannelsConfigView.sass";
 
@@ -110,6 +110,7 @@ export const ChannelsConfigView: React.FC = () => {
     // チャンネルスキャンのためのステート
     const [showScanDialog, setShowScanDialog] = useState(false);
     const [scanType, setScanType] = useState<ChannelType>("GR");
+    const [scanRoute, setScanRoute] = useState<ChannelRoute | "">("");
     const [scanMinCh, setScanMinCh] = useState("13");
     const [scanMaxCh, setScanMaxCh] = useState("62");
     const [scanSkipCh, setScanSkipCh] = useState("");
@@ -150,6 +151,9 @@ export const ChannelsConfigView: React.FC = () => {
         try {
             const params = new URLSearchParams();
             params.append("type", scanType);
+            if (scanRoute !== "") {
+                params.append("route", scanRoute);
+            }
             params.append("minCh", scanMinCh);
             params.append("maxCh", scanMaxCh);
 
@@ -482,7 +486,7 @@ export const ChannelsConfigView: React.FC = () => {
             <div className="content">
                 {/* スキャン進行中/完了時のステータス表示 */}
                 {scanInProgress && scanStatus && (
-                    <Callout intent="primary" title={`チャンネルスキャン中 (${scanStatus.type})`}>
+                    <Callout intent="primary" title={`チャンネルスキャン中 (${scanStatus.type}${scanStatus.route ? ` / ${scanStatus.route}` : ""})`}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
                             <ProgressBar value={(scanStatus.progress || 0) / 100} />
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -502,7 +506,7 @@ export const ChannelsConfigView: React.FC = () => {
                 {!scanInProgress && scanStatus && (scanStatus.status === "completed" || (scanStatus.scanLog && scanStatus.scanLog.length > 0)) && (
                     <Callout
                         intent={scanStatus.status === "completed" ? "success" : "warning"}
-                        title={`前回のスキャン結果 (${scanStatus.type})`}
+                        title={`前回のスキャン結果 (${scanStatus.type}${scanStatus.route ? ` / ${scanStatus.route}` : ""})`}
                     >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
                             <div>
@@ -583,6 +587,27 @@ export const ChannelsConfigView: React.FC = () => {
                                 </td>
                                 <td>
                                     <div className="channel-options-grid">
+                                        <FormGroup label="Route" style={{ width: "90px", marginBottom: 0 }}>
+                                            <HTMLSelect
+                                                value={ch.route || ""}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === "") {
+                                                        deleteChannelProperty(i, "route");
+                                                    } else {
+                                                        updateChannel(i, { route: val as ChannelRoute });
+                                                    }
+                                                }}
+                                                options={[
+                                                    { value: "", label: ch.type === "GR" ? "(TER)" : "(SAT)" },
+                                                    { value: "TER", label: "TER" },
+                                                    { value: "SAT", label: "SAT" },
+                                                    { value: "CATV", label: "CATV" },
+                                                    { value: "HIKARI", label: "HIKARI" }
+                                                ]}
+                                            />
+                                        </FormGroup>
+
                                         <FormGroup label="Service ID" style={{ width: "90px", marginBottom: 0 }}>
                                             <InputGroup
                                                 placeholder="SID"
@@ -744,6 +769,20 @@ export const ChannelsConfigView: React.FC = () => {
                                     { value: "GR", label: "GR" },
                                     { value: "BS", label: "BS" },
                                     { value: "CS", label: "CS" }
+                                ]}
+                            />
+                        </FormGroup>
+
+                        <FormGroup label="Route">
+                            <HTMLSelect
+                                value={scanRoute}
+                                onChange={(e) => setScanRoute(e.target.value as ChannelRoute | "")}
+                                options={[
+                                    { value: "", label: scanType === "GR" ? "(TER)" : "(SAT)" },
+                                    { value: "TER", label: "TER" },
+                                    { value: "SAT", label: "SAT" },
+                                    { value: "CATV", label: "CATV" },
+                                    { value: "HIKARI", label: "HIKARI" }
                                 ]}
                             />
                         </FormGroup>

@@ -103,6 +103,8 @@ export async function responseJSON(res: express.Response, body: any): Promise<ex
 async function writeJSONArray(res: express.Response, items: any[]): Promise<void> {
     const chunks = stringifyJSONArray(items);
     let chunk: string = chunks.next().value;
+    // Keep small listings in one bounded write as their metadata grows.
+    let coalesce = items.length <= 512;
 
     while (!res.destroyed) {
         const next = chunks.next();
@@ -111,6 +113,12 @@ async function writeJSONArray(res: express.Response, items: any[]): Promise<void
             res.end(chunk);
             return;
         }
+
+        if (coalesce && chunk.length + next.value.length <= 128 * 1024) {
+            chunk += next.value;
+            continue;
+        }
+        coalesce = false;
 
         if (res.write(chunk)) {
             // 送信が詰まらない場合も、配信などの他の処理を止め続けないよう順番を譲る

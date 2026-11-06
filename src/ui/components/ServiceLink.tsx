@@ -66,7 +66,7 @@ export const ServiceLink: React.FC<ServiceLinkProps> = ({ globalId, date, time, 
             {service && service.hasLogoData && <img src={`/api/services/${service.id}/logo`} />}
 
             <Link className={service ? null : "bp5-skeleton"} title="EPG 番組表 (週間)" to={to}>
-                {service ? `${service.name.normalize("NFKC")} (${channelTypeMap[service.channel.type]})` : "サービス名..."}
+                {service ? `${service.name.normalize("NFKC")} (${channelTypeMap[service.channel?.type]})` : "サービス名..."}
             </Link>
         </div>
     );
