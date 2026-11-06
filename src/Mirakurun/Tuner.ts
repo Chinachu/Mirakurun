@@ -14,6 +14,7 @@
    limitations under the License.
 */
 import { Writable } from "stream";
+import EventEmitter = require("eventemitter3");
 import * as common from "./common";
 import * as log from "./log";
 import * as apid from "../../api";
@@ -23,6 +24,69 @@ import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
 import TSFilter from "./TSFilter";
 import TSDecoder from "./TSDecoder";
+import { DETECT_BYTES, DETECT_SKIP_BYTES, detectStreamFormat } from "./StreamFormat";
+
+// the TLV decoders (descrambling via a server, converting) take a while to output
+const TLV_DECODER_STARTUP_TIMEOUT = 10000;
+// milliseconds to receive the data to detect the format
+const DETECT_TIMEOUT = 10000;
+
+/** receives the data of a tuner to detect the format */
+class FormatProbe extends EventEmitter {
+    private _chunks: Buffer[] = [];
+    private _bytes = 0;
+    private _closed = false;
+    private _resolve: (format: apid.StreamFormat | null) => void = null;
+
+    get closed(): boolean {
+        return this._closed;
+    }
+
+    detect(timeout: number): Promise<apid.StreamFormat | null> {
+        return new Promise(resolve => {
+            const timer = setTimeout(() => this._done(null), timeout);
+            this._resolve = format => {
+                clearTimeout(timer);
+                resolve(format);
+            };
+        });
+    }
+
+    write(chunk: Buffer): void {
+        if (this._closed || this._resolve === null) {
+            return;
+        }
+        this._chunks.push(chunk);
+        this._bytes += chunk.length;
+        if (this._bytes >= DETECT_SKIP_BYTES + DETECT_BYTES) {
+            const data = Buffer.concat(this._chunks, this._bytes);
+            this._chunks = [];
+            this._done(detectStreamFormat(data.subarray(DETECT_SKIP_BYTES)));
+        }
+    }
+
+    flush(): void {
+        // nothing to output
+    }
+
+    end(): void {
+        if (this._closed) {
+            return;
+        }
+        this._closed = true;
+        this._chunks = [];
+        this._done(null);
+        this.emit("close");
+    }
+
+    private _done(format: apid.StreamFormat | null): void {
+        if (this._resolve !== null) {
+            const resolve = this._resolve;
+            this._resolve = null;
+            resolve(format);
+        }
+    }
+}
 
 interface TunerCandidate {
     channel: ChannelItem;
@@ -96,7 +160,24 @@ export class Tuner {
         return this._getDevicesByType(type, route).length > 0;
     }
 
-    initChannelStream(channel: ChannelItem, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
+    /**
+     * the output format of the stream request
+     * @returns `null` if the format is unavailable
+     */
+    getOutputFormat(channels: ChannelItem[], requested?: apid.StreamFormat): apid.StreamFormat | null {
+        if (channels[0].isTlv === false) {
+            return requested === "tlv" ? null : "ts";
+        }
+
+        const canConvert = this._getCandidates(channels).some(({ devices }) => devices.some(device => !!device.config.tlvToTsDecoder));
+        const format = requested || _.config.server.defaultTlvStreamFormat || "tlv";
+        if (format === "ts" && canConvert === false) {
+            return null;
+        }
+        return format;
+    }
+
+    initChannelStream(channel: ChannelItem, userReq: common.UserRequest, output: Writable): Promise<common.StreamFilter> {
         let networkId: number;
 
         const services = channel.getServices();
@@ -114,7 +195,7 @@ export class Tuner {
         }, output);
     }
 
-    initServiceStream(service: ServiceItem, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
+    initServiceStream(service: ServiceItem, userReq: common.UserRequest, output: Writable): Promise<common.StreamFilter> {
         const channels = service.channels;
         return this._initTS({
             ...userReq,
@@ -127,7 +208,7 @@ export class Tuner {
         }, output, channels);
     }
 
-    initProgramStream(program: apid.Program, userReq: common.UserRequest, output: Writable): Promise<TSFilter> {
+    initProgramStream(program: apid.Program, userReq: common.UserRequest, output: Writable): Promise<common.StreamFilter> {
         const channels = _.service.get(program.networkId, program.serviceId).channels;
         return this._initTS({
             ...userReq,
@@ -186,7 +267,7 @@ export class Tuner {
     }
 
     async getServices(channel: ChannelItem, user: Partial<common.User> = {}): Promise<apid.Service[]> {
-        const tsFilter = await this._initTS({
+        const userReq: common.User = {
             id: "Mirakurun:getServices()",
             priority: -1,
             disableDecoder: true,
@@ -196,7 +277,10 @@ export class Tuner {
                 parseSDT: true
             },
             ...user
-        });
+        };
+        // the format is detected only by the service scan (the streams use the format detected)
+        const format = await this._detectFormat(userReq);
+        const tsFilter = await this._initTS(userReq, undefined, undefined, format);
         return new Promise<apid.Service[]>((resolve, reject) => {
             let network = {
                 networkId: -1,
@@ -231,6 +315,9 @@ export class Tuner {
                 } else if (services === null) {
                     reject(new Error("stream has closed before get services"));
                 } else {
+                    if (services.length > 0 && _.channel.get(channel.type, channel.channel) === channel) {
+                        channel.setStream(services[0].networkId, services[0].streamId, format);
+                    }
                     if (network.remoteControlKeyId !== -1) {
                         services.forEach(service => {
                             service.remoteControlKeyId = network.remoteControlKeyId;
@@ -318,16 +405,64 @@ export class Tuner {
     }
 
     /**
-     * @param channels candidate channels carrying the same stream (default: `streamSetting.channel`)
+     * detects the format of the stream by the data received after tuning
+     * @returns the format of the channel if not detected
      */
-    private async _initTS(user: common.User, dest?: Writable, channels?: ChannelItem[]): Promise<TSFilter | null> {
+    private async _detectFormat(user: common.User): Promise<apid.StreamFormat> {
+        const channel = user.streamSetting.channel;
+        const devices = this._getDevicesByType(channel.type, channel.route);
+        // the remote Mirakurun outputs the format by itself, TSMF is TS outside
+        if (channel.tsmfRelTs || devices.some(device => device.isRemote)) {
+            return channel.format;
+        }
+
+        const probe = new FormatProbe();
+        for (let tryCount = 50; tryCount > 0; tryCount--) {
+            const picked = this._pickTunerDevice([{ channel, devices }], user.priority);
+            if (picked !== null) {
+                await picked.device.startStream({ ...user, id: `${user.id}#format` }, probe, channel);
+                break;
+            }
+            if (tryCount === 1) {
+                throw new Error("no available tuners");
+            }
+            await new Promise(resolve => setTimeout(resolve, 250));
+        }
+
+        const format = await probe.detect(DETECT_TIMEOUT);
+        // the tuner is kept tuned for a while, the stream of the scan joins it
+        probe.end();
+
+        if (format === null) {
+            log.warn("Tuner: the format of %s/%s is not detected, using `%s`", channel.type, channel.channel, channel.format);
+            return channel.format;
+        }
+        if (format !== channel.format) {
+            log.info("Tuner: the format of %s/%s is detected as `%s`", channel.type, channel.channel, format);
+        }
+        return format;
+    }
+
+    /**
+     * @param channels candidate channels carrying the same stream (default: `streamSetting.channel`)
+     * @param format the format detected (default: `format` of the channel)
+     */
+    private async _initTS(user: common.User, dest?: Writable, channels?: ChannelItem[], format?: apid.StreamFormat): Promise<common.StreamFilter | null> {
         const setting = user.streamSetting;
 
         if (_.config.server.disableEITParsing === true) {
             setting.parseEIT = false;
         }
 
-        const candidates = this._getCandidates(channels || [setting.channel]);
+        let candidates = this._getCandidates(channels || [setting.channel]);
+        const isTlv = (format || setting.channel.format) === "tlv";
+        if (isTlv && dest && user.outputFormat === "ts") {
+            // only the tuners can convert TLV to TS
+            candidates = candidates.map(({ channel, devices }) => ({
+                channel,
+                devices: devices.filter(device => !!device.config.tlvToTsDecoder)
+            }));
+        }
         let tryCount = 50;
         const startedAt = Date.now();
 
@@ -354,26 +489,41 @@ export class Tuner {
                 setting.channel = channel;
                 log.debug("Tuner: picked TunerDevice#%d for user `%s` in %dms", device.index, user.id, Date.now() - startedAt);
 
-                let output: Writable;
-                if (user.disableDecoder === true || device.decoder === null) {
-                    output = dest;
+                let tsFilter: common.StreamFilter;
+                if (isTlv) {
+                    // Keep MMT parsing modules out of the existing TS-only path.
+                    const TLVFilter = (require("./TLVFilter") as typeof import("./TLVFilter")).default;
+                    tsFilter = new TLVFilter({
+                        output: this._getTlvOutput(device, user, dest),
+                        networkId: setting.networkId,
+                        serviceId: setting.serviceId,
+                        eventId: setting.eventId,
+                        parseNIT: setting.parseNIT,
+                        parseSDT: setting.parseSDT,
+                        parseEIT: setting.parseEIT
+                    });
                 } else {
-                    output = new TSDecoder({
-                        output: dest,
-                        command: device.decoder
+                    let output: Writable;
+                    if (user.disableDecoder === true || device.decoder === null) {
+                        output = dest;
+                    } else {
+                        output = new TSDecoder({
+                            output: dest,
+                            command: device.decoder
+                        });
+                    }
+
+                    tsFilter = new TSFilter({
+                        output,
+                        networkId: setting.networkId,
+                        serviceId: setting.serviceId,
+                        eventId: setting.eventId,
+                        parseNIT: setting.parseNIT,
+                        parseSDT: setting.parseSDT,
+                        parseEIT: setting.parseEIT,
+                        tsmfRelTs: setting.channel.tsmfRelTs
                     });
                 }
-
-                const tsFilter = new TSFilter({
-                    output,
-                    networkId: setting.networkId,
-                    serviceId: setting.serviceId,
-                    eventId: setting.eventId,
-                    parseNIT: setting.parseNIT,
-                    parseSDT: setting.parseSDT,
-                    parseEIT: setting.parseEIT,
-                    tsmfRelTs: setting.channel.tsmfRelTs
-                });
 
                 Object.defineProperty(user, "streamInfo", {
                     get: () => tsFilter.streamInfo
@@ -388,6 +538,36 @@ export class Tuner {
                 }
             }
         }
+    }
+
+    /**
+     * TLV: TLVFilter -> [tlvDecoder] -> [tlvToTsDecoder] -> dest
+     */
+    private _getTlvOutput(device: TunerDevice, user: common.User, dest?: Writable): Writable {
+        if (!dest) {
+            return dest;
+        }
+
+        let output = dest;
+        if (user.outputFormat === "ts") {
+            // a stream in TS must not be continued in TLV
+            output = new TSDecoder({
+                output,
+                command: device.config.tlvToTsDecoder,
+                withArgs: true,
+                startupTimeout: TLV_DECODER_STARTUP_TIMEOUT,
+                passThroughOnFailure: false
+            });
+        }
+        if (user.disableDecoder !== true && device.config.tlvDecoder && !device.isRemote) {
+            output = new TSDecoder({
+                output,
+                command: device.config.tlvDecoder,
+                withArgs: true,
+                startupTimeout: TLV_DECODER_STARTUP_TIMEOUT
+            });
+        }
+        return output;
     }
 
     /**

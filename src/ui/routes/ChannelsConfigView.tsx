@@ -41,7 +41,7 @@ import { ConfigChannels, ConfigChannelsItem, ChannelType, ChannelRoute, ChannelS
 import "./ChannelsConfigView.sass";
 
 const configAPI = "/api/config/channels";
-const typesIndex = ["GR", "BS", "CS", "SKY"];
+const typesIndex = ["GR", "BS", "CS", "SKY", "BS4K"];
 
 function sortTypes(types: ChannelType[]): ChannelType[] {
     return types.sort((a, b) => typesIndex.indexOf(a) - typesIndex.indexOf(b));
@@ -568,7 +568,8 @@ export const ChannelsConfigView: React.FC = () => {
                                             { value: "GR", label: "GR" },
                                             { value: "BS", label: "BS" },
                                             { value: "CS", label: "CS" },
-                                            { value: "SKY", label: "SKY" }
+                                            { value: "SKY", label: "SKY" },
+                                            { value: "BS4K", label: "BS4K" }
                                         ]}
                                     />
                                 </td>

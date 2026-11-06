@@ -18,7 +18,9 @@ import EventEmitter = require("eventemitter3");
 import { TsStreamLite, TsCrc32, TsChar, TsLogo, tsDataModule } from "@chinachu/aribts";
 import { StreamInfo, getTimeFromMJD } from "./common";
 import * as log from "./log";
+import { retainOutput } from "./OutputBuffer";
 import EPG from "./EPG";
+import EPGState from "./EPGState";
 import status from "./status";
 import _ from "./_";
 import { getProgramItemId } from "./Program";
@@ -61,23 +63,6 @@ const DSMCC_BLOCK_SIZE = 4066; // ARIB TR-B15
 const LOGO_DATA_NAME_BS = Buffer.from("LOGO-05"); // ARIB STD-B21, ARIB TR-B15
 const LOGO_DATA_NAME_CS = Buffer.from("CS_LOGO-05"); // ARIB STD-B21, ARIB TR-B15
 
-interface BasicExtState {
-    basic: {
-        flags: FlagState[];
-        lastFlagsId: number;
-    };
-    extended: {
-        flags: FlagState[];
-        lastFlagsId: number;
-    };
-}
-
-interface FlagState {
-    flag: Buffer;
-    ignore: Buffer;
-    version_number: number;
-}
-
 interface DownloadData {
     downloadId: number;
     // blockSize: number; // 4066
@@ -116,7 +101,7 @@ export default class TSFilter extends EventEmitter {
     // epg
     private _epg: EPG;
     private _epgReady = false;
-    private _epgState: { [networkId: number]: { [serviceId: number]: BasicExtState } } = {};
+    private _epgState = new EPGState();
 
     // buffer
     private _packet = Buffer.allocUnsafeSlow(PACKET_SIZE).fill(0);
@@ -331,36 +316,14 @@ export default class TSFilter extends EventEmitter {
             return;
         }
 
-        // 入力のチャンクを参照したまま保持すると、出力しないパケットの分までメモリを抱え込むため、保持する分はコピーする
-        // (他のサービスのストリームと共有しているチャンクには書き込まない)
-        if (this._bufferRetainedCount < this._buffer.length) {
-            const retained = Buffer.concat(this._buffer.splice(this._bufferRetainedCount));
-            this._buffer.push(retained);
-            this._bufferRetainedCount = this._buffer.length;
-            this._bufferSourceBytes = this._bufferBytes;
-            this._bufferLastSource = null;
+        if (this._bufferBytes > this._maxBufferBytesBeforeReady && this._patWritten === false) {
+            this._patBuffered = false;
         }
-
-        // 上限を超えた分を古いパケットから破棄する
-        let excess = this._bufferBytes - this._maxBufferBytesBeforeReady;
-        if (excess > 0) {
-            // 最初の PAT を書き出す前は、保留した PAT も破棄した可能性があるため、次の PAT を保留するまでは PAT を書き出したとしない
-            // (最初の PAT を書き出した後は、最初の出力を遅らせないための判定には使わないため戻さない)
-            if (this._patWritten === false) {
-                this._patBuffered = false;
-            }
-            this._bufferBytes -= excess;
-            this._bufferSourceBytes = this._bufferBytes;
-            let head = 0;
-            while (this._buffer[head].length <= excess) {
-                excess -= this._buffer[head++].length;
-            }
-            this._buffer.splice(0, head);
-            this._bufferRetainedCount -= head;
-            if (excess > 0) {
-                this._buffer[0] = this._buffer[0].subarray(excess);
-            }
-        }
+        this._bufferBytes = retainOutput(this._buffer, this._bufferRetainedCount,
+            this._bufferBytes, this._maxBufferBytesBeforeReady);
+        this._bufferRetainedCount = this._buffer.length;
+        this._bufferSourceBytes = this._bufferBytes;
+        this._bufferLastSource = null;
     }
 
     end(): void {
@@ -1047,120 +1010,27 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _updateEpgState(data: any): void {
-        const networkId = data.original_network_id;
-        const serviceId = data.service_id;
-        const versionNumber = data.version_number;
-
-        const stateByNet = this._epgState[networkId] || (this._epgState[networkId] = {});
-        let stateBySrv = stateByNet[serviceId];
-
-        if (!stateByNet[serviceId]) {
-            stateBySrv = stateByNet[serviceId] = {
-                basic: {
-                    flags: [],
-                    lastFlagsId: -1
-                },
-                extended: {
-                    flags: [],
-                    lastFlagsId: -1
-                }
-            };
-
-            for (let i = 0; i < 0x08; i++) {
-                for (const target of [stateBySrv.basic, stateBySrv.extended]) {
-                    target.flags.push({
-                        flag: Buffer.allocUnsafeSlow(32).fill(0x00),
-                        ignore: Buffer.allocUnsafeSlow(32).fill(0xFF),
-                        version_number: -1
-                    });
-                }
-            }
-        }
-
-        const flagsId = data.table_id & 0x07;
-        const lastFlagsId = data.last_table_id & 0x07;
-        const segmentNumber = data.section_number >> 3;
-        const lastSegmentNumber = data.last_section_number >> 3;
-        const sectionNumber = data.section_number & 0x07;
-        const segmentLastSectionNumber = data.segment_last_section_number & 0x07;
-        const targetFlags = (data.table_id & 0x0F) < 0x08 ? stateBySrv.basic : stateBySrv.extended;
-        const targetFlag = targetFlags.flags[flagsId];
-
-        if ((targetFlags.lastFlagsId !== lastFlagsId) ||
-            (targetFlag.version_number !== -1 && targetFlag.version_number !== versionNumber)) {
-            // version check
-            if (targetFlag.version_number !== -1) {
-                const verDiff = versionNumber - targetFlag.version_number;
-                if (verDiff === -1 || verDiff > 1) {
-                    return;
-                }
-            }
-            // reset fields
-            for (let i = 0; i < 0x08; i++) {
-                targetFlags.flags[i].flag.fill(0x00);
-                targetFlags.flags[i].ignore.fill(i <= lastFlagsId ? 0x00 : 0xFF);
-            }
-        }
-
-        // update ignore field (past segment)
-        if (flagsId === 0 && this._streamTime !== null) {
-            const segment = (this._streamTime + 9 * 60 * 60 * 1000) / (3 * 60 * 60 * 1000) & 0x07;
-
-            for (let i = 0; i < segment; i++) {
-                targetFlag.ignore[i] = 0xFF;
-            }
-        }
-
-        // update ignore field (segment)
-        for (let i = lastSegmentNumber + 1; i < 0x20 ; i++) {
-            targetFlag.ignore[i] = 0xFF;
-        }
-
-        // update ignore field (section)
-        for (let i = segmentLastSectionNumber + 1; i < 8; i++) {
-            targetFlag.ignore[segmentNumber] |= 1 << i;
-        }
-
-        // update flag field
-        targetFlag.flag[segmentNumber] |= 1 << sectionNumber;
-
-        // update last_table_id & version_number
-        targetFlags.lastFlagsId = lastFlagsId;
-        targetFlag.version_number = versionNumber;
-
-        let ready = true;
-        isReady: for (const nid in this._epgState) {
-            for (const sid in this._epgState[nid]) {
-                for (const table of this._epgState[nid][sid].basic.flags.concat(this._epgState[nid][sid].extended.flags)) {
-                    for (let i = 0; i < table.flag.length; i++) {
-                        if ((table.flag[i] | table.ignore[i]) !== 0xFF) {
-                            ready = false;
-                            break isReady;
-                        }
-                    }
-                }
-            }
-        }
+        const ready = this._epgState.update({
+            networkId: data.original_network_id,
+            serviceId: data.service_id,
+            versionNumber: data.version_number,
+            isBasic: (data.table_id & 0x0F) < 0x08,
+            flagsId: data.table_id & 0x07,
+            lastFlagsId: data.last_table_id & 0x07,
+            sectionNumber: data.section_number,
+            lastSectionNumber: data.last_section_number,
+            segmentLastSectionNumber: data.segment_last_section_number
+        }, this._streamTime);
 
         if (ready === true) {
             this._epgReady = true;
-            this._clearEpgState();
+            this._epgState.clear();
 
             for (const service of _.service.findByNetworkId(this._targetNetworkId)) {
                 service.epgReady = true;
             }
 
             process.nextTick(() => this.emit("epgReady"));
-        }
-    }
-
-    private _clearEpgState() {
-        if (!this._epgState) {
-            return;
-        }
-
-        for (const nid in this._epgState) {
-            delete this._epgState[nid];
         }
     }
 
@@ -1201,7 +1071,7 @@ export default class TSFilter extends EventEmitter {
                 }
             }
 
-            this._clearEpgState();
+            this._epgState.clear();
             delete this._epgState;
         }
 

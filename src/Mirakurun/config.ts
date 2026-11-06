@@ -50,7 +50,8 @@ const {
     ALLOW_IPV6_CIDR_RANGES,
     ALLOW_ORIGINS,
     ALLOW_PNA,
-    TSPLAY_ENDPOINT
+    TSPLAY_ENDPOINT,
+    DEFAULT_TLV_STREAM_FORMAT
 } = process.env;
 
 const IS_DOCKER = DOCKER === "YES";
@@ -108,6 +109,9 @@ export async function loadServer(): Promise<Server> {
     }
     if (!config.tsplayEndpoint) {
         config.tsplayEndpoint = "https://mirakurun-secure-contexts-api.pages.dev/tsplay/";
+    }
+    if (config.defaultTlvStreamFormat !== undefined && config.defaultTlvStreamFormat !== "ts" && config.defaultTlvStreamFormat !== "tlv") {
+        delete config.defaultTlvStreamFormat;
     }
 
     // Docker
@@ -173,6 +177,9 @@ export async function loadServer(): Promise<Server> {
         }
         if (typeof TSPLAY_ENDPOINT !== "undefined" && TSPLAY_ENDPOINT.trim().length > 0) {
             config.tsplayEndpoint = TSPLAY_ENDPOINT.trim();
+        }
+        if (DEFAULT_TLV_STREAM_FORMAT === "ts" || DEFAULT_TLV_STREAM_FORMAT === "tlv") {
+            config.defaultTlvStreamFormat = DEFAULT_TLV_STREAM_FORMAT;
         }
 
         log.info("load server config (merged w/ env): %s", JSON.stringify(config));

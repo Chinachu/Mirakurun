@@ -66,6 +66,7 @@
 | `allowOrigins` | `ALLOW_ORIGINS` | String[] | `["https://mirakurun-secure-contexts-api.pages.dev"]` | ⚠️🧪許可するオリジン (実験中) |
 | `allowPNA` | `ALLOW_PNA` | Boolean | `true` | 🧪[PNA](https://github.com/WICG/private-network-access)/[LNA](https://github.com/explainers-by-googlers/local-network-access) 許可設定 (実験中) |
 | `tsplayEndpoint` | `TSPLAY_ENDPOINT` | String | `https://mirakurun-secure-contexts-api.pages.dev/tsplay/` | 🧪TSPlay エンドポイント (実験中) |
+| `defaultTlvStreamFormat` | `DEFAULT_TLV_STREAM_FORMAT` | String | `tlv` | `format` を付けないストリームの要求に対する、TLV (MMT) のチャンネルの出力形式 (`ts` または `tlv`)<br>`ts` を指定した場合、対象チャンネルを受信できるチューナーに `tlvToTsDecoder` が設定されていなければ HTTP 406 を返す |
 
 ## 🗒️tuners.yml
 
@@ -82,7 +83,7 @@
 ```yaml
 # 配列
 - name: チューナー識別名 # String
-  types: # (GR|BS|CS|SKY)[]
+  types: # (GR|BS|CS|SKY|BS4K)[]
     - GR
     - BS
     - CS
@@ -103,8 +104,12 @@
   remoteMirakurunDecoder: false # Boolean
   # 以下はオプション
   decoder: cmd # String
+  tlvDecoder: cmd # String
+  tlvToTsDecoder: cmd # String
   isDisabled: false # Boolean
 ```
+
+公開型 `ChannelType` に `BS4K` を追加しています。TypeScript で従来の4種を網羅する `switch` や `Record<ChannelType, ...>` を使っている場合は、`BS4K` の分岐やキーを追加してください。従来の `GR`・`BS`・`CS`・`SKY` も引き続き使用できます。
 
 #### routes
 
@@ -177,6 +182,25 @@
 sudo npm install arib-b25-stream-test -g --unsafe-perm
 ```
 
+#### tlvDecoder / tlvToTsDecoder
+
+TLV (MMT) のチャンネルでは、タイプにかかわらず、`decoder` の代わりにこれらを使います。どちらも引数を付けて指定できます (空白を含む場合は引用符で囲みます)。
+
+- `tlvDecoder`: TLV を入力して TLV を出力する CAS 処理コマンド
+- `tlvToTsDecoder`: TLV を入力して MPEG-2 TS を出力するコマンド
+
+```
+# 参考: TLV の流れ
++-------------+    +-----------+    +------------+    +----------------+    +--------+
+| TunerDevice | -> | TLVFilter | -> | tlvDecoder | -> | tlvToTsDecoder | -> | (user) |
++-------------+    +-----------+    +------------+    +----------------+    +--------+
+               TLV             TLV               TLV                   TS
+```
+
+ストリームの API に `format=tlv` を付けると `tlvToTsDecoder` を通さずに TLV を出力し、`format=ts` を付けると `tlvToTsDecoder` を設定したチューナーだけを使って TS を出力します。`format` を付けない場合は、`defaultTlvStreamFormat` に従います。出力できない形式を要求した場合は 406 を返します。
+
+`tlvToTsDecoder` が起動に失敗し続けた場合は、TLV を出力せずにストリームを終了します。`tlvDecoder` は、`decoder` と同じく入力をそのまま出力します。
+
 ## 🗒️channels.yml
 
 💯 Web UI 設定完全対応
@@ -192,12 +216,13 @@ sudo npm install arib-b25-stream-test -g --unsafe-perm
 ```yaml
 # 配列
 - name: チャンネル識別名 # String
-  type: GR # 列挙型 [GR|BS|CS|SKY]
+  type: GR # 列挙型 [GR|BS|CS|SKY|BS4K]
   channel: '0' # String
   # 以下はオプション
   route: TER # 列挙型 [TER|SAT|CATV|HIKARI] - 受信する経路。省略した場合、GR は TER、それ以外は SAT
   serviceId: 1234 # Integer - 指定しない場合、サービスは自動的にスキャンされます。
   tsmfRelTs: 1 # 数値: 1~15
+  format: tlv # 列挙型 [ts|tlv] - 指定しない場合、サービスのスキャンで判別した形式 (スキャンの前は BS4K なら tlv、それ以外は ts)
   commandVars: # オプションのコマンド変数 *@4.0.0~
     satellite: EXAMPLE-SAT4A
     space: 0
@@ -207,6 +232,12 @@ sudo npm install arib-b25-stream-test -g --unsafe-perm
     exampleArg2: -arg2 "引用符を使用して空白を含むことができます"
   isDisabled: false # Boolean
 ```
+
+#### format
+
+チャンネルで受信するデータの形式です。TLV (MMT) の場合は `tlv` です。
+
+指定しない場合は、サービスのスキャンのときに受信したデータから判別し、`channels.json` に保存します。視聴や録画などのストリームでは判別せず、保存した形式を使います (TS のストリームの開始を遅らせないため)。スキャンの前は、種別が `BS4K` なら `tlv`、それ以外は `ts` として扱います。
 
 #### route
 

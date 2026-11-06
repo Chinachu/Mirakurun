@@ -47,7 +47,10 @@ export interface Channel {
     services?: Service[];
 }
 
-export type ChannelType = "GR" | "BS" | "CS" | "SKY";
+export type ChannelType = "GR" | "BS" | "CS" | "SKY" | "BS4K";
+
+/** `tlv` for the channels of TLV (MMT), such as `BS4K`. */
+export type StreamFormat = "ts" | "tlv";
 
 /** how the tuner receives the channel. e.g. `CATV` for BS/CS via transmodulation. */
 export type ChannelRoute = "TER" | "SAT" | "CATV" | "HIKARI";
@@ -83,6 +86,8 @@ export interface Program {
     description?: string;
     genres?: ProgramGenre[];
     video?: ProgramVideo;
+    /** Video metadata carried by MH-EIT (MMT). */
+    mmtVideo?: ProgramMMTVideo;
     audios?: ProgramAudio[];
 
     series?: ProgramSeries;
@@ -108,7 +113,19 @@ export interface ProgramVideo {
     componentType: number;
 }
 
+export interface ProgramMMTVideo {
+    resolution: ProgramVideoResolution | null;
+    frameRate?: ProgramVideoFrameRate;
+    transferCharacteristics?: ProgramVideoTransferCharacteristics;
+}
+
 export type ProgramVideoType = "mpeg2" | "h.264" | "h.265";
+
+/** ARIB STD-B60 Table 7-50 */
+export type ProgramVideoFrameRate = "15" | "23.976" | "24" | "25" | "29.97" | "30" | "50" | "59.94" | "60" | "100" | "119.88" | "120";
+
+/** ARIB STD-B60 Table 7-51 */
+export type ProgramVideoTransferCharacteristics = "bt709" | "iec61966" | "bt2020" | "bt2100-pq" | "bt2100-hlg";
 
 export type ProgramVideoResolution = (
     "240p" |
@@ -295,6 +312,8 @@ export interface ConfigServer {
     allowOrigins: string[];
     allowPNA: boolean;
     tsplayEndpoint: string;
+    /** the output format of the TLV (MMT) channels for the stream requests without `format`. (default: `tlv`) */
+    defaultTlvStreamFormat?: StreamFormat;
 }
 
 /**
@@ -329,6 +348,10 @@ export interface ConfigTunersItem {
     remoteMirakurunDecoder?: boolean;
     /** CAS processor command if needed. */
     decoder?: string;
+    /** [TLV] CAS processor command for TLV (input and output TLV) if needed. */
+    tlvDecoder?: string;
+    /** [TLV] command to convert TLV to MPEG-2 TS. */
+    tlvToTsDecoder?: string;
     /** `true` to **disable** this tuner. */
     isDisabled?: boolean;
 }
@@ -345,6 +368,8 @@ export interface ConfigChannelsItem {
     serviceId?: number;
     /** TSMF (MPEG-TS Multi Frame) relative TS number config for CATV */
     tsmfRelTs?: number;
+    /** `tlv` for TLV (MMT). (default: detected by the service scan, or `tlv` for `BS4K`) */
+    format?: StreamFormat;
     /**
      * passed to tuning command variables.
      * @example { "freq": 123456, "polarity": "H", "space": 6, "extra-args": "..." }

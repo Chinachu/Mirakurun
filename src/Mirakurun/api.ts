@@ -18,8 +18,11 @@ import { setImmediate as setImmediatePromise } from "timers/promises";
 import * as yieldableJSON from "yieldable-json";
 const stringifyAsync = promisify(yieldableJSON.stringifyAsync);
 import * as express from "express";
-import { stringifyJSONArray } from "./common";
+import * as apid from "../../api";
+import { StreamFilter, UserRequest, stringifyJSONArray } from "./common";
 import * as log from "./log";
+import _ from "./_";
+import type ChannelItem from "./ChannelItem";
 
 export interface Error {
     readonly code: number;
@@ -55,6 +58,77 @@ export function responseStreamErrorHandler(res: express.Response, err: NodeJS.Er
     }
 
     return responseError(res, 500, err.message);
+}
+
+/** the query parameter of the stream APIs */
+export const streamFormatParameter = {
+    in: "query",
+    name: "format",
+    type: "string",
+    enum: ["ts", "tlv"],
+    description: "The output format. `tlv` is only for the channels of TLV (MMT), `ts` needs `tlvToTsDecoder` for them."
+};
+
+/**
+ * responds a stream (GET and HEAD use the same output format)
+ * @param channels the channels to receive the stream
+ * @param start starts the stream with the user request
+ */
+export function responseStream(
+    req: express.Request,
+    res: express.Response,
+    channels: ChannelItem[],
+    start: (userReq: UserRequest) => Promise<StreamFilter>
+): Promise<StreamFilter | null> {
+    const outputFormat = _.tuner.getOutputFormat(channels, req.query.format as apid.StreamFormat);
+    if (outputFormat === null) {
+        responseError(res, 406, "Requested Stream Format Unavailable");
+        return Promise.resolve(null);
+    }
+
+    const userId = (req.ip || "unix") + ":" + (req.socket.remotePort || Date.now());
+    const contentType = outputFormat === "tlv" ? "application/octet-stream" : "video/MP2T";
+
+    // HEAD request support
+    if (req.method === "HEAD") {
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("X-Mirakurun-Tuner-User-ID", userId);
+        res.status(200).end();
+        return Promise.resolve(null);
+    }
+
+    let requestAborted = false;
+    req.once("close", () => requestAborted = true);
+
+    (<any> res.socket)._writableState.highWaterMark = Math.max(res.writableHighWaterMark, 1024 * 1024 * 16);
+    res.socket.setNoDelay(true);
+
+    return start({
+        id: userId,
+        priority: parseInt(req.get("X-Mirakurun-Priority"), 10) || 0,
+        agent: req.get("User-Agent"),
+        url: req.url,
+        disableDecoder: (<number> <any> req.query.decode === 0),
+        outputFormat
+    })
+        .then(tsFilter => {
+            if (requestAborted === true || req.aborted === true) {
+                tsFilter.close();
+                return null;
+            }
+
+            req.once("close", () => tsFilter.close());
+
+            res.setHeader("Content-Type", contentType);
+            res.setHeader("X-Mirakurun-Tuner-User-ID", userId);
+            res.status(200);
+
+            return tsFilter;
+        })
+        .catch(err => {
+            responseStreamErrorHandler(res, err);
+            return null;
+        });
 }
 
 /**

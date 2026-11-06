@@ -15,6 +15,8 @@
 */
 import rfdc from "rfdc";
 import ChannelItem from "./ChannelItem";
+import type TSFilter from "./TSFilter";
+import type TLVFilter from "./TLVFilter";
 import * as apid from "../../api";
 
 export { parseCommandForSpawn } from "./command";
@@ -25,6 +27,8 @@ export interface User {
     readonly agent?: string;
     readonly url?: string;
     readonly disableDecoder?: boolean;
+    /** the output format of TLV (MMT) channels */
+    readonly outputFormat?: apid.StreamFormat;
     readonly streamSetting?: StreamSetting;
     readonly streamInfo?: StreamInfo;
 }
@@ -48,7 +52,27 @@ export interface StreamInfo {
     };
 }
 
-export const channelTypes: apid.ChannelType[] = ["GR", "BS", "CS", "SKY"];
+/** TSFilter for TS, TLVFilter for TLV (MMT) */
+export type StreamFilter = TSFilter | TLVFilter;
+
+/** the output of a tuner to a user */
+export interface StreamSink {
+    readonly closed: boolean;
+    write(chunk: Buffer, defer?: boolean): void;
+    flush(): void;
+    end(): void;
+    once(event: "close", listener: () => void): unknown;
+}
+
+export const channelTypes: apid.ChannelType[] = ["GR", "BS", "CS", "SKY", "BS4K"];
+
+/** the channel types of TLV (MMT) */
+export const tlvChannelTypes: apid.ChannelType[] = ["BS4K"];
+
+/** the key of `status.epgByStream` (MH-EIT carries only the events of its own TLV stream) */
+export function getEpgStreamKey(networkId: number, streamId: number): string {
+    return `${networkId}/${streamId}`;
+}
 
 export const channelRoutes: apid.ChannelRoute[] = ["TER", "SAT", "CATV", "HIKARI"];
 

@@ -66,6 +66,7 @@
 | `allowOrigins` | `ALLOW_ORIGINS` | String[] | `["https://mirakurun-secure-contexts-api.pages.dev"]` | ⚠️🧪Allowed origins (experimental) |
 | `allowPNA` | `ALLOW_PNA` | Boolean | `true` | 🧪[PNA](https://github.com/WICG/private-network-access)/[LNA](https://github.com/explainers-by-googlers/local-network-access) permission settings (experimental) |
 | `tsplayEndpoint` | `TSPLAY_ENDPOINT` | String | `https://mirakurun-secure-contexts-api.pages.dev/tsplay/` | 🧪TSPlay endpoint (experimental) |
+| `defaultTlvStreamFormat` | `DEFAULT_TLV_STREAM_FORMAT` | String | `tlv` | Output format of the TLV (MMT) channels for the stream requests without `format` (`ts` or `tlv`)<br>If `ts` is selected and no tuner for the channel has `tlvToTsDecoder` configured, HTTP 406 is returned |
 
 ## 🗒️tuners.yml
 
@@ -82,7 +83,7 @@
 ```yaml
 # Array
 - name: TunerIdentificationName # String
-  types: # (GR|BS|CS|SKY)[]
+  types: # (GR|BS|CS|SKY|BS4K)[]
     - GR
     - BS
     - CS
@@ -103,8 +104,12 @@
   remoteMirakurunDecoder: false # Boolean
   # Optional parameters below
   decoder: cmd # String
+  tlvDecoder: cmd # String
+  tlvToTsDecoder: cmd # String
   isDisabled: false # Boolean
 ```
+
+`BS4K` has been added to the public `ChannelType` union. TypeScript consumers with exhaustive switches or `Record<ChannelType, ...>` mappings for the previous four types need to add a `BS4K` case or key. `GR`, `BS`, `CS` and `SKY` remain supported.
 
 #### routes
 
@@ -177,6 +182,25 @@ Specify the CAS processing command as needed.
 sudo npm install arib-b25-stream-test -g --unsafe-perm
 ```
 
+#### tlvDecoder / tlvToTsDecoder
+
+These are used instead of `decoder` for TLV (MMT) channels of any type. Both can be specified with arguments (quote the ones including spaces).
+
+- `tlvDecoder`: CAS processing command that takes TLV and outputs TLV
+- `tlvToTsDecoder`: command that takes TLV and outputs MPEG-2 TS
+
+```
+# Reference: TLV flow
++-------------+    +-----------+    +------------+    +----------------+    +--------+
+| TunerDevice | -> | TLVFilter | -> | tlvDecoder | -> | tlvToTsDecoder | -> | (user) |
++-------------+    +-----------+    +------------+    +----------------+    +--------+
+               TLV             TLV               TLV                   TS
+```
+
+With `format=tlv`, the stream APIs output TLV without `tlvToTsDecoder`. With `format=ts`, only the tuners with `tlvToTsDecoder` are used to output TS. Without `format`, `defaultTlvStreamFormat` is followed. 406 is returned for the format that can not be output.
+
+If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outputting TLV. `tlvDecoder` passes through the input as `decoder` does.
+
 ## 🗒️channels.yml
 
 💯 Fully supported in Web UI
@@ -192,12 +216,13 @@ sudo npm install arib-b25-stream-test -g --unsafe-perm
 ```yaml
 # Array
 - name: ChannelIdentificationName # String
-  type: GR # Enum [GR|BS|CS|SKY]
+  type: GR # Enum [GR|BS|CS|SKY|BS4K]
   channel: '0' # String
   # Optional parameters below
   route: TER # Enum [TER|SAT|CATV|HIKARI] - receiving route. `TER` for GR, `SAT` for others if omitted.
   serviceId: 1234 # Integer - Services will be automatically scanned if not specified.
   tsmfRelTs: 1 # Number: 1~15
+  format: tlv # Enum [ts|tlv] - the format detected by the service scan if not specified (before the scan, tlv for BS4K, ts for others)
   commandVars: # Optional command variables *@4.0.0~
     satellite: EXAMPLE-SAT4A
     space: 0
@@ -207,6 +232,12 @@ sudo npm install arib-b25-stream-test -g --unsafe-perm
     exampleArg2: -arg2 "Can include spaces using quotes"
   isDisabled: false # Boolean
 ```
+
+#### format
+
+The format of the data received on the channel. `tlv` for TLV (MMT).
+
+If not specified, the format is detected from the data received by the service scan, and saved in `channels.json`. The streams for viewing and recording do not detect and use the format saved (not to delay the start of the streams of TS). Before the scan, `tlv` for the type `BS4K`, `ts` for the others.
 
 #### route
 

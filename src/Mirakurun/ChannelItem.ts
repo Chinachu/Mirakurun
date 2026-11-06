@@ -18,12 +18,13 @@ import _ from "./_";
 import * as common from "./common";
 import * as apid from "../../api";
 import ServiceItem from "./ServiceItem";
-import TSFilter from "./TSFilter";
 
 export interface ChannelStream {
     readonly networkId: number;
     /** transport_stream_id */
     readonly streamId: number;
+    /** detected by the service scan */
+    readonly format?: apid.StreamFormat;
 }
 
 export default class ChannelItem {
@@ -33,6 +34,7 @@ export default class ChannelItem {
     readonly channel: string;
     readonly tsmfRelTs: number;
     readonly commandVars: apid.ConfigChannelsItem["commandVars"];
+    private _format: apid.StreamFormat;
 
     constructor(config: apid.ConfigChannelsItem) {
         this.name = config.name;
@@ -41,6 +43,7 @@ export default class ChannelItem {
         this.channel = config.channel;
         this.tsmfRelTs = config.tsmfRelTs;
         this.commandVars = config.commandVars;
+        this._format = config.format;
     }
 
     /** the stream received last time. `null` until received once. */
@@ -48,8 +51,21 @@ export default class ChannelItem {
         return _.channel.getStream(this);
     }
 
-    setStream(networkId: number, streamId: number): void {
-        _.channel.setStream(this, networkId, streamId);
+    /**
+     * `format` of channels.yml, the format detected by the service scan, or the default of the type (TLV for `BS4K`).
+     * The streams use this without detecting (not to delay the streams of TS).
+     */
+    get format(): apid.StreamFormat {
+        return this._format || this.stream?.format || (common.tlvChannelTypes.includes(this.type) ? "tlv" : "ts");
+    }
+
+    get isTlv(): boolean {
+        return this.format === "tlv";
+    }
+
+    /** @param format detected by the service scan, keeps the last one if omitted */
+    setStream(networkId: number, streamId: number, format?: apid.StreamFormat): void {
+        _.channel.setStream(this, networkId, streamId, format);
     }
 
     toJSON(): apid.ConfigChannelsItem {
@@ -59,6 +75,7 @@ export default class ChannelItem {
             channel: this.channel,
             route: this.route,
             tsmfRelTs: this.tsmfRelTs,
+            format: this._format,
             commandVars: this.commandVars
         };
     }
@@ -67,7 +84,7 @@ export default class ChannelItem {
         return _.service.findByChannel(this);
     }
 
-    getStream(user: common.User, output: stream.Writable): Promise<TSFilter> {
+    getStream(user: common.User, output: stream.Writable): Promise<common.StreamFilter> {
         return _.tuner.initChannelStream(this, user, output);
     }
 }

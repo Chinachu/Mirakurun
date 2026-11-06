@@ -98,8 +98,8 @@ export const ProgramCardBase: React.FC<ProgramCardBaseProps> = ({ program, noAVI
                 <ProgramGenres genres={program.genres} />
             )}
 
-            {!noAVInfo && (program.video || program.audios) && (
-                <ProgramAVInfo video={program.video} audios={program.audios} />
+            {!noAVInfo && (program.video || program.mmtVideo || program.audios) && (
+                <ProgramAVInfo mmtVideo={program.mmtVideo} video={program.video} audios={program.audios} />
             )}
 
             {!noActions && !isDummy && (
