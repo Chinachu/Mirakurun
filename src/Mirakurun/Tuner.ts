@@ -24,7 +24,7 @@ import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
 import TSFilter from "./TSFilter";
 import TSDecoder from "./TSDecoder";
-import { DETECT_BYTES, DETECT_SKIP_BYTES, detectStreamFormat } from "./StreamFormat";
+import { DETECT_BYTES, DETECT_SKIP_BYTES, detectStreamFormat, detectTSMFStreamFormat } from "./StreamFormat";
 
 // the TLV decoders (descrambling via a server, converting) take a while to output
 const TLV_DECODER_STARTUP_TIMEOUT = 10000;
@@ -37,6 +37,10 @@ class FormatProbe extends EventEmitter {
     private _bytes = 0;
     private _closed = false;
     private _resolve: (format: apid.StreamFormat | null) => void = null;
+
+    constructor(private _detect: (data: Buffer) => apid.StreamFormat | null) {
+        super();
+    }
 
     get closed(): boolean {
         return this._closed;
@@ -61,7 +65,7 @@ class FormatProbe extends EventEmitter {
         if (this._bytes >= DETECT_SKIP_BYTES + DETECT_BYTES) {
             const data = Buffer.concat(this._chunks, this._bytes);
             this._chunks = [];
-            this._done(detectStreamFormat(data.subarray(DETECT_SKIP_BYTES)));
+            this._done(this._detect(data.subarray(DETECT_SKIP_BYTES)));
         }
     }
 
@@ -411,12 +415,13 @@ export class Tuner {
     private async _detectFormat(user: common.User): Promise<apid.StreamFormat> {
         const channel = user.streamSetting.channel;
         const devices = this._getDevicesByType(channel.type, channel.route);
-        // the remote Mirakurun outputs the format by itself, TSMF is TS outside
-        if (channel.tsmfRelTs || devices.some(device => device.isRemote)) {
+        // the remote Mirakurun outputs the format by itself
+        if (devices.some(device => device.isRemote)) {
             return channel.format;
         }
 
-        const probe = new FormatProbe();
+        // TSMF is TS outside, the relative stream is detected by the header
+        const probe = new FormatProbe(channel.tsmfRelTs ? data => detectTSMFStreamFormat(data, channel.tsmfRelTs) : detectStreamFormat);
         for (let tryCount = 50; tryCount > 0; tryCount--) {
             const picked = this._pickTunerDevice([{ channel, devices }], user.priority);
             if (picked !== null) {
@@ -500,7 +505,8 @@ export class Tuner {
                         eventId: setting.eventId,
                         parseNIT: setting.parseNIT,
                         parseSDT: setting.parseSDT,
-                        parseEIT: setting.parseEIT
+                        parseEIT: setting.parseEIT,
+                        tsmfRelTs: setting.channel.tsmfRelTs
                     });
                 } else {
                     let output: Writable;

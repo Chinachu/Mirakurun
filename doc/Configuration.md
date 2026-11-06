@@ -221,7 +221,7 @@ If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outp
   # Optional parameters below
   route: TER # Enum [TER|SAT|CATV|HIKARI] - receiving route. `TER` for GR, `SAT` for others if omitted.
   serviceId: 1234 # Integer - Services will be automatically scanned if not specified.
-  tsmfRelTs: 1 # Number: 1~15
+  tsmfRelTs: 1 # Number: 1~15 - relative TS number of TSMF. For the TLV channels, the relative stream number carrying TLV in extended TSMF (single carrier only)
   format: tlv # Enum [ts|tlv] - the format detected by the service scan if not specified (before the scan, tlv for BS4K, ts for others)
   commandVars: # Optional command variables *@4.0.0~
     satellite: EXAMPLE-SAT4A

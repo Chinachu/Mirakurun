@@ -28,6 +28,7 @@ import type ServiceItem from "./ServiceItem";
 import MHEPG from "./MHEPG";
 import EPGState from "./EPGState";
 import TLVServiceSelector from "./TLVServiceSelector";
+import TSMFTLV from "./TSMFTLV";
 import { MMTTLVReader, createMMTTLVReader } from "arib-mmt-tlv-ts";
 import {
     MHEventInformationTable,
@@ -52,6 +53,8 @@ export interface TLVFilterOptions {
     readonly parseNIT?: boolean;
     readonly parseSDT?: boolean;
     readonly parseEIT?: boolean;
+    /** the relative stream of TLV in TSMF (the input is TS) */
+    readonly tsmfRelTs?: number;
 }
 
 /** the start of the TLV packet followed by another one, `-1` if not found */
@@ -84,6 +87,7 @@ export default class TLVFilter extends EventEmitter {
 
     private _reader: MMTTLVReader = createMMTTLVReader();
     private _selector: TLVServiceSelector = null;
+    private _tsmf: TSMFTLV = null;
 
     // output
     private _output: Writable;
@@ -138,6 +142,10 @@ export default class TLVFilter extends EventEmitter {
         this._targetNetworkId = options.networkId || null;
         this._provideServiceId = options.serviceId || null;
         this._provideEventId = options.eventId || null;
+
+        if (options.tsmfRelTs) {
+            this._tsmf = new TSMFTLV(options.tsmfRelTs);
+        }
 
         if (this._provideServiceId !== null) {
             this._ready = false;
@@ -208,6 +216,13 @@ export default class TLVFilter extends EventEmitter {
     write(chunk: Buffer, defer = false): void {
         if (this._closed) {
             throw new Error("TLVFilter has closed already");
+        }
+
+        if (this._tsmf) {
+            chunk = this._tsmf.push(chunk);
+            if (chunk.length === 0) {
+                return;
+            }
         }
 
         if (this._output) {
