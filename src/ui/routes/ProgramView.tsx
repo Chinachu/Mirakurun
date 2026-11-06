@@ -104,6 +104,8 @@ export const ProgramView: React.FC = () => {
         };
     }, [program]);
 
+    const streamId = program ? state.getService(program.networkId, program.serviceId)?.streamId : undefined;
+
     return (
         <div className="route" id="route-program-view">
             <Navbar className="toolbar">
@@ -189,6 +191,7 @@ export const ProgramView: React.FC = () => {
                     <p className="meta">
                         Program ID: {program.id}<br />
                         event_id: {getIdWithHex(program.eventId)}<br />
+                        StreamID: {streamId !== undefined ? getIdWithHex(streamId) : "-"}<br />
                         SID: {getIdWithHex(program.serviceId)}<br />
                         NID: {getIdWithHex(program.networkId)}
                     </p>

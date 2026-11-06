@@ -68,6 +68,8 @@ export interface Service {
     epgUpdatedAt?: number;
     /** transport_stream_id of the stream carrying the service. */
     streamId?: number;
+    /** `false` if the service is normally scrambled (free_CA_mode of SDT). */
+    isFree?: boolean;
     channel?: Channel;
     /** every channel carrying the stream of the service. */
     channels?: Channel[];

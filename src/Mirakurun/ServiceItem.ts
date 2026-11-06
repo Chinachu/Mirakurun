@@ -38,7 +38,8 @@ export default class ServiceItem {
         private _remoteControlKeyId?: number,
         private _epgReady: boolean = false,
         private _epgUpdatedAt: number = 0,
-        private _streamId?: number
+        private _streamId?: number,
+        private _isFree?: boolean
     ) {
         this._id = ServiceItem.getId(_networkId, _serviceId);
     }
@@ -149,6 +150,20 @@ export default class ServiceItem {
         }
     }
 
+    /** `undefined` until the service is scanned */
+    get isFree(): boolean {
+        return this._isFree;
+    }
+
+    set isFree(isFree: boolean) {
+        if (this._isFree !== isFree) {
+            this._isFree = isFree;
+
+            _.service.save();
+            this._updated();
+        }
+    }
+
     get channel(): ChannelItem {
         return this.channels[0];
     }
@@ -197,6 +212,7 @@ export default class ServiceItem {
             epgReady: this._epgReady,
             epgUpdatedAt: this._epgUpdatedAt,
             streamId: this._streamId,
+            isFree: this._isFree,
             channel: {
                 type: channel.type,
                 channel: channel.channel,

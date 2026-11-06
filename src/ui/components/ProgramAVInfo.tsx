@@ -14,8 +14,8 @@
    limitations under the License.
 */
 import * as React from "react";
-import { langMap, audioModeMap } from "../modules/constants";
-import { ProgramVideo, ProgramMMTVideo, ProgramAudio } from "../../../api.d";;
+import { langMap, audioModeMap, getAudioChannelsLabel, transferCharacteristicsMap } from "../modules/constants";
+import { ProgramVideo, ProgramMMTVideo, ProgramAudio } from "../../../api.d";
 
 import "./ProgramAVInfo.sass";
 
@@ -38,6 +38,16 @@ export const ProgramAVInfo: React.FC<ProgramAVInfoProps> = ({ video, mmtVideo, a
 
     if (!video && mmtVideo) {
         labels.push(<span key="video.resolution" className="video resolution">{mmtVideo.resolution}</span>);
+        if (mmtVideo.frameRate) {
+            labels.push(<span key="video.frameRate" className="video frame-rate">{mmtVideo.frameRate}fps</span>);
+        }
+        if (mmtVideo.transferCharacteristics && transferCharacteristicsMap[mmtVideo.transferCharacteristics]) {
+            labels.push(
+                <span key="video.transferCharacteristics" className="video transfer-characteristics">
+                    {transferCharacteristicsMap[mmtVideo.transferCharacteristics]}
+                </span>
+            );
+        }
     }
 
     if (audios) {
@@ -48,11 +58,13 @@ export const ProgramAVInfo: React.FC<ProgramAVInfoProps> = ({ video, mmtVideo, a
 
             const mode = audioModeMap[type8.slice(-5)] || "不明なモード";
             const lang = audio.langs.map(lang => langMap[lang]).join("＋");
+            // the number of channels with the mode of ARIB in the tooltip
+            const channels = getAudioChannelsLabel(mode);
 
             labels.push(
-                <span key={`audios.${count}`} className="audio">
+                <span key={`audios.${count}`} className="audio" title={channels ? mode : undefined}>
                     {audios.length > 1 && <>{trackPrefix}:&nbsp;</>}
-                    {mode}
+                    {channels || mode}
                     {lang !== "日本語" && <>&nbsp;/&nbsp;{lang}</>}
                 </span>
             );

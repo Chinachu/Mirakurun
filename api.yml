@@ -141,6 +141,8 @@ definitions:
         $ref: '#/definitions/UnixtimeMS'
       streamId:
         type: integer
+      isFree:
+        type: boolean
       channel:
         $ref: '#/definitions/Channel'
       channels:

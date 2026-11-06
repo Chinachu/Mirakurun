@@ -394,6 +394,7 @@ export default class TLVFilter extends EventEmitter {
                 networkId: sdt.originalNetworkId,
                 serviceId: service.serviceId,
                 streamId: sdt.tlvStreamId,
+                isFree: !service.freeCAMode,
                 name,
                 type,
                 logoId,

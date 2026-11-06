@@ -68,6 +68,28 @@ export const audioModeMap = {
     "10001": "3/3/3-5/2/3-3/0/0.2モード",
 };
 
+/**
+ * the number of the channels of the audio mode with LFE (e.g. `3/2/2.1モード` → `7.1ch`), `null` without LFE
+ * (ARIB STD-B10: `<upper>-<middle>-<lower>.<LFE>`, each layer is `<front>/<side>/<back>`)
+ */
+export function getAudioChannelsLabel(mode: string): string | null {
+    const m = /^([0-9/\-]+)\.([0-9])モード$/.exec(mode);
+    if (m === null) {
+        return null;
+    }
+    const channels = m[1].split(/[\/\-]/).reduce((sum, n) => sum + parseInt(n, 10), 0);
+    return `${channels}.${m[2]}ch`;
+}
+
+/** ARIB STD-B60 Table 7-51 */
+export const transferCharacteristicsMap = {
+    bt709: "BT.709",
+    iec61966: "IEC 61966",
+    bt2020: "BT.2020",
+    "bt2100-pq": "HDR (PQ)",
+    "bt2100-hlg": "HDR (HLG)",
+};
+
 export const ProgramAttributeMap = {
     字: "字幕放送", // 字幕放送
     新: "新番組", // 新番組
@@ -86,6 +108,71 @@ export const ProgramAttributeMap = {
     解: "音声解説", // 音声解説
     PPV: "PPV", // PPV
     手: "手話通訳放送", // 手話通訳放送
+    // ARIB STD-B62 (4K/8K)
+    "3D": "3DTV", // 🆛
+    "2ndScr": "セカンドスクリーン", // 🆜
+    "2K": "2K放送", // 🆝
+    "4K": "4K放送", // 🆞
+    "8K": "8K放送", // 🆟
+    "5.1": "5.1ch サラウンド", // 🆠
+    "7.1": "7.1ch サラウンド", // 🆡
+    "22.2": "22.2ch サラウンド", // 🆢
+    "60P": "60P", // 🆣
+    "120P": "120P", // 🆤
+    d: "データ放送", // 🆥
+    HC: "ハイブリッドキャスト", // 🆦
+    HDR: "HDR", // 🆧
+    "Hi-Res": "ハイレゾ", // 🆨
+    Lossless: "ロスレス", // 🆩
+    SHV: "スーパーハイビジョン", // 🆪
+    UHD: "UHD", // 🆫
+    VOD: "VOD", // 🆬
+    配: "配信", // 🈻
+};
+
+/** the class of the label of the attribute (default: `bg-attribute-<attribute>`) */
+export const ProgramAttributeClassMap: Partial<Record<keyof typeof ProgramAttributeMap, string>> = {
+    "3D": "uhd-video",
+    "2K": "uhd-video",
+    "4K": "uhd-video",
+    "8K": "uhd-video",
+    "60P": "uhd-video",
+    "120P": "uhd-video",
+    SHV: "uhd-video",
+    UHD: "uhd-video",
+    "5.1": "uhd-audio",
+    "7.1": "uhd-audio",
+    "22.2": "uhd-audio",
+    "Hi-Res": "uhd-audio",
+    Lossless: "uhd-audio",
+    HDR: "hdr",
+    "2ndScr": "uhd-service",
+    d: "uhd-service",
+    HC: "uhd-service",
+    VOD: "uhd-service",
+    配: "uhd-service",
+};
+
+/** the attributes of the characters not normalized to the text by NFKC */
+export const ProgramAttributeNormalizationMap: Record<string, keyof typeof ProgramAttributeMap> = {
+    "\u{1F19B}": "3D",
+    "\u{1F19C}": "2ndScr",
+    "\u{1F19D}": "2K",
+    "\u{1F19E}": "4K",
+    "\u{1F19F}": "8K",
+    "\u{1F1A0}": "5.1",
+    "\u{1F1A1}": "7.1",
+    "\u{1F1A2}": "22.2",
+    "\u{1F1A3}": "60P",
+    "\u{1F1A4}": "120P",
+    "\u{1F1A5}": "d",
+    "\u{1F1A6}": "HC",
+    "\u{1F1A7}": "HDR",
+    "\u{1F1A8}": "Hi-Res",
+    "\u{1F1A9}": "Lossless",
+    "\u{1F1AA}": "SHV",
+    "\u{1F1AB}": "UHD",
+    "\u{1F1AC}": "VOD",
 };
 
 export const Genre1Map = {

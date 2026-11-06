@@ -246,7 +246,8 @@ export class Service {
                     service.remoteControlKeyId,
                     service.epgReady,
                     service.epgUpdatedAt,
-                    service.streamId
+                    service.streamId,
+                    service.isFree
                 )
             );
         }
@@ -409,11 +410,12 @@ export class Service {
         if (item !== null) {
             // already added on another channel carrying the same stream
             item.streamId = service.streamId;
+            item.isFree = service.isFree;
         } else {
             this.add(
                 new ServiceItem(
                     channel, service.networkId, service.serviceId, service.name, service.type, service.logoId,
-                    undefined, false, 0, service.streamId
+                    undefined, false, 0, service.streamId, service.isFree
                 )
             );
         }
@@ -442,6 +444,7 @@ export class Service {
             const item = this.get(service.networkId, service.serviceId);
             if (item !== null) {
                 item.streamId = service.streamId;
+                item.isFree = service.isFree;
                 item.name = service.name;
                 item.type = service.type;
                 if (service.logoId > -1) {
@@ -460,7 +463,8 @@ export class Service {
                         service.remoteControlKeyId,
                         false,
                         0,
-                        service.streamId
+                        service.streamId,
+                        service.isFree
                     )
                 );
             }
