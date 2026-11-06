@@ -1,6 +1,17 @@
 const { describe, it, before } = require("node:test");
 const assert = require("assert");
+const path = require("path");
 
+// status.ts のタイマーでテストのプロセスが終了しなくなるため差し替える
+const statusPath = path.join(__dirname, "../lib/Mirakurun/status.js");
+require.cache[statusPath] = {
+  id: statusPath,
+  filename: statusPath,
+  loaded: true,
+  exports: { __esModule: true, default: { epg: {}, epgByStream: {}, streamCount: { tsFilter: 0, decoder: 0 }, errorCount: { bufferOverflow: 0 } } }
+};
+
+const _ = require("../lib/Mirakurun/_").default;
 const log = require("../lib/Mirakurun/log");
 let TSMFTLV;
 
@@ -208,6 +219,20 @@ describe("[tsmftlv.spec] TSMFTLV.ts", () => {
     const bonded = Buffer.concat(frames(slotMap, splitTLV([tlvPacket(1, 1000)]), { numberOfCarriers: 3 }));
     assert.strictEqual(new TSMFTLV(1).push(bonded).length, 0);
   });
+
+  it("assembles the large TLV packets and the headers across the TS packets", () => {
+    // TLV のヘッダー (4 バイト) が TS パケットの境界をまたぐように、TS パケットの残りより少し小さい TLV を挟む
+    const tlv = [tlvPacket(1, 65000), tlvPacket(2, 178), tlvPacket(3, 30000), tlvPacket(4, 1), tlvPacket(5, 2)];
+    const ts = Buffer.concat(frames(slotMap, splitTLV(tlv)));
+    for (const size of [ts.length, 188, 61]) {
+      const t = new TSMFTLV(1);
+      const out = [];
+      for (let pos = 0; pos < ts.length; pos += size) {
+        out.push(t.push(ts.subarray(pos, pos + size)));
+      }
+      assert.ok(Buffer.concat(out).equals(Buffer.concat(tlv)), `chunk size: ${size}`);
+    }
+  });
 });
 
 describe("[tsmftlv.spec] StreamFormat.ts: detectTSMFStreamFormat()", () => {
@@ -223,5 +248,29 @@ describe("[tsmftlv.spec] StreamFormat.ts: detectTSMFStreamFormat()", () => {
     assert.strictEqual(detectTSMFStreamFormat(Buffer.concat([stale, ...frames]), 1), "ts");
     assert.strictEqual(detectTSMFStreamFormat(Buffer.concat([header({ slotMap, cc: 0 }), header({ slotMap, cc: 1 })]), 1), "tlv");
     assert.strictEqual(detectTSMFStreamFormat(Buffer.concat([stale]), 1), null);
+  });
+
+  it("is used by the format detection of the service scan for the channels of TSMF", async () => {
+    _.config = { server: {} };
+    _.channel = { getStream: () => null };
+    const Tuner = require("../lib/Mirakurun/Tuner").default;
+    const ChannelItem = require("../lib/Mirakurun/ChannelItem").default;
+    // 判別は 64KB を読み飛ばした後の 64KB で行う
+    const tlv = Array.from({ length: 40 }, (_, i) => tlvPacket(i, 4000));
+    for (const [tlvRelTs, expected] of [[[1], "tlv"], [[], "ts"]]) {
+      const channel = new ChannelItem({ name: "CATV", type: "CS", channel: "C13", tsmfRelTs: 1 });
+      const streamSetting = { channel };
+      const data = Buffer.concat(frames(slotMap, splitTLV(tlv), { tlvRelTs }));
+      const device = {
+        config: { name: "t", types: ["CS"], tlvToTsDecoder: "mmt2ts" }, isRemote: false, users: [{ id: "scan", streamSetting }],
+        async startStream(user, sink) {
+          setImmediate(() => sink.write(data));
+        }
+      };
+      const t = Object.create(Tuner.prototype);
+      t._devices = [device];
+      const probe = t._startFormatProbe({ id: "scan", priority: -1, streamSetting });
+      assert.strictEqual(await probe.format, expected);
+    }
   });
 });

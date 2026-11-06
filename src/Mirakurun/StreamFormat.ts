@@ -14,7 +14,6 @@
    limitations under the License.
 */
 import * as apid from "../../api";
-import { parseTSMFHeader } from "./TSMFTLV";
 
 const TS_PACKET_SIZE = 188;
 /** TS packets in a row to detect TS */
@@ -52,6 +51,8 @@ export function detectStreamFormat(data: Buffer): apid.StreamFormat | null {
  * @returns `null` if unknown
  */
 export function detectTSMFStreamFormat(data: Buffer, relTs: number): apid.StreamFormat | null {
+    // keep the module of TSMF out of the path only for TS
+    const { parseTSMFHeader } = require("./TSMFTLV") as typeof import("./TSMFTLV");
     let last: { cc: number, isTlv: boolean } = null;
     for (let i = 0; i + TS_PACKET_SIZE <= data.length; i++) {
         if (data[i] !== 0x47 || (((data[i + 1] & 0x1F) << 8) | data[i + 2]) !== 0x2F) {

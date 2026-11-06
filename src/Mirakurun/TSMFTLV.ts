@@ -73,6 +73,7 @@ export default class TSMFTLV {
 
     private _slotMap: number[] = null;
     private _slotCounter = -1;
+    /** the packets of the relative stream in the frame (the other slots are only counted) */
     private _frame: Buffer[] = [];
     private _headerCC = -1;
     private _warned = false;
@@ -137,7 +138,8 @@ export default class TSMFTLV {
         }
         // A missing whole packet shifts every subsequent slot. Do not emit until
         // the next header confirms both the frame length and continuity.
-        if (++this._slotCounter <= SLOT_COUNT) {
+        if (++this._slotCounter <= SLOT_COUNT && this._slotMap[this._slotCounter - 1] === this._relTs) {
+            // the input chunk is shared with the other users
             this._frame.push(Buffer.from(packet));
         }
     }
@@ -181,10 +183,8 @@ export default class TSMFTLV {
         }
 
         if (this._slotCounter === SLOT_COUNT) {
-            for (let i = 0; i < frame.length; i++) {
-                if (this._slotMap[i] === this._relTs) {
-                    this._onSelectedPacket(frame[i], outputs);
-                }
+            for (const selected of frame) {
+                this._onSelectedPacket(selected, outputs);
             }
         }
 
@@ -233,33 +233,47 @@ export default class TSMFTLV {
         this._outputTLV(outputs);
     }
 
-    /** moves the complete TLV packets to the outputs */
+    /**
+     * moves the complete TLV packets to the outputs
+     * (the data is kept as received until a TLV packet is complete, not to copy the rest again for each TS packet)
+     */
     private _outputTLV(outputs: Buffer[]): void {
-        let buffer = this._tlv.length === 1 ? this._tlv[0] : Buffer.concat(this._tlv, this._tlvLength);
-        let end = 0;
-        while (end + TLV_HEADER_SIZE <= buffer.length) {
-            if (buffer[end] !== TLV_SYNC_BYTE) {
+        while (this._tlvLength >= TLV_HEADER_SIZE) {
+            const header = this._tlv[0].length >= TLV_HEADER_SIZE ? this._tlv[0] : Buffer.concat(this._tlv.slice(0, TLV_HEADER_SIZE));
+            if (header[0] !== TLV_SYNC_BYTE) {
                 // broken, wait for the next start
                 this._lost();
-                if (end > 0) {
-                    outputs.push(Buffer.from(buffer.subarray(0, end)));
-                }
                 return;
             }
-            const next = end + TLV_HEADER_SIZE + buffer.readUInt16BE(end + 2);
-            if (next > buffer.length) {
-                break;
+            const size = TLV_HEADER_SIZE + header.readUInt16BE(2);
+            if (size > this._tlvLength) {
+                return;
             }
-            end = next;
+            outputs.push(this._takeTLV(size));
         }
+    }
 
-        if (end > 0) {
-            // the input chunk is shared with the other users
-            outputs.push(Buffer.from(buffer.subarray(0, end)));
-            buffer = buffer.subarray(end);
+    /** takes the bytes of a TLV packet from the head of the data kept */
+    private _takeTLV(size: number): Buffer {
+        const parts: Buffer[] = [];
+        let rest = size;
+        let used = 0;
+        while (rest > 0) {
+            const part = this._tlv[used];
+            if (part.length <= rest) {
+                parts.push(part);
+                rest -= part.length;
+                used++;
+            } else {
+                parts.push(part.subarray(0, rest));
+                this._tlv[used] = part.subarray(rest);
+                rest = 0;
+            }
         }
-        this._tlv = buffer.length > 0 ? [buffer] : [];
-        this._tlvLength = buffer.length;
+        this._tlv.splice(0, used);
+        this._tlvLength -= size;
+        // the data is of the packets copied from the input chunk
+        return parts.length === 1 ? parts[0] : Buffer.concat(parts, size);
     }
 
     /** drops the TLV packet in assembling, and starts again from the next start of a TLV packet */
