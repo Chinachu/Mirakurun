@@ -73,7 +73,8 @@ const channelOrder: Record<apid.ChannelType, number> = {
     GR: 1,
     BS: 2,
     CS: 3,
-    SKY: 4
+    SKY: 4,
+    BS4K: 5
 };
 
 /**
@@ -195,7 +196,7 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig | unde
     };
 
     // Handle BS (Broadcast Satellite) channels
-    if (option.type === "BS") {
+    if (option.type === "BS" || option.type === "BS4K") {
         // Handle subchannel style BS scanning (e.g. BS01_0)
         if (satelliteOptions.useSubCh) {
             const bsSubchOptions = {
@@ -942,7 +943,7 @@ About BS Subchannel Style:
             in: "query",
             name: "type",
             type: "string",
-            enum: ["GR", "BS", "CS"] as apid.ChannelType[],
+            enum: ["GR", "BS", "CS", "BS4K"] as apid.ChannelType[],
             default: "GR",
             description: "Specifies the channel type to scan."
         },

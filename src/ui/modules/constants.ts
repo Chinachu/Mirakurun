@@ -20,6 +20,7 @@ export const channelTypeMap = {
     BS: "BS",
     CS: "CS",
     SKY: "SKY",
+    BS4K: "BS4K",
 };
 
 export const relatedItemTypeMap = {

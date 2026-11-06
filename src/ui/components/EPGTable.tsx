@@ -38,6 +38,7 @@ const scrollState = {
         BS: -1,
         CS: -1,
         SKY: -1,
+        BS4K: -1,
     },
     top: -1,
 };
@@ -261,7 +262,7 @@ export const EPGTable: React.FC<EPGTableProps> = ({ date, channelType, globalSer
 
         // 全体番組表
         const _services = state.services
-            .filter(s => s.type === 1)
+            .filter(s => s.type === 0x01 || s.type === 0xAD) // digital TV / UHD
             .filter(s => channelType ? s.channel?.type === channelType : true);
 
         // ソート

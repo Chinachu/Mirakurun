@@ -92,6 +92,13 @@ definitions:
       - BS
       - CS
       - SKY
+      - BS4K
+
+  StreamFormat:
+    type: string
+    enum:
+      - ts
+      - tlv
 
   ChannelRoute:
     type: string
@@ -191,6 +198,17 @@ definitions:
             type: integer
           componentType:
             type: integer
+      mmtVideo:
+        description: Video metadata carried by MH-EIT (MMT).
+        type: object
+        properties:
+          resolution:
+            x-nullable: true
+            $ref: '#/definitions/ProgramVideoResolution'
+          frameRate:
+            type: string
+          transferCharacteristics:
+            type: string
       audios:
         type: array
         items:
@@ -600,6 +618,8 @@ definitions:
         type: array
         items:
           type: string
+      defaultTlvStreamFormat:
+        $ref: '#/definitions/StreamFormat'
 
   ConfigTuners:
     type: array
@@ -636,6 +656,10 @@ definitions:
         type: boolean
       decoder:
         type: string
+      tlvDecoder:
+        type: string
+      tlvToTsDecoder:
+        type: string
       isDisabled:
         type: boolean
 
@@ -663,6 +687,8 @@ definitions:
         $ref: '#/definitions/ServiceId'
       tsmfRelTs:
         type: integer
+      format:
+        $ref: '#/definitions/StreamFormat'
       commandVars:
         type: object
       isDisabled:

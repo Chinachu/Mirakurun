@@ -38,7 +38,8 @@ export const parameters = [
         type: "integer",
         minimum: 0,
         maximum: 1
-    }
+    },
+    api.streamFormatParameter
 ];
 
 export const get: Operation = (req, res) => {
@@ -49,49 +50,24 @@ export const get: Operation = (req, res) => {
         return;
     }
 
-    const userId = (req.ip || "unix") + ":" + (req.socket.remotePort || Date.now());
-
-    // HEAD request support
-    if (req.method === "HEAD") {
-        res.setHeader("Content-Type", "video/MP2T");
-        res.setHeader("X-Mirakurun-Tuner-User-ID", userId);
-        res.status(200).end();
+    const service = _.service.get(program.networkId, program.serviceId);
+    if (service === null) {
+        api.responseError(res, 404);
         return;
     }
 
-    let requestAborted = false;
-    req.once("close", () => requestAborted = true);
-
-    (<any> res.socket)._writableState.highWaterMark = Math.max(res.writableHighWaterMark, 1024 * 1024 * 16);
-    res.socket.setNoDelay(true);
-
-    _.tuner.initProgramStream(program, {
-        id: userId,
-        priority: parseInt(req.get("X-Mirakurun-Priority"), 10) || 0,
-        agent: req.get("User-Agent"),
-        url: req.url,
-        disableDecoder: (<number> <any> req.query.decode === 0)
-    }, res)
+    api.responseStream(req, res, service.channels, userReq => _.tuner.initProgramStream(program, userReq, res))
         .then(tsFilter => {
-            if (requestAborted === true || req.aborted === true) {
-                return tsFilter.close();
+            if (tsFilter) {
+                req.setTimeout(1000 * 60 * 10); // 10 minites
             }
-
-            req.once("close", () => tsFilter.close());
-
-            res.setHeader("Content-Type", "video/MP2T");
-            res.setHeader("X-Mirakurun-Tuner-User-ID", userId);
-            res.status(200);
-
-            req.setTimeout(1000 * 60 * 10); // 10 minites
-        })
-        .catch((err) => api.responseStreamErrorHandler(res, err));
+        });
 };
 
 get.apiDoc = {
     tags: ["programs", "stream"],
     operationId: "getProgramStream",
-    produces: ["video/MP2T"],
+    produces: ["video/MP2T", "application/octet-stream"],
     responses: {
         200: {
             description: "OK",
@@ -103,6 +79,9 @@ get.apiDoc = {
         },
         404: {
             description: "Not Found"
+        },
+        406: {
+            description: "Requested Stream Format Unavailable"
         },
         503: {
             description: "Tuner Resource Unavailable"

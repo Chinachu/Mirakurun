@@ -62,7 +62,7 @@ const COMPONENT_TYPE = {
     0xF4: "180p"
 };
 
-const SAMPLING_RATE = {
+export const SAMPLING_RATE = {
     0: -1,
     1: 16000,
     2: 22050,
@@ -90,9 +90,17 @@ const ISO_639_LANG_CODE = {
 };
 
 type TableId = number;
-type VersionRecord<T = number> = Record<TableId, T>;
+export type VersionRecord<T = number> = Record<TableId, T>;
 
-interface EventState {
+/** the version of the table in EIT (MH-EIT of MMT gives `table_id` of EIT[p/f actual] (0x4E) for EIT[p/f]) */
+export type EITVersion = Pick<EIT, "table_id" | "version_number">;
+
+export interface EventState<ExtendedItem = {
+    item_description_length: number;
+    item_description_char: Buffer;
+    item_length: number;
+    item_char: Buffer;
+}> {
     version: VersionRecord;
     programId: number;
 
@@ -101,12 +109,7 @@ interface EventState {
     };
     extended: {
         version: VersionRecord; // extended
-        _descs?: {
-            item_description_length: number;
-            item_description_char: Buffer;
-            item_length: number;
-            item_char: Buffer;
-        }[][];
+        _descs?: ExtendedItem[][];
         _done?: boolean;
     };
     component: {
@@ -431,7 +434,7 @@ export default class EPG {
     }
 }
 
-function isOutOfDate(eit: EIT, versionRecord: VersionRecord): boolean {
+export function isOutOfDate(eit: EITVersion, versionRecord: VersionRecord): boolean {
     if (
         (versionRecord[0x4E] !== undefined && eit.table_id !== 0x4E) ||
         (versionRecord[0x4F] !== undefined && eit.table_id !== 0x4E && eit.table_id !== 0x4F)
@@ -442,7 +445,7 @@ function isOutOfDate(eit: EIT, versionRecord: VersionRecord): boolean {
     return versionRecord[eit.table_id] !== eit.version_number;
 }
 
-function isOutOfDateLv2(eit: EIT, versionRecord: VersionRecord<VersionRecord>, lv2: number): boolean {
+export function isOutOfDateLv2(eit: EITVersion, versionRecord: VersionRecord<VersionRecord>, lv2: number): boolean {
     if (
         (versionRecord[0x4E] !== undefined && eit.table_id !== 0x4E) ||
         (versionRecord[0x4F] !== undefined && eit.table_id !== 0x4E && eit.table_id !== 0x4F)
@@ -465,7 +468,7 @@ function getGenre(content: any): apid.ProgramGenre {
     };
 }
 
-function getLangCode(buffer: Buffer): apid.ProgramAudioLanguageCode {
+export function getLangCode(buffer: Buffer): apid.ProgramAudioLanguageCode {
     for (const code in ISO_639_LANG_CODE) {
         if (ISO_639_LANG_CODE[code].compare(buffer) === 0) {
             return code as apid.ProgramAudioLanguageCode;

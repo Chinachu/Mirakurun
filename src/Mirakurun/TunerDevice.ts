@@ -24,7 +24,6 @@ import * as apid from "../../api";
 import status from "./status";
 import Event from "./Event";
 import ChannelItem from "./ChannelItem";
-import TSFilter from "./TSFilter";
 import Client, { ProgramsQuery } from "../client";
 import type DvbDevice from "./dvb/DvbDevice";
 import { parseDvbv5ZapCommand } from "./dvb/dvbv5-zap";
@@ -58,7 +57,7 @@ function loadDvbDevice(): typeof DvbDevice | null {
 }
 
 interface User extends common.User {
-    _stream?: TSFilter;
+    _stream?: common.StreamSink;
 }
 
 export interface TunerDeviceStatus {
@@ -221,7 +220,7 @@ export default class TunerDevice extends EventEmitter {
         await this._kill(true);
     }
 
-    async startStream(user: User, stream: TSFilter, channel?: ChannelItem): Promise<void> {
+    async startStream(user: User, stream: common.StreamSink, channel?: ChannelItem): Promise<void> {
         log.debug("TunerDevice#%d start stream for user `%s` (priority=%d)...", this._index, user.id, user.priority);
 
         if (this._isAvailable === false) {

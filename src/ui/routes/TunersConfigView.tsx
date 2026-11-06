@@ -40,7 +40,7 @@ import { parseCommandForSpawn } from "../../Mirakurun/command";
 import "./TunersConfigView.sass";
 
 const configAPI = "/api/config/tuners";
-const typesIndex = ["GR", "BS", "CS", "SKY"];
+const typesIndex = ["GR", "BS", "CS", "SKY", "BS4K"];
 const routesIndex: ChannelRoute[] = ["TER", "SAT", "CATV", "HIKARI"];
 
 function sortTypes(types: ChannelType[]): ChannelType[] {
@@ -265,7 +265,7 @@ export const TunersConfigView: React.FC = () => {
                                 </td>
                                 <td>
                                     <div className="types-checkboxes">
-                                        {(["GR", "BS", "CS", "SKY"] as ChannelType[]).map((type) => {
+                                        {(["GR", "BS", "CS", "SKY", "BS4K"] as ChannelType[]).map((type) => {
                                             const checked = tuner.types?.includes(type) ?? false;
                                             return (
                                                 <Checkbox
@@ -428,6 +428,36 @@ export const TunersConfigView: React.FC = () => {
                                                     }}
                                                 />
                                             </FormGroup>
+                                        )}
+                                        {tuner.types?.includes("BS4K") && (
+                                            <>
+                                                <FormGroup label="TLV Decoder">
+                                                    <InputGroup
+                                                        value={tuner.tlvDecoder || ""}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            if (val === "") {
+                                                                deleteTunerProperty(i, "tlvDecoder");
+                                                            } else {
+                                                                updateTuner(i, { tlvDecoder: val });
+                                                            }
+                                                        }}
+                                                    />
+                                                </FormGroup>
+                                                <FormGroup label="TLV to TS Decoder">
+                                                    <InputGroup
+                                                        value={tuner.tlvToTsDecoder || ""}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            if (val === "") {
+                                                                deleteTunerProperty(i, "tlvToTsDecoder");
+                                                            } else {
+                                                                updateTuner(i, { tlvToTsDecoder: val });
+                                                            }
+                                                        }}
+                                                    />
+                                                </FormGroup>
+                                            </>
                                         )}
                                     </div>
                                 </td>

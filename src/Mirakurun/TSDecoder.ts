@@ -16,11 +16,18 @@
 import * as stream from "stream";
 import * as child_process from "child_process";
 import * as log from "./log";
+import { parseCommandForSpawn } from "./command";
 import status from "./status";
 
 interface StreamOptions extends stream.TransformOptions {
     readonly output: stream.Writable;
     readonly command: string;
+    /** `true` to split the command into the arguments (for the TLV decoders) */
+    readonly withArgs?: boolean;
+    /** milliseconds to wait for the first output (default: 1500) */
+    readonly startupTimeout?: number;
+    /** `false` to close the stream instead of passing through the input when the process keeps failing (default: `true`) */
+    readonly passThroughOnFailure?: boolean;
 }
 
 let idCounter = 0;
@@ -31,6 +38,9 @@ export default class TSDecoder extends stream.Writable {
 
     private _id: number;
     private _command: string;
+    private _withArgs: boolean;
+    private _startupTimeout: number;
+    private _passThroughOnFailure: boolean;
     private _process: child_process.ChildProcess;
     private _readable: stream.Readable;
     private _writable: stream.Writable;
@@ -45,6 +55,9 @@ export default class TSDecoder extends stream.Writable {
 
         this._id = idCounter++;
         this._command = opts.command;
+        this._withArgs = opts.withArgs === true;
+        this._startupTimeout = opts.startupTimeout || 1500;
+        this._passThroughOnFailure = opts.passThroughOnFailure !== false;
 
         this._output = opts.output;
         this._output.once("finish", this._close.bind(this));
@@ -77,7 +90,7 @@ export default class TSDecoder extends stream.Writable {
             this._timeout = setTimeout(() => {
                 log.warn("TSDecoder#%d process will force killed because no respond...", this._id);
                 this._dead();
-            }, 1500);
+            }, this._startupTimeout);
         }
 
         this._writable.write(chunk);
@@ -112,15 +125,33 @@ export default class TSDecoder extends stream.Writable {
             log.warn("TSDecoder#%d respawning because dead (count=%d)", this._id, this._deadCount);
         }
 
-        const proc = this._process = child_process.spawn(this._command);
+        let proc: child_process.ChildProcess;
+        if (this._withArgs) {
+            const parsed = parseCommandForSpawn(this._command);
+            proc = this._process = child_process.spawn(parsed.command, parsed.args);
+        } else {
+            proc = this._process = child_process.spawn(this._command);
+        }
 
         proc.once("close", (code, signal) => {
             log.info(
                 "TSDecoder#%d process has closed with exit code=%d by signal `%s` (pid=%d)",
                 this._id, code, signal, proc.pid
             );
-            this._dead();
+            if (this._process === proc) {
+                this._dead();
+            }
         });
+
+        // stdin may fail before the child close event (for example EPIPE).
+        const onError = (err: Error) => {
+            if (this._process === proc) {
+                log.error("TSDecoder#%d process error: %s", this._id, err.message);
+                this._dead();
+            }
+        };
+        proc.once("error", onError);
+        proc.stdin.on("error", onError);
 
         proc.stderr.pipe(process.stderr);
         proc.stdout.once("data", () => clearTimeout(this._timeout));
@@ -142,10 +173,16 @@ export default class TSDecoder extends stream.Writable {
         log.error("TSDecoder#%d unexpected dead", this._id);
 
         ++this._deadCount;
+        clearTimeout(this._timeout);
         this._kill();
 
         if (this._deadCount > 3) {
-            this._fallback();
+            if (this._passThroughOnFailure) {
+                this._fallback();
+            } else {
+                log.error("TSDecoder#%d gave up, closing the stream (command=%s)", this._id, this._command);
+                this._close();
+            }
             return;
         }
 
@@ -186,6 +223,7 @@ export default class TSDecoder extends stream.Writable {
         }
         this._closed = true;
 
+        clearTimeout(this._timeout);
         this._kill();
 
         if (this._output.writableEnded === false) {

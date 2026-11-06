@@ -37,6 +37,7 @@ export interface Channel {
     channel: string;
     networkId: number;
     streamId: number;
+    format?: apid.StreamFormat;
 }
 
 export interface Program extends apid.Program {

@@ -15,6 +15,8 @@
 */
 interface Status {
     epg: { [networkId: number]: boolean };
+    /** EPG of TLV (MMT) is gathered per TLV stream (`${networkId}/${streamId}`) */
+    epgByStream: { [stream: string]: boolean };
     rpcCount: number;
     streamCount: {
         tsFilter: number;
@@ -37,6 +39,7 @@ interface Status {
 
 const status: Status = {
     epg: {},
+    epgByStream: {},
     rpcCount: 0,
     streamCount: {
         tsFilter: 0,

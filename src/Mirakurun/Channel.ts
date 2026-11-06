@@ -20,6 +20,7 @@ import _ from "./_";
 import * as db from "./db";
 import status from "./status";
 import ChannelItem, { ChannelStream } from "./ChannelItem";
+import type ServiceItem from "./ServiceItem";
 import { JobItem } from "./Job";
 
 export class Channel {
@@ -122,12 +123,13 @@ export class Channel {
         return this._streams.get(item) || null;
     }
 
-    setStream(item: ChannelItem, networkId: number, streamId: number): void {
+    setStream(item: ChannelItem, networkId: number, streamId: number, format?: apid.StreamFormat): void {
         const stream = this._streams.get(item);
-        if (stream && stream.networkId === networkId && stream.streamId === streamId) {
+        const isSameStream = stream && stream.networkId === networkId && stream.streamId === streamId;
+        if (isSameStream && (format === undefined || format === stream.format)) {
             return;
         }
-        this._streams.set(item, { networkId, streamId });
+        this._streams.set(item, { networkId, streamId, format: format || (isSameStream ? stream.format : undefined) });
         this._streamIndex = null;
         _.service?.invalidateChannelIndex?.();
 
@@ -148,7 +150,7 @@ export class Channel {
             if (item === null || typeof channel.networkId !== "number" || typeof channel.streamId !== "number") {
                 continue;
             }
-            item.setStream(channel.networkId, channel.streamId);
+            item.setStream(channel.networkId, channel.streamId, channel.format === "ts" || channel.format === "tlv" ? channel.format : undefined);
         }
         // nothing changed by loading
         clearTimeout(this._saveTimerId);
@@ -160,11 +162,10 @@ export class Channel {
         db.saveChannels(
             this._items
                 .filter(item => this._streams.has(item))
-                .map(item => ({
-                    type: item.type,
-                    channel: item.channel,
-                    ...this._streams.get(item)
-                })),
+                .map(item => {
+                    const { networkId, streamId, format } = this._streams.get(item);
+                    return { type: item.type, channel: item.channel, networkId, streamId, ...(format && { format }) };
+                }),
             _.configIntegrity.channels
         );
     }
@@ -180,13 +181,18 @@ export class Channel {
                 return;
             }
 
-            if (channel.type !== "GR" && channel.type !== "BS" && channel.type !== "CS" && channel.type !== "SKY") {
+            if (common.channelTypes.includes(channel.type) === false) {
                 log.error("invalid type of property `type` in channel#%d (%s) configuration", i, channel.name);
                 return;
             }
 
             if (typeof channel.channel !== "string") {
                 log.error("invalid type of property `channel` in channel#%d (%s) configuration", i, channel.name);
+                return;
+            }
+
+            if (channel.format !== undefined && channel.format !== "ts" && channel.format !== "tlv") {
+                log.error("invalid type of property `format` in channel#%d (%s) configuration", i, channel.name);
                 return;
             }
 
@@ -270,14 +276,27 @@ export class Channel {
             this._startup = false;
         }
 
-        const networkIds = [...new Set(_.service.items.map(item => item.networkId))];
-
-        for (const networkId of networkIds) {
-            const services = _.service.findByNetworkId(networkId);
-            if (services.length === 0) {
-                continue;
+        // EIT of TS carries the whole network, MH-EIT of TLV (MMT) carries only its own stream
+        const targets = new Map<string, { label: string, networkId: number, streamId?: number, services: ServiceItem[] }>();
+        for (const item of _.service.items) {
+            const isTlv = item.channel.isTlv;
+            const key = isTlv ? `NID.${item.networkId}.TSID.${item.streamId}` : `NID.${item.networkId}`;
+            if (!targets.has(key)) {
+                targets.set(key, {
+                    label: isTlv ? `Network#${item.networkId} Stream#${item.streamId}` : `Network#${item.networkId}`,
+                    networkId: item.networkId,
+                    streamId: isTlv ? item.streamId : undefined,
+                    services: []
+                });
             }
+            targets.get(key).services.push(item);
+        }
+
+        for (const [key, { label, networkId, streamId, services }] of targets) {
             const service = services[0];
+            const isGathering = streamId === undefined
+                ? () => status.epg[networkId] === true
+                : () => status.epgByStream[common.getEpgStreamKey(networkId, streamId)] === true;
 
             // any channel of the network can be used, the first service's ones come first
             const channels = [...new Set([service, ...services].flatMap(item => item.channels))];
@@ -288,42 +307,43 @@ export class Channel {
             let channel: ChannelItem = null;
 
             _.job.add({
-                key: `EPG.Gather.NID.${networkId}`,
-                name: `EPG Gather Network#${networkId}`,
+                key: `EPG.Gather.${key}`,
+                name: `EPG Gather ${label}`,
                 isRerunnable: true,
                 fn: async () => {
-                    log.info("Network#%d EPG gathering has started on %s/%s", networkId, channel.type, channel.channel);
+                    log.info("%s EPG gathering has started on %s/%s", label, channel.type, channel.channel);
                     try {
                         await _.tuner.getEPG(channel);
-                        log.info("Network#%d EPG gathering has finished", networkId);
+                        log.info("%s EPG gathering has finished", label);
                     } catch (e) {
-                        log.warn("Network#%d EPG gathering has failed [%s]", networkId, e);
+                        log.warn("%s EPG gathering has failed [%s]", label, e);
                         throw new Error("EPG gathering failed");
                     }
                 },
                 readyFn: async () => {
                     await common.sleep(100);
 
-                    if (status.epg[networkId] === true) {
-                        log.info("Network#%d EPG gathering is already in progress on another stream", networkId);
+                    if (isGathering()) {
+                        log.info("%s EPG gathering is already in progress on another stream", label);
                         return false;
                     }
                     if (service.epgReady === true) {
                         const now = Date.now();
                         if (startup && now - service.epgUpdatedAt < 1000 * 60 * 10) { // 10 mins
-                            log.info("Network#%d EPG gathering has skipped because EPG is already up to date (in 10 mins)", networkId);
+                            log.info("%s EPG gathering has skipped because EPG is already up to date (in 10 mins)", label);
                             return false;
                         }
                         if (now - service.epgUpdatedAt > 1000 * 60 * 60 * 12) { // 12 hours
-                            log.info("Network#%d EPG gathering is resuming forcibly because reached maximum pause time (12 hours)", networkId);
+                            log.info("%s EPG gathering is resuming forcibly because reached maximum pause time (12 hours)", label);
                             service.epgReady = false;
                         } else {
+                            const isTarget = (program: { serviceId: number }) => streamId === undefined || services.some(item => item.serviceId === program.serviceId);
                             const currentPrograms = _.program.findByNetworkIdAndTime(networkId, now)
-                                .filter(program => !!program.name && program.name !== "放送休止");
+                                .filter(program => !!program.name && program.name !== "放送休止" && isTarget(program));
                             if (currentPrograms.length === 0) {
-                                const networkPrograms = _.program.findByNetworkId(networkId);
+                                const networkPrograms = _.program.findByNetworkId(networkId).filter(isTarget);
                                 if (networkPrograms.length > 0) {
-                                    log.info("Network#%d EPG gathering has skipped because broadcast is off", networkId);
+                                    log.info("%s EPG gathering has skipped because broadcast is off", label);
                                     return false;
                                 }
                                 service.epgReady = false;

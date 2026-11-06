@@ -272,7 +272,7 @@ export class Client {
         return res.body as apid.Service;
     }
 
-    async getServiceStreamByChannel(opt: { type: apid.ChannelType, channel: string, sid: apid.ServiceId, decode?: boolean, priority?: number, signal?: AbortSignal }): Promise<http.IncomingMessage>;
+    async getServiceStreamByChannel(opt: { type: apid.ChannelType, channel: string, sid: apid.ServiceId, decode?: boolean, priority?: number, format?: apid.StreamFormat, signal?: AbortSignal }): Promise<http.IncomingMessage>;
     async getServiceStreamByChannel(type: apid.ChannelType, channel: string, sid: apid.ServiceId, decode?: boolean, priority?: number): Promise<http.IncomingMessage>;
     async getServiceStreamByChannel(...args: any[]) {
         let type: apid.ChannelType;
@@ -281,6 +281,7 @@ export class Client {
         let decode: boolean;
         let priority: number;
         let signal: AbortSignal;
+        let format: apid.StreamFormat;
 
         if (typeof args[0] === "object") {
             const opt = args[0];
@@ -290,6 +291,7 @@ export class Client {
             decode = opt.decode;
             priority = opt.priority;
             signal = opt.signal;
+            format = opt.format;
         } else {
             type = args[0];
             channel = args[1];
@@ -302,11 +304,12 @@ export class Client {
             type,
             channel,
             sid,
-            decode: decode ? 1 : 0
+            decode: decode ? 1 : 0,
+            ...(format ? { format } : {})
         }, { priority, signal });
     }
 
-    async getChannelStream(opt: { type: apid.ChannelType, channel: string, decode?: boolean, priority?: number, signal?: AbortSignal }): Promise<http.IncomingMessage>;
+    async getChannelStream(opt: { type: apid.ChannelType, channel: string, decode?: boolean, priority?: number, format?: apid.StreamFormat, signal?: AbortSignal }): Promise<http.IncomingMessage>;
     async getChannelStream(type: apid.ChannelType, channel: string, decode?: boolean, priority?: number): Promise<http.IncomingMessage>;
     async getChannelStream(...args: any[]): Promise<http.IncomingMessage> {
         let type: apid.ChannelType;
@@ -314,6 +317,7 @@ export class Client {
         let decode: boolean;
         let priority: number;
         let signal: AbortSignal;
+        let format: apid.StreamFormat;
 
         if (typeof args[0] === "object") {
             const opt = args[0];
@@ -322,6 +326,7 @@ export class Client {
             decode = opt.decode;
             priority = opt.priority;
             signal = opt.signal;
+            format = opt.format;
         } else {
             type = args[0];
             channel = args[1];
@@ -332,7 +337,8 @@ export class Client {
         return this.call("getChannelStream", {
             type,
             channel,
-            decode: decode ? 1 : 0
+            decode: decode ? 1 : 0,
+            ...(format ? { format } : {})
         }, { priority, signal });
     }
 
@@ -346,13 +352,14 @@ export class Client {
         return res.body as apid.Program;
     }
 
-    async getProgramStream(opt: { id: apid.ProgramId, decode?: boolean, priority?: number, signal?: AbortSignal }): Promise<http.IncomingMessage>;
+    async getProgramStream(opt: { id: apid.ProgramId, decode?: boolean, priority?: number, format?: apid.StreamFormat, signal?: AbortSignal }): Promise<http.IncomingMessage>;
     async getProgramStream(id: apid.ProgramId, decode?: boolean, priority?: number): Promise<http.IncomingMessage>;
     async getProgramStream(...args: any[]): Promise<http.IncomingMessage> {
         let id: apid.ProgramId;
         let decode: boolean;
         let priority: number;
         let signal: AbortSignal;
+        let format: apid.StreamFormat;
 
         if (typeof args[0] === "object") {
             const opt = args[0];
@@ -360,6 +367,7 @@ export class Client {
             decode = opt.decode;
             priority = opt.priority;
             signal = opt.signal;
+            format = opt.format;
         } else {
             id = args[0];
             decode = args[1];
@@ -368,7 +376,8 @@ export class Client {
 
         return this.call("getProgramStream", {
             id,
-            decode: decode ? 1 : 0
+            decode: decode ? 1 : 0,
+            ...(format ? { format } : {})
         }, { priority, signal });
     }
 
@@ -387,13 +396,14 @@ export class Client {
         return res.body as Buffer;
     }
 
-    async getServiceStream(opt: { id: apid.ServiceItemId, decode?: boolean, priority?: number, signal?: AbortSignal }): Promise<http.IncomingMessage>;
+    async getServiceStream(opt: { id: apid.ServiceItemId, decode?: boolean, priority?: number, format?: apid.StreamFormat, signal?: AbortSignal }): Promise<http.IncomingMessage>;
     async getServiceStream(id: apid.ServiceItemId, decode?: boolean, priority?: number): Promise<http.IncomingMessage>;
     async getServiceStream(...args: any[]): Promise<http.IncomingMessage> {
         let id: apid.ServiceItemId;
         let decode: boolean;
         let priority: number;
         let signal: AbortSignal;
+        let format: apid.StreamFormat;
 
         if (typeof args[0] === "object") {
             const opt = args[0];
@@ -401,6 +411,7 @@ export class Client {
             decode = opt.decode;
             priority = opt.priority;
             signal = opt.signal;
+            format = opt.format;
         } else {
             id = args[0];
             decode = args[1];
@@ -409,7 +420,8 @@ export class Client {
 
         return this.call("getServiceStream", {
             id,
-            decode: decode ? 1 : 0
+            decode: decode ? 1 : 0,
+            ...(format ? { format } : {})
         }, { priority, signal });
     }
 

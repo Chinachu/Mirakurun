@@ -182,8 +182,8 @@ export const ProgramView: React.FC = () => {
                         <ProgramGenres genres={program.genres} />
                     )}
 
-                    {(program.video || program.audios) && (
-                        <ProgramAVInfo video={program.video} audios={program.audios} />
+                    {(program.video || program.mmtVideo || program.audios) && (
+                        <ProgramAVInfo mmtVideo={program.mmtVideo} video={program.video} audios={program.audios} />
                     )}
 
                     <p className="meta">
