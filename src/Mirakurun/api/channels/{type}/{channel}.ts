@@ -45,14 +45,7 @@ export const get: Operation = (req, res) => {
 
     const body: apid.Channel = channel.toJSON();
 
-    body.services = channel.getServices().map(service => ({
-        id: service.id,
-        serviceId: service.serviceId,
-        networkId: service.networkId,
-        streamId: service.streamId,
-        name: service.name,
-        type: service.type
-    }));
+    body.services = api.getChannelServices(channel);
 
     api.responseJSON(res, body);
 };

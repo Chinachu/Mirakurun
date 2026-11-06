@@ -139,6 +139,11 @@ definitions:
         type: boolean
       epgUpdatedAt:
         $ref: '#/definitions/UnixtimeMS'
+      tsmfRelTs:
+        type: integer
+        minimum: 1
+        maximum: 15
+        description: Relative TS on the carrier when included in Channel.services
       streamId:
         type: integer
       channel:
@@ -425,6 +430,8 @@ definitions:
             type: boolean
           parseEIT:
             type: boolean
+          tsmfRelTs:
+            type: integer
       streamInfo:
         type: object
         additionalProperties:

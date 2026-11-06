@@ -21,10 +21,14 @@ import ServiceItem from "./ServiceItem";
 
 export interface ChannelStream {
     readonly networkId: number;
-    /** transport_stream_id */
+    /** transport_stream_id (or tlv_stream_id) */
     readonly streamId: number;
     /** detected by the service scan */
     readonly format?: apid.StreamFormat;
+    /** TSMF: the relative stream number */
+    readonly relTs?: number;
+    /** TSMF: the slots of the relative stream in a frame */
+    readonly slots?: number;
 }
 
 export default class ChannelItem {
@@ -46,9 +50,31 @@ export default class ChannelItem {
         this._format = config.format;
     }
 
-    /** the stream received last time. `null` until received once. */
+    /** the streams received last time (the relative streams of TSMF). `[]` until received once. */
+    get streams(): ChannelStream[] {
+        return _.channel.getStreams(this);
+    }
+
+    /** the stream of `defaultRelTs`. `null` until received once. */
     get stream(): ChannelStream {
-        return _.channel.getStream(this);
+        return this.getStreamByRelTs(this.defaultRelTs);
+    }
+
+    /**
+     * the relative stream of TSMF without specifying: `tsmfRelTs` of channels.yml, or the one of the most slots (the smaller number if the same)
+     * (`undefined` if not TSMF or not received yet)
+     */
+    get defaultRelTs(): number {
+        if (this.tsmfRelTs) {
+            return this.tsmfRelTs;
+        }
+        let picked: ChannelStream = null;
+        for (const stream of this.streams) {
+            if (stream.relTs !== undefined && (picked === null || stream.slots > picked.slots || (stream.slots === picked.slots && stream.relTs < picked.relTs))) {
+                picked = stream;
+            }
+        }
+        return picked?.relTs;
     }
 
     /**
@@ -56,16 +82,38 @@ export default class ChannelItem {
      * The streams use this without detecting (not to delay the streams of TS).
      */
     get format(): apid.StreamFormat {
-        return this._format || this.stream?.format || (common.tlvChannelTypes.includes(this.type) ? "tlv" : "ts");
+        return this.getFormat(this.defaultRelTs);
     }
 
     get isTlv(): boolean {
         return this.format === "tlv";
     }
 
+    /** @param relTs the relative stream of TSMF */
+    getStreamByRelTs(relTs?: number): ChannelStream {
+        return this.streams.find(stream => stream.relTs === relTs) || null;
+    }
+
+    /** @param relTs the relative stream of TSMF */
+    getFormat(relTs?: number): apid.StreamFormat {
+        return this._format || this.getStreamByRelTs(relTs)?.format || (common.tlvChannelTypes.includes(this.type) ? "tlv" : "ts");
+    }
+
     /** @param format detected by the service scan, keeps the last one if omitted */
     setStream(networkId: number, streamId: number, format?: apid.StreamFormat): void {
-        _.channel.setStream(this, networkId, streamId, format);
+        const last = this.getStreamByRelTs(this.tsmfRelTs || undefined);
+        const isSame = last !== null && last.networkId === networkId && last.streamId === streamId;
+        this.setStreams([{
+            networkId,
+            streamId,
+            format: format || (isSame ? last.format : undefined),
+            ...(this.tsmfRelTs && { relTs: this.tsmfRelTs })
+        }]);
+    }
+
+    /** the streams received by the service scan (all the relative streams of TSMF) */
+    setStreams(streams: ChannelStream[]): void {
+        _.channel.setStreams(this, streams);
     }
 
     toJSON(): apid.ConfigChannelsItem {

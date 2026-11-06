@@ -56,6 +56,8 @@ export type StreamFormat = "ts" | "tlv";
 export type ChannelRoute = "TER" | "SAT" | "CATV" | "HIKARI";
 
 export interface Service {
+    /** Relative TS on the carrier, when returned in Channel.services. */
+    tsmfRelTs?: number;
     id: ServiceItemId;
     serviceId: ServiceId;
     networkId: NetworkId;
@@ -233,6 +235,8 @@ interface StreamSetting {
     parseNIT?: boolean;
     parseSDT?: boolean;
     parseEIT?: boolean;
+    /** the relative stream of TSMF */
+    tsmfRelTs?: number;
 }
 
 export interface StreamInfo {

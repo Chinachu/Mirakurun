@@ -255,34 +255,34 @@ describe("[tlv.spec] TLV (MMT)", () => {
 
   describe("Tuner: output format", () => {
     before(() => {
-      _.channel = { getStream: () => null };
+      _.channel = { getStreams: () => [] };
     });
     const bs4k = () => new ChannelItem({ name: "BS4K", type: "BS4K", channel: "1" });
     const gr = () => new ChannelItem({ name: "GR", type: "GR", channel: "27" });
 
     it("is TS for the TS channels and rejects TLV", () => {
       const t = tuner([fakeDevice(0, { types: ["GR"] })]);
-      assert.strictEqual(t.getOutputFormat([gr()]), "ts");
-      assert.strictEqual(t.getOutputFormat([gr()], "ts"), "ts");
-      assert.strictEqual(t.getOutputFormat([gr()], "tlv"), null);
+      assert.strictEqual(t.getOutputFormat({ isTlv: false, channels: [gr()] }), "ts");
+      assert.strictEqual(t.getOutputFormat({ isTlv: false, channels: [gr()] }, "ts"), "ts");
+      assert.strictEqual(t.getOutputFormat({ isTlv: false, channels: [gr()] }, "tlv"), null);
     });
 
     it("is TLV by default, and TS when requested and a tuner can convert TLV to TS", () => {
       const t = tuner([fakeDevice(0, { types: ["BS4K"] }), fakeDevice(1, { types: ["BS4K"], tlvToTsDecoder: "mmt2ts" })]);
-      assert.strictEqual(t.getOutputFormat([bs4k()]), "tlv");
-      assert.strictEqual(t.getOutputFormat([bs4k()], "ts"), "ts");
+      assert.strictEqual(t.getOutputFormat({ isTlv: true, channels: [bs4k()] }), "tlv");
+      assert.strictEqual(t.getOutputFormat({ isTlv: true, channels: [bs4k()] }, "ts"), "ts");
     });
 
     it("is TLV by default and rejects TS without tlvToTsDecoder", () => {
       const t = tuner([fakeDevice(0, { types: ["BS4K"] })]);
-      assert.strictEqual(t.getOutputFormat([bs4k()]), "tlv");
-      assert.strictEqual(t.getOutputFormat([bs4k()], "ts"), null);
+      assert.strictEqual(t.getOutputFormat({ isTlv: true, channels: [bs4k()] }), "tlv");
+      assert.strictEqual(t.getOutputFormat({ isTlv: true, channels: [bs4k()] }, "ts"), null);
     });
 
     it("follows defaultTlvStreamFormat", () => {
       const t = tuner([fakeDevice(0, { types: ["BS4K"], tlvToTsDecoder: "mmt2ts" })]);
       _.config = { server: { defaultTlvStreamFormat: "ts" } };
-      assert.strictEqual(t.getOutputFormat([bs4k()]), "ts");
+      assert.strictEqual(t.getOutputFormat({ isTlv: true, channels: [bs4k()] }), "ts");
       _.config = { server: {} };
     });
   });
@@ -297,16 +297,14 @@ describe("[tlv.spec] TLV (MMT)", () => {
         const ch = new ChannelItem({ name: "BS4K", type: "BS4K", channel: "1" });
         return ch;
       }
-      for (const ch of Object.values(channels)) {
-        ch.getStream = async (userReq, output) => {
-          const filter = new EventEmitter();
-          filter.close = () => output.end();
-          setImmediate(() => output.end(userReq.outputFormat));
-          return filter;
-        };
-      }
-      _.channel = { get: type => channels[type] || null, getStream: () => null };
+      _.channel = { get: type => channels[type] || null, getStreams: () => [] };
       _.tuner = tuner([fakeDevice(0, { types: ["GR", "BS4K"], tlvToTsDecoder: "mmt2ts" })]);
+      _.tuner.initChannelStream = async (ch, userReq, output) => {
+        const filter = new EventEmitter();
+        filter.close = () => output.end();
+        setImmediate(() => output.end(userReq.outputFormat));
+        return filter;
+      };
 
       const app = express();
       app.get("/:type/:channel", op.get);
@@ -387,18 +385,18 @@ describe("[tlv.spec] format detection", () => {
   });
 
   it("uses `format` of channels.yml, the format detected, then the default of the type", () => {
-    _.channel = { getStream: () => null };
+    _.channel = { getStreams: () => [] };
     assert.strictEqual(new ChannelItem({ name: "GR", type: "GR", channel: "27" }).format, "ts");
     assert.strictEqual(new ChannelItem({ name: "BS4K", type: "BS4K", channel: "1" }).format, "tlv");
     assert.strictEqual(new ChannelItem({ name: "GR", type: "GR", channel: "27", format: "tlv" }).format, "tlv");
 
-    _.channel = { getStream: () => ({ networkId: 1, streamId: 1, format: "tlv" }) };
+    _.channel = { getStreams: () => [{ networkId: 1, streamId: 1, format: "tlv" }] };
     assert.strictEqual(new ChannelItem({ name: "GR", type: "GR", channel: "27" }).format, "tlv");
     assert.strictEqual(new ChannelItem({ name: "GR", type: "GR", channel: "27", format: "ts" }).format, "ts");
   });
 
   it("detects the format by the data after the start, which may be of the channel tuned before", async () => {
-    _.channel = { getStream: () => null };
+    _.channel = { getStreams: () => [] };
     _.config = { server: {} };
     const channel = new ChannelItem({ name: "GR", type: "GR", channel: "27" });
     const device = {
@@ -417,8 +415,9 @@ describe("[tlv.spec] format detection", () => {
     t._devices = [device];
     t._readyForJobPickedDeviceSet = new Set();
 
-    const format = await t._detectFormat({ id: "scan", priority: -1, streamSetting: { channel } });
+    const { format, tsmf } = await t._detectFormat({ id: "scan", priority: -1, streamSetting: { channel } });
     assert.strictEqual(format, "ts");
+    assert.strictEqual(tsmf, null);
     assert.strictEqual(device.user.id, "scan#format");
   });
 });

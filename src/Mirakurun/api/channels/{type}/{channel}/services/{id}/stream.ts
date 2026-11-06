@@ -72,7 +72,7 @@ export const get: Operation = (req, res) => {
         return;
     }
 
-    api.responseStream(req, res, service.channels, userReq => service.getStream(userReq, res));
+    api.responseStream(req, res, { isTlv: service.isTlv, channels: service.channels }, userReq => service.getStream(userReq, res));
 };
 
 get.apiDoc = {

@@ -166,7 +166,11 @@ describe("[route.spec] route / streamId", () => {
       await _.service.load();
 
       const scanned = [{ networkId: 4, serviceId: 701, streamId: 20225, name: "Test BS", type: 1, logoId: -1, remoteControlKeyId: 1 }];
-      _.tuner.getServices = async () => scanned;
+      // Tuner.getServices() saves the stream received on the channel
+      _.tuner.getServices = async ch => {
+        ch.setStream(4, 20225, "ts");
+        return scanned;
+      };
       await _.service._scan(_.channel.get("BS", "BS31_0"), false);
       // 同じストリームを受信できる別の経路
       await _.service._scan(_.channel.get("BS", "C45"), false);
@@ -188,8 +192,8 @@ describe("[route.spec] route / streamId", () => {
         channels: undefined
       }]);
       assert.deepStrictEqual(savedChannels, [
-        { type: "BS", channel: "BS31_0", networkId: 4, streamId: 20225 },
-        { type: "BS", channel: "C45", networkId: 4, streamId: 20225 }
+        { type: "BS", channel: "BS31_0", streams: [{ networkId: 4, streamId: 20225, format: "ts" }] },
+        { type: "BS", channel: "C45", streams: [{ networkId: 4, streamId: 20225, format: "ts" }] }
       ]);
     });
 
@@ -200,8 +204,8 @@ describe("[route.spec] route / streamId", () => {
       ]);
       fs.writeFileSync(process.env.CHANNELS_DB_PATH, JSON.stringify([
         { __integrity__: "test" },
-        { type: "BS", channel: "BS31_0", networkId: 4, streamId: 20225 },
-        { type: "BS", channel: "C45", networkId: 4, streamId: 20225 }
+        { type: "BS", channel: "BS31_0", streams: [{ networkId: 4, streamId: 20225, format: "ts" }] },
+        { type: "BS", channel: "C45", streams: [{ networkId: 4, streamId: 20225, format: "ts", relTs: 1, slots: 44 }] }
       ]));
       fs.writeFileSync(process.env.SERVICES_DB_PATH, JSON.stringify([
         { __integrity__: "test" },
@@ -428,5 +432,17 @@ describe("[route.spec] route / streamId", () => {
       });
       assert.strictEqual(device._dvb, null);
     });
+  });
+});
+
+
+describe("channel service relative TS references", () => {
+  it("distinguishes services on different relative streams of one carrier", () => {
+    const { getChannelServices } = require("../lib/Mirakurun/api");
+    const services = [701, 702].map((serviceId, i) => ({ id: 400000 + serviceId, serviceId, networkId: 4, streamId: 20225 + i, name: "Test", type: 1 }));
+    const channel = { getServices: () => services, streams: [{ networkId: 4, streamId: 20225, relTs: 2 }, { networkId: 4, streamId: 20226, relTs: 3 }] };
+    assert.deepStrictEqual(getChannelServices(channel).map(s => [s.serviceId, s.tsmfRelTs]), [[701, 2], [702, 3]]);
+    channel.streams = [{ networkId: 4, streamId: 20225 }];
+    assert.ok(getChannelServices(channel).every(s => !("tsmfRelTs" in s)));
   });
 });

@@ -46,13 +46,24 @@ export function detectStreamFormat(data: Buffer): apid.StreamFormat | null {
     return ts >= tlv ? "ts" : "tlv";
 }
 
+/** a relative stream of TSMF */
+export interface TSMFStream {
+    relTs: number;
+    /** the slots in a frame */
+    slots: number;
+    format: apid.StreamFormat;
+    /** stream_id of the TSMF header (transport_stream_id or tlv_stream_id) */
+    streamId: number;
+    networkId: number;
+}
+
 /**
- * detects the format of the relative stream of TSMF by stream_type of the TSMF headers
- * (decided by 2 headers in a row of continuity_counter, the frame of the channel tuned before may remain)
- * @returns `null` if unknown
+ * the relative streams of TSMF by the TSMF headers
+ * (decided by 2 headers in a row of continuity_counter with the same contents, the frame of the channel tuned before may remain)
+ * @returns `null` if not TSMF
  */
-export function detectTSMFStreamFormat(data: Buffer, relTs: number): apid.StreamFormat | null {
-    let last: { cc: number, isTlv: boolean } = null;
+export function detectTSMFStreams(data: Buffer): TSMFStream[] | null {
+    let last: { cc: number, key: string } = null;
     for (let i = 0; i + TS_PACKET_SIZE <= data.length; i++) {
         if (data[i] !== 0x47 || (((data[i + 1] & 0x1F) << 8) | data[i + 2]) !== 0x2F) {
             continue;
@@ -63,15 +74,41 @@ export function detectTSMFStreamFormat(data: Buffer, relTs: number): apid.Stream
             last = null;
             continue;
         }
-        const cc = packet[3] & 0x0F;
-        const isTlv = ((header.streamTypeBits >> (15 - relTs)) & 1) === 0;
-        if (last !== null && cc === ((last.cc + 1) & 0x0F) && isTlv === last.isTlv) {
-            return isTlv ? "tlv" : "ts";
-        }
-        last = { cc, isTlv };
         i += TS_PACKET_SIZE - 1;
+
+        const payload = packet.subarray(4);
+        const streams: TSMFStream[] = [];
+        for (let relTs = 1; relTs <= 15; relTs++) {
+            const slots = header.slotMap.filter(n => n === relTs).length;
+            if (slots === 0) {
+                continue;
+            }
+            const offset = 5 + (relTs - 1) * 4;
+            streams.push({
+                relTs,
+                slots,
+                format: ((header.streamTypeBits >> (15 - relTs)) & 1) === 0 ? "tlv" : "ts",
+                streamId: payload.readUInt16BE(offset),
+                networkId: payload.readUInt16BE(offset + 2)
+            });
+        }
+
+        const cc = packet[3] & 0x0F;
+        const key = JSON.stringify(streams);
+        if (last !== null && cc === ((last.cc + 1) & 0x0F) && key === last.key) {
+            return streams;
+        }
+        last = { cc, key };
     }
     return null;
+}
+
+/**
+ * detects the format of the relative stream of TSMF by stream_type of the TSMF headers
+ * @returns `null` if unknown
+ */
+export function detectTSMFStreamFormat(data: Buffer, relTs: number): apid.StreamFormat | null {
+    return detectTSMFStreams(data)?.find(stream => stream.relTs === relTs)?.format || null;
 }
 
 /** the bytes of the TS packets in a row from the first sync */
