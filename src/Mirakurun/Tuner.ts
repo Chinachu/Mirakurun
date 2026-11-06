@@ -209,7 +209,8 @@ export class Tuner {
 
             Promise.all<void>([
                 new Promise((resolve, reject) => {
-                    tsFilter.once("network", _network => {
+                    // CATV では自身の TS のセクションが後から届くため、最後に通知されたものを使う
+                    tsFilter.on("network", _network => {
                         network = _network;
                         resolve();
                     });

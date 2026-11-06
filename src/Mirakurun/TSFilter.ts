@@ -165,8 +165,10 @@ export default class TSFilter extends EventEmitter {
     private _pmtPid = -1;
     private _pmtTimer: NodeJS.Timeout;
     private _streamTime: number = null;
+    private _isCatv = false; // ESS is detected by service_type in NIT
     private _patMap: Map<number, number> = null; // <serviceId, pid>, for CATV ESS detection
     private _networkEmitted = false;
+    private _networkMatched = false; // 自身の TS のセクションから通知したか
     private _essMap = new Map<number, number>(); // <serviceId, pid>
     private _essEsPids = new Set<number>();
     private _dlDataMap = new Map<number, DownloadData>();
@@ -252,6 +254,7 @@ export default class TSFilter extends EventEmitter {
                 this._enableParseDSMCC = true;
             } else if (CATV_NETWORK_IDS.includes(this._targetNetworkId)) {
                 this._enableParseDSMCC = true;
+                this._isCatv = true;
                 // ESS is detected by service_type in NIT
                 this._parseNIT = true;
             } else {
@@ -568,8 +571,10 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _onPAT(pid: number, data: any): void {
+        const tsidChanged = this._tsid !== data.transport_stream_id;
+
         this._tsid = data.transport_stream_id;
-        this._patMap = this._enableParseDSMCC && this._targetNetworkId !== 4 ? new Map() : null;
+        this._patMap = this._isCatv ? new Map() : null;
         this._serviceIds = new Set();
         this._parseServiceIds = new Set();
 
@@ -583,7 +588,12 @@ export default class TSFilter extends EventEmitter {
 
                 if (this._parseNIT) {
                     this._parsePids.add(NIT_PID);
-                    this._networkEmitted = false;
+
+                    // TS が変わらなければ、通知済みのネットワークはそのまま有効
+                    if (tsidChanged) {
+                        this._networkEmitted = false;
+                        this._networkMatched = false;
+                    }
                 }
                 continue;
             }
@@ -667,6 +677,26 @@ export default class TSFilter extends EventEmitter {
                 this._parsePids.add(0x11);
             }
         }
+
+        // 検出済みの ESS は、PAT が更新されても視聴サービスとして扱わない (PMT PID は追従する)
+        if (this._patMap !== null) {
+            for (const [serviceId, essPmtPid] of this._essMap) {
+                const newEssPmtPid = this._patMap.get(serviceId);
+                if (newEssPmtPid === undefined) {
+                    continue;
+                }
+                this._serviceIds.delete(serviceId);
+
+                if (newEssPmtPid !== essPmtPid) {
+                    this._essMap.set(serviceId, newEssPmtPid);
+                    if (this._parsePids.delete(essPmtPid)) {
+                        this._parsePids.add(newEssPmtPid);
+                    }
+
+                    log.debug("TSFilter#_onPAT: ESS PMT PID has changed to %d from %d as serviceId=%d", newEssPmtPid, essPmtPid, serviceId);
+                }
+            }
+        }
     }
 
     private _onPMT(pid: number, data: any): void {
@@ -675,7 +705,7 @@ export default class TSFilter extends EventEmitter {
                 for (const descriptor of stream.ES_info) {
                     if (descriptor.descriptor_tag === 0x52) { // stream identifier descriptor
                         if (
-                            descriptor.component_tag === 0x79 || // ARIB TR-B15 (BS)
+                            descriptor.component_tag === 0x79 || // ARIB TR-B15 (BS, CATV)
                             descriptor.component_tag === 0x7A // ...? (CS)
                         ) {
                             this._parsePids.add(stream.elementary_PID);
@@ -717,6 +747,11 @@ export default class TSFilter extends EventEmitter {
     }
 
     private _onNIT(pid: number, data: any): void {
+        // NIT other (0x41) は他のネットワークの情報で、transport_stream_id も自身の TS と重なりうる
+        if (data.table_id !== 0x40) {
+            return;
+        }
+
         const _network = {
             networkId: data.network_id,
             areaCode: -1,
@@ -724,11 +759,13 @@ export default class TSFilter extends EventEmitter {
         };
 
         // NIT of CATV lists many transport streams (in multiple sections)
-        const ts = data.transport_streams.find(ts => ts.transport_stream_id === this._tsid);
-        const isCatvEss = this._enableParseDSMCC && this._targetNetworkId !== 4;
+        const matchedTs = data.transport_streams.find(ts => ts.transport_stream_id === this._tsid);
+        // CATV では、自身の TS が見つからなければ別の TS の記述子を読まない
+        // (別の TS の remoteControlKeyId を通知しないため)
+        const ts = matchedTs || (this._isCatv ? undefined : data.transport_streams[0]);
 
-        if (ts || data.transport_streams[0]) {
-            for (const desc of (ts || data.transport_streams[0]).transport_descriptors) {
+        if (ts) {
+            for (const desc of ts.transport_descriptors) {
                 switch (desc.descriptor_tag) {
                     case 0xFA:
                         _network.areaCode = desc.area_code;
@@ -737,7 +774,7 @@ export default class TSFilter extends EventEmitter {
                         _network.remoteControlKeyId = desc.remote_control_key_id;
                         break;
                     case 0x41: // service list descriptor
-                        if (isCatvEss && ts) {
+                        if (this._isCatv) {
                             this._detectEss(desc.services);
                         }
                         break;
@@ -745,13 +782,15 @@ export default class TSFilter extends EventEmitter {
             }
         }
 
-        if (this._networkEmitted === false) {
+        // CATV では自身の TS のセクションが後から届くため、届いたら通知し直す
+        if (this._networkMatched === false && (this._networkEmitted === false || matchedTs)) {
             this._networkEmitted = true;
+            this._networkMatched = this._isCatv === false || matchedTs !== undefined;
             this.emit("network", _network);
         }
 
         // for CATV, wait for the section of this transport stream
-        if (this._parsePids.has(pid) && (isCatvEss === false || ts)) {
+        if (this._parsePids.has(pid) && (this._isCatv === false || matchedTs)) {
             this._parsePids.delete(pid);
         }
     }
