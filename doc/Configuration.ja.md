@@ -222,6 +222,7 @@ TLV (MMT) のチャンネルでは、タイプにかかわらず、`decoder` の
   route: TER # 列挙型 [TER|SAT|CATV|HIKARI] - 受信する経路。省略した場合、GR は TER、それ以外は SAT
   serviceId: 1234 # Integer - 指定しない場合、サービスは自動的にスキャンされます。
   tsmfRelTs: 1 # 数値: 1~15 - TSMF の相対 TS 番号。指定しない場合、サービスのスキャンで TSMF のすべての相対 TS を判別する
+  tsmfGroupId: 1 # 数値: 1~255 - 1 つの TLV を複数の搬送波で伝送する場合 (CATV のチャネルボンディング) のグループ。同じ値のチャンネルが同じグループの搬送波になる
   format: tlv # 列挙型 [ts|tlv] - 指定しない場合、サービスのスキャンで判別した形式 (スキャンの前は BS4K なら tlv、それ以外は ts)
   commandVars: # オプションのコマンド変数 *@4.0.0~
     satellite: EXAMPLE-SAT4A
@@ -246,6 +247,34 @@ TSMF で多重化されたチャンネルの相対 TS 番号です。拡張 TSMF
 チャンネルで受信するデータの形式です。TLV (MMT) の場合は `tlv` です。
 
 指定しない場合は、サービスのスキャンのときに受信したデータから判別し、`channels.json` に保存します。視聴や録画などのストリームでは判別せず、保存した形式を使います (TS のストリームの開始を遅らせないため)。スキャンの前は、種別が `BS4K` なら `tlv`、それ以外は `ts` として扱います。
+#### tsmfGroupId
+
+CATV で 1 つの TLV を複数の搬送波に分けて伝送する場合 (チャネルボンディング) に指定します。同じ `type` と `tsmfGroupId` のチャンネルを同じグループの搬送波として、それぞれ別のチューナーで同時に選局し、TLV を組み立てます。グループのどのチャンネルを要求しても同じ TLV を出力します。
+
+- 搬送波の数だけ、選局できるチューナーが必要です。搬送波のチューナーは、`/api/tuners` に `<利用者の ID>#carrier<n>` の利用者として表示されます。
+- 同じ搬送波を受信しているチューナーは、EPG 取得や他の配信と共有します。同じ受信への合流では、要求の優先度が高くても既存の利用を終了しません。別の搬送波を要求し、空きチューナーがない場合は、従来どおり優先度に従って切り替えます。
+- 搬送波の間のずれは、組み立てた TLV が正しくつながるかで判定します。搬送波のどれかが止まった場合や、組み立てられない状態が続いた場合は、ストリームを終了します。
+
+```yaml
+- name: TLV (1)
+  type: BS4K
+  route: CATV
+  channel: '1'
+  tsmfRelTs: 1
+  tsmfGroupId: 8
+- name: TLV (2)
+  type: BS4K
+  route: CATV
+  channel: '2'
+  tsmfRelTs: 1
+  tsmfGroupId: 8
+- name: TLV (3)
+  type: BS4K
+  route: CATV
+  channel: '3'
+  tsmfRelTs: 1
+  tsmfGroupId: 8
+```
 
 #### route
 

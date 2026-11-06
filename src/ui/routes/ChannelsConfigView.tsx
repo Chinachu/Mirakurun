@@ -643,6 +643,24 @@ export const ChannelsConfigView: React.FC = () => {
                                             />
                                         </FormGroup>
 
+                                        <FormGroup label="TsmfGroupId" style={{ width: "100px", marginBottom: 0 }}>
+                                            <InputGroup
+                                                placeholder="Group ID"
+                                                value={`${ch.tsmfGroupId ?? ""}`}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === "") {
+                                                        deleteChannelProperty(i, "tsmfGroupId");
+                                                    } else if (/^[0-9]+$/.test(val)) {
+                                                        const tsmfGroupId = parseInt(val, 10);
+                                                        if (tsmfGroupId >= 1 && tsmfGroupId <= 255) {
+                                                            updateChannel(i, { tsmfGroupId });
+                                                        }
+                                                    }
+                                                }}
+                                            />
+                                        </FormGroup>
+
                                         <div className="cmd-vars-container">
                                             <div className="cmd-vars-title">Command Vars</div>
                                             <div className="cmd-vars-list">

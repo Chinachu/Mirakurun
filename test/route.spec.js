@@ -274,6 +274,63 @@ describe("[route.spec] route / streamId", () => {
     assert.deepStrictEqual(ordered(), [b, a]);
   });
 
+  describe("Tuner: sharing bonded carriers", () => {
+    for (const initialPriority of [-1, 0]) {
+      it(`keeps all three carriers and the priority ${initialPriority} user when a higher priority stream joins`, async () => {
+        const configs = [1, 2, 3].map(i => ({ name: `Carrier ${i}`, type: "BS4K", channel: `C${i}`, route: "CATV", format: "tlv", tsmfRelTs: 1, tsmfGroupId: 5 }));
+        setupChannels(configs);
+        _.config.server.disableEITParsing = false;
+        const channels = configs.map(c => _.channel.get(c.type, c.channel));
+        const devices = configs.map((c, i) => {
+          const d = Object.create(TunerDevice.prototype);
+          Object.assign(d, { _index: i, _config: { name: `Tuner ${i}`, types: ["BS4K"], routes: ["CATV"] }, _users: new Set(), _isAvailable: true, _channel: null, _stream: null, _dvbActive: false, _isRemote: false, _endStreamTimer: null, _pendingBytes: 0, _flushTimer: null, _spawnedAt: 0 });
+          d._updated = () => {};
+          d._flushUsersBound = d._flushUsers.bind(d);
+          d._spawn = mock.fn(async channel => { d._channel = channel; d._stream = new EventEmitter(); });
+          d._kill = mock.fn(async () => { throw new Error("sharing must not retune a carrier"); });
+          return d;
+        });
+        const t = tuner(devices);
+        const filters = [];
+        const start = async (id, priority, channel, relTs, serviceId) => {
+          const filter = await t._initTS({ id, priority, disableDecoder: true, streamSetting: { channel, networkId: 11, serviceId, parseEIT: true } }, undefined, [t._getCandidate(channel, relTs, "tlv")]);
+          filters.push(filter);
+          return filter;
+        };
+        try {
+          const first = await start("existing", initialPriority, channels[1], 1, undefined);
+          assert.deepStrictEqual(devices.map(d => d.users.length), [1, 1, 1]);
+          const joined = await start("joined", 2, channels[0], 1, 701);
+          const relative = await start("relative", 3, channels[2], 2, 702);
+          const firstWrites = mock.method(first, "write");
+          const firstCarriers = mock.method(first, "writeCarrier");
+          const joinedWrites = mock.method(joined, "write");
+          const joinedCarriers = mock.method(joined, "writeCarrier");
+          const packet = Buffer.alloc(188, 0xFF); packet[0] = 0x47; packet[1] = 0x1F; packet[2] = 0xFF; packet[3] = 0x10;
+          for (const d of devices) { d._streamOnData(packet); d._flushUsers(); }
+          assert.deepStrictEqual([firstWrites.mock.callCount(), firstCarriers.mock.callCount(), joinedWrites.mock.callCount(), joinedCarriers.mock.callCount()], [1, 2, 1, 2]);
+          assert.strictEqual(first.closed, false);
+          assert.deepStrictEqual(devices.map(d => d.users.length), [3, 3, 3]);
+          assert.deepStrictEqual(devices.map(d => d.getPriority()), [3, 3, 3]);
+          relative.close();
+          assert.strictEqual(first.closed, false);
+          assert.strictEqual(joined.closed, false);
+          assert.deepStrictEqual(devices.map(d => d.users.length), [2, 2, 2]);
+          first.close();
+          assert.strictEqual(joined.closed, false);
+          assert.deepStrictEqual(devices.map(d => d.users.length), [1, 1, 1]);
+          assert.deepStrictEqual(devices.map(d => d.getPriority()), [2, 2, 2]);
+          for (const d of devices) { d._streamOnData(packet); d._flushUsers(); }
+          assert.deepStrictEqual([joinedWrites.mock.callCount(), joinedCarriers.mock.callCount()], [2, 4]);
+          assert.ok(devices.every(d => d._spawn.mock.callCount() === 1 && d._kill.mock.callCount() === 0));
+        } finally {
+          for (const filter of filters) filter.close();
+        }
+        assert.deepStrictEqual(devices.map(d => d.users.length), [0, 0, 0]);
+      });
+    }
+  });
+
   describe("Tuner: route", () => {
     it("picks only the tuners of the route", () => {
       setupChannels([]);

@@ -222,6 +222,7 @@ If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outp
   route: TER # Enum [TER|SAT|CATV|HIKARI] - receiving route. `TER` for GR, `SAT` for others if omitted.
   serviceId: 1234 # Integer - Services will be automatically scanned if not specified.
   tsmfRelTs: 1 # Number: 1~15 - relative TS number of TSMF. All the relative streams of TSMF are detected by the service scan if not specified.
+  tsmfGroupId: 1 # Number: 1~255 - the group of the carriers transmitting a TLV (channel bonding of CATV). The channels of the same value are the carriers of the group
   format: tlv # Enum [ts|tlv] - the format detected by the service scan if not specified (before the scan, tlv for BS4K, ts for others)
   commandVars: # Optional command variables *@4.0.0~
     satellite: EXAMPLE-SAT4A
@@ -246,6 +247,34 @@ The stream of the channel (`/api/channels/{type}/{channel}/stream`) accepts the 
 The format of the data received on the channel. `tlv` for TLV (MMT).
 
 If not specified, the format is detected from the data received by the service scan, and saved in `channels.json`. The streams for viewing and recording do not detect and use the format saved (not to delay the start of the streams of TS). Before the scan, `tlv` for the type `BS4K`, `ts` for the others.
+#### tsmfGroupId
+
+Specify this when a TLV is transmitted by multiple carriers of CATV (channel bonding). The channels of the same `type` and `tsmfGroupId` are the carriers of the group, tuned at the same time by the different tuners to assemble the TLV. Any channel of the group outputs the same TLV.
+
+- Tuners as many as the carriers are needed. The tuners of the carriers are shown in `/api/tuners` as the users `<user ID>#carrier<n>`.
+- Requests for the same carriers share the tuners with EPG acquisition and other streams. Joining the same reception does not stop existing users, even at a higher priority. Requests for other carriers follow the usual priority rules when no tuner is free.
+- The skew of the carriers is found by checking the TLV assembled. The stream is closed when a carrier stops or the TLV can not be assembled.
+
+```yaml
+- name: TLV (1)
+  type: BS4K
+  route: CATV
+  channel: '1'
+  tsmfRelTs: 1
+  tsmfGroupId: 8
+- name: TLV (2)
+  type: BS4K
+  route: CATV
+  channel: '2'
+  tsmfRelTs: 1
+  tsmfGroupId: 8
+- name: TLV (3)
+  type: BS4K
+  route: CATV
+  channel: '3'
+  tsmfRelTs: 1
+  tsmfGroupId: 8
+```
 
 #### route
 

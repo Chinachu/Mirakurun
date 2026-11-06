@@ -29,6 +29,7 @@ import MHEPG from "./MHEPG";
 import EPGState from "./EPGState";
 import TLVServiceSelector from "./TLVServiceSelector";
 import TSMFTLV from "./TSMFTLV";
+import TSMFBonding from "./TSMFBonding";
 import { MMTTLVReader, createMMTTLVReader } from "arib-mmt-tlv-ts";
 import {
     MHEventInformationTable,
@@ -55,6 +56,8 @@ export interface TLVFilterOptions {
     readonly parseEIT?: boolean;
     /** the relative stream of TLV in TSMF (the input is TS) */
     readonly tsmfRelTs?: number;
+    /** the bonded carriers (the inputs by `write()` and `writeCarrier()`) */
+    readonly tsmfCarriers?: number;
 }
 
 /** the start of the TLV packet followed by another one, `-1` if not found */
@@ -88,6 +91,7 @@ export default class TLVFilter extends EventEmitter {
     private _reader: MMTTLVReader = createMMTTLVReader();
     private _selector: TLVServiceSelector = null;
     private _tsmf: TSMFTLV = null;
+    private _bonding: TSMFBonding = null;
 
     // output
     private _output: Writable;
@@ -143,7 +147,12 @@ export default class TLVFilter extends EventEmitter {
         this._provideServiceId = options.serviceId || null;
         this._provideEventId = options.eventId || null;
 
-        if (options.tsmfRelTs) {
+        if (options.tsmfRelTs && options.tsmfCarriers > 1) {
+            this._bonding = new TSMFBonding(options.tsmfRelTs, options.tsmfCarriers, reason => {
+                log.error("TLVFilter: closing because the bonded carriers can not be assembled (%s)", reason);
+                this._close();
+            });
+        } else if (options.tsmfRelTs) {
             this._tsmf = new TSMFTLV(options.tsmfRelTs);
         }
 
@@ -218,38 +227,24 @@ export default class TLVFilter extends EventEmitter {
             throw new Error("TLVFilter has closed already");
         }
 
-        if (this._tsmf) {
-            chunk = this._tsmf.push(chunk);
-            if (chunk.length === 0) {
-                return;
-            }
+        if (this._bonding) {
+            this._writeTLV(this._bonding.push(0, chunk), defer);
+        } else if (this._tsmf) {
+            this._writeTLV(this._tsmf.push(chunk), defer);
+        } else {
+            this._writeTLV(chunk, defer);
         }
+    }
 
-        if (this._output) {
-            this._countPackets(chunk);
+    /**
+     * the input from the other carriers (`tsmfCarriers`)
+     * @param carrier 1..tsmfCarriers - 1
+     */
+    writeCarrier(carrier: number, chunk: Buffer, defer = false): void {
+        if (this._closed) {
+            return;
         }
-        this._reader.push(chunk);
-
-        if (this._ready && this._output) {
-            if (this._selector) {
-                chunk = this._selector.push(chunk);
-                if (chunk.length === 0) {
-                    return;
-                }
-            } else if (this._outputStarted === false) {
-                const start = findTlvPacketStart(chunk);
-                if (start === -1) {
-                    return;
-                }
-                this._outputStarted = true;
-                chunk = chunk.subarray(start);
-            }
-            this._buffer.push(chunk);
-            this._bufferBytes += chunk.length;
-            if (defer === false) {
-                this.flush();
-            }
-        }
+        this._writeTLV(this._bonding.push(carrier, chunk), defer);
     }
 
     /** 保留している出力を書き出す (書き出せない間は保持し、上限を超えた分を古いものから破棄する) */
@@ -281,6 +276,38 @@ export default class TLVFilter extends EventEmitter {
 
     close(): void {
         this._close();
+    }
+
+    private _writeTLV(chunk: Buffer, defer: boolean): void {
+        if (chunk.length === 0 || this._closed) {
+            return;
+        }
+
+        if (this._output) {
+            this._countPackets(chunk);
+        }
+        this._reader.push(chunk);
+
+        if (this._ready && this._output) {
+            if (this._selector) {
+                chunk = this._selector.push(chunk);
+                if (chunk.length === 0) {
+                    return;
+                }
+            } else if (this._outputStarted === false) {
+                const start = findTlvPacketStart(chunk);
+                if (start === -1) {
+                    return;
+                }
+                this._outputStarted = true;
+                chunk = chunk.subarray(start);
+            }
+            this._buffer.push(chunk);
+            this._bufferBytes += chunk.length;
+            if (defer === false) {
+                this.flush();
+            }
+        }
     }
 
     private _countPackets(chunk: Buffer): void {
@@ -551,6 +578,7 @@ export default class TLVFilter extends EventEmitter {
 
         this._reader.close();
         delete this._reader;
+        this._bonding?.close();
 
         if (this._epg) {
             this._epg.end();
