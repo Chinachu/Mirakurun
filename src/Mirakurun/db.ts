@@ -31,6 +31,14 @@ interface Service extends apid.Service {
     logoData?: string; // base64
 }
 
+/** the stream received last time on the channel. */
+export interface Channel {
+    type: apid.ChannelType;
+    channel: string;
+    networkId: number;
+    streamId: number;
+}
+
 export interface Program extends apid.Program {
     /** (internal) indicates EIT[p/f] received */
     _pf?: true; // for compatibility
@@ -44,6 +52,14 @@ export async function loadServices(integrity: string, sync = false): Promise<Ser
 
 export async function saveServices(data: Service[], integrity: string): Promise<void> {
     return save(process.env.SERVICES_DB_PATH, data, integrity);
+}
+
+export async function loadChannels(integrity: string, sync = false): Promise<Channel[]> {
+    return load(process.env.CHANNELS_DB_PATH, integrity, sync);
+}
+
+export async function saveChannels(data: Channel[], integrity: string): Promise<void> {
+    return save(process.env.CHANNELS_DB_PATH, data, integrity);
 }
 
 export async function loadPrograms(integrity: string, sync = false): Promise<Program[]> {

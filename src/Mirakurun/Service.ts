@@ -102,6 +102,7 @@ export class Service {
 
     private _items: ServiceItem[] = [];
     private _saveTimerId: NodeJS.Timeout;
+    private _channelIndex: Map<ChannelItem, ServiceItem[]> = null;
 
     get items(): ServiceItem[] {
         return this._items;
@@ -113,6 +114,7 @@ export class Service {
         }
 
         this._items.push(item);
+        this.invalidateChannelIndex();
 
         Event.emit("service", "create", item.export());
 
@@ -147,17 +149,27 @@ export class Service {
         return this.get(id, serviceId) !== null;
     }
 
+    invalidateChannelIndex(): void {
+        this._channelIndex = null;
+    }
+
     findByChannel(channel: ChannelItem): ServiceItem[] {
-        const items = [];
-
-        const l = this._items.length;
-        for (let i = 0; i < l; i++) {
-            if (this._items[i].channel === channel) {
-                items.push(this._items[i]);
+        if (!this._channelIndex) {
+            const index = new Map<ChannelItem, ServiceItem[]>();
+            for (const item of this._items) {
+                for (const route of item.channels) {
+                    let items = index.get(route);
+                    if (!items) {
+                        items = [];
+                        index.set(route, items);
+                    }
+                    items.push(item);
+                }
             }
+            this._channelIndex = index;
         }
-
-        return items;
+        // Callers may sort or modify the result, as before.
+        return this._channelIndex.get(channel)?.slice() || [];
     }
 
     findByNetworkId(networkId: number): ServiceItem[] {
@@ -233,7 +245,8 @@ export class Service {
                     service.logoId,
                     service.remoteControlKeyId,
                     service.epgReady,
-                    service.epgUpdatedAt
+                    service.epgUpdatedAt,
+                    service.streamId
                 )
             );
         }
@@ -247,6 +260,12 @@ export class Service {
 
     private async _initJobs(): Promise<void> {
         log.debug("init service jobs...");
+
+        // scan the channels of the services without `streamId` (migrated from the db of older versions)
+        const migratingChannels = new Set(this._items.filter(item => item.streamId === undefined).map(item => item.channel));
+        for (const channel of migratingChannels) {
+            this._queueScanToUpdate(channel);
+        }
 
         // add services from channel config
         for (const channelConfig of _.config.channels) {
@@ -320,7 +339,11 @@ export class Service {
         log.debug("saving services...");
 
         db.saveServices(
-            this._items.map(service => service.export()),
+            this._items.map(service => {
+                // `channels` is resolved from the channels db
+                const { channels, ...ret } = service.export();
+                return ret;
+            }),
             _.configIntegrity.channels
         );
     }
@@ -330,7 +353,7 @@ export class Service {
             key: `Service.Add.Check.${channel.type}.${channel.channel}.${serviceId}`,
             name: `Service Add Check ${channel.type}/${channel.channel}/${serviceId}`,
             fn: () => this._checkToAdd(channel, serviceId),
-            readyFn: () => _.tuner.readyForJob(channel),
+            readyFn: async () => (await _.tuner.readyForJob(channel)) !== null,
             retryOnFail: true,
             retryMax: (1000 * 60 * 60 * 12) / (1000 * 60 * 3), // (12時間 / retryDelay) = 12時間～
             retryDelay: 1000 * 60 * 3
@@ -342,7 +365,7 @@ export class Service {
             key: `Service.Add.Scan.${channel.type}.${channel.channel}`,
             name: `Service Add Scan ${channel.type}/${channel.channel}`,
             fn: async () => this._scan(channel, true),
-            readyFn: () => _.tuner.readyForJob(channel),
+            readyFn: async () => (await _.tuner.readyForJob(channel)) !== null,
             retryOnFail: true,
             retryMax: (1000 * 60 * 60 * 12) / (1000 * 60 * 3), // (12時間 / retryDelay) = 12時間～
             retryDelay: 1000 * 60 * 3
@@ -354,7 +377,7 @@ export class Service {
             key: `Service.Update.Scan.${channel.type}.${channel.channel}`,
             name: `Service Update Scan ${channel.type}/${channel.channel}`,
             fn: async () => this._scan(channel, false),
-            readyFn: () => _.tuner.readyForJob(channel)
+            readyFn: async () => (await _.tuner.readyForJob(channel)) !== null
         });
     }
 
@@ -380,9 +403,20 @@ export class Service {
 
         log.debug("ChannelItem#'%s' serviceId=%d: %s", channel.name, serviceId, JSON.stringify(service, null, "  "));
 
-        this.add(
-            new ServiceItem(channel, service.networkId, service.serviceId, service.name, service.type, service.logoId)
-        );
+        channel.setStream(service.networkId, service.streamId);
+
+        const item = this.get(service.networkId, service.serviceId);
+        if (item !== null) {
+            // already added on another channel carrying the same stream
+            item.streamId = service.streamId;
+        } else {
+            this.add(
+                new ServiceItem(
+                    channel, service.networkId, service.serviceId, service.name, service.type, service.logoId,
+                    undefined, false, 0, service.streamId
+                )
+            );
+        }
 
         log.info("ChannelItem#'%s' serviceId=%d check has finished", channel.name, serviceId);
     }
@@ -400,9 +434,14 @@ export class Service {
 
         log.debug("ChannelItem#'%s' services: %s", channel.name, JSON.stringify(services, null, "  "));
 
+        if (services.length > 0) {
+            channel.setStream(services[0].networkId, services[0].streamId);
+        }
+
         services.forEach(service => {
             const item = this.get(service.networkId, service.serviceId);
             if (item !== null) {
+                item.streamId = service.streamId;
                 item.name = service.name;
                 item.type = service.type;
                 if (service.logoId > -1) {
@@ -418,7 +457,10 @@ export class Service {
                         service.name,
                         service.type,
                         service.logoId,
-                        service.remoteControlKeyId
+                        service.remoteControlKeyId,
+                        false,
+                        0,
+                        service.streamId
                     )
                 );
             }

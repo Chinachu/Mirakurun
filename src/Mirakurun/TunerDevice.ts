@@ -65,6 +65,7 @@ export interface TunerDeviceStatus {
     readonly index: number;
     readonly name: string;
     readonly types: apid.ChannelType[];
+    readonly routes?: apid.ChannelRoute[];
     readonly command: string;
     readonly pid: number;
     readonly users: common.User[];
@@ -96,6 +97,8 @@ export default class TunerDevice extends EventEmitter {
     // dvbv5-zap のコマンドの代わりに、DVB デバイスを直接操作する場合
     private _dvb: DvbDevice = null;
     private _dvbChannelsConfPath: string = null;
+    /** when the command has `<route>` (e.g. `-c dvbv5_channels_<route>.conf`) */
+    private _dvbChannelsConfPathByRoute: Partial<Record<apid.ChannelRoute, string>> = null;
     private _dvbChannelByFrequency = false;
     // DVB デバイスで選局してから止めるまでの間 (コマンドのプロセスがある間に相当)
     private _dvbActive = false;
@@ -202,6 +205,7 @@ export default class TunerDevice extends EventEmitter {
             index: this._index,
             name: this._config.name,
             types: this._config.types,
+            routes: this._config.routes,
             command: this._command,
             pid: this.pid,
             users: this.users,
@@ -324,13 +328,35 @@ export default class TunerDevice extends EventEmitter {
     /** dvbv5-zap のコマンドを解釈できる場合は、DVB デバイスを直接操作する */
     private _initDvb(): void {
         let options: ReturnType<typeof parseDvbv5ZapCommand>;
+        let confPathByRoute: Partial<Record<apid.ChannelRoute, string>> = null;
         try {
-            options = parseDvbv5ZapCommand(this._config.command, this._config.dvbDevicePath);
-            if (options === null) {
-                return;
+            if (this._config.command && this._config.command.includes("<route>")) {
+                // 経路ごとのコマンドを解釈する (チャンネル設定ファイル以外は同じでなければならない)
+                confPathByRoute = {};
+                for (const route of this._config.routes || common.channelRoutes) {
+                    const routeOptions = parseDvbv5ZapCommand(
+                        this._config.command.replace(/<route>/g, route.toLowerCase()),
+                        this._config.dvbDevicePath
+                    );
+                    if (routeOptions === null) {
+                        return;
+                    }
+                    if (options && JSON.stringify({ ...options, channelsConfPath: null }) !== JSON.stringify({ ...routeOptions, channelsConfPath: null })) {
+                        throw new Error("`<route>` is only allowed in `-c`");
+                    }
+                    // 読めないチャンネル設定ファイルでは選局のたびに失敗するため、先に読んで確かめる
+                    loadChannelsConf(routeOptions.channelsConfPath);
+                    options = routeOptions;
+                    confPathByRoute[route] = routeOptions.channelsConfPath;
+                }
+            } else {
+                options = parseDvbv5ZapCommand(this._config.command, this._config.dvbDevicePath);
+                if (options === null) {
+                    return;
+                }
+                // 読めないチャンネル設定ファイルでは選局のたびに失敗するため、先に読んで確かめる
+                loadChannelsConf(options.channelsConfPath);
             }
-            // 読めないチャンネル設定ファイルでは選局のたびに失敗するため、先に読んで確かめる
-            loadChannelsConf(options.channelsConfPath);
         } catch (err) {
             // dvbv5-zap なのにコマンドを実行する場合は、選局が遅くなるため警告する
             log.warn("TunerDevice#%d uses the command instead of DVB device direct access (%s)", this._index, err.message);
@@ -344,6 +370,7 @@ export default class TunerDevice extends EventEmitter {
 
         this._dvb = new DvbDeviceClass(options);
         this._dvbChannelsConfPath = options.channelsConfPath;
+        this._dvbChannelsConfPathByRoute = confPathByRoute;
         this._dvbChannelByFrequency = options.channelByFrequency;
         this._dvb.on("data", this._streamOnData.bind(this));
         this._dvb.on("overflow", () => {
@@ -386,6 +413,7 @@ export default class TunerDevice extends EventEmitter {
         cmd = common.replaceCommandTemplate(cmd, {
             channel: ch.channel,
             type: ch.type,
+            route: (ch.route || common.getDefaultChannelRoute(ch.type)).toLowerCase(),
             satelite: ch.commandVars?.satellite || "", // deprecated, for backward compatibility
             space: 0, // default value for backward compatibility
             ...ch.commandVars
@@ -488,9 +516,12 @@ export default class TunerDevice extends EventEmitter {
         this._updated();
 
         const generation = ++this._dvbGeneration;
+        const channelsConfPath = this._dvbChannelsConfPathByRoute
+            ? this._dvbChannelsConfPathByRoute[ch.route || common.getDefaultChannelRoute(ch.type)]
+            : this._dvbChannelsConfPath;
         let channels: DvbChannels;
         try {
-            channels = await readChannelsConf(this._dvbChannelsConfPath);
+            channels = await readChannelsConf(channelsConfPath);
         } catch (err) {
             // 起動後にチャンネル設定ファイルを読めなくなった場合は、その選局だけコマンドを実行する (次の選局で読み直す)
             return this._spawnCommandInsteadOfDvb(ch, generation, err);
@@ -501,7 +532,7 @@ export default class TunerDevice extends EventEmitter {
             if (generation !== this._dvbGeneration) {
                 return;
             }
-            await this._dvb.start(findChannelParams(channels, ch.channel, this._dvbChannelsConfPath, this._dvbChannelByFrequency));
+            await this._dvb.start(findChannelParams(channels, ch.channel, channelsConfPath, this._dvbChannelByFrequency));
         } catch (err) {
             // 選局の途中で止めた場合は、止めた側で後処理している
             if (generation === this._dvbGeneration) {

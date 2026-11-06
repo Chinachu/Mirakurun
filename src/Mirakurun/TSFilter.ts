@@ -754,6 +754,7 @@ export default class TSFilter extends EventEmitter {
                 _services.push({
                     networkId: data.original_network_id,
                     serviceId: service.service_id,
+                    streamId: data.transport_stream_id,
                     name: name,
                     type: type,
                     logoId: logoId

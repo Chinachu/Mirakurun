@@ -27,6 +27,7 @@ export default class ServiceItem {
     }
 
     private _id: number;
+    private _order: number;
 
     constructor(
         private _channel: ChannelItem,
@@ -37,7 +38,8 @@ export default class ServiceItem {
         private _logoId?: number,
         private _remoteControlKeyId?: number,
         private _epgReady: boolean = false,
-        private _epgUpdatedAt: number = 0
+        private _epgUpdatedAt: number = 0,
+        private _streamId?: number
     ) {
         this._id = ServiceItem.getId(_networkId, _serviceId);
     }
@@ -100,6 +102,7 @@ export default class ServiceItem {
     set remoteControlKeyId(id: number) {
         if (this._remoteControlKeyId !== id) {
             this._remoteControlKeyId = id;
+            this._order = undefined;
 
             _.service.save();
             this._updated();
@@ -132,11 +135,58 @@ export default class ServiceItem {
         }
     }
 
+    /** `undefined` until the service is scanned (e.g. migrated from the db of older versions) */
+    get streamId(): number {
+        return this._streamId;
+    }
+
+    set streamId(streamId: number) {
+        if (this._streamId !== streamId) {
+            this._streamId = streamId;
+            _.service.invalidateChannelIndex?.();
+
+            _.service.save();
+            this._updated();
+        }
+    }
+
     get channel(): ChannelItem {
-        return this._channel;
+        return this.channels[0];
+    }
+
+    /** channels carrying the stream of the service, the channel scanned the service comes first. */
+    get channels(): ChannelItem[] {
+        const channels: ChannelItem[] = [];
+
+        // until the stream is received on the channel, it is trusted as before
+        const stream = this._channel.stream;
+        if (
+            this._streamId === undefined ||
+            stream === null ||
+            (stream.networkId === this._networkId && stream.streamId === this._streamId)
+        ) {
+            channels.push(this._channel);
+        }
+
+        if (this._streamId !== undefined) {
+            for (const channel of _.channel.findByStream(this._networkId, this._streamId)) {
+                if (channel !== this._channel) {
+                    channels.push(channel);
+                }
+            }
+        }
+
+        // the stream has moved from the channel but not found elsewhere yet
+        if (channels.length === 0) {
+            channels.push(this._channel);
+        }
+
+        return channels;
     }
 
     export(): apid.Service {
+        const channels = this.channels;
+        const channel = channels[0];
         const ret: apid.Service = {
             id: this._id,
             serviceId: this._serviceId,
@@ -147,10 +197,17 @@ export default class ServiceItem {
             remoteControlKeyId: this._remoteControlKeyId,
             epgReady: this._epgReady,
             epgUpdatedAt: this._epgUpdatedAt,
+            streamId: this._streamId,
             channel: {
-                type: this._channel.type,
-                channel: this._channel.channel
-            }
+                type: channel.type,
+                channel: channel.channel,
+                route: channel.route
+            },
+            channels: channels.map(channel => ({
+                type: channel.type,
+                channel: channel.channel,
+                route: channel.route
+            }))
         };
 
         return ret;
@@ -161,6 +218,9 @@ export default class ServiceItem {
     }
 
     getOrder(): number {
+        if (this._order !== undefined) {
+            return this._order;
+        }
         let order: string;
 
         switch (this._channel.type) {
@@ -186,7 +246,7 @@ export default class ServiceItem {
 
         order += (10000 + this._serviceId).toString(10);
 
-        return parseInt(order, 10);
+        return this._order = parseInt(order, 10);
     }
 
     private _updated(): void {

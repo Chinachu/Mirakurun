@@ -20,9 +20,16 @@ import * as apid from "../../api";
 import ServiceItem from "./ServiceItem";
 import TSFilter from "./TSFilter";
 
+export interface ChannelStream {
+    readonly networkId: number;
+    /** transport_stream_id */
+    readonly streamId: number;
+}
+
 export default class ChannelItem {
     readonly name: string;
     readonly type: apid.ChannelType;
+    readonly route: apid.ChannelRoute;
     readonly channel: string;
     readonly tsmfRelTs: number;
     readonly commandVars: apid.ConfigChannelsItem["commandVars"];
@@ -30,9 +37,30 @@ export default class ChannelItem {
     constructor(config: apid.ConfigChannelsItem) {
         this.name = config.name;
         this.type = config.type;
+        this.route = config.route || common.getDefaultChannelRoute(config.type);
         this.channel = config.channel;
         this.tsmfRelTs = config.tsmfRelTs;
         this.commandVars = config.commandVars;
+    }
+
+    /** the stream received last time. `null` until received once. */
+    get stream(): ChannelStream {
+        return _.channel.getStream(this);
+    }
+
+    setStream(networkId: number, streamId: number): void {
+        _.channel.setStream(this, networkId, streamId);
+    }
+
+    toJSON(): apid.ConfigChannelsItem {
+        return {
+            name: this.name,
+            type: this.type,
+            channel: this.channel,
+            route: this.route,
+            tsmfRelTs: this.tsmfRelTs,
+            commandVars: this.commandVars
+        };
     }
 
     getServices(): ServiceItem[] {

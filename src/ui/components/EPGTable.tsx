@@ -262,7 +262,7 @@ export const EPGTable: React.FC<EPGTableProps> = ({ date, channelType, globalSer
         // 全体番組表
         const _services = state.services
             .filter(s => s.type === 1)
-            .filter(s => channelType ? s.channel.type === channelType : true);
+            .filter(s => channelType ? s.channel?.type === channelType : true);
 
         // ソート
         _services.sort((a, b) => {
@@ -360,7 +360,7 @@ export const EPGTable: React.FC<EPGTableProps> = ({ date, channelType, globalSer
                     _serviceItems.push(
                         <button className="epg-table-header-item date" key={`${service.id}-${i}`}
                             onClick={() => {
-                                state.navigate(`/epg?type=${service.channel.type}&date=${cur.toISODate()}`);
+                                state.navigate(`/epg?type=${service.channel?.type}&date=${cur.toISODate()}`);
                             }}
                         >
                             <span>{cur.toFormat("M月d日（ccc）")}</span>

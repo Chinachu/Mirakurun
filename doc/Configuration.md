@@ -87,8 +87,12 @@
     - BS
     - CS
     - SKY
+  routes: # (TER|SAT|CATV|HIKARI)[] - routes the tuner can receive. All routes if omitted.
+    - TER
+    - CATV
   # For chardev/dvb
   # "<template>" will be replaced with `commandVars[template]` or "(empty)" *@4.0.0~
+  # "<route>" will be replaced with the route of the channel in lowercase (ter|sat|catv|hikari)
   command: cmd <channel> --arg1 --arg2 <exampleArg1> <exampleArg2>... # String
   # For dvb
   dvbDevicePath: /dev/dvb/adapter/dvr/path # String
@@ -101,6 +105,12 @@
   decoder: cmd # String
   isDisabled: false # Boolean
 ```
+
+#### routes
+
+The routes the tuner can receive. A channel is tuned only by the tuners whose `routes` include the `route` of the channel. If omitted, the tuner is treated as receiving all routes (same as before).
+
+For example, specify `BS` in `types` and `CATV` in `routes` for a tuner receiving BS through CATV transmodulation. A tuner connected to the satellite antenna with `SAT` in `routes` is not used for the CATV channels.
 
 #### DVB device direct access
 
@@ -124,6 +134,8 @@ The output options (`-r`, `-o -`) and the display options (`-s`, `-v`, `-N`) are
 For satellite, the LNB power, 22kHz tone, DiSEqC and frequency conversion are handled in the same way as `dvbv5-zap`, and `LNB`, `POLARIZATION` and `SAT_NUMBER` in the channels file are used in the same way. If the LNBf is specified neither by `-l` nor by `LNB` in the channels file, the frequency is not converted and the LNB is not powered.
 
 Supported delivery systems are ISDB-T and ISDB-S.
+
+`<route>` can be used in `-c` (such as `-c ./conf/dvbv5_channels_<route>.conf`). In this case, the channels file of each of `routes` (all routes if omitted) is read, and the file of the route of the channel is used for tuning.
 
 ##### When the command is run
 
@@ -183,6 +195,7 @@ sudo npm install arib-b25-stream-test -g --unsafe-perm
   type: GR # Enum [GR|BS|CS|SKY]
   channel: '0' # String
   # Optional parameters below
+  route: TER # Enum [TER|SAT|CATV|HIKARI] - receiving route. `TER` for GR, `SAT` for others if omitted.
   serviceId: 1234 # Integer - Services will be automatically scanned if not specified.
   tsmfRelTs: 1 # Number: 1~15
   commandVars: # Optional command variables *@4.0.0~
@@ -194,3 +207,9 @@ sudo npm install arib-b25-stream-test -g --unsafe-perm
     exampleArg2: -arg2 "Can include spaces using quotes"
   isDisabled: false # Boolean
 ```
+
+#### route
+
+The route to receive the channel. The same broadcast can also be configured as a channel of another route, such as BS received both through a satellite antenna and through CATV transmodulation.
+
+A service is associated with the channels by the stream received (`networkId` and `transport_stream_id`). If multiple channels can receive the same stream, the route with an available tuner is tuned (the channel scanned first is preferred). The stream received on each channel is saved in `channels.json` (environment variable: `CHANNELS_DB_PATH`).

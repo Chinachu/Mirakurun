@@ -50,6 +50,12 @@ export interface StreamInfo {
 
 export const channelTypes: apid.ChannelType[] = ["GR", "BS", "CS", "SKY"];
 
+export const channelRoutes: apid.ChannelRoute[] = ["TER", "SAT", "CATV", "HIKARI"];
+
+export function getDefaultChannelRoute(type: apid.ChannelType): apid.ChannelRoute {
+    return type === "GR" ? "TER" : "SAT";
+}
+
 export class WhereQueryError extends Error {
     readonly code = "WHERE_QUERY";
     readonly status = 400;

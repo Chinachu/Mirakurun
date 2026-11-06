@@ -3,6 +3,7 @@
 export SERVER_CONFIG_PATH=/app-config/server.yml
 export TUNERS_CONFIG_PATH=/app-config/tuners.yml
 export CHANNELS_CONFIG_PATH=/app-config/channels.yml
+export CHANNELS_DB_PATH=/app-data/channels.json
 export SERVICES_DB_PATH=/app-data/services.json
 export PROGRAMS_DB_PATH=/app-data/programs.json
 export LOGO_DATA_DIR_PATH=/app-data/logo-data

@@ -59,6 +59,7 @@ function setEnv(name: string, value: string) {
 setEnv("SERVER_CONFIG_PATH", "/usr/local/etc/mirakurun/server.yml");
 setEnv("TUNERS_CONFIG_PATH", "/usr/local/etc/mirakurun/tuners.yml");
 setEnv("CHANNELS_CONFIG_PATH", "/usr/local/etc/mirakurun/channels.yml");
+setEnv("CHANNELS_DB_PATH", "/usr/local/var/db/mirakurun/channels.json");
 setEnv("SERVICES_DB_PATH", "/usr/local/var/db/mirakurun/services.json");
 setEnv("PROGRAMS_DB_PATH", "/usr/local/var/db/mirakurun/programs.json");
 setEnv("LOGO_DATA_DIR_PATH", "/usr/local/var/db/mirakurun/logo-data");
@@ -96,6 +97,7 @@ import * as log from "./Mirakurun/log";
     _.program = new Program();
     _.server = new Server();
 
+    await _.channel.load();
     await _.service.load();
     await _.program.load();
 

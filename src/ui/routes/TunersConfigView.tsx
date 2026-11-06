@@ -34,13 +34,14 @@ import {
 import equal from "fast-deep-equal";
 import { state } from "../modules/state";
 import * as ui from "../modules/ui";
-import { ConfigTuners, ConfigTunersItem, ChannelType } from "../../../api.d";
+import { ConfigTuners, ConfigTunersItem, ChannelType, ChannelRoute } from "../../../api.d";
 import { parseCommandForSpawn } from "../../Mirakurun/command";
 
 import "./TunersConfigView.sass";
 
 const configAPI = "/api/config/tuners";
 const typesIndex = ["GR", "BS", "CS", "SKY"];
+const routesIndex: ChannelRoute[] = ["TER", "SAT", "CATV", "HIKARI"];
 
 function sortTypes(types: ChannelType[]): ChannelType[] {
     return types.sort((a, b) => typesIndex.indexOf(a) - typesIndex.indexOf(b));
@@ -238,6 +239,7 @@ export const TunersConfigView: React.FC = () => {
                             <th style={{ width: "80px" }}>Enable</th>
                             <th style={{ width: "180px" }}>Name</th>
                             <th style={{ width: "120px" }}>Types</th>
+                            <th style={{ width: "120px" }}>Routes</th>
                             <th>Options</th>
                             <th style={{ width: "140px", textAlign: "right" }}></th>
                         </tr>
@@ -280,6 +282,36 @@ export const TunersConfigView: React.FC = () => {
                                                             newTypes = newTypes.filter(t => t !== type);
                                                         }
                                                         updateTuner(i, { types: newTypes });
+                                                    }}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                </td>
+                                <td>
+                                    {/* 未選択の場合はすべての経路 */}
+                                    <div className="types-checkboxes" title="Routes (all if none checked)">
+                                        {routesIndex.map((route) => {
+                                            const checked = tuner.routes?.includes(route) ?? false;
+                                            return (
+                                                <Checkbox
+                                                    key={route}
+                                                    label={route}
+                                                    checked={checked}
+                                                    inline
+                                                    onChange={(e) => {
+                                                        let newRoutes = [...(tuner.routes || [])];
+                                                        if (e.currentTarget.checked) {
+                                                            newRoutes.push(route);
+                                                            newRoutes.sort((a, b) => routesIndex.indexOf(a) - routesIndex.indexOf(b));
+                                                        } else {
+                                                            newRoutes = newRoutes.filter(r => r !== route);
+                                                        }
+                                                        if (newRoutes.length === 0) {
+                                                            deleteTunerProperty(i, "routes");
+                                                        } else {
+                                                            updateTuner(i, { routes: newRoutes });
+                                                        }
                                                     }}
                                                 />
                                             );

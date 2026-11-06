@@ -17,6 +17,8 @@ import { Operation } from "express-openapi";
 import * as api from "../../../api";
 import * as apid from "../../../../../api";
 import * as config from "../../../config";
+import * as common from "../../../common";
+import ChannelItem from "../../../ChannelItem";
 import _ from "../../../_";
 
 /**
@@ -421,6 +423,7 @@ type ScanStatusUpdate = PhaseScanStatusUpdate | StepScanStatusUpdate | ResultSca
  * @param scanConfig Configuration for the scan including channels to scan
  * @param dryRun If true, don't save changes
  * @param type Channel type being scanned (GR, BS, CS, SKY)
+ * @param route Receiving route being scanned
  * @param refresh Whether to rescan channels that already exist
  * @param outputWriter Optional function to write output text during scan
  * @returns Promise resolving to the final channel list
@@ -429,6 +432,7 @@ async function runChannelScan(
     scanConfig: ScanConfig,
     dryRun: boolean,
     type: apid.ChannelType,
+    route: apid.ChannelRoute,
     refresh: boolean,
     outputWriter?: (text: string) => void,
     skipCh: number[] = []
@@ -437,8 +441,12 @@ async function runChannelScan(
         // Initialize scan data
         const scanLog: string[] = [];
         const oldChannelItems = await config.loadChannels();
-        // Filter out channels of the type we're scanning (they'll be replaced)
-        const result: apid.ConfigChannels = oldChannelItems.filter(channel => channel.type !== type);
+        const defaultRoute = common.getDefaultChannelRoute(type);
+        const isScanTarget = (item: apid.ConfigChannelsItem): boolean => {
+            return item.type === type && (item.route || defaultRoute) === route;
+        };
+        // Filter out channels of the type and the route we're scanning (they'll be replaced)
+        const result: apid.ConfigChannels = oldChannelItems.filter(channel => !isScanTarget(channel));
         let newCount = 0;
         let takeoverCount = 0;
 
@@ -447,6 +455,7 @@ async function runChannelScan(
         Object.assign(scanStatus, {
             status: "scanning" as const,
             type,
+            route,
             dryRun,
             progress: 0,
             currentChannel: "",
@@ -575,7 +584,7 @@ async function runChannelScan(
             // Check for existing enabled channels if we're not refreshing
             if (!refresh) {
                 const existingChannels = oldChannelItems.filter(
-                    item => item.type === type &&
+                    item => isScanTarget(item) &&
                            item.channel === channel &&
                            !item.isDisabled
                 );
@@ -619,10 +628,12 @@ async function runChannelScan(
             let services: apid.Service[];
             try {
                 // Get services from the tuner
-                services = await _.tuner.getServices(<any> {
+                services = await _.tuner.getServices(new ChannelItem({
+                    name: `${type}:${channel}`,
                     type,
-                    channel
-                }, {
+                    channel,
+                    route
+                }), {
                     id: "Mirakurun:API:channelScan",
                     priority: 1
                 });
@@ -676,6 +687,9 @@ async function runChannelScan(
             // Add newly scanned items to results
             const scannedItems: apid.ConfigChannels = [];
             for (const newChannelItem of scannedChannelItems) {
+                if (route !== defaultRoute) {
+                    newChannelItem.route = route;
+                }
                 result.push(newChannelItem);
                 newCount++;
                 scanStatus.newCount = newCount;
@@ -810,6 +824,7 @@ export const put: Operation = async (req, res) => {
     const asyncMode = Boolean(req.query.async);
     const dryRun = Boolean(req.query.dryRun);
     const type = req.query.type as apid.ChannelType;
+    const route = req.query.route as apid.ChannelRoute || common.getDefaultChannelRoute(type);
     const refresh = Boolean(req.query.refresh);
 
     // Parse skipCh parameter
@@ -850,7 +865,7 @@ export const put: Operation = async (req, res) => {
         res.end();
 
         // Run scan in background
-        runChannelScan(scanConfig, dryRun, type, refresh, null, skipCh)
+        runChannelScan(scanConfig, dryRun, type, route, refresh, null, skipCh)
             .catch(error => {
                 console.error("Channel scan error:", error);
                 // Error is used only when the scan is stopped
@@ -876,7 +891,7 @@ export const put: Operation = async (req, res) => {
         };
 
         // Run scan with output streaming
-        await runChannelScan(scanConfig, dryRun, type, refresh, logTextOutput, skipCh);
+        await runChannelScan(scanConfig, dryRun, type, route, refresh, logTextOutput, skipCh);
         res.end();
     } catch (error) {
         console.error("Channel scan error:", error);
@@ -898,8 +913,9 @@ put.apiDoc = {
     description: `Entry rewriting specifications:
 - The scan is performed on a range of channels of the specified type and the entries for those channels, if any, are saved in the configuration file.
 - If the channel to be scanned is described in the configuration file and is enabled, the scan will not be performed for that channel and the entries described will remain intact. If you do not want to keep the entries, use the \`refresh\` option.
-- All entries outside the channel range of the specified type will be deleted.
-- All entries of a type other than the specified type will remain.
+- All entries outside the channel range of the specified type and route will be deleted.
+- All entries of a type or a route other than the specified ones will remain.
+- Only the tuners which can receive the specified route are used. The entries added have the \`route\` if it is not the default of the type.
 
 About BS Subchannel Style:
 - Only when scanning BS, you can specify the channel number in the subchannel style (e.g. BS01_0). To specify the channel number, use minSubCh and maxSubCh in addition to minCh and maxCh.
@@ -929,6 +945,15 @@ About BS Subchannel Style:
             enum: ["GR", "BS", "CS"] as apid.ChannelType[],
             default: "GR",
             description: "Specifies the channel type to scan."
+        },
+        {
+            in: "query",
+            name: "route",
+            type: "string",
+            enum: ["TER", "SAT", "CATV", "HIKARI"] as apid.ChannelRoute[],
+            description: "Specifies the receiving route to scan.\n\n" +
+                "_Default value (GR)_: TER\n" +
+                "_Default value (BS/CS)_: SAT"
         },
         {
             in: "query",

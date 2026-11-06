@@ -17,13 +17,18 @@ import * as common from "./common";
 import * as log from "./log";
 import * as apid from "../../api";
 import _ from "./_";
+import * as db from "./db";
 import status from "./status";
-import ChannelItem from "./ChannelItem";
+import ChannelItem, { ChannelStream } from "./ChannelItem";
 import { JobItem } from "./Job";
 
 export class Channel {
     private _items: ChannelItem[] = [];
     private _startup: boolean = true;
+    private _saveTimerId: NodeJS.Timeout;
+    private _streams = new Map<ChannelItem, ChannelStream>();
+    /** <networkId, <streamId, channels>> */
+    private _streamIndex: Map<number, Map<number, ChannelItem[]>> = null;
 
     constructor() {
         this._load();
@@ -58,6 +63,8 @@ export class Channel {
     add(item: ChannelItem): void {
         if (this.get(item.type, item.channel) === null) {
             this._items.push(item);
+            this._streamIndex = null;
+            _.service?.invalidateChannelIndex?.();
         }
     }
 
@@ -85,6 +92,83 @@ export class Channel {
         return items;
     }
 
+    /** channels received the stream last time */
+    findByStream(networkId: number, streamId: number): ChannelItem[] {
+        if (this._streamIndex === null) {
+            this._streamIndex = new Map();
+            for (const item of this._items) {
+                const stream = this._streams.get(item);
+                if (!stream) {
+                    continue;
+                }
+                let streams = this._streamIndex.get(stream.networkId);
+                if (!streams) {
+                    streams = new Map();
+                    this._streamIndex.set(stream.networkId, streams);
+                }
+                let channels = streams.get(stream.streamId);
+                if (!channels) {
+                    channels = [];
+                    streams.set(stream.streamId, channels);
+                }
+                channels.push(item);
+            }
+        }
+
+        return this._streamIndex.get(networkId)?.get(streamId) || [];
+    }
+
+    getStream(item: ChannelItem): ChannelStream {
+        return this._streams.get(item) || null;
+    }
+
+    setStream(item: ChannelItem, networkId: number, streamId: number): void {
+        const stream = this._streams.get(item);
+        if (stream && stream.networkId === networkId && stream.streamId === streamId) {
+            return;
+        }
+        this._streams.set(item, { networkId, streamId });
+        this._streamIndex = null;
+        _.service?.invalidateChannelIndex?.();
+
+        this.save();
+    }
+
+    save(): void {
+        clearTimeout(this._saveTimerId);
+        this._saveTimerId = setTimeout(() => this._save(), 1000 * 10);
+    }
+
+    async load(): Promise<void> {
+        log.debug("loading channels db...");
+
+        const channels = await db.loadChannels(_.configIntegrity.channels, true);
+        for (const channel of channels) {
+            const item = this.get(channel.type, channel.channel);
+            if (item === null || typeof channel.networkId !== "number" || typeof channel.streamId !== "number") {
+                continue;
+            }
+            item.setStream(channel.networkId, channel.streamId);
+        }
+        // nothing changed by loading
+        clearTimeout(this._saveTimerId);
+    }
+
+    private _save(): void {
+        log.debug("saving channels db...");
+
+        db.saveChannels(
+            this._items
+                .filter(item => this._streams.has(item))
+                .map(item => ({
+                    type: item.type,
+                    channel: item.channel,
+                    ...this._streams.get(item)
+                })),
+            _.configIntegrity.channels
+        );
+    }
+
     private _load(): void {
         log.debug("loading channels...");
 
@@ -103,6 +187,11 @@ export class Channel {
 
             if (typeof channel.channel !== "string") {
                 log.error("invalid type of property `channel` in channel#%d (%s) configuration", i, channel.name);
+                return;
+            }
+
+            if (channel.route !== undefined && common.channelRoutes.includes(channel.route) === false) {
+                log.error("invalid type of property `route` in channel#%d (%s) configuration", i, channel.name);
                 return;
             }
 
@@ -162,7 +251,7 @@ export class Channel {
                 return;
             }
 
-            if (_.tuner.typeExists(channel.type) === false) {
+            if (_.tuner.typeExists(channel.type, channel.route || common.getDefaultChannelRoute(channel.type)) === false) {
                 return;
             }
 
@@ -190,14 +279,22 @@ export class Channel {
             }
             const service = services[0];
 
+            // any channel of the network can be used, the first service's ones come first
+            const channels = [...new Set([service, ...services].flatMap(item => item.channels))];
+            if (channels.length === 0) {
+                continue;
+            }
+            // picked by readyFn
+            let channel: ChannelItem = null;
+
             _.job.add({
                 key: `EPG.Gather.NID.${networkId}`,
                 name: `EPG Gather Network#${networkId}`,
                 isRerunnable: true,
                 fn: async () => {
-                    log.info("Network#%d EPG gathering has started", networkId);
+                    log.info("Network#%d EPG gathering has started on %s/%s", networkId, channel.type, channel.channel);
                     try {
-                        await _.tuner.getEPG(service.channel);
+                        await _.tuner.getEPG(channel);
                         log.info("Network#%d EPG gathering has finished", networkId);
                     } catch (e) {
                         log.warn("Network#%d EPG gathering has failed [%s]", networkId, e);
@@ -234,7 +331,8 @@ export class Channel {
                         }
                     }
 
-                    return _.tuner.readyForJob(service.channel);
+                    channel = await _.tuner.readyForJob(channels);
+                    return channel !== null;
                 }
             });
         }

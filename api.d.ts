@@ -42,10 +42,15 @@ export interface Channel {
     type: ChannelType;
     channel: string;
     name?: string;
+    /** receiving route. (default: `TER` for `GR`, `SAT` for others) */
+    route?: ChannelRoute;
     services?: Service[];
 }
 
 export type ChannelType = "GR" | "BS" | "CS" | "SKY";
+
+/** how the tuner receives the channel. e.g. `CATV` for BS/CS via transmodulation. */
+export type ChannelRoute = "TER" | "SAT" | "CATV" | "HIKARI";
 
 export interface Service {
     id: ServiceItemId;
@@ -58,7 +63,11 @@ export interface Service {
     remoteControlKeyId?: number;
     epgReady?: boolean;
     epgUpdatedAt?: number;
+    /** transport_stream_id of the stream carrying the service. */
+    streamId?: number;
     channel?: Channel;
+    /** every channel carrying the stream of the service. */
+    channels?: Channel[];
 }
 
 export interface Program {
@@ -176,6 +185,7 @@ export interface TunerDevice {
     index: number;
     name: string;
     types: ChannelType[];
+    routes?: ChannelRoute[];
     command: string;
     /** `null` when no process is running (including when the tuner accesses the DVB device directly). */
     pid: number | null;
@@ -303,6 +313,8 @@ export interface ConfigTunersItem {
     name: string;
     /** channel type. */
     types: ChannelType[];
+    /** receiving routes. (default: all routes) */
+    routes?: ChannelRoute[];
     /** [chardev][dvb] command to get TS. */
     command?: string;
     /** [dvb] dvr adapter device path */
@@ -328,6 +340,8 @@ export interface ConfigChannelsItem {
     type: ChannelType;
     /** passed to tuning command */
     channel: string;
+    /** receiving route. (default: `TER` for `GR`, `SAT` for others) */
+    route?: ChannelRoute;
     serviceId?: number;
     /** TSMF (MPEG-TS Multi Frame) relative TS number config for CATV */
     tsmfRelTs?: number;
@@ -353,6 +367,7 @@ export interface ChannelScanStatus {
     isScanning: boolean;
     status: ChannelScanPhase;
     type?: ChannelType;
+    route?: ChannelRoute;
     dryRun?: boolean;
     progress?: number;
     currentChannel?: string;
