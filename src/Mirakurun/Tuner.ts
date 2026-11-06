@@ -165,11 +165,14 @@ export class Tuner {
      * @returns `null` if the format is unavailable
      */
     getOutputFormat(channels: ChannelItem[], requested?: apid.StreamFormat): apid.StreamFormat | null {
-        if (channels[0].isTlv === false) {
+        const tlvChannels = channels.filter(channel => channel.isTlv);
+        if (tlvChannels.length === 0) {
             return requested === "tlv" ? null : "ts";
         }
 
-        const canConvert = this._getCandidates(channels).some(({ devices }) => devices.some(device => !!device.config.tlvToTsDecoder));
+        // the channels of TS can output TS without the conversion
+        const canConvert = tlvChannels.length < channels.length ||
+            this._getCandidates(tlvChannels).some(({ devices }) => devices.some(device => !!device.config.tlvToTsDecoder));
         const format = requested || _.config.server.defaultTlvStreamFormat || "tlv";
         if (format === "ts" && canConvert === false) {
             return null;
@@ -278,9 +281,17 @@ export class Tuner {
             },
             ...user
         };
-        // the format is detected only by the service scan (the streams use the format detected)
-        const format = await this._detectFormat(userReq);
+        return this._scanServices(channel, userReq, channel.format, true);
+    }
+
+    /**
+     * @param format the format to receive the stream
+     * @param detect `true` to detect the format (only by the service scan, the streams use the format detected)
+     */
+    private async _scanServices(channel: ChannelItem, userReq: common.User, format: apid.StreamFormat, detect: boolean): Promise<apid.Service[]> {
         const tsFilter = await this._initTS(userReq, undefined, undefined, format);
+        // the format is detected by the data of the same tuner, the scan does not wait for it
+        const probe = detect ? this._startFormatProbe(userReq) : null;
         return new Promise<apid.Service[]>((resolve, reject) => {
             let network = {
                 networkId: -1,
@@ -288,8 +299,19 @@ export class Tuner {
                 remoteControlKeyId: -1
             };
             let services: apid.Service[] = null;
+            let retryFormat: apid.StreamFormat = null;
 
-            setTimeout(() => tsFilter.close(), 20000);
+            const timeout = setTimeout(() => tsFilter.close(), 20000);
+
+            probe?.format.then(detected => {
+                // the scan has succeeded in the format
+                if (detected === null || detected === format || tsFilter.closed || (network.networkId !== -1 && services !== null)) {
+                    return;
+                }
+                log.info("Tuner: the format of %s/%s is detected as `%s`, scanning again", channel.type, channel.channel, detected);
+                retryFormat = detected;
+                tsFilter.close();
+            });
 
             Promise.all<void>([
                 new Promise((resolve, reject) => {
@@ -310,8 +332,13 @@ export class Tuner {
             tsFilter.once("close", () => {
                 tsFilter.removeAllListeners("network");
                 tsFilter.removeAllListeners("services");
+                clearTimeout(timeout);
+                probe?.end();
 
-                if (network.networkId === -1) {
+                if (retryFormat !== null) {
+                    // the tuner is kept tuned for a while, the stream of the scan joins it
+                    resolve(this._scanServices(channel, userReq, retryFormat, false));
+                } else if (network.networkId === -1) {
                     reject(new Error("stream has closed before get network"));
                 } else if (services === null) {
                     reject(new Error("stream has closed before get services"));
@@ -406,42 +433,34 @@ export class Tuner {
     }
 
     /**
-     * detects the format of the stream by the data received after tuning
-     * @returns the format of the channel if not detected
+     * detects the format of the stream by joining the tuner streaming to `user` (does not tune by itself)
+     * @returns `null` if the format is not detected: the remote Mirakurun outputs the format by itself, TSMF is TS outside,
+     * and only the tuners for TLV (MMT) detect, not to add any work to the environments only for TS
      */
-    private async _detectFormat(user: common.User): Promise<apid.StreamFormat> {
-        const channel = user.streamSetting.channel;
-        const devices = this._getDevicesByType(channel.type, channel.route);
-        // the remote Mirakurun outputs the format by itself, TSMF is TS outside
-        if (channel.tsmfRelTs || devices.some(device => device.isRemote)) {
-            return channel.format;
+    private _startFormatProbe(user: common.User): { format: Promise<apid.StreamFormat | null>, end: () => void } | null {
+        if (user.streamSetting.channel.tsmfRelTs) {
+            return null;
+        }
+        // the ID of the scan is not unique (the scans run on the tuners at the same time), `streamSetting` is of this scan
+        const device = this._devices.find(device => device.users.some(deviceUser => deviceUser.streamSetting === user.streamSetting));
+        if (!device || device.isRemote) {
+            return null;
+        }
+        const { types, tlvDecoder, tlvToTsDecoder } = device.config;
+        if (!tlvDecoder && !tlvToTsDecoder && types.some(type => common.tlvChannelTypes.includes(type)) === false) {
+            return null;
         }
 
         const probe = new FormatProbe();
-        for (let tryCount = 50; tryCount > 0; tryCount--) {
-            const picked = this._pickTunerDevice([{ channel, devices }], user.priority);
-            if (picked !== null) {
-                await picked.device.startStream({ ...user, id: `${user.id}#format` }, probe, channel);
-                break;
-            }
-            if (tryCount === 1) {
-                throw new Error("no available tuners");
-            }
-            await new Promise(resolve => setTimeout(resolve, 250));
-        }
-
-        const format = await probe.detect(DETECT_TIMEOUT);
-        // the tuner is kept tuned for a while, the stream of the scan joins it
-        probe.end();
-
-        if (format === null) {
-            log.warn("Tuner: the format of %s/%s is not detected, using `%s`", channel.type, channel.channel, channel.format);
-            return channel.format;
-        }
-        if (format !== channel.format) {
-            log.info("Tuner: the format of %s/%s is detected as `%s`", channel.type, channel.channel, format);
-        }
-        return format;
+        const format = probe.detect(DETECT_TIMEOUT).then(detected => {
+            probe.end();
+            return detected;
+        });
+        device.startStream({ ...user, id: `${user.id}#format` }, probe).catch(err => {
+            log.debug("Tuner: the format detection has failed (%s)", err.message);
+            probe.end();
+        });
+        return { format, end: () => probe.end() };
     }
 
     /**
@@ -456,13 +475,17 @@ export class Tuner {
         }
 
         let candidates = this._getCandidates(channels || [setting.channel]);
-        const isTlv = (format || setting.channel.format) === "tlv";
-        if (isTlv && dest && user.outputFormat === "ts") {
-            // only the tuners can convert TLV to TS
-            candidates = candidates.map(({ channel, devices }) => ({
-                channel,
-                devices: devices.filter(device => !!device.config.tlvToTsDecoder)
-            }));
+        // the format detected is only for `streamSetting.channel`
+        const isTlvChannel = (channel: ChannelItem) => (channels === undefined && format) ? format === "tlv" : channel.isTlv;
+        if (dest && user.outputFormat) {
+            candidates = candidates.map(({ channel, devices }) => {
+                if (isTlvChannel(channel)) {
+                    // only the tuners can convert TLV to TS
+                    return { channel, devices: user.outputFormat === "ts" ? devices.filter(device => !!device.config.tlvToTsDecoder) : devices };
+                }
+                // the channels of TS cannot output TLV
+                return { channel, devices: user.outputFormat === "tlv" ? [] : devices };
+            });
         }
         let tryCount = 50;
         const startedAt = Date.now();
@@ -487,6 +510,7 @@ export class Tuner {
             } else {
                 // found
                 const { device, channel } = picked;
+                const isTlv = isTlvChannel(channel);
                 setting.channel = channel;
                 log.debug("Tuner: picked TunerDevice#%d for user `%s` in %dms", device.index, user.id, Date.now() - startedAt);
 

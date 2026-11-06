@@ -28,6 +28,12 @@ export const get: Operation = async (req, res) => {
         if (service.type !== 1 && service.type !== 173) {
             continue;
         }
+        // the IPTV clients play only TS
+        const channels = service.channels;
+        if (_.tuner.getOutputFormat(channels, "ts") === null) {
+            continue;
+        }
+        const query = channels.some(channel => channel.isTlv) ? "?format=ts" : "";
 
         m += `#KODIPROP:mimetype=video/mp2t\n`;
         m += `#EXTINF:-1 tvg-id="${service.id}"`;
@@ -35,7 +41,7 @@ export const get: Operation = async (req, res) => {
             m += ` tvg-logo="${apiRoot}/services/${service.id}/logo"`;
         }
         m += ` group-title="${service.channel.type}",${service.name}\n`;
-        m += `${apiRoot}/services/${service.id}/stream\n`;
+        m += `${apiRoot}/services/${service.id}/stream${query}\n`;
     }
 
     res.setHeader("Content-Type", "application/x-mpegURL; charset=utf-8");

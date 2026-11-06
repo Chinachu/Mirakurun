@@ -429,7 +429,8 @@ export const TunersConfigView: React.FC = () => {
                                                 />
                                             </FormGroup>
                                         )}
-                                        {tuner.types?.includes("BS4K") && (
+                                        {/* hidden for the tuners only for GR, which does not carry TLV (MMT) */}
+                                        {(tuner.types?.some(type => type !== "GR") || tuner.tlvDecoder || tuner.tlvToTsDecoder) && (
                                             <>
                                                 <FormGroup label="TLV Decoder">
                                                     <InputGroup

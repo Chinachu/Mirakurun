@@ -237,7 +237,7 @@ If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outp
 
 The format of the data received on the channel. `tlv` for TLV (MMT).
 
-If not specified, the format is detected from the data received by the service scan, and saved in `channels.json`. The streams for viewing and recording do not detect and use the format saved (not to delay the start of the streams of TS). Before the scan, `tlv` for the type `BS4K`, `ts` for the others.
+If not specified, the format is detected from the data received by the service scan, and saved in `channels.json`. It is detected only when the tuner of the scan has the type `BS4K` or `tlvDecoder` / `tlvToTsDecoder` (not to add any work to the environments only for TS). The streams for viewing and recording do not detect and use the format saved (not to delay the start of the streams of TS). Before the scan, `tlv` for the type `BS4K`, `ts` for the others.
 
 #### route
 

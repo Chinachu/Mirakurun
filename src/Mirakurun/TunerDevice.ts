@@ -405,6 +405,9 @@ export default class TunerDevice extends EventEmitter {
             if (this._config.remoteMirakurunDecoder === true) {
                 cmd += " decode";
             }
+            if (ch.isTlv) {
+                cmd += " tlv";
+            }
         } else {
             cmd = this._config.command;
         }

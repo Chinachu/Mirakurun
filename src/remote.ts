@@ -28,7 +28,9 @@ const opt = {
     port: parseInt(process.argv[3], 10),
     type: process.argv[4] as apid.ChannelType,
     channel: process.argv[5],
-    decode: process.argv.includes("decode") === true
+    decode: process.argv.includes("decode") === true,
+    // the local TLVFilter needs TLV regardless of `defaultTlvStreamFormat` of the remote
+    format: process.argv.slice(6).includes("tlv") ? "tlv" as apid.StreamFormat : undefined
 };
 
 console.error("remote:", opt);
@@ -40,7 +42,7 @@ client.host = opt.host;
 client.port = opt.port;
 client.userAgent = "Mirakurun (Remote)";
 
-client.getChannelStream(opt.type, opt.channel, opt.decode)
+client.getChannelStream({ type: opt.type, channel: opt.channel, decode: opt.decode, format: opt.format })
     .then(_stream => {
         stream = _stream;
         stream.pipe(process.stdout);

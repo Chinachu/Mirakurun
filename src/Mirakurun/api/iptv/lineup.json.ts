@@ -37,6 +37,12 @@ export const get: Operation = (req, res) => {
         if (service.type !== 1 && service.type !== 173) {
             continue;
         }
+        // the IPTV clients play only TS
+        const serviceChannels = service.channels;
+        if (_.tuner.getOutputFormat(serviceChannels, "ts") === null) {
+            continue;
+        }
+        const query = serviceChannels.some(channel => channel.isTlv) ? "?format=ts" : "";
 
         const mainNum = service.remoteControlKeyId || service.serviceId;
         if (countMap.has(mainNum)) {
@@ -50,7 +56,7 @@ export const get: Operation = (req, res) => {
             GuideNumber: `${mainNum}.${subNum}`,
             GuideName: service.name,
             HD: 1,
-            URL: `${apiRoot}/services/${service.id}/stream`
+            URL: `${apiRoot}/services/${service.id}/stream${query}`
         });
     }
 

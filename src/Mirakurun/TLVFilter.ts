@@ -196,6 +196,9 @@ export default class TLVFilter extends EventEmitter {
         if (this._ready === false) {
             log.info("TLVFilter: waiting for serviceId=%d, eventId=%d", this._provideServiceId, this._provideEventId);
         }
+
+        // counted as TSFilter for the status (the filters of streams)
+        ++status.streamCount.tsFilter;
     }
 
     get closed(): boolean {
@@ -561,6 +564,8 @@ export default class TLVFilter extends EventEmitter {
         this._buffer = [];
 
         delete this.streamInfo;
+
+        --status.streamCount.tsFilter;
 
         log.info("TLVFilter#_close: closed (serviceId=%s, eventId=%s)", this._provideServiceId, this._provideEventId);
 
