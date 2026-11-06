@@ -24,7 +24,7 @@ import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
 import TSFilter from "./TSFilter";
 import TSDecoder from "./TSDecoder";
-import { DETECT_BYTES, DETECT_SKIP_BYTES, detectStreamFormat } from "./StreamFormat";
+import { DETECT_BYTES, DETECT_SKIP_BYTES, detectStreamFormat, detectTSMFStreamFormat } from "./StreamFormat";
 
 // the TLV decoders (descrambling via a server, converting) take a while to output
 const TLV_DECODER_STARTUP_TIMEOUT = 10000;
@@ -37,6 +37,10 @@ class FormatProbe extends EventEmitter {
     private _bytes = 0;
     private _closed = false;
     private _resolve: (format: apid.StreamFormat | null) => void = null;
+
+    constructor(private _detect: (data: Buffer) => apid.StreamFormat | null) {
+        super();
+    }
 
     get closed(): boolean {
         return this._closed;
@@ -61,7 +65,7 @@ class FormatProbe extends EventEmitter {
         if (this._bytes >= DETECT_SKIP_BYTES + DETECT_BYTES) {
             const data = Buffer.concat(this._chunks, this._bytes);
             this._chunks = [];
-            this._done(detectStreamFormat(data.subarray(DETECT_SKIP_BYTES)));
+            this._done(this._detect(data.subarray(DETECT_SKIP_BYTES)));
         }
     }
 
@@ -434,13 +438,10 @@ export class Tuner {
 
     /**
      * detects the format of the stream by joining the tuner streaming to `user` (does not tune by itself)
-     * @returns `null` if the format is not detected: the remote Mirakurun outputs the format by itself, TSMF is TS outside,
+     * @returns `null` if the format is not detected: the remote Mirakurun outputs the format by itself,
      * and only the tuners for TLV (MMT) detect, not to add any work to the environments only for TS
      */
     private _startFormatProbe(user: common.User): { format: Promise<apid.StreamFormat | null>, end: () => void } | null {
-        if (user.streamSetting.channel.tsmfRelTs) {
-            return null;
-        }
         // the ID of the scan is not unique (the scans run on the tuners at the same time), `streamSetting` is of this scan
         const device = this._devices.find(device => device.users.some(deviceUser => deviceUser.streamSetting === user.streamSetting));
         if (!device || device.isRemote) {
@@ -451,7 +452,9 @@ export class Tuner {
             return null;
         }
 
-        const probe = new FormatProbe();
+        // TSMF is TS outside, the relative stream is detected by the header
+        const channel = user.streamSetting.channel;
+        const probe = new FormatProbe(channel.tsmfRelTs ? data => detectTSMFStreamFormat(data, channel.tsmfRelTs) : detectStreamFormat);
         const format = probe.detect(DETECT_TIMEOUT).then(detected => {
             probe.end();
             return detected;
@@ -525,7 +528,8 @@ export class Tuner {
                         eventId: setting.eventId,
                         parseNIT: setting.parseNIT,
                         parseSDT: setting.parseSDT,
-                        parseEIT: setting.parseEIT
+                        parseEIT: setting.parseEIT,
+                        tsmfRelTs: setting.channel.tsmfRelTs
                     });
                 } else {
                     let output: Writable;

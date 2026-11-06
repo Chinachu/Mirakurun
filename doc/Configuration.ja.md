@@ -221,7 +221,7 @@ TLV (MMT) のチャンネルでは、タイプにかかわらず、`decoder` の
   # 以下はオプション
   route: TER # 列挙型 [TER|SAT|CATV|HIKARI] - 受信する経路。省略した場合、GR は TER、それ以外は SAT
   serviceId: 1234 # Integer - 指定しない場合、サービスは自動的にスキャンされます。
-  tsmfRelTs: 1 # 数値: 1~15
+  tsmfRelTs: 1 # 数値: 1~15 - TSMF の相対 TS 番号。TLV のチャンネルでは、拡張 TSMF で TLV を伝送する相対 TS 番号 (単一の搬送波のみ)
   format: tlv # 列挙型 [ts|tlv] - 指定しない場合、サービスのスキャンで判別した形式 (スキャンの前は BS4K なら tlv、それ以外は ts)
   commandVars: # オプションのコマンド変数 *@4.0.0~
     satellite: EXAMPLE-SAT4A

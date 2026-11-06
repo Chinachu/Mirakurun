@@ -14,6 +14,7 @@
    limitations under the License.
 */
 import * as apid from "../../api";
+import { parseTSMFHeader } from "./TSMFTLV";
 
 const TS_PACKET_SIZE = 188;
 /** TS packets in a row to detect TS */
@@ -43,6 +44,34 @@ export function detectStreamFormat(data: Buffer): apid.StreamFormat | null {
         return null;
     }
     return ts >= tlv ? "ts" : "tlv";
+}
+
+/**
+ * detects the format of the relative stream of TSMF by stream_type of the TSMF headers
+ * (decided by 2 headers in a row of continuity_counter, the frame of the channel tuned before may remain)
+ * @returns `null` if unknown
+ */
+export function detectTSMFStreamFormat(data: Buffer, relTs: number): apid.StreamFormat | null {
+    let last: { cc: number, isTlv: boolean } = null;
+    for (let i = 0; i + TS_PACKET_SIZE <= data.length; i++) {
+        if (data[i] !== 0x47 || (((data[i + 1] & 0x1F) << 8) | data[i + 2]) !== 0x2F) {
+            continue;
+        }
+        const packet = data.subarray(i, i + TS_PACKET_SIZE);
+        const header = parseTSMFHeader(packet);
+        if (header === null) {
+            last = null;
+            continue;
+        }
+        const cc = packet[3] & 0x0F;
+        const isTlv = ((header.streamTypeBits >> (15 - relTs)) & 1) === 0;
+        if (last !== null && cc === ((last.cc + 1) & 0x0F) && isTlv === last.isTlv) {
+            return isTlv ? "tlv" : "ts";
+        }
+        last = { cc, isTlv };
+        i += TS_PACKET_SIZE - 1;
+    }
+    return null;
 }
 
 /** the bytes of the TS packets in a row from the first sync */
