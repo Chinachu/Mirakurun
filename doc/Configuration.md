@@ -236,9 +236,9 @@ If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outp
 
 #### tsmfRelTs
 
-The relative TS number of the channel multiplexed by TSMF. The relative stream carrying TLV in extended TSMF can also be specified (single carrier only).
+The relative TS number of the channel multiplexed by TSMF. The relative stream carrying TLV in extended TSMF can also be specified.
 
-If not specified, all the relative streams in use, and TS or TLV for each, are detected from the TSMF headers by the service scan, and the services are scanned for each relative stream (saved in `channels.json`). The services are newly registered only by the scan of the channel without services, as before. The streams of the services and the programs receive the relative stream of the service. Like `format`, they are detected only when the tuner of the scan has the type `BS4K` or `tlvDecoder` / `tlvToTsDecoder` (TSMF of multiple carriers is not detected). Specify `tsmfRelTs` to receive a channel of TSMF by the tuners only for TS.
+If not specified, all the relative streams in use, and TS or TLV for each, are detected from the TSMF headers by the service scan, and the services are scanned for each relative stream (saved in `channels.json`). The services are newly registered only by the scan of the channel without services, as before. The streams of the services and the programs receive the relative stream of the service. Like `format`, they are detected only when the tuner of the scan has the type `BS4K` or `tlvDecoder` / `tlvToTsDecoder`. Specify `tsmfRelTs` to receive a channel of TSMF by the tuners only for TS.
 
 The stream of the channel (`/api/channels/{type}/{channel}/stream`) accepts the query `tsmfRelTs` to specify the relative stream. Without it, the relative stream of `tsmfRelTs` of channels.yml (the stream as received if not specified) is output as before, for the remote Mirakurun receiving it. The stream as received of a channel whose TSMF is detected is TS, even for the type `BS4K` (unless `format` is specified). When the relative stream of a service is unknown, the relative stream of the most slots (the smaller number if the same) of the network of the service (of all if none) is received. The relative streams detected are not received by the remote tuners (the remote Mirakurun outputs its own relative stream). If there are only the remote tuners, the stream as received is received as before (503 for the relative stream detected specified by the query `tsmfRelTs`).
 
@@ -256,7 +256,7 @@ Specify this when a TLV is transmitted by multiple carriers of CATV (channel bon
 
 - Tuners as many as the carriers are needed. The tuners of the carriers are shown in `/api/tuners` as the users `<user ID>#carrier<n>`.
 - Requests for the same carriers share the tuners with EPG acquisition and other streams. Joining the same reception does not stop existing users, even at a higher priority. Requests for other carriers follow the usual priority rules when no tuner is free.
-- `tsmfRelTs` is needed (the relative streams detected without `tsmfRelTs` do not include TSMF of multiple carriers).
+- When `tsmfRelTs` and `tsmfGroupId` are omitted, each channel scan saves the relative streams, stream IDs, group ID and carrier count from the headers in `channels.json`. Once all carriers of the same type, route and group carrying the same TLV have been discovered, service scanning uses the additional tuners. TS services sharing a carrier are scanned even before the other carriers have been discovered. If fewer compatible local tuners are registered than required, header information is saved and TLV service scanning is deferred.
 - The skew of the carriers is found by checking the TLV assembled (the difference of the delays up to about 0.5 seconds). Nothing is output until it is found, usually within a second, but it may take about 10 seconds for 4 or more carriers.
 - The stream is closed when a carrier is not received for about 10 seconds (including starting the tuner) or the TLV can not be assembled.
 

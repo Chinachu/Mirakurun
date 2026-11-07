@@ -167,7 +167,11 @@ export class Channel {
                     streamId: stream.streamId,
                     ...((stream.format === "ts" || stream.format === "tlv") && { format: stream.format }),
                     ...(typeof stream.relTs === "number" && { relTs: stream.relTs }),
-                    ...(typeof stream.slots === "number" && { slots: stream.slots })
+                    ...(typeof stream.slots === "number" && { slots: stream.slots }),
+                    ...(Number.isInteger(stream.groupId) && stream.groupId > 0 && stream.groupId <= 255 &&
+                        Number.isInteger(stream.numberOfCarriers) && stream.numberOfCarriers > 1 && stream.numberOfCarriers <= 255 &&
+                        Number.isInteger(stream.carrierSequence) && stream.carrierSequence >= 0 && stream.carrierSequence <= stream.numberOfCarriers &&
+                        { groupId: stream.groupId, numberOfCarriers: stream.numberOfCarriers, carrierSequence: stream.carrierSequence })
                 })));
         }
         // nothing changed by loading
@@ -229,10 +233,6 @@ export class Channel {
             if (channel.tsmfRelTs && typeof channel.tsmfRelTs !== "number") {
                 log.error("invalid type of property `tsmfRelTs` in channel#%d (%s) configuration", i, channel.name);
                 return;
-            }
-
-            if (channel.tsmfGroupId !== undefined && !channel.tsmfRelTs) {
-                log.warn("property `tsmfGroupId` without `tsmfRelTs` is ignored in channel#%d (%s) configuration", i, channel.name);
             }
 
             if (channel.commandVars && typeof channel.commandVars !== "object") {
