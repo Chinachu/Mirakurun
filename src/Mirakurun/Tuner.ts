@@ -591,7 +591,7 @@ export class Tuner {
                 }
                 isNotTSMF = isNotTSMF || probe.tsmf;
                 // the scan has succeeded in the format
-                if (detected.format === format || (network.networkId !== -1 && services !== null)) {
+                if (detected.format === candidate.format || (network.networkId !== -1 && services !== null)) {
                     return;
                 }
                 log.info("Tuner: the format of %s/%s is detected as `%s`, scanning again", channel.type, channel.channel, detected.format);
@@ -645,7 +645,8 @@ export class Tuner {
                     const keepsTSMF = relTs === undefined && isNotTSMF === false && channel.streams.some(stream => stream.relTs !== undefined) &&
                         this._getDevicesByType(channel.type, channel.route).some(device => this._detectsFormat(device));
                     if (services.length > 0 && relTs === channel.tsmfRelTs && !keepsTSMF && _.channel.get(channel.type, channel.channel) === channel) {
-                        channel.setStream(services[0].networkId, services[0].streamId, format);
+                        // the format received (the format of the remote Mirakurun with only the remote tuners)
+                        channel.setStream(services[0].networkId, services[0].streamId, candidate.format);
                     }
                     if (network.remoteControlKeyId !== -1) {
                         services.forEach(service => {
@@ -653,7 +654,7 @@ export class Tuner {
                         });
                     }
 
-                    options.streams?.push({ relTs, format, services });
+                    options.streams?.push({ relTs, format: candidate.format, services });
                     resolve(services);
                 }
             });

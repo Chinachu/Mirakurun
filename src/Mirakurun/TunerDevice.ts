@@ -46,7 +46,7 @@ const REMOTE_REFUSED_EXIT_CODE = 2;
 /** リモートの Mirakurun が判別した相対 TS の指定 (`tsmfRelTs`) に対応しない場合 (4.3.0 以前) の `lib/remote` の終了コード */
 const REMOTE_RELTS_UNSUPPORTED_EXIT_CODE = 3;
 /** リモートの Mirakurun が判別した相対 TS に対応するかを確認できなかった場合に、確認し直すまでの時間 (ミリ秒) */
-const REMOTE_RELTS_CHECK_INTERVAL = 1000 * 60;
+const REMOTE_RELTS_CHECK_INTERVAL = 1000 * 10;
 
 // koffi (FFI) は DVB デバイスを直接操作するチューナーがある場合だけ読み込む
 let dvbDeviceClass: typeof DvbDevice | null;

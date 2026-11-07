@@ -962,13 +962,29 @@ describe("[route.spec] route / streamId", () => {
     });
 
     // リモートのチューナーだけで受信する場合、受信したままのストリームは、リモートの Mirakurun が出力する形式でスキャンする
-    it("scans the stream as received in the format of the remote Mirakurun if only the remote tuners", () => {
+    it("scans the stream as received in the format of the remote Mirakurun if only the remote tuners", async () => {
       setupChannels([{ name: "4K", type: "BS4K", route: "CATV", channel: "C19" }]);
       const channel = _.channel.items[0];
       // detected by the local tuners removed
       channel.setStreams([{ networkId: 11, streamId: 45168, relTs: 1, format: "tlv", slots: 52 }]);
-      const t = tuner([fakeDevice(0, ["BS4K"], ["CATV"], { isRemote: true })]);
+      const t = tuner([fakeDevice(0, ["BS4K"], ["CATV"], { isRemote: true, getRemoteChannel: async () => ({ type: "BS4K", channel: "C19", services: [] }) })]);
       assert.strictEqual(t._getCandidate(channel, undefined, channel.getFormat(undefined)).format, "tlv");
+
+      // saved in the format received
+      const filters = [];
+      mock.method(t, "_initTS", async (user, dest, candidates) => {
+        const filter = new EventEmitter();
+        filter.close = () => filter.emit("close");
+        filters.push([candidates[0].format, filter]);
+        setImmediate(() => {
+          filter.emit("network", { networkId: 11, areaCode: -1, remoteControlKeyId: -1 });
+          filter.emit("services", [{ networkId: 11, serviceId: 101, streamId: 45168 }]);
+        });
+        return filter;
+      });
+      const services = await t.getServices(channel);
+      assert.deepStrictEqual([filters.map(([format]) => format), services.map(service => service.serviceId)], [["tlv"], [101]]);
+      assert.deepStrictEqual(channel.streams, [{ networkId: 11, streamId: 45168, format: "tlv" }]);
     });
 
     // リモートの Mirakurun が判別した TLV は、搬送波がわからないため、ローカルのチューナーで判別するまでリモートのチューナーで受信する
@@ -1517,7 +1533,7 @@ describe("[route.spec] route / streamId", () => {
       assert.deepStrictEqual([checked, device.supportsRemoteRelTs], [1, false]);
 
       result = Promise.resolve(true);
-      mock.timers.tick(1000 * 60);
+      mock.timers.tick(1000 * 10);
       await new Promise(resolve => setImmediate(resolve));
       assert.deepStrictEqual([checked, device.supportsRemoteRelTs], [2, true]);
       // checked once
