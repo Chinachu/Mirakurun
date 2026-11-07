@@ -569,6 +569,8 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
         [5, "tlv", [105]],
         [9, "ts", []]
       ]);
+      // the network of the TSMF header, and the relative stream failed to scan
+      assert.deepStrictEqual(streams.map(({ networkId, failed }) => [networkId, failed]), [[4, undefined], [11, undefined], [4, true]]);
       assert.deepStrictEqual(saved, []);
 
       // without TSMF

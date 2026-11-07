@@ -242,6 +242,17 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
     assert.deepStrictEqual(result.tuned.map(t => t.type), ["GR", "BS"]);
     assert.ok(logs.some(text => /spawn recpt1 ENOENT/.test(text)));
 
+    // no signal over the channel not in the channel config of dvbv5 of the tuners of the other type
+    logs.length = 0;
+    result = await runScan(
+      { route: "HIKARI", source: "list", channels: ["27"], refresh: true, dryRun: true },
+      channel => { throw new Error(channel.type === "GR" ? "stream has closed before get network" : "channel 27 is not found in /etc/isdbs.conf"); },
+      { scanTypes: ["GR", "BS"], logs }
+    );
+    assert.deepStrictEqual(result.tuned.map(t => t.type), ["GR", "BS"]);
+    assert.ok(logs.some(text => /^-> no signal\.\n/.test(text)));
+    assert.ok(!logs.some(text => /is not found/.test(text)));
+
     result = await runScan(
       { route: "HIKARI", source: "list", channels: ["27", "28"], refresh: true },
       () => {

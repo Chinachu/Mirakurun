@@ -278,6 +278,15 @@ export function getScanAttempts(route: apid.ChannelRoute, channel?: string): Sca
     return _.tuner.getScanAttempts(route, order.filter(type => routeTypes[route].includes(type)));
 }
 
+/** the error of the scan of a channel to show: 2 = other errors, 1 = no signal, 0 = the channel not in the channel config of dvbv5 */
+function getScanErrorRank(error: unknown): number {
+    const text = String(error);
+    if (/stream has closed before get network/.test(text)) {
+        return 1;
+    }
+    return /channel .+ is not found in /.test(text) ? 0 : 2;
+}
+
 /**
  * the channel items of a channel scanned (by the type of each stream)
  * @param log writes the notes
@@ -295,18 +304,23 @@ export function generateScannedChannelItems(
     for (const stream of streams) {
         const services = stream.services.filter(service => serviceTypes.includes(service.type));
         const bonded = stream.format === "tlv" && stream.numberOfCarriers > 1;
-        // the carriers of a TLV of multiple carriers are added without the services (the services are scanned after all the carriers are known)
-        if (services.length === 0 && !bonded) {
+        // the carriers of a TLV of multiple carriers are added without the services (the services are scanned after all the carriers are known),
+        // the relative stream failed to scan is counted by the network of the TSMF header (not to specify the other relative stream of the type)
+        if (services.length === 0 && !bonded && !stream.failed) {
             continue;
         }
-        let type = getChannelTypeByNetwork(services[0]?.networkId, stream.format);
+        const networkId = services[0]?.networkId ?? stream.networkId;
+        let type = getChannelTypeByNetwork(networkId, stream.format);
         if (remoteType !== undefined && type !== remoteType) {
             log(`-> received by the remote tuner as ${remoteType}${type === null ? "" : ` (the network is of ${type})`}, added as ${remoteType}.\n`);
             type = remoteType;
         }
         if (type === null) {
-            log(`-> unknown network (networkId: ${services[0].networkId}${stream.relTs ? `, relTs: ${stream.relTs}` : ""}), skipped.\n`);
+            log(`-> unknown network (networkId: ${networkId}${stream.relTs ? `, relTs: ${stream.relTs}` : ""}), skipped.\n`);
             continue;
+        }
+        if (stream.failed) {
+            log(`-> the services of the relative stream ${stream.relTs} (${type}) are not received, scan again to add them.\n`);
         }
         const entry = types.get(type) || { relTs: new Set(), services: [], bonded: false };
         entry.relTs.add(stream.relTs);
@@ -317,6 +331,10 @@ export function generateScannedChannelItems(
 
     const items: apid.ConfigChannels = [];
     for (const [type, { relTs, services, bonded }] of types) {
+        // only the relative streams failed to scan
+        if (services.length === 0 && !bonded) {
+            continue;
+        }
         const scanMode = scanConfig.scanMode || (type === "GR" ? "Channel" : "Service");
         const setDisabledOnAdd = scanConfig.setDisabledOnAdd ?? type !== "GR";
         // the relative stream of TSMF is specified if only one (any tuner receives it), the relative streams are detected if more than one
@@ -727,8 +745,9 @@ async function runChannelScan(
                     received = attempt;
                     break;
                 } catch (error) {
-                    // the error other than no signal is shown (the tuners of the other types may not receive the channel)
-                    if (lastError === null || /stream has closed before get network/.test(String(lastError))) {
+                    // the error other than no signal is shown, no signal over the channel not in the channel config of dvbv5
+                    // (the tuners of the other types may not receive the channel)
+                    if (lastError === null || getScanErrorRank(error) > getScanErrorRank(lastError)) {
                         lastError = error;
                     }
                 }

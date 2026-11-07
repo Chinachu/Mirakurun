@@ -108,6 +108,21 @@ describe("[scan.spec] /api/config/channel/scan : generateScannedChannelItems", (
         assert.ok(logs.some(text => /relative streams of BS are detected/.test(text)));
     });
 
+    // スキャンに失敗した相対 TS も TSMF のヘッダーのネットワークで数え、ほかの相対 TS を指定しない
+    it("does not specify the relative stream if another one of the type has failed to scan", () => {
+        const logs = [];
+        const items = scan.generateScannedChannelItems("C23", "CATV", [
+            { relTs: 1, format: "ts", networkId: 4, services: [service(4, 101, "BS 1")] },
+            { relTs: 2, format: "ts", networkId: 4, services: [], failed: true },
+            { relTs: 3, format: "ts", networkId: 0xFFFE, services: [], failed: true },
+            { relTs: 9, format: "ts", networkId: 4, services: [] }
+        ], {}, text => logs.push(text));
+
+        assert.deepStrictEqual(items.map(item => [item.type, item.serviceId, item.tsmfRelTs]), [["BS", 101, undefined]]);
+        assert.ok(logs.some(text => /relative stream 2 \(BS\) are not received/.test(text)));
+        assert.ok(logs.some(text => /relative stream 3 \(GR\) are not received/.test(text)));
+    });
+
     it("adds the carriers of a TLV of multiple carriers without the services", () => {
         const items = scan.generateScannedChannelItems("C30", "CATV", [
             { relTs: 1, format: "tlv", services: [], numberOfCarriers: 3 }

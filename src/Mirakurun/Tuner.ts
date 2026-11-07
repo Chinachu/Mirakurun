@@ -150,6 +150,10 @@ export interface ScannedStream {
     services: apid.Service[];
     /** TSMF of multiple carriers (the TLV is not scanned until all the carriers are known) */
     numberOfCarriers?: number;
+    /** the network of the relative stream in the TSMF header */
+    networkId?: number;
+    /** the services of the relative stream are not received (the scan has failed) */
+    failed?: boolean;
 }
 
 /** the tuners to try a channel by the channel scan, as the type */
@@ -631,6 +635,7 @@ export class Tuner {
 
         const services: apid.Service[] = [];
         const streamServices: apid.Service[][] = streams.map(() => []);
+        const failed: boolean[] = streams.map(() => false);
         let lastError: Error = null;
         results.forEach((result, index) => {
             const i = scanStreams === streams ? index : streams.indexOf(scanStreams[index]);
@@ -641,6 +646,7 @@ export class Tuner {
                     channelStreams[i] = { ...channelStreams[i], networkId: result.value[0].networkId, streamId: result.value[0].streamId };
                 }
             } else {
+                failed[i] = true;
                 lastError = result.reason;
                 log.warn(
                     "Tuner: the services of the relative stream %d of TSMF on %s/%s are not received [%s]",
@@ -668,7 +674,9 @@ export class Tuner {
             relTs: stream.relTs,
             format: stream.format,
             services: streamServices[i],
-            ...(stream.numberOfCarriers > 1 && { numberOfCarriers: stream.numberOfCarriers })
+            networkId: stream.networkId,
+            ...(stream.numberOfCarriers > 1 && { numberOfCarriers: stream.numberOfCarriers }),
+            ...(failed[i] && { failed: true })
         })));
 
         // the channel scan adds the carriers bonded without the services (the TLV is scanned when all the carriers are found)
