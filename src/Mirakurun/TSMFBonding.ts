@@ -48,8 +48,10 @@ const MAX_SKEW = 60;
 const ALIGN_PROBE_SUPERFRAMES = 2;
 /** the super frames kept after the alignment (the carriers deliver them at different times) */
 const KEEP_SUPERFRAMES = 2;
-/** a carrier is stalled if the others are ahead by this super frames */
+/** the alignment is found again if the other carriers are ahead of a carrier by this super frames */
 const MAX_AHEAD_SUPERFRAMES = 60;
+/** a carrier is stalled if the others deliver this super frames each without it (about 10 seconds, including starting the tuner) */
+const STALL_SUPERFRAMES = 1200;
 
 /** receives the frames of a relative stream from a carrier (one tuner) */
 class CarrierInput {
@@ -169,6 +171,10 @@ export default class TSMFBonding {
     private _offsets: number[] = null;
     private _failures = 0;
     private _nextAlignAt = ALIGN_SUPERFRAMES;
+    /** the super frames received from all the carriers */
+    private _received = 0;
+    /** `_received` when each carrier delivered a super frame last */
+    private _lastReceived: number[] = [];
     private _warned = new Set<string>();
     private _closed = false;
 
@@ -179,6 +185,7 @@ export default class TSMFBonding {
     constructor(private _relTs: number, numberOfInputs: number, private _onError: (reason: string) => void) {
         for (let i = 0; i < numberOfInputs; i++) {
             this._inputs.push(new CarrierInput(_relTs, () => this._lost(), message => this._warn(message)));
+            this._lastReceived.push(0);
         }
     }
 
@@ -188,8 +195,13 @@ export default class TSMFBonding {
             return Buffer.alloc(0);
         }
         const carrier = this._inputs[input];
+        const received = carrier.superframes.length;
         carrier.push(chunk);
         carrier.commit();
+        if (carrier.superframes.length > received) {
+            this._received += carrier.superframes.length - received;
+            this._lastReceived[input] = this._received;
+        }
 
         const outputs: Buffer[] = [];
         this._assemble(outputs);
@@ -202,9 +214,18 @@ export default class TSMFBonding {
     }
 
     private _assemble(outputs: Buffer[]): void {
+        // the tuner of the carrier has not started, or has stopped
+        if (this._lastReceived.some(last => this._received - last > STALL_SUPERFRAMES * (this._inputs.length - 1))) {
+            this._closed = true;
+            this._onError("a carrier has stalled");
+            return;
+        }
+
         const counts = this._inputs.map(carrier => carrier.superframes.length);
-        if (Math.max(...counts) - Math.min(...counts) > MAX_AHEAD_SUPERFRAMES) {
-            // a carrier has stalled or lost the super frames
+        if (this._offsets === null) {
+            this._trim(Math.min(...counts));
+        } else if (Math.max(...counts) - Math.min(...counts) > MAX_AHEAD_SUPERFRAMES) {
+            // a carrier has lagged or lost the super frames
             this._fail("a carrier has stalled");
             return;
         }
@@ -245,6 +266,20 @@ export default class TSMFBonding {
         if (count > 0) {
             for (const carrier of carriers) {
                 carrier.superframes.splice(0, count);
+            }
+        }
+    }
+
+    /**
+     * drops the super frames received before the other carriers started (they can not be aligned),
+     * keeping the skews to check
+     * @param min the super frames of the carrier started last
+     */
+    private _trim(min: number): void {
+        const limit = Math.min(MAX_SKEW + ALIGN_CHECK_SUPERFRAMES, min + MAX_SKEW);
+        for (const input of this._inputs) {
+            if (input.superframes.length > limit) {
+                input.superframes.splice(0, input.superframes.length - limit);
             }
         }
     }

@@ -85,10 +85,16 @@ function splitTLV(tlvPackets) {
   return packets;
 }
 
+const nullPacket = Buffer.alloc(188, 0xFF);
+nullPacket[0] = 0x47;
+nullPacket[1] = 0x1F;
+nullPacket[2] = 0xFF;
+
 // distributes the TS packets of TLV to the super frames of the carriers in the interleaved order
-function carriers(packets, numberOfCarriers, numberOfFrames) {
+// (followed by the super frames of the null packets up to `minSuperframes`)
+function carriers(packets, numberOfCarriers, numberOfFrames, minSuperframes = 0) {
   const perSuperframe = numberOfCarriers * numberOfFrames * 52;
-  const superframes = Math.ceil(packets.length / perSuperframe);
+  const superframes = Math.max(Math.ceil(packets.length / perSuperframe), minSuperframes);
   const streams = Array.from({ length: numberOfCarriers }, () => []);
   let next = 0;
   const cc = new Array(numberOfCarriers).fill(0);
@@ -103,11 +109,7 @@ function carriers(packets, numberOfCarriers, numberOfFrames) {
           if (slot < 0) {
             continue;
           }
-          const p = Buffer.alloc(188, 0xFF);
-          p[0] = 0x47;
-          p[1] = 0x1F;
-          p[2] = 0xFF;
-          slots[c][frame][slot] = next < packets.length ? packets[next++] : p;
+          slots[c][frame][slot] = next < packets.length ? packets[next++] : nullPacket;
         }
       }
     }
@@ -197,7 +199,8 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
 
   it("reports an error when a carrier has stalled", () => {
     const tlv = tlvPackets(40000);
-    const streams = carriers(splitTLV(tlv), 3, 2);
+    // 他の搬送波は、止まった後も約 10 秒分を受信する
+    const streams = carriers(splitTLV(tlv), 3, 2, 2600);
     // 搬送波 3 が途中で止まる
     streams[2].splice(10);
     const errors = [];
@@ -207,7 +210,7 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
   });
 
   it("reports an error when a carrier never delivers its first header", () => {
-    const streams = carriers(splitTLV(tlvPackets(40000)), 3, 2);
+    const streams = carriers(splitTLV(tlvPackets(40000)), 3, 2, 2600);
     streams[2] = [];
     const errors = [];
     const bonding = new TSMFBonding(1, 3, reason => errors.push(reason));
@@ -215,6 +218,27 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
     assert.deepStrictEqual(errors, ["a carrier has stalled"]);
     assert.strictEqual(out.length, 0);
     assert.strictEqual(bonding.push(0, Buffer.alloc(188)).length, 0);
+  });
+
+  it("assembles TLV when the tuners of the other carriers start 3 seconds later", () => {
+    const tlv = tlvPackets(40000);
+    const streams = carriers(splitTLV(tlv), 3, 1);
+    // 搬送波 1 だけを約 3 秒分 (370 スーパーフレーム) 受信した後に、他の搬送波の受信が始まる
+    const lead = 370;
+    const errors = [];
+    const bonding = new TSMFBonding(1, 3, reason => errors.push(reason));
+    const out = [];
+    for (let sf = 0; sf < streams[0].length; sf++) {
+      for (let c = 0; c < 3; c++) {
+        if (c === 0 || sf >= lead) {
+          out.push(bonding.push(c, Buffer.concat(streams[c][sf])));
+        }
+      }
+    }
+    assert.deepStrictEqual(errors, []);
+    const { matched } = assertTLV(Buffer.concat(out), tlv);
+    // 他の搬送波の受信が始まった後の TLV を出力する
+    assert.ok(matched > tlv.length * (1 - lead / streams[0].length) * 0.9, `assembled ${matched} of ${tlv.length} TLV packets`);
   });
 
   it("aligns carriers with a 43-superframe skew without losing or reordering TLV packets", () => {
