@@ -130,8 +130,8 @@ describe("[route.spec] route / streamId", () => {
         const result = await t._scanTSMFServices(channels[last], { streamSetting: { channel: channels[last] } }, stream(last));
         assert.strictEqual(result[0].serviceId, 701);
         assert.strictEqual(scan.mock.callCount(), 1);
-        assert.strictEqual(queued.mock.callCount(), 2);
-        assert.deepStrictEqual(new Set(queued.mock.calls.map(c => c.arguments[0])), new Set(order.slice(0, 2).map(i => channels[i])));
+        // the services of the TLV are scanned by this carrier, the other carriers do not scan it again
+        assert.strictEqual(queued.mock.callCount(), 0);
         assert.deepStrictEqual(channels[last].streams[0], stream(last)[0]);
         assert.strictEqual(channels[last].getBondedChannels().length, 3);
         await _.service._readyForScan(channels[last]);
@@ -251,6 +251,22 @@ describe("[route.spec] route / streamId", () => {
       });
     }
 
+    // そろえた搬送波で TLV のサービスを取得できなかった場合は、ほかの搬送波でスキャンする
+    it("queues the scans of the other carriers when the TLV is not scanned by the carrier completing the group", async () => {
+      setupChannels([0, 1, 2].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` })));
+      const channels = _.channel.items;
+      const t = tuner([0, 1, 2].map(i => fakeDevice(i, ["BS4K"], ["CATV"])));
+      const queued = mock.method(_.service, "queueDiscoveredTsmfScan", () => {});
+      mock.method(t, "_scanServices", async () => { throw new Error("no available tuners"); });
+      const stream = i => [{ networkId: 32752, streamId: 60001, relTs: 2, format: "tlv", slots: 52, groupId: 9, numberOfCarriers: 3, carrierSequence: i }];
+      for (const i of [0, 1]) {
+        assert.deepStrictEqual(await t._scanTSMFServices(channels[i], { streamSetting: { channel: channels[i] } }, stream(i)), []);
+      }
+      await assert.rejects(t._scanTSMFServices(channels[2], { streamSetting: { channel: channels[2] } }, stream(2)), /no available tuners/);
+
+      assert.deepStrictEqual(new Set(queued.mock.calls.map(c => c.arguments[0])), new Set([channels[0], channels[1]]));
+    });
+
     // ヘッダーの ID とスキャンしたサービスの ID が違っても、ヘッダーが変わらなければ他の搬送波を再スキャンし続けない
     it("does not re-queue the other carriers by the IDs of the services different from the header", async () => {
       setupChannels([0, 1].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` })));
@@ -260,7 +276,7 @@ describe("[route.spec] route / streamId", () => {
       // the TS of relTs 1: original_network_id 4 in the header, 32752 in SDT
       mock.method(t, "_scanServices", async (channel, user, format, detect, relTs) => relTs === 1
         ? [{ networkId: 32752, streamId: 100, serviceId: 1 }]
-        : [{ networkId: 11, streamId: 60001, serviceId: 2 }]);
+        : []); // the TLV is not scanned (the other carriers scan it)
       const header = i => [
         { relTs: 1, slots: 10, format: "ts", streamId: 100, networkId: 4, groupId: 9, numberOfCarriers: 2, carrierSequence: i },
         { relTs: 2, slots: 42, format: "tlv", streamId: 60001, networkId: 11, groupId: 9, numberOfCarriers: 2, carrierSequence: i }

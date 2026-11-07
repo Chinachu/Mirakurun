@@ -492,6 +492,7 @@ export class Tuner {
         );
 
         let scanStreams = streams;
+        let carriersCompleted = false;
         const discovery = streams.find(stream => stream.numberOfCarriers > 1 && stream.format === "tlv");
         if (discovery) {
             // by the carriers of the header (the IDs saved may be of the services scanned, which may differ from the header)
@@ -512,12 +513,8 @@ export class Tuner {
                 );
                 // TS services on a shared carrier do not require the other carriers.
                 scanStreams = streams.filter(stream => stream.format === "ts");
-            } else if (discoveryChanged) {
-                for (const carrier of channel.getBondedChannels()) {
-                    if (carrier !== channel) {
-                        _.service.queueDiscoveredTsmfScan(carrier);
-                    }
-                }
+            } else {
+                carriersCompleted = discoveryChanged;
             }
         }
 
@@ -553,6 +550,17 @@ export class Tuner {
                 }
             }
         });
+        // the other carriers scan the TLV only if it is not scanned by this (its services are added by any carrier)
+        const tlvScanned = scanStreams.some((stream, index) => stream.format === "tlv" && results[index].status === "fulfilled" &&
+            (results[index] as PromiseFulfilledResult<apid.Service[]>).value.length > 0);
+        if (carriersCompleted && !tlvScanned) {
+            for (const carrier of channel.getBondedChannels()) {
+                if (carrier !== channel) {
+                    _.service.queueDiscoveredTsmfScan(carrier);
+                }
+            }
+        }
+
         if (services.length === 0 && lastError !== null) {
             throw lastError;
         }
