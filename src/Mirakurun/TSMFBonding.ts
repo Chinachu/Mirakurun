@@ -208,7 +208,8 @@ export default class TSMFBonding {
      */
     constructor(private _relTs: number, numberOfInputs: number, private _onError: (reason: string) => void) {
         for (let i = 0; i < numberOfInputs; i++) {
-            this._inputs.push(new CarrierInput(_relTs, () => this._lost(), message => this._warn(message)));
+            const input: CarrierInput = new CarrierInput(_relTs, () => this._lost(input), message => this._warn(message));
+            this._inputs.push(input);
             this._lastReceived.push(0);
         }
     }
@@ -467,7 +468,7 @@ export default class TSMFBonding {
         return checkTLV(Buffer.concat(outputs), total, minCompressedIP);
     }
 
-    private _lost(): void {
+    private _lost(carrier: CarrierInput): void {
         // a lost super frame shifts the alignment of the carrier
         if (this._offsets !== null) {
             const min = Math.min(...this._inputs.map(input => input.superframes.length));
@@ -479,8 +480,10 @@ export default class TSMFBonding {
             for (const input of this._inputs) {
                 input.drop(input.superframes.length);
             }
+        } else {
+            // the super frames before the loss do not continue to the later ones (aligned by them, the later ones are misaligned)
+            carrier.drop(carrier.superframes.length);
         }
-        // the super frames received after the samples do not continue from them
         this._search = null;
         this._framer.lost();
     }

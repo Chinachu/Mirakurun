@@ -219,6 +219,22 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
     assert.ok(matched > tlv.length * 0.7, `assembled ${matched} of ${tlv.length} TLV packets`);
   });
 
+  it("does not align by the super frames before a loss of a carrier not aligned yet", () => {
+    const tlv = tlvPackets(15000);
+    const streams = carriers(splitTLV(tlv), 3, 1);
+    // 搬送波 2 のスーパーフレーム 45 を失う (ずれを判定する前に、他の搬送波より先に受信する)
+    streams[1].splice(45, 1);
+    const errors = [];
+    const bonding = new TSMFBonding(1, 3, reason => errors.push(reason));
+    const out = [bonding.push(1, Buffer.concat(streams[1].slice(0, 50).flat()))];
+    out.push(feed(bonding, [streams[0], streams[1].slice(50), streams[2]], [0, 0, 0]));
+
+    assert.deepStrictEqual(errors, []);
+    // 失う前のスーパーフレームでずれを判定すると、失った後の TLV が壊れる
+    const { matched } = assertTLV(Buffer.concat(out), tlv);
+    assert.ok(matched > tlv.length / 2, `assembled ${matched} of ${tlv.length} TLV packets`);
+  });
+
   it("reports an error when a carrier has stalled", () => {
     const tlv = tlvPackets(40000);
     // 他の搬送波は、止まった後も約 10 秒分を受信する
