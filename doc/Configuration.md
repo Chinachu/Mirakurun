@@ -221,8 +221,8 @@ If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outp
   # Optional parameters below
   route: TER # Enum [TER|SAT|CATV|HIKARI] - receiving route. `TER` for GR, `SAT` for others if omitted.
   serviceId: 1234 # Integer - Services will be automatically scanned if not specified.
-  tsmfRelTs: 1 # Number: 1~15 - relative TS number of TSMF. All the relative streams of TSMF are detected by the service scan on the tuners for TLV if not specified.
-  tsmfGroupId: 1 # Number: 1~255 - the group of the carriers transmitting a TLV (channel bonding of CATV). The channels of the same value are the carriers of the group
+  tsmfRelTs: 1 # Number: 1~15 - relative TS number of TSMF (for both TS and TLV). Detected by the service scan on the tuners for TLV (the types including BS4K, or tlvDecoder / tlvToTsDecoder configured) if not specified. Required for the tuners only for TS
+  tsmfGroupId: 1 # Number: 1~255 - the group of the carriers transmitting a TLV (channel bonding of CATV). The channels of the same value are the carriers of the group. Detected by the service scan on the tuners for TLV if not specified together with tsmfRelTs
   format: tlv # Enum [ts|tlv] - the format detected by the service scan if not specified (before the scan, tlv for BS4K, ts for others)
   commandVars: # Optional command variables *@4.0.0~
     satellite: EXAMPLE-SAT4A

@@ -221,8 +221,8 @@ TLV (MMT) のチャンネルでは、タイプにかかわらず、`decoder` の
   # 以下はオプション
   route: TER # 列挙型 [TER|SAT|CATV|HIKARI] - 受信する経路。省略した場合、GR は TER、それ以外は SAT
   serviceId: 1234 # Integer - 指定しない場合、サービスは自動的にスキャンされます。
-  tsmfRelTs: 1 # 数値: 1~15 - TSMF の相対 TS 番号。指定しない場合、TLV 用のチューナーではサービスのスキャンで TSMF のすべての相対 TS を判別する
-  tsmfGroupId: 1 # 数値: 1~255 - 1 つの TLV を複数の搬送波で伝送する場合 (CATV のチャネルボンディング) のグループ。同じ値のチャンネルが同じグループの搬送波になる
+  tsmfRelTs: 1 # 数値: 1~15 - TSMF の相対 TS 番号 (TS と TLV のどちらも)。指定しない場合、TLV 用のチューナー (タイプに BS4K を含むか、tlvDecoder / tlvToTsDecoder を設定したもの) ではサービスのスキャンで判別する。TS だけのチューナーでは指定が必要
+  tsmfGroupId: 1 # 数値: 1~255 - 1 つの TLV を複数の搬送波で伝送する場合 (CATV のチャネルボンディング) のグループ。同じ値のチャンネルが同じグループの搬送波になる。tsmfRelTs とともに指定しない場合、TLV 用のチューナーではサービスのスキャンで判別する
   format: tlv # 列挙型 [ts|tlv] - 指定しない場合、サービスのスキャンで判別した形式 (スキャンの前は BS4K なら tlv、それ以外は ts)
   commandVars: # オプションのコマンド変数 *@4.0.0~
     satellite: EXAMPLE-SAT4A
