@@ -92,7 +92,7 @@ nullPacket[2] = 0xFF;
 
 // distributes the TS packets of TLV to the super frames of the carriers in the interleaved order
 // (followed by the super frames of the null packets up to `minSuperframes`)
-function carriers(packets, numberOfCarriers, numberOfFrames, minSuperframes = 0) {
+function carriers(packets, numberOfCarriers, numberOfFrames, minSuperframes = 0, firstSequence = 1) {
   const perSuperframe = numberOfCarriers * numberOfFrames * 52;
   const superframes = Math.max(Math.ceil(packets.length / perSuperframe), minSuperframes);
   const streams = Array.from({ length: numberOfCarriers }, () => []);
@@ -116,7 +116,7 @@ function carriers(packets, numberOfCarriers, numberOfFrames, minSuperframes = 0)
     for (let c = 0; c < numberOfCarriers; c++) {
       const sfPackets = [];
       for (let frame = 0; frame < numberOfFrames; frame++) {
-        sfPackets.push(header({ numberOfCarriers, carrierSequence: c + 1, numberOfFrames, framePosition: frame, cc: cc[c]++ }), ...slots[c][frame]);
+        sfPackets.push(header({ numberOfCarriers, carrierSequence: firstSequence + c, numberOfFrames, framePosition: frame, cc: cc[c]++ }), ...slots[c][frame]);
       }
       streams[c].push(sfPackets);
     }
@@ -184,6 +184,24 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
 
     assert.deepStrictEqual(errors, []);
     assertTLV(out, tlv);
+  });
+
+  it("assembles TLV of the carriers whose carrier_sequence starts from 0", () => {
+    const tlv = tlvPackets(6000);
+    const streams = carriers(splitTLV(tlv), 3, 2, 0, 0);
+    const errors = [];
+    const out = feed(new TSMFBonding(1, 3, reason => errors.push(reason)), streams, [0, 2, 1]);
+
+    assert.deepStrictEqual(errors, []);
+    assertTLV(out, tlv);
+  });
+
+  it("reports an error when the channels of the group receive the same carrier", () => {
+    const streams = carriers(splitTLV(tlvPackets(6000)), 3, 2);
+    const errors = [];
+    feed(new TSMFBonding(1, 3, reason => errors.push(reason)), [streams[0], streams[1], streams[1]], [0, 0, 0]);
+
+    assert.deepStrictEqual(errors, ["the channels of the group receive the same carrier (carrier_sequence: 1, 2, 2)"]);
   });
 
   it("aligns the carriers again after a super frame of a carrier is lost", () => {

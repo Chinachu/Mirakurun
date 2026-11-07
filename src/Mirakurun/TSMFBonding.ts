@@ -67,7 +67,8 @@ class CarrierInput {
     removed = 0;
     /** the super frames delivered ahead of the carrier delivering last, when the alignment was lost */
     lead = 0;
-    carrierSequence = 0;
+    /** `-1` until the header is received */
+    carrierSequence = -1;
     numberOfCarriers = 0;
 
     private _reader = new TSPacketReader(packet => this._onPacket(packet), () => this._lost());
@@ -142,7 +143,7 @@ class CarrierInput {
             this._warn(`the relative stream ${this._relTs} is not TLV`);
             return;
         }
-        if (this.carrierSequence !== 0 && this.carrierSequence !== header.carrierSequence) {
+        if (this.carrierSequence !== -1 && this.carrierSequence !== header.carrierSequence) {
             this._warn(`the carrier sequence has changed (${this.carrierSequence} -> ${header.carrierSequence})`);
             this._lost();
         }
@@ -254,13 +255,18 @@ export default class TSMFBonding {
         }
 
         // the carriers in carrier_sequence
-        const carriers = this._inputs.filter(input => input.carrierSequence !== 0).sort((a, b) => a.carrierSequence - b.carrierSequence);
+        const carriers = this._inputs.filter(input => input.carrierSequence !== -1).sort((a, b) => a.carrierSequence - b.carrierSequence);
         if (carriers.length < this._inputs.length) {
             return;
         }
         if (carriers.some(carrier => carrier.numberOfCarriers !== this._inputs.length)) {
             this._closed = true;
             this._onError(`the number of carriers (${carriers[0].numberOfCarriers}) differs from the channels of the group (${this._inputs.length})`);
+            return;
+        }
+        if (new Set(carriers.map(carrier => carrier.carrierSequence)).size !== carriers.length) {
+            this._closed = true;
+            this._onError(`the channels of the group receive the same carrier (carrier_sequence: ${carriers.map(carrier => carrier.carrierSequence).join(", ")})`);
             return;
         }
 

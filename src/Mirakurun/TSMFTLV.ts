@@ -35,7 +35,7 @@ export interface TSMFHeader {
     streamTypeBits: number;
     /** 1 unless the carriers are bonded (frame_type 0x2 may also have 1) */
     numberOfCarriers: number;
-    /** 1..numberOfCarriers */
+    /** the order of the carrier (0 or 1..numberOfCarriers, the start is not specified), 1 for a single carrier */
     carrierSequence: number;
     /** the frames of a super frame */
     numberOfFrames: number;
@@ -62,9 +62,10 @@ export function parseTSMFHeader(packet: Buffer): TSMFHeader | null {
     }
 
     const isMultiCarrier = (payload[2] & 0x0F) === 0x02;
-    const numberOfCarriers = isMultiCarrier ? payload[124] : 1;
-    const carrierSequence = isMultiCarrier ? payload[125] : 1;
-    if (numberOfCarriers < 1 || carrierSequence < 1 || carrierSequence > numberOfCarriers) {
+    // frame_type 0x2 (multi-carrier) of a single carrier is the same as the others
+    const numberOfCarriers = isMultiCarrier ? Math.max(payload[124], 1) : 1;
+    const carrierSequence = numberOfCarriers > 1 ? payload[125] : 1;
+    if (carrierSequence > numberOfCarriers) {
         return null;
     }
 

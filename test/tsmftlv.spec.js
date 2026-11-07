@@ -222,6 +222,15 @@ describe("[tsmftlv.spec] TSMFTLV.ts", () => {
     assert.strictEqual(new TSMFTLV(1).push(bonded).length, 0);
   });
 
+  it("assembles TLV of a single carrier of frame_type 0x2, whatever carrier_sequence is", () => {
+    const tlv = [tlvPacket(1, 1000), tlvPacket(2, 300)];
+    // carrier_sequence が 0 から始まるか 1 から始まるかは規定されていない
+    for (const options of [{ carrierSequence: 0 }, { numberOfCarriers: 0, carrierSequence: 0 }, { carrierSequence: 0xFF }]) {
+      const ts = Buffer.concat(frames(slotMap, splitTLV(tlv), options));
+      assert.ok(new TSMFTLV(1).push(ts).equals(Buffer.concat(tlv)), JSON.stringify(options));
+    }
+  });
+
   it("assembles the large TLV packets and the headers across the TS packets", () => {
     // TLV のヘッダー (4 バイト) が TS パケットの境界をまたぐように、TS パケットの残りより少し小さい TLV を挟む
     const tlv = [tlvPacket(1, 65000), tlvPacket(2, 178), tlvPacket(3, 30000), tlvPacket(4, 1), tlvPacket(5, 2)];
