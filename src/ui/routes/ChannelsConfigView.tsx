@@ -47,12 +47,12 @@ function sortTypes(types: ChannelType[]): ChannelType[] {
     return types.sort((a, b) => typesIndex.indexOf(a) - typesIndex.indexOf(b));
 }
 
-// チャンネルの一覧を展開する関数 (同じ接頭辞の番号の範囲を展開し、チャンネル名はそのまま。例: "14-16,C18-C19,BS01_0" → ["14", "15", "16", "C18", "C19", "BS01_0"])
+// チャンネルの一覧を展開する関数 (同じ接頭辞の末尾の番号の範囲を展開し、チャンネル名はそのまま。例: "14-16,C18-C19,BS01_0-BS01_1" → ["14", "15", "16", "C18", "C19", "BS01_0", "BS01_1"])
 function expandChannelRanges(input: string): string[] {
     const result: string[] = [];
 
     for (const part of input.split(",").map(p => p.trim()).filter(p => p !== "")) {
-        const range = /^([^\d-]*)(\d+)-([^\d-]*)(\d+)$/.exec(part);
+        const range = /^(.*?)(\d+)-(.*?)(\d+)$/.exec(part);
         if (range && range[1] === range[3]) {
             // the digits of the start (zero padded, e.g. BS01-BS03 -> BS01, BS02, BS03)
             const [start, end] = [parseInt(range[2], 10), parseInt(range[4], 10)].sort((a, b) => a - b);
@@ -803,7 +803,7 @@ export const ChannelsConfigView: React.FC = () => {
                         {scanSource === "list" && (
                             <FormGroup
                                 label="Channel List (comma separated)"
-                                helperText="Range notation (e.g. 14-16, C13-C20) is supported."
+                                helperText="Range notation (e.g. 14-16, C13-C20, BS01_0-BS01_3) is supported."
                             >
                                 <InputGroup
                                     placeholder="Example: C13-C20,27,BS01_0"
@@ -848,7 +848,7 @@ export const ChannelsConfigView: React.FC = () => {
 
                         <FormGroup
                             label="Skip Channels (comma separated)"
-                            helperText="Channel names. Range notation (e.g. 14-16, C13-C20) is supported."
+                            helperText="Channel names. Range notation (e.g. 14-16, C13-C20, BS01_0-BS01_3) is supported."
                         >
                             <InputGroup
                                 placeholder="Example: 13,14-16,C18-C20"

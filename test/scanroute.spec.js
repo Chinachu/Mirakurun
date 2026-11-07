@@ -162,6 +162,38 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
     assert.deepStrictEqual(saved.filter(item => item.route === "HIKARI").map(item => [item.type, item.channel]), [["GR", "27"], ["BS", "BS03_1"], ["BS", "C13"]]);
   });
 
+  // 受信経路の放送のタイプだけを試す (routes のないチューナーは、すべての受信経路のチューナー)
+  it("tries only the types of the route", async () => {
+    const { tuned } = await runScan(
+      { route: "TER", source: "list", channels: ["13"], refresh: true, dryRun: true },
+      () => { throw new Error("stream has closed before get network"); },
+      { scanTypes: ["GR", "BS", "SKY"] }
+    );
+    assert.deepStrictEqual(tuned.map(t => t.type), ["GR"]);
+  });
+
+  it("shows the error other than no signal, and stops trying the types when cancelled", async () => {
+    const logs = [];
+    let result = await runScan(
+      { route: "HIKARI", source: "list", channels: ["27"], refresh: true, dryRun: true },
+      channel => { throw new Error(channel.type === "GR" ? "spawn recpt1 ENOENT" : "stream has closed before get network"); },
+      { scanTypes: ["GR", "BS"], logs }
+    );
+    assert.deepStrictEqual(result.tuned.map(t => t.type), ["GR", "BS"]);
+    assert.ok(logs.some(text => /spawn recpt1 ENOENT/.test(text)));
+
+    result = await runScan(
+      { route: "HIKARI", source: "list", channels: ["27", "28"], refresh: true },
+      () => {
+        scan.del({}, { status() {}, setHeader() {}, json() {} });
+        throw new Error("stream has closed before get network");
+      },
+      { scanTypes: ["GR", "BS"] }
+    );
+    assert.deepStrictEqual(result.tuned.map(t => [t.channel, t.type]), [["27", "GR"]]);
+    assert.strictEqual(result.saved, undefined);
+  });
+
   it("uses the tuners of any type of the route", async () => {
     const { tuned } = await runScan({ route: "SAT", source: "list", channels: ["CS2"], refresh: true, dryRun: true }, () => [], { types: ["CS"] });
     assert.deepStrictEqual(tuned, [{ channel: "CS2", route: "SAT", type: "CS" }]);

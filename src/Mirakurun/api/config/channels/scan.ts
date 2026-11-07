@@ -257,6 +257,14 @@ export function getChannelTypeByNetwork(networkId: number, format: apid.StreamFo
     return null;
 }
 
+/** the types of the broadcasts of each route (the tuners without `routes` receive any route) */
+const routeTypes: Record<apid.ChannelRoute, apid.ChannelType[]> = {
+    TER: ["GR"],
+    SAT: ["BS", "CS", "BS4K", "SKY"],
+    CATV: ["GR", "BS", "CS", "BS4K", "SKY"],
+    HIKARI: ["GR", "BS", "CS", "BS4K", "SKY"]
+};
+
 /**
  * the types of the channel item to tune a channel for the scan, covering all the tuners of the route
  * (such as the tuners of ISDB-T and ISDB-S on HIKARI), the types of the satellite first for the channels named BS / CS
@@ -264,7 +272,7 @@ export function getChannelTypeByNetwork(networkId: number, format: apid.StreamFo
 export function getScanChannelTypes(route: apid.ChannelRoute, channel?: string): apid.ChannelType[] {
     const satellite = channel !== undefined && /^(BS|CS)/i.test(channel);
     const order: apid.ChannelType[] = satellite ? ["BS", "CS", "BS4K", "SKY", "GR"] : ["GR", "BS", "CS", "BS4K", "SKY"];
-    return _.tuner.getScanTypes(route, order);
+    return _.tuner.getScanTypes(route, order.filter(type => routeTypes[route].includes(type)));
 }
 
 /**
@@ -693,6 +701,9 @@ async function runChannelScan(
             let streams: ScannedStream[] = null;
             let lastError: Error = null;
             for (const scanType of getScanChannelTypes(route, channel)) {
+                if (isCancellationRequested) {
+                    break;
+                }
                 try {
                     streams = await _.tuner.scanChannel(new ChannelItem({
                         name: `${route}:${channel}`,
@@ -705,8 +716,14 @@ async function runChannelScan(
                     });
                     break;
                 } catch (error) {
-                    lastError = error;
+                    // the error other than no signal is shown (the tuners of the other types may not receive the channel)
+                    if (lastError === null || /stream has closed before get network/.test(String(lastError))) {
+                        lastError = error;
+                    }
                 }
+            }
+            if (isCancellationRequested) {
+                continue; // the cancellation is handled at the next channel
             }
             if (streams === null) {
                 const error = lastError;
@@ -1021,7 +1038,8 @@ The channels to scan (\`source\`):
 - \`list\`: the channels of \`channels\`
 - \`format\`: the channels of \`channelNameFormat\` in the range of \`minCh\`-\`maxCh\` (and \`minSubCh\`-\`maxSubCh\` with \`{subch}\`)
 
-The tuners of the route are used. The tuners of the different types (such as ISDB-T and ISDB-S) try each channel until received.
+The tuners of the route are used. The tuners of the different types (such as ISDB-T and ISDB-S) try each channel until received
+(the types of the route: TER: GR, SAT: BS / CS / BS4K / SKY, CATV and HIKARI: any).
 The relative streams of TSMF are detected on any local tuner.
 A tuner receiving multiple systems should have all the types to receive in \`types\` (such as \`[GR, BS, CS, BS4K]\` for CATV).
 
