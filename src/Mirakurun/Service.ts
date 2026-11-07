@@ -261,10 +261,13 @@ export class Service {
     private async _initJobs(): Promise<void> {
         log.debug("init service jobs...");
 
-        // scan the channels of the services without `streamId` (migrated from the db of older versions)
-        const migratingChannels = new Set(this._items.filter(item => item.streamId === undefined).map(item => item.channel));
-        for (const channel of migratingChannels) {
-            this._queueScanToUpdate(channel);
+        // scan the channels of the services without `streamId` (migrated from the db of older versions),
+        // only until a stream is received (the services not found by the scan, such as ended, are updated by the daily scan)
+        if (_.channel.items.every(item => item.streams.length === 0)) {
+            const migratingChannels = new Set(this._items.filter(item => item.streamId === undefined).map(item => item.channel));
+            for (const channel of migratingChannels) {
+                this._queueScanToUpdate(channel);
+            }
         }
 
         // add services from channel config

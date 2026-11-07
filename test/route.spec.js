@@ -141,6 +141,7 @@ describe("[route.spec] route / streamId", () => {
 
     it("scans the channels of the migrated services first", async () => {
       setupChannels([{ name: "GR27", type: "GR", channel: "27" }]);
+      fs.rmSync(process.env.CHANNELS_DB_PATH, { force: true });
       writeLegacyServices([
         { id: 3275201024, serviceId: 1024, networkId: 32752, name: "A", type: 1, channel: { type: "GR", channel: "27" } }
       ]);
@@ -152,6 +153,32 @@ describe("[route.spec] route / streamId", () => {
       await _.service._initJobs();
 
       assert.strictEqual(jobs[0].key, "Service.Update.Scan.GR.27");
+    });
+
+    // 放送を終了したサービスなど、スキャンしても streamId が付かないサービスで、起動のたびにスキャンしない
+    it("does not scan the channels of the services without streamId after a stream is received", async () => {
+      setupChannels([
+        { name: "GR27", type: "GR", channel: "27" },
+        { name: "GR28", type: "GR", channel: "28" }
+      ]);
+      fs.writeFileSync(process.env.CHANNELS_DB_PATH, JSON.stringify([
+        { __integrity__: "test" },
+        { type: "GR", channel: "27", streams: [{ networkId: 32752, streamId: 32752, format: "ts" }] }
+      ]));
+      fs.writeFileSync(process.env.SERVICES_DB_PATH, JSON.stringify([
+        { __integrity__: "test" },
+        { id: 3275201024, serviceId: 1024, networkId: 32752, streamId: 32752, name: "A", type: 1, channel: { type: "GR", channel: "27" } },
+        { id: 3275201025, serviceId: 1025, networkId: 32752, name: "ENDED", type: 1, channel: { type: "GR", channel: "27" } },
+        { id: 3275301024, serviceId: 1024, networkId: 32753, name: "B", type: 1, channel: { type: "GR", channel: "28" } }
+      ]));
+      await _.channel.load();
+      await _.service.load();
+
+      const jobs = [];
+      _.job = { add: job => jobs.push(job), addSchedule: () => {}, jobs: [] };
+      await _.service._initJobs();
+
+      assert.deepStrictEqual(jobs.filter(job => job.key.startsWith("Service.Update.Scan.")), []);
     });
 
     it("sets streamId by the scan and saves services.json that 4.2.1 can load", async () => {
