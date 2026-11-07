@@ -1039,7 +1039,7 @@ The channels to scan (\`source\`):
 - \`format\`: the channels of \`channelNameFormat\` in the range of \`minCh\`-\`maxCh\` (and \`minSubCh\`-\`maxSubCh\` with \`{subch}\`)
 
 The tuners of the route are used. The tuners of the different types (such as ISDB-T and ISDB-S) try each channel until received
-(the types of the route: TER: GR, SAT: BS / CS / BS4K / SKY, CATV and HIKARI: any).
+(the types of the route: TER: GR, SAT: BS / CS / BS4K / SKY, CATV and HIKARI: any). The remote tuners are tried by each type.
 The relative streams of TSMF are detected on any local tuner.
 A tuner receiving multiple systems should have all the types to receive in \`types\` (such as \`[GR, BS, CS, BS4K]\` for CATV).
 

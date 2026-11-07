@@ -823,6 +823,9 @@ describe("[route.spec] route / streamId", () => {
       t = tuner([fakeDevice(0, ["GR", "BS", "CS", "BS4K"], ["CATV"])]);
       assert.deepStrictEqual(t.getScanTypes("CATV"), ["GR"]);
       assert.deepStrictEqual(t.getScanTypes("SAT"), []);
+      // the remote Mirakurun receives only the channels of the type configured on it
+      t = tuner([fakeDevice(0, ["GR", "BS", "CS", "BS4K"], ["CATV"]), fakeDevice(1, ["GR", "BS"], ["CATV"], { isRemote: true })]);
+      assert.deepStrictEqual(t.getScanTypes("CATV"), ["GR", "BS"]);
     });
 
     it("lists the channels of the channel config files of the tuners used for the scan (the type and the route)", async () => {

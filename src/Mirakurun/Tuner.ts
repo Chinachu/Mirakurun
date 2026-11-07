@@ -402,16 +402,17 @@ export class Tuner {
 
     /**
      * the types to tune the channels of the route by the channel scan: the types covering all the tuners of the route
-     * (in the order of `types`, a tuner of multiple types is tried by one of them)
+     * (in the order of `types`, a local tuner of multiple types is tried by one of them,
+     * a remote tuner by each of them: the remote Mirakurun receives only the channel of the type configured)
      */
     getScanTypes(route: apid.ChannelRoute, types: apid.ChannelType[] = common.channelTypes): apid.ChannelType[] {
-        const covered = new Set<TunerDevice>();
+        const covered = new Set<TunerDevice | string>();
         const scanTypes: apid.ChannelType[] = [];
         for (const type of types) {
-            const devices = this._getDevicesByType(type, route);
-            if (devices.some(device => !covered.has(device))) {
+            const keys = this._getDevicesByType(type, route).map(device => device.isRemote ? `${device.index}:${type}` : device);
+            if (keys.some(key => !covered.has(key))) {
                 scanTypes.push(type);
-                devices.forEach(device => covered.add(device));
+                keys.forEach(key => covered.add(key));
             }
         }
         return scanTypes;
