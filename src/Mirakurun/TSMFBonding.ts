@@ -13,6 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+import { performance } from "perf_hooks";
 import * as log from "./log";
 import { SLOT_COUNT, TSMF_PID, TLVFramer, TSPacketReader, isTLVStream, parseTSMFHeader } from "./TSMFTLV";
 
@@ -46,6 +47,12 @@ const ALIGN_MAX_FAILURES = 3;
 const MAX_SKEW = 60;
 /** a short check rejects broken candidates before checking the full sample */
 const ALIGN_PROBE_SUPERFRAMES = 2;
+/** the offsets within this super frames of the ones by the times received are checked first (the tuners started at different times) */
+const ALIGN_NEAR = 8;
+/** the super frames kept to find the alignment */
+const ALIGN_SAMPLE_SUPERFRAMES = MAX_SKEW + ALIGN_CHECK_SUPERFRAMES;
+/** the candidates of the offsets checked until all the skews can be checked (the more ones are checked once with all the skews) */
+const ALIGN_EARLY_CANDIDATES = 20000;
 /** the super frames kept after the alignment (the carriers deliver them at different times) */
 const KEEP_SUPERFRAMES = 2;
 /** the alignment is found again if the other carriers are ahead of a carrier by this super frames */
@@ -56,6 +63,10 @@ const STALL_SUPERFRAMES = 1200;
 /** receives the frames of a relative stream from a carrier (one tuner) */
 class CarrierInput {
     readonly superframes: Superframe[] = [];
+    /** the super frames removed from `superframes` */
+    removed = 0;
+    /** the super frames delivered ahead of the carrier delivering last, when the alignment was lost */
+    lead = 0;
     carrierSequence = 0;
     numberOfCarriers = 0;
 
@@ -71,6 +82,12 @@ class CarrierInput {
 
     push(chunk: Buffer): void {
         this._reader.push(chunk);
+    }
+
+    /** removes the super frames from the start of `superframes` */
+    drop(count: number): void {
+        this.superframes.splice(0, count);
+        this.removed += count;
     }
 
     /** moves the super frame completed by the slots of the last frame to `superframes` */
@@ -166,6 +183,9 @@ class CarrierInput {
  * The super frames of the carriers are aligned by checking the TLV assembled, since the carriers are not synchronized.
  */
 export default class TSMFBonding {
+    /** CPU time to find the alignment for each super frame of the carriers (not to block the other streams) */
+    static alignSliceMs = 2;
+
     private _inputs: CarrierInput[] = [];
     private _framer = new TLVFramer();
     private _offsets: number[] = null;
@@ -175,6 +195,9 @@ export default class TSMFBonding {
     private _received = 0;
     /** `_received` when each carrier delivered a super frame last */
     private _lastReceived: number[] = [];
+    /** finding the alignment in the samples of the super frames */
+    private _search: { iterator: Iterator<void, number[] | null>, samples: Superframe[][], removed: number[] } = null;
+    private _nextSliceAt = 0;
     private _warned = new Set<string>();
     private _closed = false;
 
@@ -242,20 +265,13 @@ export default class TSMFBonding {
         }
 
         if (this._offsets === null) {
-            if (Math.min(...counts) < this._nextAlignAt) {
+            const offsets = this._findAlignment(carriers, Math.min(...counts));
+            if (offsets === null) {
                 return;
             }
-            this._offsets = this._align(carriers);
-            if (this._offsets === null) {
-                this._nextAlignAt = Math.min(...counts) + ALIGN_SUPERFRAMES;
-                // Keep the samples so a larger skew can be checked as more data arrives.
-                if (Math.min(...counts) >= MAX_SKEW + ALIGN_SUPERFRAMES) {
-                    this._fail("can not align the carriers");
-                }
-                return;
-            }
+            this._offsets = offsets;
             this._failures = 0;
-            carriers.forEach((carrier, i) => carrier.superframes.splice(0, this._offsets[i]));
+            carriers.forEach((carrier, i) => carrier.drop(offsets[i]));
             this._framer.lost();
         }
 
@@ -265,9 +281,61 @@ export default class TSMFBonding {
         }
         if (count > 0) {
             for (const carrier of carriers) {
-                carrier.superframes.splice(0, count);
+                carrier.drop(count);
             }
         }
+    }
+
+    /**
+     * finds the alignment in the slices of CPU time for the super frames received
+     * @param min the super frames of the carrier started last
+     * @returns the super frames of `carriers` to drop to align them, `null` if not found yet
+     */
+    private _findAlignment(carriers: CarrierInput[], min: number): number[] | null {
+        if (this._search === null) {
+            if (min < this._nextAlignAt) {
+                return null;
+            }
+            // the super frames are dropped while finding (not to keep them for long)
+            const samples = carriers.map(carrier => carrier.superframes.slice(0, ALIGN_SAMPLE_SUPERFRAMES));
+            const leads = carriers.map(carrier => carrier.lead);
+            this._search = { iterator: this._align(samples, leads), samples, removed: carriers.map(carrier => carrier.removed) };
+            this._nextSliceAt = this._received;
+        }
+        if (this._received < this._nextSliceAt) {
+            return null;
+        }
+        this._nextSliceAt = this._received + this._inputs.length;
+
+        const deadline = performance.now() + TSMFBonding.alignSliceMs;
+        let result: IteratorResult<void, number[] | null>;
+        do {
+            result = this._search.iterator.next();
+        } while (result.done !== true && performance.now() < deadline);
+        if (result.done !== true) {
+            return null;
+        }
+
+        const { samples, removed } = this._search;
+        this._search = null;
+        this._nextAlignAt = Math.min(min + ALIGN_SUPERFRAMES, ALIGN_SAMPLE_SUPERFRAMES);
+        const found = result.value;
+        if (found === null) {
+            // all the skews have been checked
+            if (Math.min(...samples.map(sample => sample.length)) >= MAX_SKEW + ALIGN_SUPERFRAMES) {
+                this._fail("can not align the carriers");
+            }
+            return null;
+        }
+
+        // the same alignment from the super frames not dropped yet
+        const dropped = carriers.map((carrier, i) => carrier.removed - removed[i]);
+        const shift = Math.max(0, ...found.map((offset, i) => dropped[i] - offset));
+        const offsets = found.map((offset, i) => offset + shift - dropped[i]);
+        if (offsets.some((offset, i) => offset >= carriers[i].superframes.length)) {
+            return null;
+        }
+        return offsets;
     }
 
     /**
@@ -279,7 +347,7 @@ export default class TSMFBonding {
         const limit = Math.min(MAX_SKEW + ALIGN_CHECK_SUPERFRAMES, min + MAX_SKEW);
         for (const input of this._inputs) {
             if (input.superframes.length > limit) {
-                input.superframes.splice(0, input.superframes.length - limit);
+                input.drop(input.superframes.length - limit);
             }
         }
     }
@@ -310,36 +378,50 @@ export default class TSMFBonding {
         }
     }
 
-    /** finds the offsets of the super frames of the carriers which assemble the valid TLV */
-    private _align(carriers: CarrierInput[]): number[] | null {
-        const counts = carriers.map(carrier => carrier.superframes.length);
-        // Queue lengths reflect delivery timing, not the positions in the broadcast stream.
+    /**
+     * finds the offsets of the super frames of the carriers which assemble the valid TLV (yields for each candidate)
+     * @param leads the super frames delivered ahead before the alignment was lost
+     */
+    private *_align(samples: Superframe[][], leads: number[]): Generator<void, number[] | null> {
+        const counts = samples.map(sample => sample.length);
         const maxOffsets = counts.map(count => Math.min(MAX_SKEW, Math.max(0, count - ALIGN_SUPERFRAMES)));
+        const min = Math.min(...counts);
+        const estimates = [
+            // the tuners started at different times: the super frames received since the carrier started last
+            counts.map(count => count - min),
+            // the alignment lost: the carriers delivering later received the older super frames since then
+            leads.map(lead => Math.max(...leads) - lead)
+        ];
+        for (const estimate of estimates) {
+            const near = yield* this._alignIn(
+                samples,
+                estimate.map((offset, i) => Math.min(Math.max(0, offset - ALIGN_NEAR), maxOffsets[i])),
+                estimate.map((offset, i) => Math.min(offset + ALIGN_NEAR, maxOffsets[i]))
+            );
+            if (near !== null) {
+                return near;
+            }
+        }
+
+        // Queue lengths reflect delivery timing, not always the positions in the broadcast stream.
+        const from = counts.map(() => 0);
+        if (min < MAX_SKEW + ALIGN_SUPERFRAMES && countNormalizedOffsets(from, maxOffsets) > ALIGN_EARLY_CANDIDATES) {
+            return null;
+        }
+        return yield* this._alignIn(samples, from, maxOffsets);
+    }
+
+    /** @returns the offsets in the ranges which assemble the valid TLV, `null` if not found or ambiguous */
+    private *_alignIn(samples: Superframe[][], from: number[], to: number[]): Generator<void, number[] | null> {
         const results: { offsets: number[], ratio: number }[] = [];
-        const offsets = counts.map(() => 0);
-        // The first zero offset identifies each normalized candidate exactly once.
-        const visit = (index: number, firstZero: number): void => {
-            if (index === carriers.length) {
-                if (this._checkAlignment(carriers, offsets, ALIGN_PROBE_SUPERFRAMES, 0) !== null) {
-                    const ratio = this._checkAlignment(carriers, offsets, ALIGN_CHECK_SUPERFRAMES);
-                    if (ratio !== null) {
-                        results.push({ offsets: offsets.slice(), ratio });
-                    }
+        for (const offsets of normalizedOffsets(from, to)) {
+            if (this._checkAlignment(samples, offsets, ALIGN_PROBE_SUPERFRAMES, 0) !== null) {
+                const ratio = this._checkAlignment(samples, offsets, ALIGN_CHECK_SUPERFRAMES);
+                if (ratio !== null) {
+                    results.push({ offsets: offsets.slice(), ratio });
                 }
-                return;
             }
-            if (index === firstZero) {
-                offsets[index] = 0;
-                visit(index + 1, firstZero);
-                return;
-            }
-            for (let offset = index < firstZero ? 1 : 0; offset <= maxOffsets[index]; offset++) {
-                offsets[index] = offset;
-                visit(index + 1, firstZero);
-            }
-        };
-        for (let firstZero = 0; firstZero < carriers.length; firstZero++) {
-            visit(0, firstZero);
+            yield;
         }
 
         if (results.length === 0) {
@@ -354,8 +436,8 @@ export default class TSMFBonding {
         return results[0].offsets;
     }
 
-    private _checkAlignment(carriers: CarrierInput[], offsets: number[], maxSuperframes: number, minCompressedIP = ALIGN_MIN_COMPRESSED_IP): number | null {
-        const count = Math.min(maxSuperframes, ...carriers.map((carrier, i) => carrier.superframes.length - offsets[i]));
+    private _checkAlignment(samples: Superframe[][], offsets: number[], maxSuperframes: number, minCompressedIP = ALIGN_MIN_COMPRESSED_IP): number | null {
+        const count = Math.min(maxSuperframes, ...samples.map((sample, i) => sample.length - offsets[i]));
         if (count <= 0) {
             return null;
         }
@@ -364,7 +446,7 @@ export default class TSMFBonding {
         const outputs: Buffer[] = [];
         let total = 0;
         for (let sf = 0; sf < count; sf++) {
-            this._forEachSlot(carriers.map((carrier, i) => carrier.superframes[offsets[i] + sf]), packet => {
+            this._forEachSlot(samples.map((sample, i) => sample[offsets[i] + sf]), packet => {
                 if (packet !== null) {
                     total += packet.length - 4;
                 }
@@ -382,17 +464,24 @@ export default class TSMFBonding {
     private _lost(): void {
         // a lost super frame shifts the alignment of the carrier
         if (this._offsets !== null) {
+            const min = Math.min(...this._inputs.map(input => input.superframes.length));
+            for (const input of this._inputs) {
+                input.lead = input.superframes.length - min;
+            }
             this._offsets = null;
             this._nextAlignAt = ALIGN_SUPERFRAMES;
             for (const input of this._inputs) {
-                input.superframes.length = 0;
+                input.drop(input.superframes.length);
             }
         }
+        // the super frames received after the samples do not continue from them
+        this._search = null;
         this._framer.lost();
     }
 
     private _fail(reason: string): void {
         this._offsets = null;
+        this._search = null;
         ++this._failures;
         if (this._failures >= ALIGN_MAX_FAILURES) {
             this._closed = true;
@@ -401,7 +490,7 @@ export default class TSMFBonding {
         }
         log.warn("TSMFBonding: %s, aligning the carriers again (%d/%d)", reason, this._failures, ALIGN_MAX_FAILURES);
         for (const input of this._inputs) {
-            input.superframes.length = 0;
+            input.drop(input.superframes.length);
         }
         this._nextAlignAt = ALIGN_SUPERFRAMES;
     }
@@ -412,6 +501,52 @@ export default class TSMFBonding {
             log.warn("TSMFBonding: %s", message);
         }
     }
+}
+
+/**
+ * the offsets in the ranges, one of them is 0 (the others are relative to it)
+ * (the same array is yielded with the next offsets)
+ */
+function* normalizedOffsets(from: number[], to: number[]): Generator<number[]> {
+    for (const { lower, upper } of normalizedRanges(from, to)) {
+        const offsets = lower.slice();
+        while (true) {
+            yield offsets;
+            let i = offsets.length - 1;
+            while (i >= 0 && offsets[i] === upper[i]) {
+                offsets[i] = lower[i];
+                i--;
+            }
+            if (i < 0) {
+                break;
+            }
+            offsets[i]++;
+        }
+    }
+}
+
+function countNormalizedOffsets(from: number[], to: number[]): number {
+    let count = 0;
+    for (const { lower, upper } of normalizedRanges(from, to)) {
+        count += lower.reduce((product, offset, i) => product * (upper[i] - offset + 1), 1);
+    }
+    return count;
+}
+
+/** the ranges of the offsets for each of the offsets to be 0 (the offsets before it are not 0, counted by the zero before) */
+function normalizedRanges(from: number[], to: number[]): { lower: number[], upper: number[] }[] {
+    const ranges: { lower: number[], upper: number[] }[] = [];
+    for (let zero = 0; zero < from.length; zero++) {
+        if (from[zero] !== 0) {
+            continue;
+        }
+        const lower = from.map((offset, i) => i === zero ? 0 : i < zero ? Math.max(offset, 1) : offset);
+        const upper = to.map((offset, i) => i === zero ? 0 : offset);
+        if (lower.every((offset, i) => offset <= upper[i])) {
+            ranges.push({ lower, upper });
+        }
+    }
+    return ranges;
 }
 
 /**

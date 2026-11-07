@@ -1,4 +1,4 @@
-const { describe, it, before } = require("node:test");
+const { describe, it, before, beforeEach, afterEach } = require("node:test");
 const assert = require("assert");
 
 const log = require("../lib/Mirakurun/log");
@@ -171,6 +171,10 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
     TSMFBonding = require("../lib/Mirakurun/TSMFBonding").default;
   });
 
+  // ずれの探索を区切らない (結果がテストを実行する速さによらないように)
+  beforeEach(() => TSMFBonding.alignSliceMs = Infinity);
+  afterEach(() => TSMFBonding.alignSliceMs = 2);
+
   it("assembles TLV of 3 carriers started at different super frames", () => {
     const tlv = tlvPackets(6000);
     const streams = carriers(splitTLV(tlv), 3, 2);
@@ -249,6 +253,29 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
     assert.deepStrictEqual(errors, []);
     const { matched } = assertTLV(out, tlv);
     assert.ok(matched > tlv.length / 3);
+  });
+
+  it("finds the skews of 4 carriers in slices, not blocking the other streams", () => {
+    // 4 搬送波のずれをすべて調べる (区切らない場合は、1 回で 1 秒ほどかかる)
+    TSMFBonding.alignSliceMs = 10;
+    const tlv = tlvPackets(60000);
+    const streams = carriers(splitTLV(tlv), 4, 1);
+    const errors = [];
+    const bonding = new TSMFBonding(1, 4, reason => errors.push(reason));
+    const starts = [0, 50, 30, 10];
+    const out = [];
+    let maxMs = 0;
+    for (let sf = 0; sf < streams[0].length - 50; sf++) {
+      for (let c = 0; c < 4; c++) {
+        const startedAt = performance.now();
+        out.push(bonding.push(c, Buffer.concat(streams[c][starts[c] + sf])));
+        maxMs = Math.max(maxMs, performance.now() - startedAt);
+      }
+    }
+    assert.deepStrictEqual(errors, []);
+    assert.ok(maxMs < 100, `a push took ${maxMs}ms`);
+    const { matched } = assertTLV(Buffer.concat(out), tlv);
+    assert.ok(matched > tlv.length / 3, `assembled ${matched} of ${tlv.length} TLV packets`);
   });
 
   it("keeps samples when one carrier is delivered in a large burst before the others", () => {
