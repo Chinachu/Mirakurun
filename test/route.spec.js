@@ -910,6 +910,17 @@ describe("[route.spec] route / streamId", () => {
       await t.getServices(channel);
       // the stream as received (not the relative stream 2 detected by the remote)
       assert.deepStrictEqual(scanned, [["ts", undefined]]);
+
+      // the remote Mirakurun supporting it is asked for the channel (not the one of 4.3.0 or before)
+      const supporting = fakeDevice(1, ["BS"], ["CATV"], {
+        isRemote: true,
+        getRemoteChannel: async () => ({ type: "BS", channel: "C46", services: [{ id: 1, serviceId: 265, networkId: 4, streamId: 18801, tsmfRelTs: 2, format: "ts" }] })
+      });
+      remote.getRemoteChannel = async () => { throw new Error("not called"); };
+      t._devices = [remote, supporting];
+      scanned.length = 0;
+      await t.getServices(channel);
+      assert.deepStrictEqual(scanned, [["ts", 2]]);
     });
 
     // ローカルのチューナーで判別した相対 TS の EPG は、ローカルのチューナーで取得する (リモートの Mirakurun が判別していない場合がある)
@@ -950,12 +961,15 @@ describe("[route.spec] route / streamId", () => {
       const remote = fakeDevice(0, ["BS4K"], ["CATV"], { isRemote: true, getRemoteChannel: async () => ({ type: "BS4K", channel: "C19", services }) });
       const t = tuner([remote]);
       const scanned = [];
-      mock.method(t, "_scanServices", async (ch, userReq, format) => (scanned.push(format), []));
+      const scannedRelTs = [];
+      mock.method(t, "_scanServices", async (ch, userReq, format, detect, relTs) => (scanned.push(format), scannedRelTs.push(relTs), []));
 
-      // no services yet (such as a new DB of the remote): kept
+      // no services yet (such as a new DB of the remote): the relative streams detected before are scanned (not the stream as received)
       channel.setStreams(detected);
       await t.getServices(channel);
       assert.deepStrictEqual(channel.streams, detected);
+      assert.deepStrictEqual(scanned.pop(), "tlv");
+      assert.deepStrictEqual(scannedRelTs.pop(), 1);
 
       services = [{ id: 1, serviceId: 101, networkId: 11, streamId: 45168 }];
       await t.getServices(channel);

@@ -474,12 +474,8 @@ export class Tuner {
             return null;
         }
 
-        let services: apid.Service[];
-        try {
-            services = (await devices[0].getRemoteChannel(channel.type, channel.channel)).services || [];
-        } catch (err) {
-            log.warn("Tuner: failed to get the channel %s/%s of the remote Mirakurun [%s]", channel.type, channel.channel, err.message);
-            // the relative streams detected by the remote Mirakurun before (not to replace them by the stream as received)
+        // the relative streams detected by the remote Mirakurun before (not to replace them by the stream as received)
+        const getSaved = (): TSMFStream[] | null => {
             const saved = channel.streams.filter(stream => stream.remote === true && stream.relTs !== undefined);
             return saved.length > 0 ? saved.map(stream => ({
                 relTs: stream.relTs,
@@ -488,10 +484,23 @@ export class Tuner {
                 streamId: stream.streamId,
                 networkId: stream.networkId
             })) : null;
+        };
+
+        let services: apid.Service[];
+        try {
+            // the remote Mirakurun supporting the relative stream detected
+            services = (await devices.find(device => device.supportsRemoteRelTs).getRemoteChannel(channel.type, channel.channel)).services || [];
+        } catch (err) {
+            log.warn("Tuner: failed to get the channel %s/%s of the remote Mirakurun [%s]", channel.type, channel.channel, err.message);
+            return getSaved();
+        }
+        // no services yet (such as scanning by the remote Mirakurun)
+        if (services.length === 0) {
+            return getSaved();
         }
 
         // the remote Mirakurun does not detect TSMF any longer (such as `tsmfRelTs` of its channels.yml)
-        if (services.length > 0 && services.every(service => service.tsmfRelTs === undefined) && channel.streams.some(stream => stream.remote === true)) {
+        if (services.every(service => service.tsmfRelTs === undefined) && channel.streams.some(stream => stream.remote === true)) {
             log.info("Tuner: the relative streams of TSMF on %s/%s are not detected by the remote Mirakurun any longer", channel.type, channel.channel);
             channel.setStreams([]);
         }

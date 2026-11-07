@@ -435,6 +435,8 @@ definitions:
             type: boolean
           tsmfRelTs:
             type: integer
+          format:
+            $ref: '#/definitions/StreamFormat'
       streamInfo:
         type: object
         additionalProperties:

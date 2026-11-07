@@ -239,6 +239,8 @@ interface StreamSetting {
     parseEIT?: boolean;
     /** the relative stream of TSMF */
     tsmfRelTs?: number;
+    /** the format to receive (the remote Mirakurun outputs it) */
+    format?: StreamFormat;
 }
 
 export interface StreamInfo {
