@@ -302,6 +302,17 @@ describe("[route.spec] route / streamId", () => {
   });
 
   describe("Tuner: sharing bonded carriers", () => {
+    it("warns tsmfGroupId without tsmfRelTs, which is not bonded", () => {
+      const warn = mock.method(log, "warn", () => {});
+      try {
+        setupChannels([{ name: "TLV", type: "BS4K", channel: "C1", route: "CATV", tsmfGroupId: 5 }]);
+        assert.ok(_.channel.get("BS4K", "C1"));
+        assert.ok(warn.mock.calls.some(call => /`tsmfGroupId` without `tsmfRelTs`/.test(call.arguments[0])));
+      } finally {
+        warn.mock.restore();
+      }
+    });
+
     for (const initialPriority of [-1, 0]) {
       it(`keeps all three carriers and the priority ${initialPriority} user when a higher priority stream joins`, async () => {
         const configs = [1, 2, 3].map(i => ({ name: `Carrier ${i}`, type: "BS4K", channel: `C${i}`, route: "CATV", format: "tlv", tsmfRelTs: 1, tsmfGroupId: 5 }));

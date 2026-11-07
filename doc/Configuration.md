@@ -256,7 +256,9 @@ Specify this when a TLV is transmitted by multiple carriers of CATV (channel bon
 
 - Tuners as many as the carriers are needed. The tuners of the carriers are shown in `/api/tuners` as the users `<user ID>#carrier<n>`.
 - Requests for the same carriers share the tuners with EPG acquisition and other streams. Joining the same reception does not stop existing users, even at a higher priority. Requests for other carriers follow the usual priority rules when no tuner is free.
-- The skew of the carriers is found by checking the TLV assembled. The stream is closed when a carrier stops or the TLV can not be assembled.
+- `tsmfRelTs` is needed (the relative streams detected without `tsmfRelTs` do not include TSMF of multiple carriers).
+- The skew of the carriers is found by checking the TLV assembled (the difference of the delays up to about 0.5 seconds). Nothing is output until it is found, usually within a second, but it may take about 10 seconds for 4 or more carriers.
+- The stream is closed when a carrier is not received for about 10 seconds (including starting the tuner) or the TLV can not be assembled.
 
 ```yaml
 - name: TLV (1)

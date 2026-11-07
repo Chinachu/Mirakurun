@@ -231,6 +231,10 @@ export class Channel {
                 return;
             }
 
+            if (channel.tsmfGroupId !== undefined && !channel.tsmfRelTs) {
+                log.warn("property `tsmfGroupId` without `tsmfRelTs` is ignored in channel#%d (%s) configuration", i, channel.name);
+            }
+
             if (channel.commandVars && typeof channel.commandVars !== "object") {
                 log.error("invalid type of property `commandVars` in channel#%d (%s) configuration", i, channel.name);
                 return;
