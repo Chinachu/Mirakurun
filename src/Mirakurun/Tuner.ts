@@ -23,6 +23,7 @@ import TunerDevice, { TunerDeviceStatus } from "./TunerDevice";
 import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
 import TSFilter from "./TSFilter";
+import type TLVFilter from "./TLVFilter";
 import TSDecoder from "./TSDecoder";
 import { DETECT_BYTES, DETECT_SKIP_BYTES, TSMFStream, detectStreamFormat, detectTSMFStreamFormat, detectTSMFStreams } from "./StreamFormat";
 
@@ -92,6 +93,42 @@ class FormatProbe extends EventEmitter {
     }
 }
 
+/** the output of a tuner of a bonded carrier, to the TLVFilter of the first carrier */
+class CarrierSink extends EventEmitter {
+    private _closed = false;
+
+    constructor(private _filter: TLVFilter, private _carrier: number) {
+        super();
+        if (_filter.closed) {
+            this._closed = true;
+        } else {
+            _filter.once("close", () => this.end());
+        }
+    }
+
+    get closed(): boolean {
+        return this._closed;
+    }
+
+    write(chunk: Buffer, defer = false): void {
+        this._filter.writeCarrier(this._carrier, chunk, defer);
+    }
+
+    flush(): void {
+        this._filter.flush();
+    }
+
+    /** the stream can not continue without a carrier */
+    end(): void {
+        if (this._closed) {
+            return;
+        }
+        this._closed = true;
+        this._filter.close();
+        this.emit("close");
+    }
+}
+
 /** a channel and the relative stream of TSMF to receive */
 export interface StreamTarget {
     channel: ChannelItem;
@@ -156,21 +193,25 @@ export class Tuner {
                 })),
                 -1
             );
-            if (picked === null) {
+            // the bonded carriers need the tuners too
+            const carriers = picked === null ? null : this._pickCarrierDevices(picked, -1, this._readyForJobPickedDeviceSet);
+            if (picked === null || carriers === null) {
                 // log.debug("readyForJob: no available tuners for channel type: %s", channel.type);
                 await common.sleep(1000 * 10);
                 continue;
             }
-            const { device, channel } = picked;
+            const { channel } = picked;
             // pick したチューナーを少し保持する
-            this._readyForJobPickedDeviceSet.add(device);
-            log.debug("readyForJob: picked device: #%d (%s) for %s/%s", device.index, device.config.name, channel.type, channel.channel);
+            for (const { device } of [picked, ...carriers]) {
+                this._readyForJobPickedDeviceSet.add(device);
+                log.debug("readyForJob: picked device: #%d (%s) for %s/%s", device.index, device.config.name, channel.type, channel.channel);
 
-            setTimeout(() => {
-                // 開放
-                this._readyForJobPickedDeviceSet.delete(device);
-                log.debug("readyForJob: released device: #%d (%s)", device.index, device.config.name);
-            }, 1000 * 5);
+                setTimeout(() => {
+                    // 開放
+                    this._readyForJobPickedDeviceSet.delete(device);
+                    log.debug("readyForJob: released device: #%d (%s)", device.index, device.config.name);
+                }, 1000 * 5);
+            }
 
             return channel;
         }
@@ -630,8 +671,10 @@ export class Tuner {
 
         while (tryCount > 0) {
             const picked = this._pickTunerDevice(candidates, user.priority);
+            // the tuners of the other bonded carriers
+            const carriers = picked === null ? null : this._pickCarrierDevices(picked, user.priority);
 
-            if (picked === null) {
+            if (picked === null || carriers === null) {
                 // retry
                 tryCount--;
                 if (tryCount <= 0) {
@@ -660,7 +703,8 @@ export class Tuner {
                         parseNIT: setting.parseNIT,
                         parseSDT: setting.parseSDT,
                         parseEIT: setting.parseEIT,
-                        tsmfRelTs: relTs
+                        tsmfRelTs: relTs,
+                        tsmfCarriers: carriers.length + 1
                     });
                 } else {
                     let output: Writable;
@@ -691,6 +735,11 @@ export class Tuner {
 
                 try {
                     await device.startStream(user, tsFilter, setting.channel);
+                    await Promise.all(carriers.map(({ device: carrierDevice, channel: carrierChannel }, i) => carrierDevice.startStream(
+                        { ...user, id: `${user.id}#carrier${i + 1}`, streamSetting: { channel: carrierChannel } },
+                        new CarrierSink(tsFilter as TLVFilter, i + 1),
+                        carrierChannel
+                    )));
                     return tsFilter;
                 } catch (err) {
                     tsFilter.end();
@@ -698,6 +747,40 @@ export class Tuner {
                 }
             }
         }
+    }
+
+    /**
+     * the tuners of the other bonded carriers of the channel
+     * @returns `[]` if not bonded, `null` if not available
+     */
+    private _pickCarrierDevices(
+        { device, channel, candidate }: { device: TunerDevice, channel: ChannelItem, candidate: TunerCandidate },
+        priority: number,
+        excluded: Set<TunerDevice> = new Set()
+    ): { device: TunerDevice, channel: ChannelItem }[] | null {
+        // the TLV of the relative stream of TSMF
+        const channels = candidate.relTs && candidate.format === "tlv" ? channel.getBondedChannels() : null;
+        if (channels === null || channels.length < 2) {
+            return [];
+        }
+
+        const used = new Set([device, ...excluded]);
+        const picked: { device: TunerDevice, channel: ChannelItem }[] = [];
+        for (const carrierChannel of channels) {
+            if (carrierChannel === channel) {
+                continue;
+            }
+            const carrier = this._pickTunerDevice([{
+                ...this._getCandidate(carrierChannel, candidate.relTs, candidate.format),
+                devices: this._getDevicesByType(carrierChannel.type, carrierChannel.route).filter(d => used.has(d) === false)
+            }], priority);
+            if (carrier === null) {
+                return null;
+            }
+            used.add(carrier.device);
+            picked.push(carrier);
+        }
+        return picked;
     }
 
     /**

@@ -37,6 +37,7 @@ export default class ChannelItem {
     readonly route: apid.ChannelRoute;
     readonly channel: string;
     readonly tsmfRelTs: number;
+    readonly tsmfGroupId: number;
     readonly commandVars: apid.ConfigChannelsItem["commandVars"];
     private _format: apid.StreamFormat;
     /** as configured (for the output) */
@@ -50,6 +51,7 @@ export default class ChannelItem {
         // `0` or empty is not specified
         this.tsmfRelTs = config.tsmfRelTs || undefined;
         this._configuredTsmfRelTs = config.tsmfRelTs;
+        this.tsmfGroupId = config.tsmfGroupId;
         this.commandVars = config.commandVars;
         this._format = config.format;
     }
@@ -152,8 +154,17 @@ export default class ChannelItem {
             route: this.route,
             tsmfRelTs: this._configuredTsmfRelTs,
             format: this._format,
+            tsmfGroupId: this.tsmfGroupId,
             commandVars: this.commandVars
         };
+    }
+
+    /** the channels of the bonded carriers including this, `null` if not bonded */
+    getBondedChannels(): ChannelItem[] | null {
+        if (!this.tsmfGroupId) {
+            return null;
+        }
+        return _.channel.items.filter(item => item.type === this.type && item.tsmfGroupId === this.tsmfGroupId);
     }
 
     getServices(): ServiceItem[] {

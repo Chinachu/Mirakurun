@@ -28,7 +28,7 @@ function crc32(data) {
 
 let headerCC = 0;
 // TSMF の多重フレームヘッダー (slotMap: 52 スロットの相対 TS 番号、tlvRelTs: TLV の相対 TS 番号)
-function header({ slotMap, tlvRelTs = [1], numberOfCarriers = 1, cc = headerCC++ }) {
+function header({ slotMap, tlvRelTs = [1], numberOfCarriers = 1, carrierSequence = 1, numberOfFrames = 1, framePosition = 0, cc = headerCC++ }) {
   const p = Buffer.alloc(188, 0xFF);
   p[0] = 0x47;
   p[1] = 0x00;
@@ -49,6 +49,8 @@ function header({ slotMap, tlvRelTs = [1], numberOfCarriers = 1, cc = headerCC++
   payload[121] = streamTypeBits >> 7;
   payload[122] = (streamTypeBits << 1) & 0xFF;
   payload[124] = numberOfCarriers;
+  payload[125] = carrierSequence;
+  payload[126] = (numberOfFrames << 4) | framePosition;
   payload.writeUInt32BE(crc32(payload.subarray(0, 180)), 180);
   return p;
 }

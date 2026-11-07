@@ -221,6 +221,11 @@ export class Channel {
                 return;
             }
 
+            if (channel.tsmfGroupId !== undefined && (Number.isInteger(channel.tsmfGroupId) === false || channel.tsmfGroupId < 1 || channel.tsmfGroupId > 255)) {
+                log.error("invalid type of property `tsmfGroupId` in channel#%d (%s) configuration", i, channel.name);
+                return;
+            }
+
             if (channel.tsmfRelTs && typeof channel.tsmfRelTs !== "number") {
                 log.error("invalid type of property `tsmfRelTs` in channel#%d (%s) configuration", i, channel.name);
                 return;

@@ -374,6 +374,8 @@ export interface ConfigChannelsItem {
     tsmfRelTs?: number;
     /** `tlv` for TLV (MMT). (default: detected by the service scan, or `tlv` for `BS4K`) */
     format?: StreamFormat;
+    /** [TLV] the channels of the same `tsmfGroupId` and type are the bonded carriers (channel bonding of CATV) */
+    tsmfGroupId?: number;
     /**
      * passed to tuning command variables.
      * @example { "freq": 123456, "polarity": "H", "space": 6, "extra-args": "..." }

@@ -300,6 +300,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
       const payload = p.subarray(4);
       payload[2] = (payload[2] & 0xF0) | 0x02;
       payload[124] = 2;
+      payload[125] = 1;
       payload.writeUInt32BE(crc32(payload.subarray(0, 180)), 180);
       return p;
     };

@@ -16,12 +16,12 @@
 import { TsCrc32 } from "@chinachu/aribts";
 import * as log from "./log";
 
-const PACKET_SIZE = 188;
+export const PACKET_SIZE = 188;
 const SYNC_BYTE = 0x47;
-const TSMF_PID = 0x2F;
-const TLV_PID = 0x2D;
+export const TSMF_PID = 0x2F;
+export const TLV_PID = 0x2D;
 const NULL_PID = 0x1FFF;
-const SLOT_COUNT = 52;
+export const SLOT_COUNT = 52;
 const TSMF_FRAME_SYNC = [0x1A86, 0x0579];
 
 const TLV_SYNC_BYTE = 0x7F;
@@ -33,10 +33,19 @@ export interface TSMFHeader {
     slotMap: number[];
     /** bit of relative stream n (MSB = 1): 0 = TLV, 1 = TS */
     streamTypeBits: number;
+    /** 1 unless the carriers are bonded (frame_type 0x2 may also have 1) */
     numberOfCarriers: number;
+    /** 1..numberOfCarriers */
+    carrierSequence: number;
+    /** the frames of a super frame */
+    numberOfFrames: number;
+    framePosition: number;
 }
 
 export function parseTSMFHeader(packet: Buffer): TSMFHeader | null {
+    if ((packet[1] & 0x80) !== 0) {
+        return null;
+    }
     const payload = packet.subarray(4, PACKET_SIZE);
 
     if (TSMF_FRAME_SYNC.includes(((payload[0] << 8) | payload[1]) & 0x1FFF) === false) {
@@ -52,43 +61,36 @@ export function parseTSMFHeader(packet: Buffer): TSMFHeader | null {
         slotMap[i] = (i & 1) === 0 ? b >> 4 : b & 0x0F;
     }
 
-    // frame_type 0x2 (multi-carrier) has the number of carriers, but it may be 1
-    const frameType = payload[2] & 0x0F;
+    const isMultiCarrier = (payload[2] & 0x0F) === 0x02;
+    const numberOfCarriers = isMultiCarrier ? payload[124] : 1;
+    const carrierSequence = isMultiCarrier ? payload[125] : 1;
+    if (numberOfCarriers < 1 || carrierSequence < 1 || carrierSequence > numberOfCarriers) {
+        return null;
+    }
 
     return {
         slotMap,
         streamTypeBits: (payload[121] << 7) | (payload[122] >> 1),
-        numberOfCarriers: frameType === 0x02 ? payload[124] : 1
+        numberOfCarriers,
+        carrierSequence,
+        numberOfFrames: isMultiCarrier ? Math.max(payload[126] >> 4, 1) : 1,
+        framePosition: isMultiCarrier ? payload[126] & 0x0F : 0
     };
 }
 
-/**
- * assembles TLV of a relative stream from the slots of the TSMF frames (single carrier).
- * Only the complete TLV packets are output, a TLV packet broken by a lost packet is dropped.
- */
-export default class TSMFTLV {
-    // the remainder of the last chunk
+export function isTLVStream(header: TSMFHeader, relTs: number): boolean {
+    return ((header.streamTypeBits >> (15 - relTs)) & 1) === 0;
+}
+
+/** splits the chunks into the TS packets */
+export class TSPacketReader {
     private _packet = Buffer.allocUnsafe(PACKET_SIZE);
     private _packetLength = 0;
 
-    private _slotMap: number[] = null;
-    private _slotCounter = -1;
-    /** the packets of the relative stream in the frame (the other slots are only counted) */
-    private _frame: Buffer[] = [];
-    private _headerCC = -1;
-    private _warned = false;
-
-    // TLV
-    private _tlv: Buffer[] = [];
-    private _tlvLength = 0;
-    private _tlvStarted = false;
-
-    constructor(private _relTs: number) {
+    constructor(private _onPacket: (packet: Buffer) => void, private _onLost: () => void) {
     }
 
-    /** @returns TLV packets in the chunk (TS packets) */
-    push(chunk: Buffer): Buffer {
-        const outputs: Buffer[] = [];
+    push(chunk: Buffer): void {
         let offset = 0;
 
         if (this._packetLength > 0) {
@@ -96,14 +98,16 @@ export default class TSMFTLV {
             if (chunk.length < need) {
                 chunk.copy(this._packet, this._packetLength);
                 this._packetLength += chunk.length;
-                return Buffer.alloc(0);
+                return;
             }
             chunk.copy(this._packet, this._packetLength, 0, need);
             this._packetLength = 0;
             offset = need;
             if (this._packet[0] === SYNC_BYTE) {
                 // the buffer is reused, the data must be copied
-                this._onPacket(Buffer.from(this._packet), outputs);
+                this._onPacket(Buffer.from(this._packet));
+            } else {
+                this._onLost();
             }
         }
 
@@ -111,10 +115,10 @@ export default class TSMFTLV {
             if (chunk[offset] !== SYNC_BYTE) {
                 // resync
                 ++offset;
-                this._lost();
+                this._onLost();
                 continue;
             }
-            this._onPacket(chunk.subarray(offset, offset + PACKET_SIZE), outputs);
+            this._onPacket(chunk.subarray(offset, offset + PACKET_SIZE));
             offset += PACKET_SIZE;
         }
 
@@ -122,99 +126,36 @@ export default class TSMFTLV {
             chunk.copy(this._packet, 0, offset);
             this._packetLength = chunk.length - offset;
         }
+    }
+}
 
-        return outputs.length === 1 ? outputs[0] : Buffer.concat(outputs);
+/**
+ * assembles TLV from the TS packets of TLV (PID 0x2D).
+ * Only the complete TLV packets are output, a TLV packet broken by a lost packet is dropped.
+ */
+export class TLVFramer {
+    private _tlv: Buffer[] = [];
+    private _tlvLength = 0;
+    private _started = false;
+
+    constructor(private _onLost?: () => void) {
     }
 
-    private _onPacket(packet: Buffer, outputs: Buffer[]): void {
-        const pid = ((packet[1] & 0x1F) << 8) | packet[2];
-
-        if (pid === TSMF_PID) {
-            this._onHeader(packet, outputs);
-            return;
-        }
-        if (this._slotCounter < 0) {
-            return;
-        }
-        // A missing whole packet shifts every subsequent slot. Do not emit until
-        // the next header confirms both the frame length and continuity.
-        if (++this._slotCounter <= SLOT_COUNT && this._slotMap[this._slotCounter - 1] === this._relTs) {
-            // the input chunk is shared with the other users
-            this._frame.push(Buffer.from(packet));
-        }
-    }
-
-    private _onSelectedPacket(packet: Buffer, outputs: Buffer[]): void {
-        const pid = ((packet[1] & 0x1F) << 8) | packet[2];
-        if ((packet[1] & 0x80) !== 0) {
-            // transport_error_indicator
-            this._lost();
-            return;
-        }
-        if (pid === TLV_PID) {
-            this._onTLVPacket(packet, outputs);
-        } else if (pid !== NULL_PID) {
-            this._lost();
-        }
-    }
-
-    private _onHeader(packet: Buffer, outputs: Buffer[]): void {
-        const frame = this._frame;
-        this._frame = [];
-        const header = (packet[1] & 0x80) === 0 ? parseTSMFHeader(packet) : null;
-        if (header === null) {
-            this._slotCounter = -1;
-            this._lost();
-            return;
-        }
-
-        // the frames between were lost (or the frame of the channel tuned before remains right after tuning)
-        const cc = packet[3] & 0x0F;
-        const continuous = this._headerCC !== -1 && cc === ((this._headerCC + 1) & 0x0F);
-        this._headerCC = cc;
-        if (continuous === false) {
-            this._lost();
-            this._slotCounter = -1;
-            return;
-        }
-        // the slots of the last frame were lost
-        if (this._slotCounter !== -1 && this._slotCounter !== SLOT_COUNT) {
-            this._lost();
-        }
-
-        if (this._slotCounter === SLOT_COUNT) {
-            for (const selected of frame) {
-                this._onSelectedPacket(selected, outputs);
+    /** @param packet a TS packet of TLV, `null` if lost */
+    push(packet: Buffer | null, outputs: Buffer[]): void {
+        if (packet === null || (packet[1] & 0x80) !== 0 || (((packet[1] & 0x1F) << 8) | packet[2]) !== TLV_PID) {
+            if (packet !== null && (((packet[1] & 0x1F) << 8) | packet[2]) === NULL_PID) {
+                return;
             }
-        }
-
-        if (header.numberOfCarriers > 1) {
-            if (this._warned === false) {
-                this._warned = true;
-                log.warn("TSMFTLV: the multi-carrier TSMF is not supported (numberOfCarriers=%d)", header.numberOfCarriers);
-            }
-            this._slotCounter = -1;
-            return;
-        }
-        if (((header.streamTypeBits >> (15 - this._relTs)) & 1) !== 0) {
-            if (this._warned === false) {
-                this._warned = true;
-                log.warn("TSMFTLV: the relative stream %d is not TLV", this._relTs);
-            }
-            this._slotCounter = -1;
+            this.lost();
             return;
         }
 
-        this._slotMap = header.slotMap;
-        this._slotCounter = 0;
-    }
-
-    private _onTLVPacket(packet: Buffer, outputs: Buffer[]): void {
         // the TS packets of TLV have no continuity_counter: the payload starts at 3, or at 4 after pointer_field
         const pusi = (packet[1] & 0x40) !== 0;
         let data = packet.subarray(pusi ? 4 : 3);
 
-        if (this._tlvStarted === false) {
+        if (this._started === false) {
             if (pusi === false) {
                 return;
             }
@@ -225,36 +166,44 @@ export default class TSMFTLV {
                 return;
             }
             data = data.subarray(start);
-            this._tlvStarted = true;
+            this._started = true;
         }
 
         this._tlv.push(data);
         this._tlvLength += data.length;
-        this._outputTLV(outputs);
+        this._output(outputs);
+    }
+
+    /** drops the TLV packet in assembling, and starts again from the next start of a TLV packet */
+    lost(): void {
+        this._started = false;
+        this._tlv = [];
+        this._tlvLength = 0;
+        this._onLost?.();
     }
 
     /**
      * moves the complete TLV packets to the outputs
      * (the data is kept as received until a TLV packet is complete, not to copy the rest again for each TS packet)
      */
-    private _outputTLV(outputs: Buffer[]): void {
+    private _output(outputs: Buffer[]): void {
         while (this._tlvLength >= TLV_HEADER_SIZE) {
             const header = this._tlv[0].length >= TLV_HEADER_SIZE ? this._tlv[0] : Buffer.concat(this._tlv.slice(0, TLV_HEADER_SIZE));
             if (header[0] !== TLV_SYNC_BYTE) {
                 // broken, wait for the next start
-                this._lost();
+                this.lost();
                 return;
             }
             const size = TLV_HEADER_SIZE + header.readUInt16BE(2);
             if (size > this._tlvLength) {
                 return;
             }
-            outputs.push(this._takeTLV(size));
+            outputs.push(this._take(size));
         }
     }
 
     /** takes the bytes of a TLV packet from the head of the data kept */
-    private _takeTLV(size: number): Buffer {
+    private _take(size: number): Buffer {
         const parts: Buffer[] = [];
         let rest = size;
         let used = 0;
@@ -275,11 +224,98 @@ export default class TSMFTLV {
         // the data is of the packets copied from the input chunk
         return parts.length === 1 ? parts[0] : Buffer.concat(parts, size);
     }
+}
 
-    /** drops the TLV packet in assembling, and starts again from the next start of a TLV packet */
-    private _lost(): void {
-        this._tlvStarted = false;
-        this._tlv = [];
-        this._tlvLength = 0;
+/**
+ * assembles TLV of a relative stream from the slots of the TSMF frames (single carrier).
+ */
+export default class TSMFTLV {
+    private _reader = new TSPacketReader(packet => this._onPacket(packet), () => this._framer.lost());
+    private _framer = new TLVFramer();
+    private _outputs: Buffer[] = [];
+
+    private _slotMap: number[] = null;
+    private _slotCounter = -1;
+    /** the packets of the relative stream in the frame (the other slots are only counted) */
+    private _frame: Buffer[] = [];
+    private _headerCC = -1;
+    private _warned = false;
+
+    constructor(private _relTs: number) {
+    }
+
+    /** @returns TLV packets in the chunk (TS packets) */
+    push(chunk: Buffer): Buffer {
+        this._reader.push(chunk);
+
+        const outputs = this._outputs;
+        this._outputs = [];
+        return outputs.length === 1 ? outputs[0] : Buffer.concat(outputs);
+    }
+
+    private _onPacket(packet: Buffer): void {
+        const pid = ((packet[1] & 0x1F) << 8) | packet[2];
+
+        if (pid === TSMF_PID) {
+            this._onHeader(packet);
+            return;
+        }
+
+        if (this._slotCounter < 0) {
+            return;
+        }
+        // Wait for the next header before trusting the slot positions.
+        if (++this._slotCounter <= SLOT_COUNT && this._slotMap[this._slotCounter - 1] === this._relTs) {
+            // the input chunk is shared with the other users
+            this._frame.push(Buffer.from(packet));
+        }
+    }
+
+    private _onHeader(packet: Buffer): void {
+        const frame = this._frame;
+        this._frame = [];
+        const header = parseTSMFHeader(packet);
+        if (header === null) {
+            this._slotCounter = -1;
+            this._framer.lost();
+            return;
+        }
+
+        // the frames between were lost (or the frame of the channel tuned before remains right after tuning)
+        const cc = packet[3] & 0x0F;
+        const continuous = this._headerCC !== -1 && cc === ((this._headerCC + 1) & 0x0F);
+        this._headerCC = cc;
+        if (continuous === false) {
+            this._framer.lost();
+            this._slotCounter = -1;
+            return;
+        }
+        // the slots of the last frame were lost
+        if (this._slotCounter !== -1 && this._slotCounter !== SLOT_COUNT) {
+            this._framer.lost();
+        }
+
+        if (this._slotCounter === SLOT_COUNT) {
+            for (const selected of frame) {
+                this._framer.push(selected, this._outputs);
+            }
+        }
+
+        // the frames of the carriers are interleaved, assembled by TSMFBonding
+        // (the interleaving of the frames of a single carrier is the same order as the frames)
+        if (header.numberOfCarriers > 1 || isTLVStream(header, this._relTs) === false) {
+            if (this._warned === false) {
+                this._warned = true;
+                log.warn(
+                    "TSMFTLV: the relative stream %d is not TLV of a single carrier (numberOfCarriers=%d), `tsmfGroupId` may be needed",
+                    this._relTs, header.numberOfCarriers
+                );
+            }
+            this._slotCounter = -1;
+            return;
+        }
+
+        this._slotMap = header.slotMap;
+        this._slotCounter = 0;
     }
 }
