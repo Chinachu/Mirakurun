@@ -384,7 +384,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
   });
 
   it("is ready for the job of the relative stream detected by the local tuners first", async () => {
-    const remote = { index: 0, config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
+    const remote = { index: 0, config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true, canReceiveRemoteRelTs: () => true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
     const local = { index: 1, config: { name: "local", types: ["BS"] }, isRemote: false, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
     const t = Object.create(Tuner.prototype);
     t._devices = [remote, local];
@@ -441,13 +441,13 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     await t.initChannelStream(channel, { id: "u" }, null);
     await t.initChannelStream(channel, { id: "u" }, null, 1);
     assert.deepStrictEqual(users, [[4, undefined], [11, 1]]);
-    t._devices = [{ config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true }];
+    t._devices = [{ config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true, canReceiveRemoteRelTs: () => true }];
     await t.initChannelStream(channel, { id: "u" }, null, 1);
     assert.deepStrictEqual(users[2], [11, 1]);
   });
 
   it("requests the relative stream detected from the remote tuners if only they are left", async () => {
-    const remote = { index: 0, config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
+    const remote = { index: 0, config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true, canReceiveRemoteRelTs: () => true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
     const t = Object.create(Tuner.prototype);
     t._devices = [remote];
     t._readyForJobPickedDeviceSet = new Set();
@@ -479,7 +479,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
 
   it("receives the relative streams detected by the local tuners first, and by the remote tuners", () => {
     const local = { config: { name: "local", types: ["BS"] }, isRemote: false };
-    const remote = { config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true };
+    const remote = { config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true, canReceiveRemoteRelTs: () => true };
     const t = Object.create(Tuner.prototype);
     t._devices = [local, remote];
     _.channel = { getStreams: () => [] };
@@ -667,7 +667,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
       const detecting = { config: { name: "4k", types: ["BS"], tlvToTsDecoder: "mmt2ts" }, isRemote: false };
       // the remote Mirakurun has not detected the relative streams (no services)
       const remote = {
-        config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true,
+        config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true, canReceiveRemoteRelTs: () => true,
         checkRemoteRelTs: async () => true, getRemoteChannel: async () => ({ type: "BS", channel: "C46", services: [] })
       };
       for (const [probe, devices, replaced] of [

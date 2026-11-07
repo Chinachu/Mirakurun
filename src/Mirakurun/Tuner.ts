@@ -721,6 +721,9 @@ export class Tuner {
             } else {
                 carriersCompleted = discoveryChanged;
             }
+        } else if (!remote && channel.streams.some(stream => stream.remote === true) && _.channel.get(channel.type, channel.channel) === channel) {
+            // the relative streams detected by the local tuners are received by them (not as detected by the remote Mirakurun)
+            channel.setStreams([...channelStreams]);
         }
 
         const scan = (stream: TSMFStream): Promise<apid.Service[]> => this._scanServices(
@@ -1046,17 +1049,20 @@ export class Tuner {
         priority: number,
         excluded?: Set<TunerDevice>
     ): { picked: { device: TunerDevice, channel: ChannelItem, candidate: TunerCandidate } | null, carriers: { device: TunerDevice, channel: ChannelItem }[] | null } {
-        const picked = this._pickTunerDevice(candidates, priority);
-        if (picked === null) {
-            return { picked, carriers: null };
-        }
-        const carriers = this._pickCarrierDevices(picked, priority, excluded);
-        if (carriers !== null || picked.device.isRemote) {
+        // the remote tuners for the relative stream detected come after the local tuners (taking over, and of the carriers),
+        // the remote Mirakurun may not have detected it
+        const isDetectedByRemote = (candidate: TunerCandidate, device: TunerDevice): boolean => device.isRemote && this._getRemoteRelTs(candidate) !== undefined;
+        const picked = this._pickTunerDevice(candidates.map(candidate => ({
+            ...candidate,
+            devices: candidate.devices.filter(device => !isDetectedByRemote(candidate, device))
+        })), priority);
+        const carriers = picked === null ? null : this._pickCarrierDevices(picked, priority, excluded);
+        if (picked !== null && carriers !== null) {
             return { picked, carriers };
         }
         const remote = this._pickTunerDevice(candidates.map(candidate => ({
             ...candidate,
-            devices: candidate.devices.filter(device => device.isRemote && this._getRemoteRelTs(candidate) !== undefined)
+            devices: candidate.devices.filter(device => isDetectedByRemote(candidate, device))
         })), priority);
         return remote === null ? { picked, carriers: null } : { picked: remote, carriers: this._pickCarrierDevices(remote, priority, excluded) };
     }
@@ -1225,7 +1231,7 @@ export class Tuner {
         if (relTs !== undefined && relTs !== channel.tsmfRelTs) {
             // the local tuners come first, and the TLV of the carriers discovered is bonded only if all the carriers are found (not as a single carrier)
             // the remote Mirakurun of 4.3.0 or before outputs the stream of the channel (not the relative stream detected)
-            const remote = devices.filter(device => device.isRemote && device.supportsRemoteRelTs);
+            const remote = devices.filter(device => device.isRemote && device.canReceiveRemoteRelTs(channel, relTs));
             devices = this._canReceiveDetectedCarriers(channel, relTs) ? [...devices.filter(device => !device.isRemote), ...remote] : remote;
         } else if (channel.getFormat(relTs) !== channel.remoteFormat && (format === undefined || format === channel.getFormat(relTs))) {
             // the stream of the remote Mirakurun is not the stream as received of TSMF detected by the local tuners

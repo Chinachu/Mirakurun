@@ -45,6 +45,8 @@ const DVB_MISSING_DEVICE_ERRORS = ["ENOENT", "ENODEV", "ENXIO"];
 const REMOTE_REFUSED_EXIT_CODE = 2;
 /** リモートの Mirakurun が判別した相対 TS の指定 (`tsmfRelTs`) に対応しない場合 (4.3.0 以前) の `lib/remote` の終了コード */
 const REMOTE_RELTS_UNSUPPORTED_EXIT_CODE = 3;
+/** リモートの Mirakurun に断られた相対 TS (リモートで判別されていないなど) を、そのチューナーで要求しない時間 (ミリ秒) */
+const REMOTE_REFUSED_RELTS_PERIOD = 1000 * 60 * 10;
 /** リモートの Mirakurun が判別した相対 TS に対応するかを確認できなかった場合に、確認し直すまでの時間 (ミリ秒) */
 const REMOTE_RELTS_CHECK_INTERVAL = 1000 * 10;
 
@@ -121,6 +123,8 @@ export default class TunerDevice extends EventEmitter {
     private _remoteRelTsSupported: boolean;
     private _remoteRelTsChecking: Promise<boolean> = null;
     private _remoteRelTsRetryTimer: NodeJS.Timeout = null;
+    /** the relative streams refused by the remote Mirakurun (`type/channel/relTs`: the time) */
+    private _remoteRelTsRefused = new Map<string, number>();
     private _isFault = false;
     private _fatalCount = 0;
     private _exited = false;
@@ -372,6 +376,12 @@ export default class TunerDevice extends EventEmitter {
         return this._getRemoteClient().getChannel(type, channel);
     }
 
+    /** the remote Mirakurun outputs the relative stream of TSMF detected of the channel (not refused for a while) */
+    canReceiveRemoteRelTs(channel: ChannelItem, relTs: number): boolean {
+        const refusedAt = this._remoteRelTsRefused.get(`${channel.type}/${channel.channel}/${relTs}`);
+        return this.supportsRemoteRelTs && (refusedAt === undefined || Date.now() - refusedAt >= REMOTE_REFUSED_RELTS_PERIOD);
+    }
+
     /**
      * checks whether the remote Mirakurun outputs the relative stream of TSMF detected (by its API docs),
      * checked again after a while if failed (such as not connected)
@@ -600,6 +610,10 @@ export default class TunerDevice extends EventEmitter {
             if (this._isRemote === true && code === REMOTE_REFUSED_EXIT_CODE && this._closing === false) {
                 log.warn("TunerDevice#%d the remote Mirakurun has refused the request, closing the streams", this._index);
                 this._closing = true;
+                // the relative stream detected (such as not detected by the remote Mirakurun) is not requested for a while
+                if (this._remoteRelTs !== undefined && this._channel) {
+                    this._remoteRelTsRefused.set(`${this._channel.type}/${this._channel.channel}/${this._remoteRelTs}`, Date.now());
+                }
             }
             // the remote Mirakurun outputs the stream of the channel for the relative stream detected (not used for it)
             if (this._isRemote === true && code === REMOTE_RELTS_UNSUPPORTED_EXIT_CODE && this._closing === false) {
