@@ -863,6 +863,55 @@ describe("[route.spec] route / streamId", () => {
       assert.strictEqual(channel.remoteFormat, "ts");
     });
 
+    // channels.yml で結合する搬送波は、これまでどおりリモートのチューナーでも受信する (リモートが出力するのは 1 つの搬送波)
+    it("receives the carriers of the group of channels.yml by the remote tuners too, as before", () => {
+      setupChannels([1, 2].map(i => ({ name: `C${i}`, type: "BS4K", route: "CATV", channel: `C${i}`, format: "tlv", tsmfRelTs: 1, tsmfGroupId: 5 })));
+      const [c1] = _.channel.items;
+      const local = fakeDevice(0, ["BS4K"], ["CATV"]);
+      const remote = fakeDevice(1, ["BS4K"], ["CATV"], { isRemote: true });
+      const t = tuner([local, remote]);
+      const candidate = t._getCandidate(c1, 1);
+      assert.deepStrictEqual(t._pickCarrierDevices({ device: local, channel: c1, candidate }, 0).map(({ device }) => device), [remote]);
+      assert.deepStrictEqual(t._pickCarrierDevices({ device: remote, channel: c1, candidate }, 0).map(({ device }) => device), [local]);
+    });
+
+    // ローカルのチューナーで搬送波を受信できない場合は、判別した相対 TS を結合して出力するリモートのチューナーで受信する
+    it("receives the TLV of the carriers detected by the remote tuner if the local tuners of the carriers are not available", () => {
+      setupChannels([1, 2, 3].map(i => ({ name: `C${i}`, type: "BS4K", route: "CATV", channel: `C${i}` })));
+      const channels = _.channel.items;
+      channels.forEach((c, i) => c.setStreams([{ networkId: 11, streamId: 45280, relTs: 1, format: "tlv", slots: 52, groupId: 8, numberOfCarriers: 3, carrierSequence: i + 1 }]));
+      const busy = fakeDevice(0, ["BS4K"], ["CATV"], { isFree: false, isUsing: true, channel: {}, users: [{ priority: 5 }], getPriority: () => 5 });
+      const locals = [fakeDevice(1, ["BS4K"], ["CATV"]), fakeDevice(2, ["BS4K"], ["CATV"])];
+      const remote = fakeDevice(3, ["BS4K"], ["CATV"], { isRemote: true });
+      const t = tuner([busy, ...locals, remote]);
+      const { picked, carriers } = t._pickTunerDeviceWithCarriers([t._getCandidate(channels[0], 1)], 0);
+      assert.deepStrictEqual([picked.device, carriers], [remote, []]);
+
+      // the local tuners of all the carriers come first
+      busy.isFree = true;
+      busy.isUsing = false;
+      busy.users = [];
+      busy.channel = null;
+      const local = t._pickTunerDeviceWithCarriers([t._getCandidate(channels[0], 1)], 0);
+      assert.deepStrictEqual([local.picked.device, local.carriers.map(({ device }) => device)], [busy, locals]);
+    });
+
+    // 判別した相対 TS に対応しないリモートのチューナーだけの場合は、これまでどおりスキャンする
+    it("scans as before if the remote tuners do not support the relative stream detected", async () => {
+      setupChannels([{ name: "C46", type: "BS", route: "CATV", channel: "C46" }]);
+      const channel = _.channel.items[0];
+      const remote = fakeDevice(0, ["BS"], ["CATV"], {
+        isRemote: true, supportsRemoteRelTs: false,
+        getRemoteChannel: async () => ({ type: "BS", channel: "C46", services: [{ id: 1, serviceId: 265, networkId: 4, streamId: 18801, tsmfRelTs: 2, format: "ts" }] })
+      });
+      const t = tuner([remote]);
+      const scanned = [];
+      mock.method(t, "_scanServices", async (ch, userReq, format, detect, relTs) => (scanned.push([format, relTs]), []));
+      await t.getServices(channel);
+      // the stream as received (not the relative stream 2 detected by the remote)
+      assert.deepStrictEqual(scanned, [["ts", undefined]]);
+    });
+
     // ローカルのチューナーで判別した相対 TS の EPG は、ローカルのチューナーで取得する (リモートの Mirakurun が判別していない場合がある)
     it("gathers the EPG of the relative stream detected by the local tuners, not by the remote data", async () => {
       setupChannels([
