@@ -48,8 +48,10 @@ client.userAgent = "Mirakurun (Remote)";
 /** the remote Mirakurun outputs the relative stream of TSMF specified (not 4.3.0 or before, which outputs the stream of the channel) */
 async function supportsTsmfRelTs(): Promise<boolean> {
     const docs = await client.getDocs();
-    const operation = docs.paths["/channels/{type}/{channel}/stream"]?.get as OpenAPIV2.OperationObject;
-    return (operation?.parameters || []).some(param => (param as OpenAPIV2.Parameter).name === "tsmfRelTs");
+    const path = docs.paths["/channels/{type}/{channel}/stream"];
+    // the parameters of the path (as Mirakurun), and of the operation
+    const parameters = [...(path?.parameters || []), ...(path?.get?.parameters || [])];
+    return parameters.some(param => (param as OpenAPIV2.Parameter).name === "tsmfRelTs");
 }
 
 (async () => {

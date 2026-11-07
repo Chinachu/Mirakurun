@@ -489,6 +489,12 @@ export class Tuner {
             })) : null;
         }
 
+        // the remote Mirakurun does not detect TSMF any longer (such as `tsmfRelTs` of its channels.yml)
+        if (services.length > 0 && services.every(service => service.tsmfRelTs === undefined) && channel.streams.some(stream => stream.remote === true)) {
+            log.info("Tuner: the relative streams of TSMF on %s/%s are not detected by the remote Mirakurun any longer", channel.type, channel.channel);
+            channel.setStreams([]);
+        }
+
         const streams = new Map<number, TSMFStream>();
         for (const service of services) {
             if (!Number.isInteger(service.tsmfRelTs) || (service.format !== "ts" && service.format !== "tlv") || streams.has(service.tsmfRelTs)) {
@@ -895,7 +901,11 @@ export class Tuner {
         const startedAt = Date.now();
 
         if (!dest) {
-            const remoteResult = await this._useRemoteData(user, candidates.flatMap(candidate => candidate.devices));
+            // the relative stream detected is received by the local tuners if any (the remote Mirakurun may not have detected it)
+            const remoteResult = await this._useRemoteData(user, candidates.flatMap(candidate => {
+                const local = candidate.devices.filter(device => !device.isRemote);
+                return candidate.relTs !== candidate.channel.tsmfRelTs && local.length > 0 ? local : candidate.devices;
+            }));
             if (remoteResult) {
                 return null;
             }

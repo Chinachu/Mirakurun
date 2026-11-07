@@ -12,12 +12,16 @@ describe("[remote.spec] lib/remote", () => {
     swagger: "2.0",
     basePath: "/api",
     paths: {
+      // the parameters of the path, as Mirakurun (express-openapi of `parameters` of the module)
       "/channels/{type}/{channel}/stream": {
-        parameters: [{ in: "path", name: "type", required: true }, { in: "path", name: "channel", required: true }],
+        parameters: [
+          { in: "path", name: "type", required: true }, { in: "path", name: "channel", required: true },
+          { in: "query", name: "decode" }, { in: "query", name: "format" }, { in: "query", name: "tsmfRelTs" }
+        ],
         get: {
           operationId: "getChannelStream",
           tags: ["channels", "stream"],
-          parameters: [{ in: "query", name: "decode" }, { in: "query", name: "format" }, { in: "query", name: "tsmfRelTs" }]
+          parameters: []
         }
       }
     }
@@ -64,7 +68,8 @@ describe("[remote.spec] lib/remote", () => {
       // the remote Mirakurun of 4.3.0 or before: tsmfRelTs is not supported (3, not requested), the stream of the channel as before
       requested.length = 0;
       remoteDocs = JSON.parse(JSON.stringify(docs));
-      remoteDocs.paths["/channels/{type}/{channel}/stream"].get.parameters = [{ in: "query", name: "decode" }];
+      const streamPath = remoteDocs.paths["/channels/{type}/{channel}/stream"];
+      streamPath.parameters = streamPath.parameters.filter(param => param.name !== "format" && param.name !== "tsmfRelTs");
       const unsupported = await run(port);
       assert.strictEqual(unsupported.code, 3, unsupported.stderr);
       assert.deepStrictEqual(requested, []);

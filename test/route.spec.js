@@ -863,6 +863,58 @@ describe("[route.spec] route / streamId", () => {
       assert.strictEqual(channel.remoteFormat, "ts");
     });
 
+    // ローカルのチューナーで判別した相対 TS の EPG は、ローカルのチューナーで取得する (リモートの Mirakurun が判別していない場合がある)
+    it("gathers the EPG of the relative stream detected by the local tuners, not by the remote data", async () => {
+      setupChannels([
+        { name: "C46", type: "BS", route: "CATV", channel: "C46" },
+        { name: "C47", type: "BS", route: "CATV", channel: "C47", tsmfRelTs: 2 }
+      ]);
+      const [channel, configured] = _.channel.items;
+      channel.setStreams([
+        { networkId: 4, streamId: 18801, relTs: 2, format: "ts", slots: 24 },
+        { networkId: 4, streamId: 18803, relTs: 3, format: "ts", slots: 24 }
+      ]);
+      const local = fakeDevice(0, ["BS"], ["CATV"]);
+      const remote = fakeDevice(1, ["BS"], ["CATV"], { isRemote: true });
+      const t = tuner([local, remote]);
+      const used = [];
+      mock.method(t, "_useRemoteData", async (user, devices) => (used.push(devices), true));
+      const user = ch => ({ id: "epg", priority: -1, streamSetting: { channel: ch, networkId: 4, parseEIT: true } });
+
+      await t._initTS(user(channel), undefined, [t._getCandidate(channel, 3)]);
+      assert.deepStrictEqual(used.pop(), [local]);
+      // tsmfRelTs of channels.yml: the remote data as before
+      await t._initTS(user(configured), undefined, [t._getCandidate(configured, 2)]);
+      assert.deepStrictEqual(used.pop(), [local, remote]);
+      // only the remote tuners
+      t._devices = [remote];
+      await t._initTS(user(channel), undefined, [t._getCandidate(channel, 3)]);
+      assert.deepStrictEqual(used.pop(), [remote]);
+    });
+
+    // リモートの Mirakurun が相対 TS を判別しなくなった場合は、リモートが判別した相対 TS を消して、これまでどおりスキャンする
+    it("clears the relative streams detected by the remote Mirakurun when it does not detect them any longer", async () => {
+      setupChannels([{ name: "4K", type: "BS4K", route: "CATV", channel: "C19" }]);
+      const channel = _.channel.items[0];
+      const detected = [{ networkId: 11, streamId: 45168, relTs: 1, format: "tlv", slots: 0, remote: true }];
+      let services = [];
+      const remote = fakeDevice(0, ["BS4K"], ["CATV"], { isRemote: true, getRemoteChannel: async () => ({ type: "BS4K", channel: "C19", services }) });
+      const t = tuner([remote]);
+      const scanned = [];
+      mock.method(t, "_scanServices", async (ch, userReq, format) => (scanned.push(format), []));
+
+      // no services yet (such as a new DB of the remote): kept
+      channel.setStreams(detected);
+      await t.getServices(channel);
+      assert.deepStrictEqual(channel.streams, detected);
+
+      services = [{ id: 1, serviceId: 101, networkId: 11, streamId: 45168 }];
+      await t.getServices(channel);
+      assert.deepStrictEqual(channel.streams, []);
+      // the stream of the channel of the remote Mirakurun (TLV of BS4K)
+      assert.deepStrictEqual([scanned.pop(), channel.remoteFormat], ["tlv", "tlv"]);
+    });
+
     // 4.3.0 以前のリモートの Mirakurun は判別した相対 TS を出力しないため、対応しないとわかったチューナーは使わない
     it("does not receive the relative stream detected by the remote tuner not supporting it", () => {
       setupChannels([{ name: "C46", type: "BS", route: "CATV", channel: "C46" }]);
