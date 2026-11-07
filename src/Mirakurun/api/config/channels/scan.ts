@@ -320,7 +320,7 @@ export function generateScannedChannelItems(
             continue;
         }
         if (stream.failed) {
-            log(`-> the services of the relative stream ${stream.relTs} (${type}) are not received, scan again to add them.\n`);
+            log(`-> the services of the relative stream ${stream.relTs} (${type}) are not received, scan the channel again with refresh to add them.\n`);
         }
         const entry = types.get(type) || { relTs: new Set(), services: [], bonded: false };
         entry.relTs.add(stream.relTs);
