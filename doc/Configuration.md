@@ -316,4 +316,4 @@ The channels to scan (`source`):
 - The scan detects the relative streams of TSMF also on the tuners not for TLV. If the type has only one relative stream on the channel, `tsmfRelTs` is added (any tuner receives it). If the type has more than one, `tsmfRelTs` is not added and the tuners for TLV detect them.
 - The carriers of a TLV transmitted by multiple carriers (such as BS8K) are added as channels of BS4K without the services (`tsmfRelTs` and `tsmfGroupId` are detected).
 - The entries of the channels scanned on the route (of any type) are replaced with the result. The entries of the channels not scanned and of the other routes remain. Without `refresh`, the channels with an enabled entry are not scanned and their entries remain.
-- The channels are distinguished by the type and the channel name. If another route has an entry of the same type and channel name, the entry remains and the channel scanned is not added.
+- The channels are distinguished by the type and the channel name. If another route has an enabled entry of the same type and channel name, the entry remains and the channel scanned is not added.

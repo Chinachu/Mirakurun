@@ -772,9 +772,9 @@ async function runChannelScan(
                 continue;
             }
 
-            // the channels are unique by the type and the channel (the entry of the other route is used)
+            // the channels are unique by the type and the channel (the enabled entry of the other route is used, the disabled one is not loaded)
             const addedItems = scannedItems.filter(item => {
-                const other = result.find(o => o.type === item.type && o.channel === item.channel && !isOnRoute(o));
+                const other = result.find(o => o.type === item.type && o.channel === item.channel && !isOnRoute(o) && !o.isDisabled);
                 if (other) {
                     appendToLog(`-> ${item.type} "${item.channel}" is already configured on the route ${other.route || common.getDefaultChannelRoute(other.type)}, not added.\n`);
                 }
@@ -1063,7 +1063,7 @@ Entry rewriting specifications:
 - The entries of the channels scanned on the route (of any type) are replaced with the result. The other entries remain.
 - If an enabled entry of the channel to be scanned is in the configuration file, the scan will not be performed for that channel and the entries of the channel remain intact. If you do not want to keep the entries, use the \`refresh\` option.
 - The entries added have the \`route\` if it is not the default of the type.
-- The channels are unique by the type and the channel. The entry of the type and the channel configured on another route remains, and the entry scanned is not added.
+- The channels are unique by the type and the channel. The enabled entry of the type and the channel configured on another route remains, and the entry scanned is not added.
 - \`tsmfRelTs\` is added if the type has only one relative stream of TSMF on the channel. The relative streams are detected by the tuners for TLV if more than one.
 - The carriers of a TLV of multiple carriers (CATV channel bonding) are added as BS4K without the services (\`tsmfRelTs\` and \`tsmfGroupId\` are detected).`,
     operationId: "channelScan",

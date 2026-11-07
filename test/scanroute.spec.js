@@ -123,6 +123,23 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
     assert.ok(logs.some(text => /GR "13" is already configured on the route TER, not added/.test(text)));
   });
 
+  // 無効な設定は読み込まないため、ほかの経路の無効な設定があっても追加する
+  it("adds the channel of the type and the name configured on another route but disabled", async () => {
+    oldChannels.push({ name: "TER28", type: "GR", channel: "28", isDisabled: true });
+    try {
+      const { saved } = await runScan(
+        { route: "CATV", source: "list", channels: ["28"], refresh: true },
+        () => [{ format: "ts", services: [service(0x7FE0, 28, "地上 28")] }]
+      );
+      assert.deepStrictEqual(saved.filter(item => item.channel === "28").map(item => [item.name, item.route, item.isDisabled]), [
+        ["TER28", undefined, true],
+        ["地上 28", "CATV", false]
+      ]);
+    } finally {
+      oldChannels.pop();
+    }
+  });
+
   // 互換性のない変更: タイプではなく受信経路でスキャンする
   it("rejects the type, which is no longer supported", async () => {
     const result = await runScan({ type: "BS" }, () => []);
