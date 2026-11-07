@@ -16,7 +16,6 @@
 import * as apid from "../api";
 import Client from "./client";
 import { IncomingMessage } from "http";
-import { OpenAPIV2 } from "openapi-types";
 
 process.title = "Mirakurun: Remote";
 
@@ -45,17 +44,9 @@ client.host = opt.host;
 client.port = opt.port;
 client.userAgent = "Mirakurun (Remote)";
 
-/** the remote Mirakurun outputs the relative stream of TSMF specified (not 4.3.0 or before, which outputs the stream of the channel) */
-async function supportsTsmfRelTs(): Promise<boolean> {
-    const docs = await client.getDocs();
-    const path = docs.paths["/channels/{type}/{channel}/stream"];
-    // the parameters of the path (as Mirakurun), and of the operation
-    const parameters = [...(path?.parameters || []), ...(path?.get?.parameters || [])];
-    return parameters.some(param => (param as OpenAPIV2.Parameter).name === "tsmfRelTs");
-}
-
 (async () => {
-    if (opt.tsmfRelTs !== undefined && await supportsTsmfRelTs() === false) {
+    // the remote Mirakurun of 4.3.0 or before outputs the stream of the channel (not the relative stream detected)
+    if (opt.tsmfRelTs !== undefined && await client.supportsChannelStreamTsmfRelTs() === false) {
         console.error("remote:", "(error)", "tsmfRelTs is not supported");
         exit(3);
     }

@@ -45,6 +45,8 @@ const DVB_MISSING_DEVICE_ERRORS = ["ENOENT", "ENODEV", "ENXIO"];
 const REMOTE_REFUSED_EXIT_CODE = 2;
 /** リモートの Mirakurun が判別した相対 TS の指定 (`tsmfRelTs`) に対応しない場合 (4.3.0 以前) の `lib/remote` の終了コード */
 const REMOTE_RELTS_UNSUPPORTED_EXIT_CODE = 3;
+/** リモートの Mirakurun が判別した相対 TS に対応するかを確認できなかった場合に、確認し直すまでの時間 (ミリ秒) */
+const REMOTE_RELTS_CHECK_INTERVAL = 1000 * 60;
 
 // koffi (FFI) は DVB デバイスを直接操作するチューナーがある場合だけ読み込む
 let dvbDeviceClass: typeof DvbDevice | null;
@@ -115,8 +117,10 @@ export default class TunerDevice extends EventEmitter {
     private _remoteRelTs: number;
     /** the format the remote Mirakurun outputs */
     private _remoteFormat: apid.StreamFormat;
-    /** the remote Mirakurun does not support `tsmfRelTs` (4.3.0 or before, until restarted) */
-    private _remoteRelTsUnsupported = false;
+    /** the remote Mirakurun supports `tsmfRelTs` of the channel stream (`undefined`: not known yet) */
+    private _remoteRelTsSupported: boolean;
+    private _remoteRelTsChecking: Promise<boolean> = null;
+    private _remoteRelTsRetryTimer: NodeJS.Timeout = null;
     private _isFault = false;
     private _fatalCount = 0;
     private _exited = false;
@@ -191,9 +195,12 @@ export default class TunerDevice extends EventEmitter {
         return this._remoteFormat;
     }
 
-    /** the remote Mirakurun outputs the relative stream of TSMF detected (`false` if found not supported) */
+    /**
+     * the remote Mirakurun outputs the relative stream of TSMF detected (`tsmfRelTs` of the channel stream),
+     * `false` until checked by `checkRemoteRelTs()` (not for 4.3.0 or before)
+     */
     get supportsRemoteRelTs(): boolean {
-        return this._remoteRelTsUnsupported === false;
+        return this._remoteRelTsSupported === true;
     }
 
     get isFree(): boolean {
@@ -362,12 +369,52 @@ export default class TunerDevice extends EventEmitter {
             throw new Error(util.format("TunerDevice#%d is not remote device", this._index));
         }
 
+        return this._getRemoteClient().getChannel(type, channel);
+    }
+
+    /**
+     * checks whether the remote Mirakurun outputs the relative stream of TSMF detected (by its API docs),
+     * checked again after a while if failed (such as not connected)
+     */
+    async checkRemoteRelTs(): Promise<boolean> {
+        if (!this._isRemote) {
+            return false;
+        }
+        if (this._remoteRelTsSupported !== undefined) {
+            return this._remoteRelTsSupported;
+        }
+        if (this._remoteRelTsChecking === null) {
+            this._remoteRelTsChecking = this._getRemoteClient().supportsChannelStreamTsmfRelTs()
+                .then(supported => {
+                    // not overwritten by the result of lib/remote
+                    this._remoteRelTsSupported ??= supported;
+                    log.info("TunerDevice#%d the remote Mirakurun %s the relative stream of TSMF detected", this._index, supported ? "supports" : "does not support");
+                    return this._remoteRelTsSupported;
+                })
+                .catch(err => {
+                    log.warn("TunerDevice#%d failed to check the remote Mirakurun [%s]", this._index, err.message);
+                    if (this._remoteRelTsRetryTimer === null) {
+                        this._remoteRelTsRetryTimer = setTimeout(() => {
+                            this._remoteRelTsRetryTimer = null;
+                            this.checkRemoteRelTs();
+                        }, REMOTE_RELTS_CHECK_INTERVAL);
+                        this._remoteRelTsRetryTimer.unref?.();
+                    }
+                    return false;
+                })
+                .finally(() => {
+                    this._remoteRelTsChecking = null;
+                });
+        }
+        return this._remoteRelTsChecking;
+    }
+
+    private _getRemoteClient(): Client {
         const client = new Client();
         client.host = this.config.remoteMirakurunHost;
         client.port = this.config.remoteMirakurunPort || 40772;
         client.userAgent = "Mirakurun (Remote)";
-
-        return client.getChannel(type, channel);
+        return client;
     }
 
     private _clearEndStreamTimer(): void {
@@ -557,7 +604,7 @@ export default class TunerDevice extends EventEmitter {
             // the remote Mirakurun outputs the stream of the channel for the relative stream detected (not used for it)
             if (this._isRemote === true && code === REMOTE_RELTS_UNSUPPORTED_EXIT_CODE && this._closing === false) {
                 log.warn("TunerDevice#%d the remote Mirakurun does not support the relative stream of TSMF detected, closing the streams", this._index);
-                this._remoteRelTsUnsupported = true;
+                this._remoteRelTsSupported = false;
                 this._closing = true;
             }
 

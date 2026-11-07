@@ -127,6 +127,15 @@ export class Client {
         return this._docs;
     }
 
+    /** the channel stream outputs the relative stream of TSMF specified by `tsmfRelTs` (not 4.3.0 or before, which ignores it) */
+    async supportsChannelStreamTsmfRelTs(): Promise<boolean> {
+        const docs = await this.getDocs();
+        const path = docs.paths["/channels/{type}/{channel}/stream"];
+        // the parameters of the path (as Mirakurun), and of the operation
+        const parameters = [...(path?.parameters || []), ...(path?.get?.parameters || [])];
+        return parameters.some(param => (param as OpenAPIV2.Parameter).name === "tsmfRelTs");
+    }
+
     request(method: RequestMethod, path: string, option: RequestOption = {}): Promise<Response>|Promise<ErrorResponse> {
         return new Promise((resolve, reject) => {
             this._httpRequest(method, path, option).then(

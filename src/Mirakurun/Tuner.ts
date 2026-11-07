@@ -469,8 +469,19 @@ export class Tuner {
      */
     private async _getRemoteTSMFStreams(channel: ChannelItem): Promise<TSMFStream[] | null> {
         const devices = this._getDevicesByType(channel.type, channel.route);
-        // the remote Mirakurun of 4.3.0 or before does not output the relative stream detected
-        if (channel.tsmfRelTs !== undefined || devices.length === 0 || devices.some(device => !device.isRemote) || devices.every(device => !device.supportsRemoteRelTs)) {
+        if (channel.tsmfRelTs !== undefined || devices.length === 0 || devices.some(device => !device.isRemote)) {
+            return null;
+        }
+        // the remote Mirakurun of 4.3.0 or before does not output the relative stream detected (each host once)
+        await Promise.all(devices.map(device => device.checkRemoteRelTs()));
+        const hosts = new Map<string, TunerDevice>();
+        for (const device of devices.filter(item => item.supportsRemoteRelTs)) {
+            const host = `${device.config.remoteMirakurunHost}:${device.config.remoteMirakurunPort || 40772}`;
+            if (!hosts.has(host)) {
+                hosts.set(host, device);
+            }
+        }
+        if (hosts.size === 0) {
             return null;
         }
 
@@ -486,40 +497,51 @@ export class Tuner {
             })) : null;
         };
 
-        let services: apid.Service[];
-        try {
-            // the remote Mirakurun supporting the relative stream detected
-            services = (await devices.find(device => device.supportsRemoteRelTs).getRemoteChannel(channel.type, channel.channel)).services || [];
-        } catch (err) {
-            log.warn("Tuner: failed to get the channel %s/%s of the remote Mirakurun [%s]", channel.type, channel.channel, err.message);
-            return getSaved();
+        // the first remote Mirakurun detecting the relative streams
+        let unknown = false;
+        for (const device of hosts.values()) {
+            let services: apid.Service[];
+            try {
+                services = (await device.getRemoteChannel(channel.type, channel.channel)).services || [];
+            } catch (err) {
+                log.warn("Tuner: failed to get the channel %s/%s of the remote Mirakurun [%s]", channel.type, channel.channel, err.message);
+                unknown = true;
+                continue;
+            }
+            // no services yet (such as scanning by the remote Mirakurun)
+            if (services.length === 0) {
+                unknown = true;
+                continue;
+            }
+
+            const streams = new Map<number, TSMFStream>();
+            for (const service of services) {
+                if (!Number.isInteger(service.tsmfRelTs) || (service.format !== "ts" && service.format !== "tlv") || streams.has(service.tsmfRelTs)) {
+                    continue;
+                }
+                streams.set(service.tsmfRelTs, {
+                    relTs: service.tsmfRelTs,
+                    // not known by the services
+                    slots: 0,
+                    format: service.format,
+                    streamId: service.streamId,
+                    networkId: service.networkId
+                });
+            }
+            if (streams.size > 0) {
+                return [...streams.values()].sort((a, b) => a.relTs - b.relTs);
+            }
         }
-        // no services yet (such as scanning by the remote Mirakurun)
-        if (services.length === 0) {
+        if (unknown) {
             return getSaved();
         }
 
         // the remote Mirakurun does not detect TSMF any longer (such as `tsmfRelTs` of its channels.yml)
-        if (services.every(service => service.tsmfRelTs === undefined) && channel.streams.some(stream => stream.remote === true)) {
+        if (channel.streams.some(stream => stream.remote === true)) {
             log.info("Tuner: the relative streams of TSMF on %s/%s are not detected by the remote Mirakurun any longer", channel.type, channel.channel);
             channel.setStreams([]);
         }
-
-        const streams = new Map<number, TSMFStream>();
-        for (const service of services) {
-            if (!Number.isInteger(service.tsmfRelTs) || (service.format !== "ts" && service.format !== "tlv") || streams.has(service.tsmfRelTs)) {
-                continue;
-            }
-            streams.set(service.tsmfRelTs, {
-                relTs: service.tsmfRelTs,
-                // not known by the services
-                slots: 0,
-                format: service.format,
-                streamId: service.streamId,
-                networkId: service.networkId
-            });
-        }
-        return streams.size > 0 ? [...streams.values()].sort((a, b) => a.relTs - b.relTs) : null;
+        return null;
     }
 
     /**
@@ -844,6 +866,13 @@ export class Tuner {
         });
 
         log.info("%s of %s tuners loaded", this._devices.length, tuners.length);
+
+        // whether the remote Mirakurun outputs the relative stream of TSMF detected (not used for it until checked)
+        for (const device of this._devices) {
+            if (device.isRemote) {
+                device.checkRemoteRelTs();
+            }
+        }
 
         return this;
     }
@@ -1202,7 +1231,7 @@ export class Tuner {
             const local = devices.filter(device => !device.isRemote);
             if (local.length > 0) {
                 devices = local;
-            } else if (format === undefined) {
+            } else {
                 format = channel.remoteFormat;
             }
         }
@@ -1222,6 +1251,10 @@ export class Tuner {
     /** the TLV of the relative stream detected of the multiple carriers needs all the carriers of the group and the local tuners for them */
     private _canReceiveDetectedCarriers(channel: ChannelItem, relTs: number): boolean {
         const stream = channel.getStreamByRelTs(relTs);
+        // the TLV detected by the remote Mirakurun (the carriers are not known) is received by the remote tuners until the local tuners detect it
+        if (stream?.remote === true && stream.format === "tlv") {
+            return false;
+        }
         if (stream === null || stream.format !== "tlv" || !(stream.numberOfCarriers > 1)) {
             return true;
         }

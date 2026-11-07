@@ -665,7 +665,11 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
 
     it("keeps the relative streams detected when the scan does not detect, and replaces them when the detection finds no TSMF", async () => {
       const detecting = { config: { name: "4k", types: ["BS"], tlvToTsDecoder: "mmt2ts" }, isRemote: false };
-      const remote = { config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true };
+      // the remote Mirakurun has not detected the relative streams (no services)
+      const remote = {
+        config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true,
+        checkRemoteRelTs: async () => true, getRemoteChannel: async () => ({ type: "BS", channel: "C46", services: [] })
+      };
       for (const [probe, devices, replaced] of [
         [null, [remote, detecting], false],
         [{ detected: Promise.resolve({ format: "ts", tsmf: null }), tsmf: true, end: () => {} }, [detecting], true],

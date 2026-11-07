@@ -377,7 +377,12 @@ export class Service {
         const stream = channel.streams.find(item => item.format === "tlv" && item.numberOfCarriers > 1);
         // waits for the tuners of all the carriers only if the TLV can be assembled (the same as the scan)
         const complete = stream && _.tuner.canReceiveTsmfCarriers(channel, stream.numberOfCarriers) && channel.hasAllCarriers(stream);
-        return (await _.tuner.readyForJob(complete ? [{ channel, relTs: stream.relTs }] : channel)) !== null;
+        if (complete) {
+            return (await _.tuner.readyForJob([{ channel, relTs: stream.relTs }])) !== null;
+        }
+        // the relative streams detected by the remote Mirakurun are scanned by the remote tuners of each relative stream
+        const remote = channel.streams.filter(item => item.remote === true).map(item => ({ channel, relTs: item.relTs }));
+        return (await _.tuner.readyForJob(remote.length > 0 ? [{ channel }, ...remote] : channel)) !== null;
     }
 
     private _queueScanToAdd(channel: ChannelItem): void {
