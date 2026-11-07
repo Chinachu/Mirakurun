@@ -944,10 +944,14 @@ export class Tuner {
         const startedAt = Date.now();
 
         if (!dest) {
-            // the relative stream detected is received by the local tuners if any (the remote Mirakurun may not have detected it)
+            // the relative stream detected is received by the local tuners if any (the remote Mirakurun may not have detected it),
+            // the programs of the remote Mirakurun are used if only the remote tuners (as before, regardless of the relative stream)
             const remoteResult = await this._useRemoteData(user, candidates.flatMap(candidate => {
+                if (candidate.relTs === candidate.channel.tsmfRelTs) {
+                    return candidate.devices;
+                }
                 const local = candidate.devices.filter(device => !device.isRemote);
-                return candidate.relTs !== candidate.channel.tsmfRelTs && local.length > 0 ? local : candidate.devices;
+                return local.length > 0 ? local : this._getDevicesByType(candidate.channel.type, candidate.channel.route).filter(device => device.isRemote);
             }));
             if (remoteResult) {
                 return null;
@@ -955,8 +959,17 @@ export class Tuner {
         }
 
         while (tryCount > 0) {
-            // the tuners of the other bonded carriers
-            const { picked, carriers } = this._pickTunerDeviceWithCarriers(candidates, user.priority);
+            // the tuners of the other bonded carriers (the remote tuners refused the relative stream detected are not used)
+            const { picked, carriers } = this._pickTunerDeviceWithCarriers(candidates.map(candidate => ({
+                ...candidate,
+                devices: candidate.devices.filter(device => !this._isDetectedByRemote(candidate, device) || device.canReceiveRemoteRelTs(candidate.channel, candidate.relTs))
+            })), user.priority);
+
+            // the remote Mirakurun may not have detected the relative stream (refused with an empty stream), picked again after checked
+            if (picked !== null && this._isDetectedByRemote(picked.candidate, picked.device) && !picked.device.isRemoteChannelRelTsChecked(picked.channel, picked.candidate.relTs)) {
+                await picked.device.checkRemoteChannelRelTs(picked.channel, picked.candidate.relTs);
+                continue;
+            }
 
             if (picked === null || carriers === null) {
                 // retry
@@ -1051,7 +1064,7 @@ export class Tuner {
     ): { picked: { device: TunerDevice, channel: ChannelItem, candidate: TunerCandidate } | null, carriers: { device: TunerDevice, channel: ChannelItem }[] | null } {
         // the remote tuners for the relative stream detected come after the local tuners (taking over, and of the carriers),
         // the remote Mirakurun may not have detected it
-        const isDetectedByRemote = (candidate: TunerCandidate, device: TunerDevice): boolean => device.isRemote && this._getRemoteRelTs(candidate) !== undefined;
+        const isDetectedByRemote = (candidate: TunerCandidate, device: TunerDevice): boolean => this._isDetectedByRemote(candidate, device);
         const picked = this._pickTunerDevice(candidates.map(candidate => ({
             ...candidate,
             devices: candidate.devices.filter(device => !isDetectedByRemote(candidate, device))
@@ -1252,6 +1265,11 @@ export class Tuner {
             relTs,
             format: format || channel.getFormat(relTs)
         };
+    }
+
+    /** the remote tuner requests the relative stream detected of the candidate (the remote Mirakurun outputs it) */
+    private _isDetectedByRemote(candidate: TunerCandidate, device: TunerDevice): boolean {
+        return device.isRemote && this._getRemoteRelTs(candidate) !== undefined;
     }
 
     /** the relative stream of TSMF the remote Mirakurun outputs for the candidate (`undefined`: the stream of the channel) */

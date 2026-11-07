@@ -49,6 +49,10 @@ const REMOTE_RELTS_UNSUPPORTED_EXIT_CODE = 3;
 const REMOTE_REFUSED_RELTS_PERIOD = 1000 * 60 * 10;
 /** リモートの Mirakurun が判別した相対 TS に対応するかを確認できなかった場合に、確認し直すまでの時間 (ミリ秒) */
 const REMOTE_RELTS_CHECK_INTERVAL = 1000 * 10;
+/** リモートの Mirakurun が判別した相対 TS に対応しない場合に、確認し直すまでの時間 (ミリ秒。リモートがアップデートされた場合のため) */
+const REMOTE_RELTS_RECHECK_INTERVAL = 1000 * 60 * 10;
+/** リモートの Mirakurun でチャンネルの相対 TS が判別されているかを、確認し直すまでの時間 (ミリ秒) */
+const REMOTE_CHANNEL_RELTS_CHECK_INTERVAL = 1000 * 60;
 
 // koffi (FFI) は DVB デバイスを直接操作するチューナーがある場合だけ読み込む
 let dvbDeviceClass: typeof DvbDevice | null;
@@ -126,6 +130,8 @@ export default class TunerDevice extends EventEmitter {
     private _remoteRelTsCheckFailed = false;
     /** the relative streams refused by the remote Mirakurun (`type/channel/relTs`: the time) */
     private _remoteRelTsRefused = new Map<string, number>();
+    /** the relative streams of the channels checked whether detected by the remote Mirakurun (`type/channel/relTs`: the time) */
+    private _remoteChannelRelTsCheckedAt = new Map<string, number>();
     private _isFault = false;
     private _fatalCount = 0;
     private _exited = false;
@@ -383,6 +389,34 @@ export default class TunerDevice extends EventEmitter {
         return this.supportsRemoteRelTs && (refusedAt === undefined || Date.now() - refusedAt >= REMOTE_REFUSED_RELTS_PERIOD);
     }
 
+    /** checked by `checkRemoteChannelRelTs()` for a while */
+    isRemoteChannelRelTsChecked(channel: ChannelItem, relTs: number): boolean {
+        const checkedAt = this._remoteChannelRelTsCheckedAt.get(`${channel.type}/${channel.channel}/${relTs}`);
+        return checkedAt !== undefined && Date.now() - checkedAt < REMOTE_CHANNEL_RELTS_CHECK_INTERVAL;
+    }
+
+    /**
+     * checks whether the remote Mirakurun has detected the relative stream of the channel (`tsmfRelTs` of the services of the channel),
+     * not requested for a while if not detected (refused: an empty stream), requested if not known (such as failed to get)
+     */
+    async checkRemoteChannelRelTs(channel: ChannelItem, relTs: number): Promise<boolean> {
+        const key = `${channel.type}/${channel.channel}/${relTs}`;
+        this._remoteChannelRelTsCheckedAt.set(key, Date.now());
+        let detected: boolean;
+        try {
+            const services = (await this.getRemoteChannel(channel.type, channel.channel)).services || [];
+            detected = services.some(service => service.tsmfRelTs === relTs);
+        } catch (err) {
+            log.debug("TunerDevice#%d failed to get the channel %s/%s of the remote Mirakurun [%s]", this._index, channel.type, channel.channel, err.message);
+            return true;
+        }
+        if (!detected) {
+            log.info("TunerDevice#%d the relative stream %d on %s/%s is not detected by the remote Mirakurun", this._index, relTs, channel.type, channel.channel);
+            this._remoteRelTsRefused.set(key, Date.now());
+        }
+        return detected;
+    }
+
     /**
      * checks whether the remote Mirakurun outputs the relative stream of TSMF detected (by its API docs),
      * checked again after a while if failed (such as not connected)
@@ -399,20 +433,19 @@ export default class TunerDevice extends EventEmitter {
                 .then(supported => {
                     // not overwritten by the result of lib/remote
                     this._remoteRelTsSupported ??= supported;
+                    this._remoteRelTsCheckFailed = false;
                     log.info("TunerDevice#%d the remote Mirakurun %s the relative stream of TSMF detected", this._index, supported ? "supports" : "does not support");
+                    if (this._remoteRelTsSupported === false) {
+                        // checked again (the remote Mirakurun may be updated)
+                        this._scheduleRemoteRelTsCheck(REMOTE_RELTS_RECHECK_INTERVAL);
+                    }
                     return this._remoteRelTsSupported;
                 })
                 .catch(err => {
                     // logged once until checked
                     log[this._remoteRelTsCheckFailed ? "debug" : "warn"]("TunerDevice#%d failed to check the remote Mirakurun [%s]", this._index, err.message);
                     this._remoteRelTsCheckFailed = true;
-                    if (this._remoteRelTsRetryTimer === null) {
-                        this._remoteRelTsRetryTimer = setTimeout(() => {
-                            this._remoteRelTsRetryTimer = null;
-                            this.checkRemoteRelTs();
-                        }, REMOTE_RELTS_CHECK_INTERVAL);
-                        this._remoteRelTsRetryTimer.unref?.();
-                    }
+                    this._scheduleRemoteRelTsCheck(REMOTE_RELTS_CHECK_INTERVAL);
                     return false;
                 })
                 .finally(() => {
@@ -420,6 +453,21 @@ export default class TunerDevice extends EventEmitter {
                 });
         }
         return this._remoteRelTsChecking;
+    }
+
+    /** checks again after `delay` (not supported is checked again too) */
+    private _scheduleRemoteRelTsCheck(delay: number): void {
+        if (this._remoteRelTsRetryTimer !== null) {
+            return;
+        }
+        this._remoteRelTsRetryTimer = setTimeout(() => {
+            this._remoteRelTsRetryTimer = null;
+            if (this._remoteRelTsSupported === false) {
+                this._remoteRelTsSupported = undefined;
+            }
+            this.checkRemoteRelTs();
+        }, delay);
+        this._remoteRelTsRetryTimer.unref?.();
     }
 
     private _getRemoteClient(): Client {
@@ -622,6 +670,7 @@ export default class TunerDevice extends EventEmitter {
             if (this._isRemote === true && code === REMOTE_RELTS_UNSUPPORTED_EXIT_CODE && this._closing === false) {
                 log.warn("TunerDevice#%d the remote Mirakurun does not support the relative stream of TSMF detected, closing the streams", this._index);
                 this._remoteRelTsSupported = false;
+                this._scheduleRemoteRelTsCheck(REMOTE_RELTS_RECHECK_INTERVAL);
                 this._closing = true;
             }
 

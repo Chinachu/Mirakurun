@@ -61,8 +61,13 @@ describe("[remote.spec] lib/remote", () => {
       // refused again (400 / 404 / 406): 2, not available for now (such as 503 for the tuners in use): 1 (respawned as before)
       for (const [status, code] of [[400, 2], [404, 2], [500, 1], [503, 1]]) {
         statusCode = status;
+        const startedAt = Date.now();
         const result = await run(port);
         assert.strictEqual(result.code, code, `${status}: ${result.stderr}`);
+        // respawned after a while if failed at once (not to request again and again)
+        if (code === 1) {
+          assert.ok(Date.now() - startedAt >= 1000, `${status}: ${Date.now() - startedAt}ms`);
+        }
       }
 
       // the remote Mirakurun of 4.3.0 or before: tsmfRelTs is not supported (3, not requested), the stream of the channel as before

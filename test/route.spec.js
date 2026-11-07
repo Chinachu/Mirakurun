@@ -83,6 +83,8 @@ function fakeDevice(index, types, routes, state = {}) {
     canReceiveRemoteRelTs() {
       return this.supportsRemoteRelTs;
     },
+    // the remote Mirakurun has detected the relative stream
+    isRemoteChannelRelTsChecked: () => true,
     ...state
   };
 }
@@ -815,6 +817,32 @@ describe("[route.spec] route / streamId", () => {
       assert.deepStrictEqual(scanned.pop(), ["as before", "C46", "ts"]);
     });
 
+    // リモートの Mirakurun で判別されていない相対 TS は、空のストリームにならないように、確かめてからリモートのチューナーで受信する
+    it("receives the relative stream detected by the remote tuner after checking the remote Mirakurun has detected it", async () => {
+      setupChannels([{ name: "C46", type: "BS", route: "CATV", channel: "C46" }]);
+      const channel = _.channel.items[0];
+      channel.setStreams([
+        { networkId: 4, streamId: 18801, relTs: 2, format: "ts", slots: 24 },
+        { networkId: 4, streamId: 18803, relTs: 3, format: "ts", slots: 24 }
+      ]);
+      const started = [];
+      const remote = (index, detected) => {
+        const refused = new Set();
+        const checked = new Set();
+        return fakeDevice(index, ["BS"], ["CATV"], {
+          isRemote: true, decoder: null,
+          canReceiveRemoteRelTs: (ch, relTs) => !refused.has(relTs),
+          isRemoteChannelRelTsChecked: (ch, relTs) => checked.has(relTs),
+          checkRemoteChannelRelTs: async (ch, relTs) => (checked.add(relTs), detected || (refused.add(relTs), false)),
+          startStream: async user => started.push([index, user.streamSetting.tsmfRelTs])
+        });
+      };
+      const t = tuner([remote(0, false), remote(1, true)]);
+      const filter = await t._initTS({ id: "u", priority: 0, disableDecoder: true, streamSetting: { channel } }, undefined, [t._getCandidate(channel, 3)]);
+      filter.close();
+      assert.deepStrictEqual(started, [[1, 3]]);
+    });
+
     // リモートの Mirakurun が判別した相対 TS は、リモートのチューナーで 1 つずつスキャンし、リモートが判別したことを保存する
     it("scans the relative streams detected by the remote Mirakurun one by one, and saves them as detected by the remote", async () => {
       setupChannels([{ name: "4K", type: "BS4K", route: "CATV", channel: "C19" }]);
@@ -1069,6 +1097,10 @@ describe("[route.spec] route / streamId", () => {
       assert.deepStrictEqual(used.pop(), [local, remote]);
       // only the remote tuners
       t._devices = [remote];
+      await t._initTS(user(channel), undefined, [t._getCandidate(channel, 3)]);
+      assert.deepStrictEqual(used.pop(), [remote]);
+      // the programs of the remote Mirakurun (regardless of the relative stream detected, not supported or refused)
+      remote.supportsRemoteRelTs = false;
       await t._initTS(user(channel), undefined, [t._getCandidate(channel, 3)]);
       assert.deepStrictEqual(used.pop(), [remote]);
     });
@@ -1582,6 +1614,28 @@ describe("[route.spec] route / streamId", () => {
 
       // the local tuners do not check
       assert.strictEqual(await new TunerDevice(1, { name: "local", types: ["BS"], command: "cat" }).checkRemoteRelTs(), false);
+    });
+
+    // リモートの Mirakurun でチャンネルの相対 TS が判別されているかを確かめ、判別されていなければしばらく要求しない。対応しないリモートは、しばらくしてから確かめ直す
+    it("checks whether the remote Mirakurun has detected the relative stream, and whether it supports it again after a while", async () => {
+      setupChannels([{ name: "C46", type: "BS", route: "CATV", channel: "C46" }]);
+      const channel = _.channel.items[0];
+      const device = new TunerDevice(0, { name: "remote", types: ["BS"], remoteMirakurunHost: "remote" });
+      let supported = false;
+      device._getRemoteClient = () => ({ supportsChannelStreamTsmfRelTs: async () => supported });
+      assert.strictEqual(await device.checkRemoteRelTs(), false);
+      supported = true;
+      mock.timers.tick(1000 * 60 * 10);
+      await new Promise(resolve => setImmediate(resolve));
+      assert.strictEqual(device.supportsRemoteRelTs, true);
+
+      device.getRemoteChannel = async () => ({ type: "BS", channel: "C46", services: [{ id: 1, serviceId: 265, networkId: 4, streamId: 18801, tsmfRelTs: 2 }] });
+      assert.strictEqual(device.isRemoteChannelRelTsChecked(channel, 3), false);
+      assert.deepStrictEqual([await device.checkRemoteChannelRelTs(channel, 2), await device.checkRemoteChannelRelTs(channel, 3)], [true, false]);
+      assert.deepStrictEqual([device.isRemoteChannelRelTsChecked(channel, 3), device.canReceiveRemoteRelTs(channel, 2), device.canReceiveRemoteRelTs(channel, 3)], [true, true, false]);
+      // not known (failed to get): requested
+      device.getRemoteChannel = async () => { throw new Error("ECONNREFUSED"); };
+      assert.strictEqual(await device.checkRemoteChannelRelTs(channel, 4), true);
     });
 
     // リモートの Mirakurun に断られた相対 TS (リモートで判別されていないなど) は、しばらくそのチューナーで要求しない

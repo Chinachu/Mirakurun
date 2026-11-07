@@ -37,6 +37,10 @@ const opt = {
 
 console.error("remote:", opt);
 
+/** the time to exit after started at least, if failed (not to request again and again at once) */
+const RESPAWN_DELAY = 1000;
+const startedAt = Date.now();
+
 let stream: IncomingMessage;
 
 const client = new Client();
@@ -66,8 +70,11 @@ client.userAgent = "Mirakurun (Remote)";
             console.error("remote:", "(error)", err.address, err.code);
         }
         // the remote Mirakurun has refused the request (the same request is refused again),
-        // respawned if not available for now (such as 503 for the tuners in use, as before)
-        exit([400, 404, 406].includes(err.statusCode) ? 2 : 1);
+        // respawned if not available for now (such as 503 for the tuners in use, as before, after a while if failed at once)
+        if ([400, 404, 406].includes(err.statusCode)) {
+            exit(2);
+        }
+        setTimeout(() => exit(1), Math.max(0, startedAt + RESPAWN_DELAY - Date.now()));
     });
 
 function exit(code = 0) {
