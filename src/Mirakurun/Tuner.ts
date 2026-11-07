@@ -502,16 +502,11 @@ export class Tuner {
             if (_.channel.get(channel.type, channel.channel) === channel) {
                 channel.setStreams(streams);
             }
-            const carriers = channel.getBondedChannels() || [];
-            const sequences = carriers.map(item => item.streams.find(stream => stream.format === "tlv" &&
-                stream.networkId === discovery.networkId && stream.streamId === discovery.streamId)?.carrierSequence);
-            const ordered = [...sequences].sort((a, b) => a - b);
-            if (!discovery.groupId || !this.canReceiveTsmfCarriers(channel, discovery.numberOfCarriers) || carriers.length !== discovery.numberOfCarriers || new Set(sequences).size !== discovery.numberOfCarriers ||
-                !ordered.every((sequence, i) => sequence === i + ordered[0]) || (ordered[0] !== 0 && ordered[0] !== 1)) {
+            if (!this.canReceiveTsmfCarriers(channel, discovery.numberOfCarriers) || !channel.hasAllCarriers(discovery)) {
                 // TS services on a shared carrier do not require the other carriers.
                 scanStreams = streams.filter(stream => stream.format === "ts");
             } else if (discoveryChanged) {
-                for (const carrier of carriers) {
+                for (const carrier of channel.getBondedChannels()) {
                     if (carrier !== channel) {
                         _.service.queueDiscoveredTsmfScan(carrier);
                     }

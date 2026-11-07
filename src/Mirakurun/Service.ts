@@ -375,8 +375,8 @@ export class Service {
 
     private async _readyForScan(channel: ChannelItem): Promise<boolean> {
         const stream = channel.streams.find(item => item.format === "tlv" && item.numberOfCarriers > 1);
-        const complete = stream && _.tuner.canReceiveTsmfCarriers(channel, stream.numberOfCarriers) &&
-            channel.getBondedChannels()?.length === stream.numberOfCarriers;
+        // waits for the tuners of all the carriers only if the TLV can be assembled (the same as the scan)
+        const complete = stream && _.tuner.canReceiveTsmfCarriers(channel, stream.numberOfCarriers) && channel.hasAllCarriers(stream);
         return (await _.tuner.readyForJob(complete ? [{ channel, relTs: stream.relTs }] : channel)) !== null;
     }
 

@@ -251,6 +251,21 @@ describe("[route.spec] route / streamId", () => {
       });
     }
 
+    // 搬送波番号が重複して結合できないグループでは、スキャンのために全搬送波のチューナーを待たない
+    it("does not wait for the tuners of all the carriers when the carrier sequences are duplicated", async () => {
+      setupChannels([0, 1, 2].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` })));
+      const channels = _.channel.items;
+      channels.forEach(channel => channel.setStreams([{ networkId: 32752, streamId: 60001, relTs: 2, format: "tlv", slots: 52, groupId: 9, numberOfCarriers: 3, carrierSequence: 0 }]));
+      const ready = mock.fn(async () => channels[0]);
+      _.tuner.readyForJob = ready;
+      _.tuner.canReceiveTsmfCarriers = () => true;
+
+      assert.strictEqual(channels[0].getBondedChannels().length, 3);
+      assert.strictEqual(channels[0].hasAllCarriers(channels[0].streams[0]), false);
+      await _.service._readyForScan(channels[0]);
+      assert.strictEqual(ready.mock.calls[0].arguments[0], channels[0]);
+    });
+
     // 設定したグループに、ヘッダーのグループ ID がたまたま同じ、自動で判別した別のグループの搬送波を混ぜない
     it("does not mix the carriers discovered into a configured group with the same group ID", () => {
       setupChannels([

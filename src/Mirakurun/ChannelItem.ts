@@ -183,6 +183,19 @@ export default class ChannelItem {
                     other.relTs === stream.relTs && other.numberOfCarriers === stream.numberOfCarriers)));
     }
 
+    /**
+     * whether all the carriers of the group discovered (`stream` of TLV of this channel) are known
+     * (the number of the carriers with the consecutive carrier_sequence from 0 or 1)
+     */
+    hasAllCarriers(stream: ChannelStream): boolean {
+        const carriers = this.getBondedChannels() || [];
+        const sequences = carriers.map(item => item.streams.find(other => other.format === "tlv" &&
+            other.networkId === stream.networkId && other.streamId === stream.streamId)?.carrierSequence);
+        const ordered = [...sequences].sort((a, b) => a - b);
+        return !!stream.groupId && carriers.length === stream.numberOfCarriers && new Set(sequences).size === stream.numberOfCarriers &&
+            ordered.every((sequence, i) => sequence === i + ordered[0]) && (ordered[0] === 0 || ordered[0] === 1);
+    }
+
     getServices(): ServiceItem[] {
         return _.service.findByChannel(this);
     }
