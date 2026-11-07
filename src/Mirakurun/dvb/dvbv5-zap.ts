@@ -66,6 +66,45 @@ const VALUE_OPTIONS: { [name: string]: string } = {
 };
 
 /**
+ * dvbv5-zap のコマンドのチャンネル設定ファイル (`-c`)。dvbv5-zap でなければ null を返す
+ * (チャンネルスキャン用。直接操作できないオプションがあってもよい)
+ */
+export function findDvbv5ZapChannelsConf(command: string): string | null {
+    const { command: bin, args } = common.parseCommandForSpawn(command);
+    if (path.basename(bin) !== "dvbv5-zap") {
+        return null;
+    }
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+        if (arg.startsWith("--")) {
+            const [longName, inlineValue] = splitOnce(arg.slice(2), "=");
+            const short = findShortName(longName);
+            if (short === "c") {
+                return inlineValue ?? args[i + 1] ?? null;
+            }
+            if (short !== null && VALUE_OPTIONS[short] && inlineValue === undefined) {
+                i++;
+            }
+            continue;
+        }
+        if (arg.startsWith("-") && arg.length > 1) {
+            for (let j = 1; j < arg.length; j++) {
+                if (arg[j] === "c") {
+                    return j + 1 < arg.length ? arg.slice(j + 1) : args[i + 1] ?? null;
+                }
+                if (VALUE_OPTIONS[arg[j]]) {
+                    if (j + 1 === arg.length) {
+                        i++;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    return null;
+}
+
+/**
  * dvbv5-zap のコマンド (テンプレート) を解釈する。
  * dvbv5-zap でなければ null を返し、直接操作できないオプションがあれば理由を投げる。
  */

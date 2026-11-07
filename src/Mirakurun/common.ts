@@ -78,6 +78,16 @@ export function getEpgStreamKey(networkId: number, streamId: number): string {
 
 export const channelRoutes: apid.ChannelRoute[] = ["TER", "SAT", "CATV", "HIKARI"];
 
+// network_id of cable television (ARIB STD-B10)
+export const CATV_NETWORK_IDS = [
+    0xFFF7, // advanced cable independent
+    0xFFF9, // advanced cable trans-modulation
+    0xFFFA, // digital broadcasting advanced ReMUX
+    0xFFFD, // cable trans-modulation
+    0xFFFE, // digital broadcasting ReMUX
+    0xFFFF // cable television
+];
+
 export function getDefaultChannelRoute(type: apid.ChannelType): apid.ChannelRoute {
     return type === "GR" ? "TER" : "SAT";
 }

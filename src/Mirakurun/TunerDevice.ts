@@ -26,8 +26,8 @@ import Event from "./Event";
 import ChannelItem from "./ChannelItem";
 import Client, { ProgramsQuery } from "../client";
 import type DvbDevice from "./dvb/DvbDevice";
-import { parseDvbv5ZapCommand } from "./dvb/dvbv5-zap";
-import { DvbChannels, findChannelParams, loadChannelsConf, readChannelsConf } from "./dvb/DvbChannelConf";
+import { findDvbv5ZapChannelsConf, parseDvbv5ZapCommand } from "./dvb/dvbv5-zap";
+import { DvbChannels, findChannelParams, loadChannelsConf, readChannelNames, readChannelsConf } from "./dvb/DvbChannelConf";
 
 /** 出力をまとめて書き出すまでに保留する入力の上限 (バイト数とミリ秒) */
 const FLUSH_BYTES = 128 * 1024;
@@ -185,6 +185,15 @@ export default class TunerDevice extends EventEmitter {
 
     private get _isRunning(): boolean {
         return this._dvbActive || this._stream !== null;
+    }
+
+    /**
+     * the channels of the channel config file of dvbv5-zap of the command for the route (in the order of the file),
+     * `null` if the command is not dvbv5-zap (with or without DVB device direct access)
+     */
+    async getDvbChannelNames(route: apid.ChannelRoute): Promise<string[] | null> {
+        const confPath = this._config.command ? findDvbv5ZapChannelsConf(this._config.command.replace(/<route>/g, route.toLowerCase())) : null;
+        return confPath ? readChannelNames(confPath) : null;
     }
 
     getPriority(): number {

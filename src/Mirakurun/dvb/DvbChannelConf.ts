@@ -209,6 +209,23 @@ export function loadChannelsConf(confPath: string): DvbChannels {
 }
 
 /** `loadChannelsConf()` と同じく読む (選局のたびに読むため、イベントループを止めない) */
+/**
+ * チャンネル設定ファイルのチャンネルの名前 (ファイルの順、重複を除く。チャンネルスキャン用)
+ * 直接操作できない DELIVERY_SYSTEM (DVB-C など) のチャンネルも含むため、名前のほかは確かめない
+ */
+export async function readChannelNames(confPath: string): Promise<string[]> {
+    const names = new Set<string>();
+    for (const rawLine of (await fs.promises.readFile(confPath, "utf8")).split("\n")) {
+        // parseDvbv5ChannelsConf() と同じく、名前は最初の `]` まで (`CHANNEL` は名前なし、先頭の空白は除く)
+        const section = /^\[([^\]]*)\]/.exec(rawLine.replace(/^[ \t]+/, ""));
+        const name = section && (toAsciiUpperCase(section[1]) === "CHANNEL" ? "" : section[1]).replace(/^[ \t]+/, "");
+        if (name) {
+            names.add(name);
+        }
+    }
+    return [...names];
+}
+
 export async function readChannelsConf(confPath: string): Promise<DvbChannels> {
     const version = fileVersion(await fs.promises.stat(confPath));
     const cached = cache.get(confPath);

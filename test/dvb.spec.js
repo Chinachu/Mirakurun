@@ -8,6 +8,7 @@ const { execFileSync } = require("child_process");
 const { DTV, SYS, SEC_VOLTAGE, SEC_TONE, SEC_MINI, LNA_AUTO } = require("../lib/Mirakurun/dvb/constants");
 const conf = require("../lib/Mirakurun/dvb/DvbChannelConf");
 const sat = require("../lib/Mirakurun/dvb/DvbSat");
+const zap = require("../lib/Mirakurun/dvb/dvbv5-zap");
 
 // x64 と arm64 は構造体の大きさと ioctl 番号が同じ (それぞれ gcc で確認した)
 const isVerifiedArch = ["x64", "arm64"].includes(process.arch);
@@ -73,6 +74,32 @@ describe("[dvb.spec] DvbChannelConf.ts: parseDvbv5ChannelsConf()", () => {
     assert.deepStrictEqual(conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = ISDBT\n FREQUENCY = 557142857\n").get("1").properties, [[DTV.FREQUENCY, 557142857]]);
     // libdvbv5 は空の名前をエラーにする
     assert.throws(() => conf.parseDvbv5ChannelsConf("[]\n DELIVERY_SYSTEM = ISDBS\n FREQUENCY = 1\n"), /invalid line/);
+  });
+
+  // チャンネルスキャンで、チャンネル設定ファイルのチャンネルをスキャンする (直接操作できない DVB-C も)
+  it("lists the names of the channels in the order of the file", async () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "mirakurun-dvbconf-")), "dvbv5_channels_dvbc.conf");
+    fs.writeFileSync(file, [
+      "[CATV_C21]", " DELIVERY_SYSTEM = DVBC/ANNEX_A", " FREQUENCY = 159000000",
+      "[CHANNEL]", " DELIVERY_SYSTEM = DVBC/ANNEX_A", " FREQUENCY = 165000000",
+      "  [ CATV_C13]x", " DELIVERY_SYSTEM = DVBC/ANNEX_A", " FREQUENCY = 111000000",
+      "[CATV_C21]", " DELIVERY_SYSTEM = DVBC/ANNEX_A", " FREQUENCY = 159000000"
+    ].join("\n"));
+    try {
+      // `[CHANNEL]` は名前なし、名前は `]` まで (先頭の空白を除く)
+      assert.deepStrictEqual(await conf.readChannelNames(file), ["CATV_C21", "CATV_C13"]);
+    } finally {
+      fs.rmSync(path.dirname(file), { recursive: true, force: true });
+    }
+  });
+
+  it("finds the channel config file of the command of dvbv5-zap with any options", () => {
+    assert.strictEqual(zap.findDvbv5ZapChannelsConf("dvbv5-zap -C JP -a 0 -c /etc/dvbc.conf -r -P <channel>"), "/etc/dvbc.conf");
+    assert.strictEqual(zap.findDvbv5ZapChannelsConf("/usr/bin/dvbv5-zap -a0 -rc/etc/dvbc.conf -P <channel>"), "/etc/dvbc.conf");
+    assert.strictEqual(zap.findDvbv5ZapChannelsConf("dvbv5-zap --adapter 0 --channels=/etc/dvbc.conf -P <channel>"), "/etc/dvbc.conf");
+    // the value of the other option is not the channel config file
+    assert.strictEqual(zap.findDvbv5ZapChannelsConf("dvbv5-zap -o -c -P <channel>"), null);
+    assert.strictEqual(zap.findDvbv5ZapChannelsConf("recpt1 --b25 <channel> - -"), null);
   });
 
   it("finds the channel by VCHANNEL and frequency in the same way as dvbv5-zap", () => {

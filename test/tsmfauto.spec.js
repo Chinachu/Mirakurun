@@ -552,6 +552,57 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
       return t;
     }
 
+    // チャンネルスキャン (登録していないチャンネル) は、相対 TS ごとのサービスを返し、channels.json には保存しない
+    it("returns the services of each relative stream for the channel scan, detecting on any local tuner", async () => {
+      const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV" });
+      const saved = [];
+      _.channel = { get: () => null, getStreams: () => [], setStreams: (item, streams) => saved.push(streams) };
+      const t = scanner(detected, 0);
+      const probe = t._startFormatProbe;
+      const anyTuner = [];
+      t._startFormatProbe = (user, any) => (anyTuner.push(any), probe(user, any));
+
+      const streams = await t.scanChannel(channel);
+      assert.deepStrictEqual(anyTuner, [true]);
+      assert.deepStrictEqual(streams.map(({ relTs, format, services }) => [relTs, format, services.map(s => s.serviceId)]), [
+        [2, "ts", [102]],
+        [5, "tlv", [105]],
+        [9, "ts", []]
+      ]);
+      assert.deepStrictEqual(saved, []);
+
+      // without TSMF
+      const plain = scanner(null, 0);
+      assert.deepStrictEqual((await plain.scanChannel(channel)).map(({ relTs, format, services }) => [relTs, format, services.map(s => s.serviceId)]), [
+        [undefined, "ts", [100]]
+      ]);
+    });
+
+    it("detects the format on the local tuners only for TS by the channel scan only", async () => {
+      _.channel = { getStreams: () => [] };
+      const data = Buffer.concat(Array.from({ length: 1400 }, (_, i) => header([[2, 24, false, 18801, 4]], i)));
+      for (const isRemote of [false, true]) {
+        const channel = new ChannelItem({ name: "C", type: "GR", channel: "C46", route: "CATV" });
+        const streamSetting = { channel };
+        const device = {
+          config: { name: "t", types: ["GR"] }, isRemote, users: [{ id: "scan", streamSetting }],
+          async startStream(user, sink) {
+            setImmediate(() => sink.write(data));
+          }
+        };
+        const t = Object.create(Tuner.prototype);
+        t._devices = [device];
+        const user = { id: "scan", priority: -1, streamSetting };
+        assert.strictEqual(t._startFormatProbe(user), null);
+        const probe = t._startFormatProbe(user, true);
+        if (isRemote) {
+          assert.strictEqual(probe, null);
+        } else {
+          assert.deepStrictEqual(await probe.detected, { format: "ts", tsmf: [{ relTs: 2, slots: 24, format: "ts", streamId: 18801, networkId: 4 }] });
+        }
+      }
+    });
+
     it("scans all the relative streams at the same time, and saves the streams of them", async () => {
       // 判別の前に、相対 TS の混ざったスキャンが終わる場合も相対 TS ごとにスキャンする
       for (const detectDelay of [0, 100]) {

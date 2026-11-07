@@ -811,6 +811,21 @@ describe("[route.spec] route / streamId", () => {
     });
   });
 
+  describe("Tuner: channel config files of dvbv5", () => {
+    it("lists the channels of the channel config files of the tuners of the route", async () => {
+      const devices = [
+        { index: 0, config: { routes: ["SAT"] }, getDvbChannelNames: async () => ["BS01_0"] },
+        { index: 1, config: { routes: ["CATV"] }, getDvbChannelNames: async () => ["CATV_C21", "CATV_C22"] },
+        { index: 2, config: {}, getDvbChannelNames: async () => ["CATV_C22", "CATV_C23"] },
+        // without DVB device direct access
+        { index: 3, config: { routes: ["CATV"] }, getDvbChannelNames: async () => null },
+        { index: 4, config: { routes: ["CATV"] }, getDvbChannelNames: async () => { throw new Error("ENOENT"); } }
+      ];
+      const t = tuner(devices);
+      assert.deepStrictEqual(await t.getDvbChannelNames("CATV"), ["CATV_C21", "CATV_C22", "CATV_C23"]);
+    });
+  });
+
   describe("Tuner: route", () => {
     it("picks only the tuners of the route", () => {
       setupChannels([]);

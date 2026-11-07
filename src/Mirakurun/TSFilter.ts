@@ -16,7 +16,7 @@
 import { Writable } from "stream";
 import EventEmitter = require("eventemitter3");
 import { TsStreamLite, TsCrc32, TsChar, TsLogo, tsDataModule } from "@chinachu/aribts";
-import { StreamInfo, getTimeFromMJD } from "./common";
+import { CATV_NETWORK_IDS, StreamInfo, getTimeFromMJD } from "./common";
 import * as log from "./log";
 import { retainOutput } from "./OutputBuffer";
 import EPG from "./EPG";
@@ -65,16 +65,6 @@ const LOGO_DATA_NAME_CS = Buffer.from("CS_LOGO-05"); // ARIB STD-B21, ARIB TR-B1
 // the names in the ESS of CATV (not in ARIB STD-B21 / TR-B15)
 const LOGO_DATA_NAME_CATV = Buffer.from("CATV_LOGO-05");
 const LOGO_DATA_NAME_JCHITS = Buffer.from("JCHITS_LOGO-05"); // JC-HITS
-
-// network_id of cable television (ARIB STD-B10)
-const CATV_NETWORK_IDS = [
-    0xFFF7, // advanced cable independent
-    0xFFF9, // advanced cable trans-modulation
-    0xFFFA, // digital broadcasting advanced ReMUX
-    0xFFFD, // cable trans-modulation
-    0xFFFE, // digital broadcasting ReMUX
-    0xFFFF // cable television
-];
 
 // service_type of engineering service (ESS), not a service to view
 const SERVICE_TYPE_ENGINEERING = 0xA4;

@@ -142,6 +142,23 @@ interface TunerCandidate extends StreamTarget {
     format: apid.StreamFormat;
 }
 
+/** the stream scanned by the channel scan (`Tuner.scanChannel()`) */
+export interface ScannedStream {
+    /** the relative stream of TSMF (`undefined` if not TSMF) */
+    relTs?: number;
+    format: apid.StreamFormat;
+    services: apid.Service[];
+    /** TSMF of multiple carriers (the TLV is not scanned until all the carriers are known) */
+    numberOfCarriers?: number;
+}
+
+interface ScanOptions {
+    /** detects the format and the relative streams of TSMF on any local tuner (only by the channel scan) */
+    anyTuner?: boolean;
+    /** collects the streams scanned */
+    streams?: ScannedStream[];
+}
+
 interface DetectedFormat {
     format: apid.StreamFormat;
     /** the relative streams of TSMF (detected only if `tsmfRelTs` of the channel is not specified) */
@@ -357,7 +374,37 @@ export class Tuner {
     }
 
     async getServices(channel: ChannelItem, user: Partial<common.User> = {}): Promise<apid.Service[]> {
-        const userReq: common.User = {
+        return this._scanServices(channel, this._getScanUser(channel, user), channel.getFormat(channel.tsmfRelTs), true);
+    }
+
+    /**
+     * scans the services of each stream (each relative stream of TSMF) of a channel for the channel scan (the channel is not registered),
+     * the format and the relative streams of TSMF are detected on any local tuner
+     */
+    async scanChannel(channel: ChannelItem, user: Partial<common.User> = {}): Promise<ScannedStream[]> {
+        const streams: ScannedStream[] = [];
+        await this._scanServices(channel, this._getScanUser(channel, user), channel.getFormat(channel.tsmfRelTs), true, channel.tsmfRelTs, false, { anyTuner: true, streams });
+        return streams;
+    }
+
+    /** the channels of the channel config files of dvbv5 of the tuners for the route (DVB device direct access, in the order of the files) */
+    async getDvbChannelNames(route: apid.ChannelRoute): Promise<string[]> {
+        const names = new Set<string>();
+        for (const device of this._devices) {
+            if (device.config.routes && device.config.routes.includes(route) === false) {
+                continue;
+            }
+            const deviceNames = await device.getDvbChannelNames(route).catch(err => {
+                log.warn("Tuner: the channel config file of TunerDevice#%d is not read (%s)", device.index, err.message);
+                return null;
+            });
+            deviceNames?.forEach(name => names.add(name));
+        }
+        return [...names];
+    }
+
+    private _getScanUser(channel: ChannelItem, user: Partial<common.User>): common.User {
+        return {
             id: "Mirakurun:getServices()",
             priority: -1,
             disableDecoder: true,
@@ -368,7 +415,6 @@ export class Tuner {
             },
             ...user
         };
-        return this._scanServices(channel, userReq, channel.getFormat(channel.tsmfRelTs), true);
     }
 
     /**
@@ -383,11 +429,12 @@ export class Tuner {
         format: apid.StreamFormat,
         detect: boolean,
         relTs = channel.tsmfRelTs,
-        notTSMF = false
+        notTSMF = false,
+        options: ScanOptions = {}
     ): Promise<apid.Service[]> {
         const tsFilter = await this._initTS(userReq, undefined, [this._getCandidate(channel, relTs, format)]);
         // the format is detected by the data of the same tuner, the scan does not wait for it
-        const probe = detect ? this._startFormatProbe(userReq) : null;
+        const probe = detect ? this._startFormatProbe(userReq, options.anyTuner === true) : null;
         return new Promise<apid.Service[]>((resolve, reject) => {
             let network = {
                 networkId: -1,
@@ -451,11 +498,11 @@ export class Tuner {
 
                 if (tsmf !== null) {
                     // the tuner is kept tuned for a while, the streams of the scans join it
-                    resolve(this._scanTSMFServices(channel, userReq, tsmf));
+                    resolve(this._scanTSMFServices(channel, userReq, tsmf, options.streams));
                 } else if (retryFormat !== null) {
                     // the tuner is kept tuned for a while, the stream of the scan joins it
                     // (`streamInfo` is defined on the user of each stream)
-                    resolve(this._scanServices(channel, { ...userReq, streamSetting: { ...userReq.streamSetting } }, retryFormat, false, relTs, isNotTSMF));
+                    resolve(this._scanServices(channel, { ...userReq, streamSetting: { ...userReq.streamSetting } }, retryFormat, false, relTs, isNotTSMF, options));
                 } else if (network.networkId === -1) {
                     reject(new Error("stream has closed before get network"));
                 } else if (services === null) {
@@ -475,6 +522,7 @@ export class Tuner {
                         });
                     }
 
+                    options.streams?.push({ relTs, format, services });
                     resolve(services);
                 }
             });
@@ -485,7 +533,8 @@ export class Tuner {
      * scans all the relative streams of TSMF at the same time
      * (a relative stream may have no services, such as for the engineering)
      */
-    private async _scanTSMFServices(channel: ChannelItem, userReq: common.User, streams: TSMFStream[]): Promise<apid.Service[]> {
+    /** @param collect collects the streams scanned (for the channel scan) */
+    private async _scanTSMFServices(channel: ChannelItem, userReq: common.User, streams: TSMFStream[], collect?: ScannedStream[]): Promise<apid.Service[]> {
         log.info(
             "Tuner: the relative streams of TSMF on %s/%s are detected: %s",
             channel.type, channel.channel, streams.map(stream => `${stream.relTs}:${stream.format}(${stream.slots} slots)`).join(", ")
@@ -541,11 +590,13 @@ export class Tuner {
         )));
 
         const services: apid.Service[] = [];
+        const streamServices: apid.Service[][] = streams.map(() => []);
         let lastError: Error = null;
         results.forEach((result, index) => {
             const i = scanStreams === streams ? index : streams.indexOf(scanStreams[index]);
             if (result.status === "fulfilled") {
                 services.push(...result.value);
+                streamServices[i] = result.value;
                 if (result.value.length > 0) {
                     channelStreams[i] = { ...channelStreams[i], networkId: result.value[0].networkId, streamId: result.value[0].streamId };
                 }
@@ -572,6 +623,13 @@ export class Tuner {
                 }
             }
         }
+
+        collect?.push(...streams.map((stream, i) => ({
+            relTs: stream.relTs,
+            format: stream.format,
+            services: streamServices[i],
+            ...(stream.numberOfCarriers > 1 && { numberOfCarriers: stream.numberOfCarriers })
+        })));
 
         if (services.length === 0 && lastError !== null) {
             throw lastError;
@@ -662,11 +720,12 @@ export class Tuner {
      * @returns `null` if the format is not detected: the remote Mirakurun outputs the format by itself,
      * and only the tuners for TLV (MMT) detect, not to add any work to the environments only for TS
      * (`tsmf`: whether the relative streams of TSMF are detected)
+     * @param anyTuner `true` to detect on any local tuner (only by the channel scan)
      */
-    private _startFormatProbe(user: common.User): { detected: Promise<DetectedFormat | null>, tsmf: boolean, end: () => void } | null {
+    private _startFormatProbe(user: common.User, anyTuner = false): { detected: Promise<DetectedFormat | null>, tsmf: boolean, end: () => void } | null {
         // the ID of the scan is not unique (the scans run on the tuners at the same time), `streamSetting` is of this scan
         const device = this._devices.find(device => device.users.some(deviceUser => deviceUser.streamSetting === user.streamSetting));
-        if (!device || this._detectsFormat(device) === false) {
+        if (!device || (anyTuner ? device.isRemote : this._detectsFormat(device) === false)) {
             return null;
         }
 
