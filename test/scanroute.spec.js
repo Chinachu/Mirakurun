@@ -196,6 +196,16 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
     assert.strictEqual(result.saved, undefined);
   });
 
+  // 準備でのエラー (大きすぎる範囲など) では開始せず、次のスキャンを妨げない
+  it("rejects the scan failing to prepare, and the next scan runs", async () => {
+    let result = await runScan({ route: "CATV", source: "format", channelNameFormat: "C{ch}", minCh: 0, maxCh: 4294967296 }, () => []);
+    assert.deepStrictEqual(result.errors.map(e => e.code), [400]);
+
+    result = await runScan({ route: "CATV", source: "list", channels: ["C13"], refresh: true, dryRun: true }, () => []);
+    assert.deepStrictEqual(result.errors, []);
+    assert.deepStrictEqual(result.tuned.map(t => t.channel), ["C13"]);
+  });
+
   it("uses the tuners of any type of the route", async () => {
     const { tuned } = await runScan({ route: "SAT", source: "list", channels: ["CS2"], refresh: true, dryRun: true }, () => [], { types: ["CS"] });
     assert.deepStrictEqual(tuned, [{ channel: "CS2", route: "SAT", type: "CS" }]);

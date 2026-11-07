@@ -52,8 +52,9 @@ function expandChannelRanges(input: string): string[] {
     const result: string[] = [];
 
     for (const part of input.split(",").map(p => p.trim()).filter(p => p !== "")) {
+        // the prefix of the end may be omitted (e.g. C13-20)
         const range = /^(.*?)(\d+)-(.*?)(\d+)$/.exec(part);
-        if (range && range[1] === range[3]) {
+        if (range && (range[1] === range[3] || range[3] === "")) {
             // the digits of the start (zero padded, e.g. BS01-BS03 -> BS01, BS02, BS03)
             const [start, end] = [parseInt(range[2], 10), parseInt(range[4], 10)].sort((a, b) => a - b);
             for (let i = start; i <= end; i++) {

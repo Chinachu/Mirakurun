@@ -127,6 +127,17 @@ describe("[scan.spec] /api/config/channel/scan : generateScannedChannelItems", (
         );
     });
 
+    // リモートの Mirakurun は、その Mirakurun に設定されたタイプのチャンネルだけを受信する
+    it("adds the channel received by the remote tuner as the type received", () => {
+        const logs = [];
+        const items = scan.generateScannedChannelItems("C25", "CATV", [
+            { format: "ts", services: [service(4, 101, "BS 1")] }
+        ], {}, text => logs.push(text), "GR");
+
+        assert.deepStrictEqual(items.map(item => [item.type, item.channel, item.route]), [["GR", "C25", "CATV"]]);
+        assert.ok(logs.some(text => /received by the remote tuner as GR \(the network is of BS\)/.test(text)));
+    });
+
     it("notes the types without the tuners of the route", () => {
         const logs = [];
         scan.generateScannedChannelItems("C23", "CATV", [{ relTs: 1, format: "ts", services: [service(10, 1, "SKY")] }], {}, text => logs.push(text));

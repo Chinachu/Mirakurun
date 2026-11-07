@@ -278,13 +278,15 @@ export function getScanAttempts(route: apid.ChannelRoute, channel?: string): Sca
 /**
  * the channel items of a channel scanned (by the type of each stream)
  * @param log writes the notes
+ * @param remoteType the type of the channel received by the remote tuners (the remote Mirakurun receives only the channel of the type configured)
  */
 export function generateScannedChannelItems(
     channel: string,
     route: apid.ChannelRoute,
     streams: ScannedStream[],
     scanConfig: ScanConfig,
-    log: (text: string) => void = () => undefined
+    log: (text: string) => void = () => undefined,
+    remoteType?: apid.ChannelType
 ): apid.ConfigChannels {
     const types = new Map<apid.ChannelType, { relTs: Set<number | undefined>, services: apid.Service[], bonded: boolean }>();
     for (const stream of streams) {
@@ -294,7 +296,11 @@ export function generateScannedChannelItems(
         if (services.length === 0 && !bonded) {
             continue;
         }
-        const type = getChannelTypeByNetwork(services[0]?.networkId, stream.format);
+        let type = getChannelTypeByNetwork(services[0]?.networkId, stream.format);
+        if (remoteType !== undefined && type !== remoteType) {
+            log(`-> received by the remote tuner as ${remoteType}${type === null ? "" : ` (the network is of ${type})`}, added as ${remoteType}.\n`);
+            type = remoteType;
+        }
         if (type === null) {
             log(`-> unknown network (networkId: ${services[0].networkId}${stream.relTs ? `, relTs: ${stream.relTs}` : ""}), skipped.\n`);
             continue;
@@ -699,6 +705,7 @@ async function runChannelScan(
             // Scan the streams of the channel (the type is decided by the network of each stream),
             // by the tuners of the route until received (the tuners of the route may receive the different systems)
             let streams: ScannedStream[] = null;
+            let received: ScanAttempt = null;
             let lastError: Error = null;
             for (const attempt of getScanAttempts(route, channel)) {
                 if (isCancellationRequested) {
@@ -714,6 +721,7 @@ async function runChannelScan(
                         id: "Mirakurun:API:channelScan",
                         priority: 1
                     }, attempt.devices);
+                    received = attempt;
                     break;
                 } catch (error) {
                     // the error other than no signal is shown (the tuners of the other types may not receive the channel)
@@ -757,7 +765,8 @@ async function runChannelScan(
             );
 
             // Generate channel items by the type of each stream
-            const scannedItems = generateScannedChannelItems(channel, route, streams, scanConfig, appendToLog);
+            const remoteType = received.devices.every(device => device.isRemote) ? received.type : undefined;
+            const scannedItems = generateScannedChannelItems(channel, route, streams, scanConfig, appendToLog, remoteType);
             if (scannedItems.length === 0) {
                 appendToLog("\n");
                 continue;
@@ -943,23 +952,30 @@ export const put: Operation = async (req, res) => {
         return [...names];
     };
 
-    // Parse channel configuration options
-    const channelOptions: ChannelScanOption = {
-        route,
-        source,
-        channels: toList(req.query.channels),
-        dvbChannels: source === "dvbConf" ? await getDvbChannelNames() : undefined,
-        channelNameFormat: req.query.channelNameFormat as string,
-        startCh: req.query.minCh !== undefined ? Number(req.query.minCh) : undefined,
-        endCh: req.query.maxCh !== undefined ? Number(req.query.maxCh) : undefined,
-        startSubCh: req.query.minSubCh !== undefined ? Number(req.query.minSubCh) : undefined,
-        endSubCh: req.query.maxSubCh !== undefined ? Number(req.query.maxSubCh) : undefined,
-        scanMode: req.query.scanMode as apid.ChannelScanMode,
-        setDisabledOnAdd: req.query.setDisabledOnAdd !== undefined ? Boolean(req.query.setDisabledOnAdd) : undefined
-    };
+    let scanConfig: ScanConfig;
+    try {
+        // Parse channel configuration options
+        const channelOptions: ChannelScanOption = {
+            route,
+            source,
+            channels: toList(req.query.channels),
+            dvbChannels: source === "dvbConf" ? await getDvbChannelNames() : undefined,
+            channelNameFormat: req.query.channelNameFormat as string,
+            startCh: req.query.minCh !== undefined ? Number(req.query.minCh) : undefined,
+            endCh: req.query.maxCh !== undefined ? Number(req.query.maxCh) : undefined,
+            startSubCh: req.query.minSubCh !== undefined ? Number(req.query.minSubCh) : undefined,
+            endSubCh: req.query.maxSubCh !== undefined ? Number(req.query.maxSubCh) : undefined,
+            scanMode: req.query.scanMode as apid.ChannelScanMode,
+            setDisabledOnAdd: req.query.setDisabledOnAdd !== undefined ? Boolean(req.query.setDisabledOnAdd) : undefined
+        };
 
-    // Generate scan configuration
-    const scanConfig = generateScanConfig(channelOptions);
+        // Generate scan configuration
+        scanConfig = generateScanConfig(channelOptions);
+    } catch (error) {
+        // such as a range too large (the scan is not started)
+        reject(`Invalid scan configuration (${error.message})`);
+        return;
+    }
 
     // Handle missing scan configuration
     if (!scanConfig) {
