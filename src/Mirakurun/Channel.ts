@@ -154,10 +154,13 @@ export class Channel {
         const channels = await db.loadChannels(_.configIntegrity.channels, true);
         for (const channel of channels) {
             const item = this.get(channel.type, channel.channel);
-            if (item === null || Array.isArray(channel.streams) === false) {
+            if (item === null) {
                 continue;
             }
-            item.setStreams(channel.streams
+            // the format before the relative streams of TSMF (the stream of the channel, of `tsmfRelTs` if specified)
+            const legacy = channel as unknown as db.ChannelStream;
+            const streams = Array.isArray(channel.streams) ? channel.streams : [{ ...legacy, relTs: item.tsmfRelTs || undefined }];
+            item.setStreams(streams
                 .filter(stream => typeof stream.networkId === "number" && typeof stream.streamId === "number")
                 .map(stream => ({
                     networkId: stream.networkId,
@@ -317,6 +320,10 @@ export class Channel {
             if (channels.length === 0) {
                 continue;
             }
+            const targets = channels.map(channel => {
+                const { stream } = locations.find(location => location.channel === channel);
+                return { channel, relTs: stream ? stream.relTs : channel.getDefaultRelTs(networkId) };
+            });
             // picked by readyFn
             let channel: ChannelItem = null;
 
@@ -327,8 +334,7 @@ export class Channel {
                 fn: async () => {
                     log.info("%s EPG gathering has started on %s/%s", label, channel.type, channel.channel);
                     try {
-                        const relTs = locations.find(location => location.channel === channel)?.stream?.relTs;
-                        await _.tuner.getEPG(channel, undefined, relTs);
+                        await _.tuner.getEPG(channel, undefined, targets.find(target => target.channel === channel).relTs);
                         log.info("%s EPG gathering has finished", label);
                     } catch (e) {
                         log.warn("%s EPG gathering has failed [%s]", label, e);
@@ -366,7 +372,7 @@ export class Channel {
                         }
                     }
 
-                    channel = await _.tuner.readyForJob(channels);
+                    channel = await _.tuner.readyForJob(targets);
                     return channel !== null;
                 }
             });

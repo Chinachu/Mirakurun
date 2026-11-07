@@ -136,11 +136,13 @@ export class Tuner {
 
     /**
      * readyFn
-     * @param channels candidates, the former is preferred
+     * @param channels candidates (and the relative streams of TSMF), the former is preferred
      * @returns the channel a tuner is available for, `null` if no tuners for the channels
      */
-    async readyForJob(channels: ChannelItem | ChannelItem[]): Promise<ChannelItem> {
-        const candidates = this._getCandidates((Array.isArray(channels) ? channels : [channels]).map(channel => ({ channel })));
+    async readyForJob(channels: ChannelItem | (ChannelItem | StreamTarget)[]): Promise<ChannelItem> {
+        const candidates = this._getCandidates(
+            (Array.isArray(channels) ? channels : [channels]).map(target => target instanceof ChannelItem ? { channel: target } : target)
+        );
         if (candidates.every(candidate => candidate.devices.length === 0)) {
             log.error("readyForJob: no tuners for channel %s", candidates.map(({ channel }) => `${channel.type}/${channel.channel}`).join(", "));
             return null;
@@ -184,7 +186,9 @@ export class Tuner {
      * @returns `null` if the format is unavailable
      */
     getOutputFormat(targets: StreamTarget[], requested?: apid.StreamFormat): apid.StreamFormat | null {
-        const tlvTargets = targets.filter(({ channel, relTs }) => channel.getFormat(relTs) === "tlv");
+        const tlvTargets = targets
+            .map(({ channel, relTs }) => ({ channel, relTs: this._getReceivableRelTs(channel, relTs) }))
+            .filter(({ channel, relTs }) => channel.getFormat(relTs) === "tlv");
         if (tlvTargets.length === 0) {
             return requested === "tlv" ? null : "ts";
         }
@@ -199,15 +203,26 @@ export class Tuner {
         return format;
     }
 
-    /** @param relTs the relative stream of TSMF (default: `defaultRelTs` of the channel) */
+    /** @param relTs the relative stream of TSMF (default: `tsmfRelTs` of the channel, the stream as received if not specified) */
     initChannelStream(channel: ChannelItem, userReq: common.UserRequest, output: Writable, relTs?: number): Promise<common.StreamFilter> {
         let networkId: number;
 
-        relTs = relTs || channel.defaultRelTs;
+        relTs = relTs || channel.tsmfRelTs;
+        // the relative stream detected specified is not received by the remote tuners
+        if (relTs !== channel.tsmfRelTs && this._getReceivableRelTs(channel, relTs) !== relTs) {
+            return Promise.reject(new Error("no available tuners"));
+        }
+
         const stream = channel.getStreamByRelTs(relTs);
         const services = channel.getServices();
+        // the stream as received of TSMF detected is TS (the services of TLV are of the other networks)
+        const tsmfTS = relTs === undefined && stream === null ? channel.streams
+            .filter(item => item.relTs !== undefined && item.format === "ts")
+            .sort((a, b) => b.slots - a.slots || a.relTs - b.relTs)[0] : undefined;
         if (stream !== null) {
             networkId = stream.networkId;
+        } else if (tsmfTS) {
+            networkId = tsmfTS.networkId;
         } else if (services.length !== 0) {
             networkId = services[0].networkId;
         }
@@ -627,10 +642,10 @@ export class Tuner {
                 // found
                 const { device, channel, candidate } = picked;
                 const isTlv = candidate.format === "tlv";
-                // the remote Mirakurun outputs the relative stream of its own (`tsmfRelTs` of the channel only, as before)
-                const relTs = device.isRemote ? channel.tsmfRelTs : candidate.relTs;
+                const { relTs } = candidate;
                 setting.channel = channel;
-                setting.tsmfRelTs = relTs;
+                // only the relative stream detected (`tsmfRelTs` of channels.yml is of the channel, as before)
+                setting.tsmfRelTs = relTs !== channel.tsmfRelTs ? relTs : undefined;
                 log.debug("Tuner: picked TunerDevice#%d for user `%s` in %dms", device.index, user.id, Date.now() - startedAt);
 
                 let tsFilter: common.StreamFilter;
@@ -804,12 +819,33 @@ export class Tuner {
 
     /** @param format the format to receive (default: the format of the channel or the relative stream) */
     private _getCandidate(channel: ChannelItem, relTs?: number, format?: apid.StreamFormat): TunerCandidate {
+        const receivable = this._getReceivableRelTs(channel, relTs);
+        if (receivable !== relTs) {
+            relTs = receivable;
+            format = undefined;
+        }
+        let devices = this._getDevicesByType(channel.type, channel.route);
+        // the remote Mirakurun outputs the relative stream of its own, only `tsmfRelTs` of the channel is received as before
+        if (relTs !== undefined && relTs !== channel.tsmfRelTs) {
+            devices = devices.filter(device => !device.isRemote);
+        }
         return {
             channel,
-            devices: this._getDevicesByType(channel.type, channel.route),
+            devices,
             relTs,
             format: format || channel.getFormat(relTs)
         };
+    }
+
+    /**
+     * the relative stream detected is received by the local tuners,
+     * the stream of the channel (as before) if there are only the remote tuners (such as the tuners detected have been removed)
+     */
+    private _getReceivableRelTs(channel: ChannelItem, relTs: number): number {
+        if (relTs === undefined || relTs === channel.tsmfRelTs) {
+            return relTs;
+        }
+        return this._getDevicesByType(channel.type, channel.route).some(device => !device.isRemote) ? relTs : channel.tsmfRelTs;
     }
 
     private _getDevicesByType(type: apid.ChannelType, route?: apid.ChannelRoute): TunerDevice[] {

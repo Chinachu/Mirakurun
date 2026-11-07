@@ -117,6 +117,31 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     assert.deepStrictEqual(formats(detectTSMFStreams(Buffer.concat([header(streams, 0), header(streams, 1)]))), [[2, "tlv"], [5, "tlv"]]);
   });
 
+  it("treats tsmfRelTs of 0 or empty as not specified (outputs it as configured)", () => {
+    _.channel = { getStreams: () => [] };
+    for (const tsmfRelTs of [0, null]) {
+      const channel = new ChannelItem({ name: "C", type: "BS4K", channel: "C46", route: "CATV", tsmfRelTs });
+      assert.strictEqual(channel.tsmfRelTs, undefined);
+      assert.strictEqual(channel.toJSON().tsmfRelTs, tsmfRelTs);
+    }
+  });
+
+  it("receives the relative stream of the network of the service not received yet", () => {
+    const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV" });
+    _.channel = {
+      getStreams: () => [
+        { networkId: 4, streamId: 18801, relTs: 2, slots: 40, format: "ts" },
+        { networkId: 11, streamId: 45168, relTs: 5, slots: 12, format: "tlv" }
+      ],
+      findStreamLocations: () => []
+    };
+    const tlv = new ServiceItem(channel, 11, 151, "4K", 1, -1, undefined, false, 0, undefined);
+    assert.deepStrictEqual([tlv.targets[0].relTs, tlv.format], [5, "tlv"]);
+    // the relative stream of the most slots if no relative streams of the network
+    const other = new ServiceItem(channel, 7, 1, "x", 1, -1, undefined, false, 0, undefined);
+    assert.deepStrictEqual([other.targets[0].relTs, other.format], [2, "ts"]);
+  });
+
   it("uses the relative stream of the most slots without specifying, the smaller number if the same", () => {
     const streamsOf = list => ({ getStreams: () => list });
     const channel = new ChannelItem({ name: "C", type: "BS", channel: "C45", route: "CATV" });
@@ -152,9 +177,24 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     assert.strictEqual(ts.isTlv, false);
   });
 
-  it("uses the configured format for service and program streams over the detected format", async () => {
+  it("uses the relative stream to receive for the format of the service not received yet", () => {
+    const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV" });
+    _.channel = {
+      getStreams: () => [
+        { networkId: 4, streamId: 18801, relTs: 2, slots: 24, format: "ts" },
+        { networkId: 11, streamId: 45168, relTs: 5, slots: 28, format: "tlv" }
+      ],
+      findStreamLocations: () => []
+    };
+    // the service saved without streamId (before 4.3.0) is received from the relative stream of the most slots
+    const service = new ServiceItem(channel, 11, 151, "4K", 1, -1, undefined, false, 0, undefined);
+    assert.deepStrictEqual(service.targets.map(({ relTs }) => relTs), [5]);
+    assert.strictEqual(service.format, "tlv");
+  });
+
+  it("uses the configured format for the relative stream of tsmfRelTs over the detected format", async () => {
     for (const [configured, detected] of [["ts", "tlv"], ["tlv", "ts"]]) {
-      const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV", format: configured });
+      const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV", format: configured, tsmfRelTs: 5 });
       const stream = { networkId: 11, streamId: 45168, relTs: 5, slots: 28, format: detected };
       _.channel = {
         getStreams: () => [stream],
@@ -175,6 +215,22 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     }
   });
 
+  it("uses the formats detected for the relative streams detected, and TS for the stream as received", () => {
+    const streams = [
+      { networkId: 4, streamId: 18801, relTs: 2, slots: 24, format: "ts" },
+      { networkId: 11, streamId: 45168, relTs: 5, slots: 28, format: "tlv" }
+    ];
+    _.channel = { getStreams: () => streams };
+    // `format` of channels.yml is for the stream of the channel (the stream as received without tsmfRelTs)
+    const configured = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV", format: "ts" });
+    assert.deepStrictEqual([configured.getFormat(2), configured.getFormat(5), configured.format], ["ts", "tlv", "ts"]);
+    // TSMF is TS outside, even for the type of TLV by default
+    const bs4k = new ChannelItem({ name: "C", type: "BS4K", channel: "C46", route: "CATV" });
+    assert.deepStrictEqual([bs4k.getFormat(2), bs4k.getFormat(5), bs4k.format], ["ts", "tlv", "ts"]);
+    _.channel = { getStreams: () => [] };
+    assert.strictEqual(bs4k.format, "tlv");
+  });
+
   it("gathers TS and TLV EPG from their own relative streams when they share a channel", async () => {
     const Channel = require("../lib/Mirakurun/Channel").default;
     for (const [tsSlots, tlvSlots] of [[40, 12], [12, 40]]) {
@@ -184,7 +240,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
       _.config = { server: {}, channels: [{ name: "C", type: "BS", channel: "C46", route: "CATV" }] };
       _.tuner = {
         typeExists: () => true,
-        readyForJob: async channels => channels[0],
+        readyForJob: async targets => targets[0].channel,
         getEPG: async (channel, user, relTs) => calls.push(relTs)
       };
       const channels = new Channel();
@@ -272,6 +328,127 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     }
   });
 
+  it("uses the stream as received for the format of the channel, not the relative stream of the most slots", () => {
+    _.channel = { getStreams: () => [{ networkId: 4, streamId: 18801, relTs: 2, slots: 12, format: "ts" }, { networkId: 11, streamId: 45168, relTs: 5, slots: 40, format: "tlv" }] };
+    assert.strictEqual(new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV" }).format, "ts");
+    assert.strictEqual(new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV", tsmfRelTs: 5 }).format, "tlv");
+  });
+
+  it("outputs the channel stream as received without tsmfRelTs, as before (for the remote Mirakurun)", async () => {
+    const express = require("express");
+    const openapi = require("express-openapi");
+    const http = require("http");
+    const op = require("../lib/Mirakurun/api/channels/{type}/{channel}/stream");
+    const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV" });
+    const streams = [{ networkId: 4, streamId: 18801, relTs: 2, slots: 12, format: "ts" }, { networkId: 4, streamId: 18803, relTs: 3, slots: 40, format: "ts" }];
+    _.channel = { get: () => channel, getStreams: () => streams };
+    _.config = { server: {} };
+    const t = Object.create(Tuner.prototype);
+    t._devices = [{ config: { name: "t", types: ["BS"] }, isRemote: false }];
+    const requested = [];
+    t.initChannelStream = async (ch, userReq, output, relTs) => {
+      requested.push(relTs);
+      setImmediate(() => output.end());
+      const filter = new EventEmitter();
+      filter.close = () => {};
+      return filter;
+    };
+    _.tuner = t;
+    const app = express();
+    openapi.initialize({
+      app,
+      apiDoc: { swagger: "2.0", info: { title: "t", version: "1" }, basePath: "/api", paths: {} },
+      paths: [{ path: "/channels/{type}/{channel}/stream", module: op }]
+    });
+    const server = await new Promise(resolve => {
+      const s = app.listen(0, "127.0.0.1", () => resolve(s));
+    });
+    const status = path => new Promise((resolve, reject) => {
+      http.get({ host: "127.0.0.1", port: server.address().port, path: `/api/channels/BS/C46/stream${path}` }, res => {
+        res.resume();
+        res.on("end", () => resolve(res.statusCode));
+      }).on("error", reject);
+    });
+    try {
+      assert.strictEqual(await status(""), 200);
+      assert.strictEqual(await status("?tsmfRelTs=2"), 200);
+      assert.strictEqual(await status("?tsmfRelTs=9"), 404);
+      assert.deepStrictEqual(requested, [undefined, 2]);
+    } finally {
+      server.close();
+    }
+  });
+
+  it("is ready for the job of the relative stream detected only by the local tuners", async () => {
+    const remote = { index: 0, config: { name: "remote", types: ["BS"] }, isRemote: true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
+    const local = { index: 1, config: { name: "local", types: ["BS"] }, isRemote: false, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
+    const t = Object.create(Tuner.prototype);
+    t._devices = [remote, local];
+    t._readyForJobPickedDeviceSet = new Set();
+    _.channel = { getStreams: () => [] };
+    const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46" });
+    // the remote tuner is not picked (the former) for the relative stream detected
+    assert.strictEqual(await t.readyForJob([{ channel, relTs: 5 }]), channel);
+    assert.deepStrictEqual([...t._readyForJobPickedDeviceSet], [local]);
+    t._readyForJobPickedDeviceSet.clear();
+    assert.strictEqual(await t.readyForJob([{ channel }]), channel);
+    assert.deepStrictEqual([...t._readyForJobPickedDeviceSet], [remote]);
+    t._readyForJobPickedDeviceSet.clear();
+  });
+
+  it("shows tsmfRelTs of the stream setting only for the relative stream detected (as before for tsmfRelTs of channels.yml)", async () => {
+    _.channel = { getStreams: () => [] };
+    _.config = { server: {} };
+    const device = {
+      index: 0, config: { name: "t", types: ["BS"] }, isRemote: false, isAvailable: true, isFree: true, users: [], channel: null,
+      decoder: null, getPriority: () => -2,
+      async startStream() {}
+    };
+    const t = Object.create(Tuner.prototype);
+    t._devices = [device];
+    for (const [config, relTs, expected] of [[{ tsmfRelTs: 3 }, 3, undefined], [{}, 5, 5]]) {
+      const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", ...config });
+      const user = { id: "u", priority: 0, disableDecoder: true, streamSetting: { channel } };
+      const filter = await t._initTS(user, undefined, [t._getCandidate(channel, relTs, "ts")]);
+      assert.strictEqual(user.streamSetting.tsmfRelTs, expected);
+      filter.close();
+    }
+  });
+
+  it("parses EIT of the network of TS for the stream as received, and does not receive the relative stream specified by the remote tuners", async () => {
+    const streams = [
+      { networkId: 11, streamId: 45168, relTs: 1, slots: 28, format: "tlv" },
+      { networkId: 4, streamId: 18801, relTs: 2, slots: 24, format: "ts" }
+    ];
+    _.channel = { getStreams: () => streams };
+    // the services of TLV come first
+    _.service = { findByChannel: () => [{ networkId: 11, serviceId: 151 }, { networkId: 4, serviceId: 101 }] };
+    const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV" });
+    const t = Object.create(Tuner.prototype);
+    const users = [];
+    t._initTS = async (user, output, candidates) => users.push([user.streamSetting.networkId, candidates[0].relTs]);
+    t._devices = [{ config: { name: "local", types: ["BS"] }, isRemote: false }];
+    await t.initChannelStream(channel, { id: "u" }, null);
+    await t.initChannelStream(channel, { id: "u" }, null, 1);
+    assert.deepStrictEqual(users, [[4, undefined], [11, 1]]);
+    t._devices = [{ config: { name: "remote", types: ["BS"] }, isRemote: true }];
+    await assert.rejects(t.initChannelStream(channel, { id: "u" }, null, 1), /no available tuners/);
+  });
+
+  it("receives the stream of the channel as before if only the remote tuners are left", async () => {
+    const remote = { index: 0, config: { name: "remote", types: ["BS"] }, isRemote: true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
+    const t = Object.create(Tuner.prototype);
+    t._devices = [remote];
+    t._readyForJobPickedDeviceSet = new Set();
+    _.channel = { getStreams: () => [{ networkId: 11, streamId: 45168, relTs: 5, slots: 28, format: "tlv" }] };
+    const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46" });
+    const candidate = t._getCandidate(channel, 5);
+    assert.deepStrictEqual([candidate.relTs, candidate.format, candidate.devices], [undefined, "ts", [remote]]);
+    assert.strictEqual(t.getOutputFormat([{ channel, relTs: 5 }]), "ts");
+    assert.strictEqual(await t.readyForJob([{ channel, relTs: 5 }]), channel);
+    t._readyForJobPickedDeviceSet.clear();
+  });
+
   it("decides the output format by the relative stream of each candidate", () => {
     const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV" });
     _.channel = {
@@ -287,6 +464,20 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     assert.strictEqual(t.getOutputFormat([{ channel, relTs: 5 }], "ts"), null);
     // TS が先頭の候補でも、TLV の候補があれば TLV を出力できる
     assert.strictEqual(t.getOutputFormat([{ channel, relTs: 2 }, { channel, relTs: 5 }], "tlv"), "tlv");
+  });
+
+  it("receives the relative streams detected only by the local tuners", () => {
+    const local = { config: { name: "local", types: ["BS"] }, isRemote: false };
+    const remote = { config: { name: "remote", types: ["BS"] }, isRemote: true };
+    const t = Object.create(Tuner.prototype);
+    t._devices = [local, remote];
+    _.channel = { getStreams: () => [] };
+    const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46" });
+    const configured = new ChannelItem({ name: "C", type: "BS", channel: "C47", tsmfRelTs: 5 });
+    // the remote Mirakurun outputs the relative stream of its own
+    assert.deepStrictEqual(t._getCandidate(channel, 5).devices, [local]);
+    assert.deepStrictEqual(t._getCandidate(channel).devices, [local, remote]);
+    assert.deepStrictEqual(t._getCandidate(configured, 5).devices, [local, remote]);
   });
 
   it("scans again in the format detected with the tuner (not the user of the first scan)", async () => {

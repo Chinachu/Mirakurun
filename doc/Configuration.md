@@ -239,13 +239,15 @@ The relative TS number of the channel multiplexed by TSMF. The relative stream c
 
 If not specified, all the relative streams in use, and TS or TLV for each, are detected from the TSMF headers by the service scan, and the services are scanned for each relative stream (saved in `channels.json`). The services are newly registered only by the scan of the channel without services, as before. The streams of the services and the programs receive the relative stream of the service. Like `format`, they are detected only when the tuner of the scan has the type `BS4K` or `tlvDecoder` / `tlvToTsDecoder` (TSMF of multiple carriers is not detected). Specify `tsmfRelTs` to receive a channel of TSMF by the tuners only for TS.
 
-The stream of the channel (`/api/channels/{type}/{channel}/stream`) accepts the query `tsmfRelTs` to specify the relative stream. Without it, `tsmfRelTs` of channels.yml, otherwise the relative stream of the most slots (the smaller number if the same) is output.
+The stream of the channel (`/api/channels/{type}/{channel}/stream`) accepts the query `tsmfRelTs` to specify the relative stream. Without it, the relative stream of `tsmfRelTs` of channels.yml (the stream as received if not specified) is output as before, for the remote Mirakurun receiving it. The stream as received of a channel whose TSMF is detected is TS, even for the type `BS4K` (unless `format` is specified). When the relative stream of a service is unknown, the relative stream of the most slots (the smaller number if the same) of the network of the service (of all if none) is received. The relative streams detected are not received by the remote tuners (the remote Mirakurun outputs its own relative stream). If there are only the remote tuners, the stream as received is received as before (503 for the relative stream detected specified by the query `tsmfRelTs`).
 
 #### format
 
 The format of the data received on the channel. `tlv` for TLV (MMT).
 
 If not specified, the format is detected from the data received by the service scan, and saved in `channels.json`. It is detected only when the tuner of the scan has the type `BS4K` or `tlvDecoder` / `tlvToTsDecoder` (not to add any work to the environments only for TS). The streams for viewing and recording do not detect and use the format saved (not to delay the start of the streams of TS). Before the scan, `tlv` for the type `BS4K`, `ts` for the others.
+
+`format` is for the stream of the channel (the relative stream of `tsmfRelTs`, or the stream as received if not specified). When the relative streams of TSMF are detected without `tsmfRelTs`, each relative stream is received in the format detected.
 
 #### route
 

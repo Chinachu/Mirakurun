@@ -39,13 +39,17 @@ export default class ChannelItem {
     readonly tsmfRelTs: number;
     readonly commandVars: apid.ConfigChannelsItem["commandVars"];
     private _format: apid.StreamFormat;
+    /** as configured (for the output) */
+    private _configuredTsmfRelTs: number;
 
     constructor(config: apid.ConfigChannelsItem) {
         this.name = config.name;
         this.type = config.type;
         this.route = config.route || common.getDefaultChannelRoute(config.type);
         this.channel = config.channel;
-        this.tsmfRelTs = config.tsmfRelTs;
+        // `0` or empty is not specified
+        this.tsmfRelTs = config.tsmfRelTs || undefined;
+        this._configuredTsmfRelTs = config.tsmfRelTs;
         this.commandVars = config.commandVars;
         this._format = config.format;
     }
@@ -55,9 +59,9 @@ export default class ChannelItem {
         return _.channel.getStreams(this);
     }
 
-    /** the stream of `defaultRelTs`. `null` until received once. */
+    /** the stream of `tsmfRelTs` (the stream as received if not specified). `null` until received once. */
     get stream(): ChannelStream {
-        return this.getStreamByRelTs(this.defaultRelTs);
+        return this.getStreamByRelTs(this.tsmfRelTs || undefined);
     }
 
     /**
@@ -65,28 +69,36 @@ export default class ChannelItem {
      * (`undefined` if not TSMF or not received yet)
      */
     get defaultRelTs(): number {
-        if (this.tsmfRelTs) {
-            return this.tsmfRelTs;
-        }
-        let picked: ChannelStream = null;
-        for (const stream of this.streams) {
-            if (stream.relTs !== undefined && (picked === null || stream.slots > picked.slots || (stream.slots === picked.slots && stream.relTs < picked.relTs))) {
-                picked = stream;
-            }
-        }
-        return picked?.relTs;
+        return this.getDefaultRelTs();
     }
 
     /**
      * `format` of channels.yml, the format detected by the service scan, or the default of the type (TLV for `BS4K`).
      * The streams use this without detecting (not to delay the streams of TS).
+     * (the format of `tsmfRelTs`, or of the stream as received if not specified)
      */
     get format(): apid.StreamFormat {
-        return this.getFormat(this.defaultRelTs);
+        return this.getFormat(this.tsmfRelTs || undefined);
     }
 
     get isTlv(): boolean {
         return this.format === "tlv";
+    }
+
+    /** @param networkId the relative streams of the network come first (for the service not received on the channel yet) */
+    getDefaultRelTs(networkId?: number): number {
+        if (this.tsmfRelTs) {
+            return this.tsmfRelTs;
+        }
+        const streams = this.streams.filter(stream => stream.relTs !== undefined);
+        const ofNetwork = streams.filter(stream => stream.networkId === networkId);
+        let picked: ChannelStream = null;
+        for (const stream of ofNetwork.length > 0 ? ofNetwork : streams) {
+            if (picked === null || stream.slots > picked.slots || (stream.slots === picked.slots && stream.relTs < picked.relTs)) {
+                picked = stream;
+            }
+        }
+        return picked?.relTs;
     }
 
     /** @param relTs the relative stream of TSMF */
@@ -94,9 +106,25 @@ export default class ChannelItem {
         return this.streams.find(stream => stream.relTs === relTs) || null;
     }
 
-    /** @param relTs the relative stream of TSMF */
+    /**
+     * `format` of channels.yml is for the stream of the channel (`tsmfRelTs`, or the stream as received),
+     * the relative streams of TSMF detected use the formats detected
+     * @param relTs the relative stream of TSMF
+     */
     getFormat(relTs?: number): apid.StreamFormat {
-        return this._format || this.getStreamByRelTs(relTs)?.format || (common.tlvChannelTypes.includes(this.type) ? "tlv" : "ts");
+        const isChannelStream = relTs === (this.tsmfRelTs || undefined);
+        if (this._format && isChannelStream) {
+            return this._format;
+        }
+        const format = this.getStreamByRelTs(relTs)?.format;
+        if (format) {
+            return format;
+        }
+        // TSMF is TS outside
+        if (relTs === undefined && this.streams.some(stream => stream.relTs !== undefined)) {
+            return "ts";
+        }
+        return this._format || (common.tlvChannelTypes.includes(this.type) ? "tlv" : "ts");
     }
 
     /** @param format detected by the service scan, keeps the last one if omitted */
@@ -122,7 +150,7 @@ export default class ChannelItem {
             type: this.type,
             channel: this.channel,
             route: this.route,
-            tsmfRelTs: this.tsmfRelTs,
+            tsmfRelTs: this._configuredTsmfRelTs,
             format: this._format,
             commandVars: this.commandVars
         };

@@ -28,7 +28,8 @@ import type { StreamTarget } from "./Tuner";
 /** Service references on this carrier, including the relative TS needed to request each one. */
 export function getChannelServices(channel: ChannelItem): apid.Service[] {
     const streams = channel.streams;
-    const hasRelativeStreams = streams.some(stream => stream.relTs !== undefined);
+    // only the relative streams detected (`tsmfRelTs` of channels.yml is of the channel)
+    const hasRelativeStreams = channel.tsmfRelTs === undefined && streams.some(stream => stream.relTs !== undefined);
     return channel.getServices().map(service => {
         const result: apid.Service = {
             id: service.id,

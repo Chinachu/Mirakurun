@@ -221,6 +221,33 @@ describe("[route.spec] route / streamId", () => {
       ]);
     });
 
+    it("restores the stream saved in the format before the relative streams of TSMF", async () => {
+      setupChannels([
+        { name: "BS15", type: "BS", channel: "BS31_0" },
+        { name: "C45", type: "BS", channel: "C45", route: "CATV" },
+        { name: "C46", type: "BS", channel: "C46", route: "CATV", tsmfRelTs: 3 }
+      ]);
+      fs.writeFileSync(process.env.CHANNELS_DB_PATH, JSON.stringify([
+        { __integrity__: "test" },
+        { type: "BS", channel: "BS31_0", networkId: 4, streamId: 20225, format: "ts" },
+        { type: "BS", channel: "C45", networkId: 4, streamId: 20225 },
+        { type: "BS", channel: "C46", networkId: 11, streamId: 45168, format: "tlv" }
+      ]));
+      fs.writeFileSync(process.env.SERVICES_DB_PATH, JSON.stringify([
+        { __integrity__: "test" },
+        { id: 400701, serviceId: 701, networkId: 4, streamId: 20225, name: "Test BS", type: 1, channel: { type: "BS", channel: "BS31_0" } }
+      ]));
+      await _.channel.load();
+      await _.service.load();
+
+      assert.deepStrictEqual(_.channel.get("BS", "BS31_0").streams, [{ networkId: 4, streamId: 20225, format: "ts" }]);
+      // the stream of the channel with tsmfRelTs is of the relative stream
+      const c46 = _.channel.get("BS", "C46");
+      assert.deepStrictEqual(c46.stream, { networkId: 11, streamId: 45168, format: "tlv", relTs: 3 });
+      assert.strictEqual(c46.format, "tlv");
+      assert.deepStrictEqual(_.service.get(4, 701).channels.map(ch => ch.channel), ["BS31_0", "C45"]);
+    });
+
     it("uses the channel of services.json when the stream is not in channels.json", async () => {
       setupChannels([{ name: "BS15", type: "BS", channel: "BS31_0" }]);
       fs.writeFileSync(process.env.CHANNELS_DB_PATH, JSON.stringify([{ __integrity__: "test" }]));
@@ -442,6 +469,8 @@ describe("channel service relative TS references", () => {
     const services = [701, 702].map((serviceId, i) => ({ id: 400000 + serviceId, serviceId, networkId: 4, streamId: 20225 + i, name: "Test", type: 1 }));
     const channel = { getServices: () => services, streams: [{ networkId: 4, streamId: 20225, relTs: 2 }, { networkId: 4, streamId: 20226, relTs: 3 }] };
     assert.deepStrictEqual(getChannelServices(channel).map(s => [s.serviceId, s.tsmfRelTs]), [[701, 2], [702, 3]]);
+    // tsmfRelTs of channels.yml is of the channel, not output for the services as before
+    assert.ok(getChannelServices({ ...channel, tsmfRelTs: 2 }).every(s => !("tsmfRelTs" in s)));
     channel.streams = [{ networkId: 4, streamId: 20225 }];
     assert.ok(getChannelServices(channel).every(s => !("tsmfRelTs" in s)));
   });

@@ -53,7 +53,7 @@ export const parameters = [
         type: "integer",
         minimum: 1,
         maximum: 15,
-        description: "The relative stream of TSMF. (default: `tsmfRelTs` of the channel, or the relative stream of the most slots)"
+        description: "The relative stream of TSMF. (default: `tsmfRelTs` of the channel, the stream as received if not specified)"
     }
 ];
 
@@ -65,8 +65,8 @@ export const get: Operation = (req, res) => {
         return;
     }
 
-    // the relative streams found by the service scan
-    const relTs = req.query.tsmfRelTs !== undefined ? <number> <any> req.query.tsmfRelTs : channel.defaultRelTs;
+    // the relative streams found by the service scan (the stream as received without specifying, as before, such as for the remote Mirakurun)
+    const relTs = req.query.tsmfRelTs !== undefined ? <number> <any> req.query.tsmfRelTs : channel.tsmfRelTs;
     if (req.query.tsmfRelTs !== undefined && channel.tsmfRelTs !== relTs && channel.getStreamByRelTs(relTs) === null) {
         api.responseError(res, 404, "Relative Stream Not Found");
         return;

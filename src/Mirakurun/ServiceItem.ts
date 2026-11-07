@@ -190,13 +190,13 @@ export default class ServiceItem {
 
     /** the channels and the relative streams of TSMF to receive the service, the channel scanned the service comes first. */
     get targets(): StreamTarget[] {
-        return this.locations.map(({ channel, stream }) => ({ channel, relTs: stream ? stream.relTs : channel.defaultRelTs }));
+        return this.locations.map(({ channel, stream }) => ({ channel, relTs: stream ? stream.relTs : channel.getDefaultRelTs(this._networkId) }));
     }
 
-    /** the format of the stream carrying the service */
+    /** the format of the stream carrying the service (of the first target) */
     get format(): apid.StreamFormat {
-        const location = this.locations[0];
-        return location.channel.getFormat(location.stream?.relTs);
+        const { channel, stream } = this.locations[0];
+        return channel.getFormat(stream ? stream.relTs : channel.getDefaultRelTs(this._networkId));
     }
 
     get isTlv(): boolean {
