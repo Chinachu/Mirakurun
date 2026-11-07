@@ -584,6 +584,28 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
       assert.deepStrictEqual(plain.scans.at(-1).devices, [another]);
     });
 
+    // 複数の搬送波の TLV は、ほかの搬送波が見つかるまでスキャンしないため、TS のスキャンに失敗しても搬送波を返す
+    it("returns the carrier bonded for the channel scan, even if the scan of TS fails", async () => {
+      const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV" });
+      _.channel = { get: () => null, getStreams: () => [], setStreams: () => {} };
+      // the header of multiple carriers is copied to all the relative streams
+      const carrier = { groupId: 1, numberOfCarriers: 2, carrierSequence: 0 };
+      const ts = { relTs: 9, slots: 8, format: "ts", streamId: 18809, networkId: 4, ...carrier };
+      const t = scanner([ts, { relTs: 5, slots: 20, format: "tlv", streamId: 45168, networkId: 11, ...carrier }], 0);
+      const streams = await t.scanChannel(channel);
+      assert.deepStrictEqual(streams.map(({ relTs, format, services, numberOfCarriers }) => [relTs, format, services.length, numberOfCarriers]), [
+        [9, "ts", 0, 2],
+        [5, "tlv", 0, 2]
+      ]);
+      assert.deepStrictEqual(t.scans.map(({ relTs }) => relTs), [undefined, 9]);
+
+      // without the TLV of multiple carriers, the error of the scan (the other tuners are tried)
+      for (const detected of [[{ relTs: 9, slots: 8, format: "ts", streamId: 18809, networkId: 4 }], [ts]]) {
+        _.channel = { get: () => null, getStreams: () => [], setStreams: () => {} };
+        await assert.rejects(scanner(detected, 0).scanChannel(channel), /stream has closed/);
+      }
+    });
+
     it("detects the format on the local tuners only for TS by the channel scan only", async () => {
       _.channel = { getStreams: () => [] };
       const data = Buffer.concat(Array.from({ length: 1400 }, (_, i) => header([[2, 24, false, 18801, 4]], i)));

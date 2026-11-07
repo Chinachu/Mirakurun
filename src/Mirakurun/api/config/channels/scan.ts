@@ -772,9 +772,11 @@ async function runChannelScan(
                 continue;
             }
 
-            // the channels are unique by the type and the channel (the enabled entry of the other route is used, the disabled one is not loaded)
+            // the channels are unique by the type and the channel (the entry of the other route is used if loaded:
+            // the disabled one and the one of the route without the tuners of the type are not loaded)
             const addedItems = scannedItems.filter(item => {
-                const other = result.find(o => o.type === item.type && o.channel === item.channel && !isOnRoute(o) && !o.isDisabled);
+                const other = result.find(o => o.type === item.type && o.channel === item.channel && !isOnRoute(o) && !o.isDisabled &&
+                    _.tuner.typeExists(o.type, o.route || common.getDefaultChannelRoute(o.type)));
                 if (other) {
                     appendToLog(`-> ${item.type} "${item.channel}" is already configured on the route ${other.route || common.getDefaultChannelRoute(other.type)}, not added.\n`);
                 }
@@ -1249,7 +1251,7 @@ export const del: Operation = async (req, res) => {
 
     // Update the scan status
     scanStatus.status = "cancelled" as const;
-    scanStatus.scanLog.push("Scan cancellation requested by user.");
+    scanStatus.scanLog?.push("Scan cancellation requested by user."); // no log while preparing the first scan
 
     // Return success response
     res.status(206);

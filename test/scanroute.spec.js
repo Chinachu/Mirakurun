@@ -16,7 +16,7 @@ const oldChannels = [
 const service = (networkId, serviceId, name) => ({ networkId, serviceId, name, type: 1, streamId: 1 });
 
 // scanTypes: the types to try (by default, a tuner of all the types)
-async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"], dvbChannels = [], logs = [], scanTypes } = {}) {
+async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"], dvbChannels = [], logs = [], scanTypes, routes } = {}) {
   const saved = [];
   const tuned = [];
   const errors = [];
@@ -25,7 +25,7 @@ async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"],
     saved.push(items);
   };
   _.tuner = {
-    typeExists: type => types.includes(type),
+    typeExists: (type, route) => types.includes(type) && (!routes || routes.includes(route)),
     getScanAttempts: (route, order) => (scanTypes ? order.filter(type => scanTypes.includes(type)) : order.filter(type => types.includes(type)).slice(0, 1))
       .map(type => ({ type, devices: [`tuner of ${type}`] })),
     getDvbChannelNames: async () => typeof dvbChannels === "function" ? dvbChannels() : dvbChannels,
@@ -138,6 +138,21 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
     } finally {
       oldChannels.pop();
     }
+  });
+
+  // 受信経路にそのタイプのチューナーがない設定は読み込まないため、ほかの経路の設定があっても追加する
+  it("adds the channel of the type and the name configured on another route without the tuners of the type", async () => {
+    const logs = [];
+    const { saved } = await runScan(
+      { route: "CATV", source: "list", channels: ["13"], refresh: true },
+      () => [{ format: "ts", services: [service(0x7FE0, 13, "地上 13")] }],
+      { logs, routes: ["CATV"] }
+    );
+    assert.deepStrictEqual(saved.filter(item => item.channel === "13").map(item => [item.name, item.route]), [
+      ["TER13", undefined],
+      ["地上 13", "CATV"]
+    ]);
+    assert.ok(!logs.some(text => /already configured/.test(text)));
   });
 
   // 互換性のない変更: タイプではなく受信経路でスキャンする

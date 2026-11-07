@@ -671,7 +671,8 @@ export class Tuner {
             ...(stream.numberOfCarriers > 1 && { numberOfCarriers: stream.numberOfCarriers })
         })));
 
-        if (services.length === 0 && lastError !== null) {
+        // the channel scan adds the carriers bonded without the services (the TLV is scanned when all the carriers are found)
+        if (services.length === 0 && lastError !== null && !collect?.some(stream => stream.format === "tlv" && stream.numberOfCarriers > 1)) {
             throw lastError;
         }
 
