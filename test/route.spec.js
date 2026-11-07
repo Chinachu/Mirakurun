@@ -85,6 +85,7 @@ function fakeDevice(index, types, routes, state = {}) {
     },
     // the remote Mirakurun has detected the relative stream
     isRemoteChannelRelTsChecked: () => true,
+    clearRemoteRelTsRefused() {},
     isRemoteRelTsChecked: true,
     ...state
   };
@@ -973,7 +974,20 @@ describe("[route.spec] route / streamId", () => {
       assert.deepStrictEqual(scans, [["tlv", 1, [remote]]]);
       assert.deepStrictEqual(streams.map(({ relTs, format, services }) => [relTs, format, services.map(service => service.serviceId)]), [[1, "tlv", [101]]]);
 
+      // only the remote tuners receive the type (supporting the relative streams detected)
+      assert.strictEqual(t.receivesRelTsByRemote("BS4K", "CATV"), true);
+      t._devices.push(fakeDevice(1, ["BS4K"], ["CATV"]));
+      assert.strictEqual(t.receivesRelTsByRemote("BS4K", "CATV"), false);
+      t._devices.pop();
+
+      // the relative stream reported is requested again even if refused before
+      const cleared = [];
+      remote.clearRemoteRelTsRefused = (ch, relTs) => cleared.push(relTs);
+      await t.scanChannel(channel, {}, [remote]);
+      assert.deepStrictEqual(cleared, [1]);
+
       // not detected by the remote Mirakurun: the stream as received, as before
+      scans.length = 0;
       remote.getRemoteChannel = async () => ({ type: "BS4K", channel: "C19", services: [{ id: 1, serviceId: 101, networkId: 11, streamId: 45168 }] });
       scans.length = 0;
       await t.scanChannel(channel, {}, [remote]);

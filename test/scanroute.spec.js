@@ -26,6 +26,7 @@ async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"],
   };
   _.tuner = {
     typeExists: (type, route) => types.includes(type) && (!routes || routes.includes(route)),
+    receivesRelTsByRemote: () => false,
     getScanAttempts: (route, order) => (scanTypes ? order.filter(type => scanTypes.includes(type)) : order.filter(type => types.includes(type)).slice(0, 1))
       .map(type => ({ type, devices: [`tuner of ${type}`] })),
     getDvbChannelNames: async () => typeof dvbChannels === "function" ? dvbChannels() : dvbChannels,

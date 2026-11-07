@@ -254,6 +254,12 @@ export class Tuner {
         return this._getDevicesByType(type, route).length > 0;
     }
 
+    /** only the remote tuners receive the type, and the remote Mirakurun outputs the relative streams of TSMF detected by itself */
+    receivesRelTsByRemote(type: apid.ChannelType, route?: apid.ChannelRoute): boolean {
+        const devices = this._getDevicesByType(type, route);
+        return devices.length > 0 && devices.every(device => device.isRemote) && devices.some(device => device.supportsRemoteRelTs);
+    }
+
     /**
      * the output format of the stream request
      * @param targets the channels (and the relative streams of TSMF) to receive the stream
@@ -537,6 +543,13 @@ export class Tuner {
                 });
             }
             if (streams.size > 0) {
+                // the relative streams reported are requested again (even if refused before, such as while scanning by the remote Mirakurun)
+                for (const item of devices.filter(other => other.config.remoteMirakurunHost === device.config.remoteMirakurunHost &&
+                    (other.config.remoteMirakurunPort || 40772) === (device.config.remoteMirakurunPort || 40772))) {
+                    for (const relTs of streams.keys()) {
+                        item.clearRemoteRelTsRefused(channel, relTs);
+                    }
+                }
                 return [...streams.values()].sort((a, b) => a.relTs - b.relTs);
             }
         }

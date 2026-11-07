@@ -339,7 +339,8 @@ export function generateScannedChannelItems(
         const setDisabledOnAdd = scanConfig.setDisabledOnAdd ?? type !== "GR";
         // the relative stream of TSMF is specified if only one (any tuner receives it), the relative streams are detected if more than one,
         // not specified for the remote tuners (the remote Mirakurun outputs the relative streams detected by itself)
-        const tsmfRelTs = relTs.size === 1 && !bonded && remoteType === undefined ? [...relTs][0] : undefined;
+        const byRemote = remoteType !== undefined || _.tuner.receivesRelTsByRemote(type, route);
+        const tsmfRelTs = relTs.size === 1 && !bonded && !byRemote ? [...relTs][0] : undefined;
         if (relTs.size > 1) {
             log(`-> the ${relTs.size} relative streams of ${type} are detected by the tuners for TLV (the types including BS4K, or tlvDecoder / tlvToTsDecoder).\n`);
         }

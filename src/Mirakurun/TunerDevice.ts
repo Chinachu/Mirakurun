@@ -394,6 +394,11 @@ export default class TunerDevice extends EventEmitter {
         return this.supportsRemoteRelTs && (refusedAt === undefined || Date.now() - refusedAt >= REMOTE_REFUSED_RELTS_PERIOD);
     }
 
+    /** the relative stream of the channel reported by the remote Mirakurun is requested again */
+    clearRemoteRelTsRefused(channel: ChannelItem, relTs: number): void {
+        this._remoteRelTsRefused.delete(`${channel.type}/${channel.channel}/${relTs}`);
+    }
+
     /** checked by `checkRemoteChannelRelTs()` for a while */
     isRemoteChannelRelTsChecked(channel: ChannelItem, relTs: number): boolean {
         const checkedAt = this._remoteChannelRelTsCheckedAt.get(`${channel.type}/${channel.channel}/${relTs}`);

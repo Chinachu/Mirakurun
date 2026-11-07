@@ -71,7 +71,7 @@ describe("[scan.spec] /api/config/channel/scan : generateScannedChannelItems", (
     let tuner;
     before(() => {
         tuner = _.tuner;
-        _.tuner = { typeExists: (type, route) => ["GR", "BS", "CS", "BS4K"].includes(type) };
+        _.tuner = { typeExists: (type, route) => ["GR", "BS", "CS", "BS4K"].includes(type), receivesRelTsByRemote: () => false };
     });
     after(() => {
         _.tuner = tuner;
@@ -159,6 +159,19 @@ describe("[scan.spec] /api/config/channel/scan : generateScannedChannelItems", (
             { relTs: 1, format: "tlv", networkId: 11, services: [service(11, 101, "4K")] }
         ], {}, () => undefined, "BS4K");
         assert.deepStrictEqual(items, [{ name: "4K", type: "BS4K", channel: "C19", serviceId: 101, isDisabled: true, route: "CATV" }]);
+
+        // scanned by the local tuners, the type received only by the remote tuners
+        const receivesRelTsByRemote = _.tuner.receivesRelTsByRemote;
+        _.tuner.receivesRelTsByRemote = type => type === "BS4K";
+        try {
+            const mixed = scan.generateScannedChannelItems("C19", "CATV", [
+                { relTs: 1, format: "ts", networkId: 0xFFFE, services: [service(0xFFFE, 1, "コミュニティ")] },
+                { relTs: 2, format: "tlv", networkId: 11, services: [service(11, 101, "4K")] }
+            ], {});
+            assert.deepStrictEqual(mixed.map(item => [item.type, item.tsmfRelTs]), [["GR", 1], ["BS4K", undefined]]);
+        } finally {
+            _.tuner.receivesRelTsByRemote = receivesRelTsByRemote;
+        }
     });
 
     it("notes the types without the tuners of the route", () => {
