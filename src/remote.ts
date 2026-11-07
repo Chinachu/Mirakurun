@@ -51,10 +51,13 @@ client.getChannelStream({ type: opt.type, channel: opt.channel, decode: opt.deco
     .catch(err => {
         if (err.req) {
             console.error("remote:", "(error)", err.req.path, err.statusCode, err.statusMessage);
+        } else if (err.statusCode) {
+            console.error("remote:", "(error)", err.statusCode, err.statusMessage);
         } else {
             console.error("remote:", "(error)", err.address, err.code);
         }
-        exit(1);
+        // the remote Mirakurun has refused the request (the same request is refused again)
+        exit(err.req || err.statusCode ? 2 : 1);
     });
 
 function exit(code = 0) {

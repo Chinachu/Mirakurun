@@ -41,6 +41,8 @@ const DVB_CLOSE_DELAY = 1000;
 const DVB_RESPAWN_DELAY = 1000;
 /** DVB デバイスを開けない場合のうち、デバイスがないことを示すエラー */
 const DVB_MISSING_DEVICE_ERRORS = ["ENOENT", "ENODEV", "ENXIO"];
+/** リモートの Mirakurun が要求を断った場合 (406 や 503 など) の `lib/remote` の終了コード (起動し直しても同じく断られる) */
+const REMOTE_REFUSED_EXIT_CODE = 2;
 
 // koffi (FFI) は DVB デバイスを直接操作するチューナーがある場合だけ読み込む
 let dvbDeviceClass: typeof DvbDevice | null;
@@ -486,6 +488,12 @@ export default class TunerDevice extends EventEmitter {
                 "TunerDevice#%d process has closed with exit code=%d by signal `%s` (pid=%d)",
                 this._index, code, signal, this._process.pid
             );
+
+            // the request refused by the remote Mirakurun is not respawned (refused again)
+            if (this._isRemote === true && code === REMOTE_REFUSED_EXIT_CODE && this._closing === false) {
+                log.warn("TunerDevice#%d the remote Mirakurun has refused the request, closing the streams", this._index);
+                this._closing = true;
+            }
 
             end();
         });

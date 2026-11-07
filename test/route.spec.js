@@ -942,6 +942,49 @@ describe("[route.spec] route / streamId", () => {
       spawn.mock.restore();
     });
 
+    // リモートの Mirakurun が断った要求 (406 など) は、起動し直しても同じく断られるため、繰り返さずに終了する
+    it("closes the streams without respawning when the remote Mirakurun has refused the request", async () => {
+      setupChannels([{ name: "4K", type: "BS4K", route: "CATV", channel: "C19" }]);
+      const channel = _.channel.items[0];
+      const procs = [];
+      const close = (proc, code, signal = null) => {
+        proc.emit("exit", code, signal);
+        proc.emit("close", code, signal);
+      };
+      const spawn = mock.method(child_process, "spawn", () => {
+        const proc = Object.assign(new EventEmitter(), { pid: procs.length + 1, stdout: new EventEmitter(), stderr: new EventEmitter() });
+        proc.kill = () => setImmediate(() => close(proc, null, "SIGTERM"));
+        procs.push(proc);
+        return proc;
+      });
+      // setTimeout is mocked (the tuner is released 100ms after the process has closed)
+      const wait = async () => {
+        await new Promise(resolve => setImmediate(resolve));
+        mock.timers.tick(1000);
+        await new Promise(resolve => setImmediate(resolve));
+      };
+      try {
+        for (const [code, respawned] of [[2, false], [1, true]]) {
+          procs.length = 0;
+          const device = new TunerDevice(0, { name: "remote", types: ["BS4K"], remoteMirakurunHost: "remote" });
+          let ended = false;
+          const stream = Object.assign(new EventEmitter(), { closed: false, write() {}, flush() {}, end() { ended = true; } });
+          await device.startStream({ id: "scan", priority: -1 }, stream, channel);
+          close(procs[0], code);
+          await wait();
+          assert.deepStrictEqual([code, procs.length, ended], [code, respawned ? 2 : 1, !respawned]);
+          if (respawned) {
+            const killed = device._kill(true);
+            await wait();
+            await killed;
+          }
+          assert.strictEqual(device.isFree, true);
+        }
+      } finally {
+        spawn.mock.restore();
+      }
+    });
+
     it("accesses the DVB device directly with the channels file of each route", async () => {
       const device = new TunerDevice(0, {
         name: "dvb",
