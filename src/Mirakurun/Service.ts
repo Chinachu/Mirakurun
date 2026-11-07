@@ -403,8 +403,6 @@ export class Service {
 
         log.debug("ChannelItem#'%s' serviceId=%d: %s", channel.name, serviceId, JSON.stringify(service, null, "  "));
 
-        channel.setStream(service.networkId, service.streamId);
-
         const item = this.get(service.networkId, service.serviceId);
         if (item !== null) {
             // already added on another channel carrying the same stream
@@ -433,10 +431,6 @@ export class Service {
         }
 
         log.debug("ChannelItem#'%s' services: %s", channel.name, JSON.stringify(services, null, "  "));
-
-        if (services.length > 0) {
-            channel.setStream(services[0].networkId, services[0].streamId);
-        }
 
         services.forEach(service => {
             const item = this.get(service.networkId, service.serviceId);

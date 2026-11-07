@@ -221,7 +221,7 @@ If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outp
   # Optional parameters below
   route: TER # Enum [TER|SAT|CATV|HIKARI] - receiving route. `TER` for GR, `SAT` for others if omitted.
   serviceId: 1234 # Integer - Services will be automatically scanned if not specified.
-  tsmfRelTs: 1 # Number: 1~15 - relative TS number of TSMF. For the TLV channels, the relative stream number carrying TLV in extended TSMF (single carrier only)
+  tsmfRelTs: 1 # Number: 1~15 - relative TS number of TSMF. All the relative streams of TSMF are detected by the service scan on the tuners for TLV if not specified.
   format: tlv # Enum [ts|tlv] - the format detected by the service scan if not specified (before the scan, tlv for BS4K, ts for others)
   commandVars: # Optional command variables *@4.0.0~
     satellite: EXAMPLE-SAT4A
@@ -232,6 +232,14 @@ If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outp
     exampleArg2: -arg2 "Can include spaces using quotes"
   isDisabled: false # Boolean
 ```
+
+#### tsmfRelTs
+
+The relative TS number of the channel multiplexed by TSMF. The relative stream carrying TLV in extended TSMF can also be specified (single carrier only).
+
+If not specified, all the relative streams in use, and TS or TLV for each, are detected from the TSMF headers by the service scan, and the services are registered for each relative stream (saved in `channels.json`). The streams of the services and the programs receive the relative stream of the service. Like `format`, they are detected only when the tuner of the scan has the type `BS4K` or `tlvDecoder` / `tlvToTsDecoder`. Specify `tsmfRelTs` to receive a channel of TSMF by the tuners only for TS.
+
+The stream of the channel (`/api/channels/{type}/{channel}/stream`) accepts the query `tsmfRelTs` to specify the relative stream. Without it, `tsmfRelTs` of channels.yml, otherwise the relative stream of the most slots (the smaller number if the same) is output.
 
 #### format
 

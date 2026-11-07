@@ -29,11 +29,11 @@ export const get: Operation = async (req, res) => {
             continue;
         }
         // the IPTV clients play only TS
-        const channels = service.channels;
-        if (_.tuner.getOutputFormat(channels, "ts") === null) {
+        const targets = service.targets;
+        if (_.tuner.getOutputFormat(targets, "ts") === null) {
             continue;
         }
-        const query = channels.some(channel => channel.isTlv) ? "?format=ts" : "";
+        const query = targets.some(({ channel, relTs }) => channel.getFormat(relTs) === "tlv") ? "?format=ts" : "";
 
         m += `#KODIPROP:mimetype=video/mp2t\n`;
         m += `#EXTINF:-1 tvg-id="${service.id}"`;

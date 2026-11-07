@@ -46,7 +46,15 @@ export const parameters = [
         minimum: 0,
         maximum: 1
     },
-    api.streamFormatParameter
+    api.streamFormatParameter,
+    {
+        in: "query",
+        name: "tsmfRelTs",
+        type: "integer",
+        minimum: 1,
+        maximum: 15,
+        description: "The relative stream of TSMF. (default: `tsmfRelTs` of the channel, or the relative stream of the most slots)"
+    }
 ];
 
 export const get: Operation = (req, res) => {
@@ -57,7 +65,19 @@ export const get: Operation = (req, res) => {
         return;
     }
 
-    api.responseStream(req, res, [channel], userReq => channel.getStream(userReq, res));
+    // the relative streams found by the service scan
+    const relTs = req.query.tsmfRelTs !== undefined ? <number> <any> req.query.tsmfRelTs : channel.defaultRelTs;
+    if (req.query.tsmfRelTs !== undefined && channel.tsmfRelTs !== relTs && channel.getStreamByRelTs(relTs) === null) {
+        api.responseError(res, 404, "Relative Stream Not Found");
+        return;
+    }
+
+    api.responseStream(
+        req,
+        res,
+        [{ channel, relTs }],
+        userReq => _.tuner.initChannelStream(channel, userReq, res, relTs)
+    );
 };
 
 get.apiDoc = {

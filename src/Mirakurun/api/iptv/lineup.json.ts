@@ -38,11 +38,11 @@ export const get: Operation = (req, res) => {
             continue;
         }
         // the IPTV clients play only TS
-        const serviceChannels = service.channels;
-        if (_.tuner.getOutputFormat(serviceChannels, "ts") === null) {
+        const targets = service.targets;
+        if (_.tuner.getOutputFormat(targets, "ts") === null) {
             continue;
         }
-        const query = serviceChannels.some(channel => channel.isTlv) ? "?format=ts" : "";
+        const query = targets.some(({ channel, relTs }) => channel.getFormat(relTs) === "tlv") ? "?format=ts" : "";
 
         const mainNum = service.remoteControlKeyId || service.serviceId;
         if (countMap.has(mainNum)) {

@@ -252,7 +252,7 @@ describe("[tsmftlv.spec] StreamFormat.ts: detectTSMFStreamFormat()", () => {
 
   it("is used by the format detection of the service scan for the channels of TSMF", async () => {
     _.config = { server: {} };
-    _.channel = { getStream: () => null };
+    _.channel = { getStreams: () => [] };
     const Tuner = require("../lib/Mirakurun/Tuner").default;
     const ChannelItem = require("../lib/Mirakurun/ChannelItem").default;
     // 判別は 64KB を読み飛ばした後の 64KB で行う
@@ -270,7 +270,7 @@ describe("[tsmftlv.spec] StreamFormat.ts: detectTSMFStreamFormat()", () => {
       const t = Object.create(Tuner.prototype);
       t._devices = [device];
       const probe = t._startFormatProbe({ id: "scan", priority: -1, streamSetting });
-      assert.strictEqual(await probe.format, expected);
+      assert.strictEqual((await probe.detected).format, expected);
     }
   });
 });

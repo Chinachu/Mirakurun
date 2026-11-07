@@ -43,6 +43,8 @@ interface StreamSetting {
     parseNIT?: boolean;
     parseSDT?: boolean;
     parseEIT?: boolean;
+    /** the relative stream of TSMF */
+    tsmfRelTs?: number;
 }
 
 export interface StreamInfo {

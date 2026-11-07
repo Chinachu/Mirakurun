@@ -37,14 +37,7 @@ export const get: Operation = (req, res) => {
         const channels: apid.Channel[] = _.channel.findByType(req.params.type as apid.ChannelType).map(channel => {
             const ch: apid.Channel = channel.toJSON();
 
-            ch.services = channel.getServices().map(service => ({
-                id: service.id,
-                serviceId: service.serviceId,
-                networkId: service.networkId,
-                streamId: service.streamId,
-                name: service.name,
-                type: service.type
-            }));
+            ch.services = api.getChannelServices(channel);
 
             return ch;
         }).filter(sift(req.query));

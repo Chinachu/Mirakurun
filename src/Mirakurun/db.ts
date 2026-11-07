@@ -31,13 +31,21 @@ interface Service extends apid.Service {
     logoData?: string; // base64
 }
 
-/** the stream received last time on the channel. */
+/** the streams received last time on the channel. */
 export interface Channel {
     type: apid.ChannelType;
     channel: string;
+    streams: ChannelStream[];
+}
+
+export interface ChannelStream {
     networkId: number;
     streamId: number;
     format?: apid.StreamFormat;
+    /** TSMF */
+    relTs?: number;
+    /** TSMF */
+    slots?: number;
 }
 
 export interface Program extends apid.Program {

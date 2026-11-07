@@ -23,13 +23,19 @@ import ChannelItem, { ChannelStream } from "./ChannelItem";
 import type ServiceItem from "./ServiceItem";
 import { JobItem } from "./Job";
 
+export interface StreamLocation {
+    channel: ChannelItem;
+    /** `null` until the stream is received on the channel */
+    stream: ChannelStream | null;
+}
+
 export class Channel {
     private _items: ChannelItem[] = [];
     private _startup: boolean = true;
     private _saveTimerId: NodeJS.Timeout;
-    private _streams = new Map<ChannelItem, ChannelStream>();
-    /** <networkId, <streamId, channels>> */
-    private _streamIndex: Map<number, Map<number, ChannelItem[]>> = null;
+    private _streams = new Map<ChannelItem, ChannelStream[]>();
+    /** <networkId, <streamId, the channels and the streams>> */
+    private _streamIndex: Map<number, Map<number, StreamLocation[]>> = null;
 
     constructor() {
         this._load();
@@ -95,41 +101,42 @@ export class Channel {
 
     /** channels received the stream last time */
     findByStream(networkId: number, streamId: number): ChannelItem[] {
+        return [...new Set(this.findStreamLocations(networkId, streamId).map(location => location.channel))];
+    }
+
+    /** the channels and the streams (the relative streams of TSMF) received the stream last time */
+    findStreamLocations(networkId: number, streamId: number): StreamLocation[] {
         if (this._streamIndex === null) {
             this._streamIndex = new Map();
             for (const item of this._items) {
-                const stream = this._streams.get(item);
-                if (!stream) {
-                    continue;
+                for (const stream of this._streams.get(item) || []) {
+                    let streams = this._streamIndex.get(stream.networkId);
+                    if (!streams) {
+                        streams = new Map();
+                        this._streamIndex.set(stream.networkId, streams);
+                    }
+                    let locations = streams.get(stream.streamId);
+                    if (!locations) {
+                        locations = [];
+                        streams.set(stream.streamId, locations);
+                    }
+                    locations.push({ channel: item, stream });
                 }
-                let streams = this._streamIndex.get(stream.networkId);
-                if (!streams) {
-                    streams = new Map();
-                    this._streamIndex.set(stream.networkId, streams);
-                }
-                let channels = streams.get(stream.streamId);
-                if (!channels) {
-                    channels = [];
-                    streams.set(stream.streamId, channels);
-                }
-                channels.push(item);
             }
         }
 
         return this._streamIndex.get(networkId)?.get(streamId) || [];
     }
 
-    getStream(item: ChannelItem): ChannelStream {
-        return this._streams.get(item) || null;
+    getStreams(item: ChannelItem): ChannelStream[] {
+        return this._streams.get(item) || [];
     }
 
-    setStream(item: ChannelItem, networkId: number, streamId: number, format?: apid.StreamFormat): void {
-        const stream = this._streams.get(item);
-        const isSameStream = stream && stream.networkId === networkId && stream.streamId === streamId;
-        if (isSameStream && (format === undefined || format === stream.format)) {
+    setStreams(item: ChannelItem, streams: ChannelStream[]): void {
+        if (JSON.stringify(this._streams.get(item) || []) === JSON.stringify(streams)) {
             return;
         }
-        this._streams.set(item, { networkId, streamId, format: format || (isSameStream ? stream.format : undefined) });
+        this._streams.set(item, streams);
         this._streamIndex = null;
         _.service?.invalidateChannelIndex?.();
 
@@ -147,10 +154,18 @@ export class Channel {
         const channels = await db.loadChannels(_.configIntegrity.channels, true);
         for (const channel of channels) {
             const item = this.get(channel.type, channel.channel);
-            if (item === null || typeof channel.networkId !== "number" || typeof channel.streamId !== "number") {
+            if (item === null || Array.isArray(channel.streams) === false) {
                 continue;
             }
-            item.setStream(channel.networkId, channel.streamId, channel.format === "ts" || channel.format === "tlv" ? channel.format : undefined);
+            item.setStreams(channel.streams
+                .filter(stream => typeof stream.networkId === "number" && typeof stream.streamId === "number")
+                .map(stream => ({
+                    networkId: stream.networkId,
+                    streamId: stream.streamId,
+                    ...((stream.format === "ts" || stream.format === "tlv") && { format: stream.format }),
+                    ...(typeof stream.relTs === "number" && { relTs: stream.relTs }),
+                    ...(typeof stream.slots === "number" && { slots: stream.slots })
+                })));
         }
         // nothing changed by loading
         clearTimeout(this._saveTimerId);
@@ -161,11 +176,8 @@ export class Channel {
 
         db.saveChannels(
             this._items
-                .filter(item => this._streams.has(item))
-                .map(item => {
-                    const { networkId, streamId, format } = this._streams.get(item);
-                    return { type: item.type, channel: item.channel, networkId, streamId, ...(format && { format }) };
-                }),
+                .filter(item => this.getStreams(item).length > 0)
+                .map(item => ({ type: item.type, channel: item.channel, streams: this.getStreams(item) })),
             _.configIntegrity.channels
         );
     }
@@ -279,7 +291,7 @@ export class Channel {
         // EIT of TS carries the whole network, MH-EIT of TLV (MMT) carries only its own stream
         const targets = new Map<string, { label: string, networkId: number, streamId?: number, services: ServiceItem[] }>();
         for (const item of _.service.items) {
-            const isTlv = item.channel.isTlv;
+            const isTlv = item.isTlv;
             const key = isTlv ? `NID.${item.networkId}.TSID.${item.streamId}` : `NID.${item.networkId}`;
             if (!targets.has(key)) {
                 targets.set(key, {
@@ -299,7 +311,9 @@ export class Channel {
                 : () => status.epgByStream[common.getEpgStreamKey(networkId, streamId)] === true;
 
             // any channel of the network can be used, the first service's ones come first
-            const channels = [...new Set([service, ...services].flatMap(item => item.channels))];
+            // the channels and the relative streams of TSMF (MH-EIT of TLV needs the relative stream of the stream)
+            const locations = [service, ...services].flatMap(item => item.locations);
+            const channels = [...new Set(locations.map(location => location.channel))];
             if (channels.length === 0) {
                 continue;
             }
@@ -313,7 +327,8 @@ export class Channel {
                 fn: async () => {
                     log.info("%s EPG gathering has started on %s/%s", label, channel.type, channel.channel);
                     try {
-                        await _.tuner.getEPG(channel);
+                        const relTs = locations.find(location => location.channel === channel)?.stream?.relTs;
+                        await _.tuner.getEPG(channel, undefined, relTs);
                         log.info("%s EPG gathering has finished", label);
                     } catch (e) {
                         log.warn("%s EPG gathering has failed [%s]", label, e);

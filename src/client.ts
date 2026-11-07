@@ -309,7 +309,7 @@ export class Client {
         }, { priority, signal });
     }
 
-    async getChannelStream(opt: { type: apid.ChannelType, channel: string, decode?: boolean, priority?: number, format?: apid.StreamFormat, signal?: AbortSignal }): Promise<http.IncomingMessage>;
+    async getChannelStream(opt: { type: apid.ChannelType, channel: string, decode?: boolean, priority?: number, format?: apid.StreamFormat, tsmfRelTs?: number, signal?: AbortSignal }): Promise<http.IncomingMessage>;
     async getChannelStream(type: apid.ChannelType, channel: string, decode?: boolean, priority?: number): Promise<http.IncomingMessage>;
     async getChannelStream(...args: any[]): Promise<http.IncomingMessage> {
         let type: apid.ChannelType;
@@ -318,6 +318,7 @@ export class Client {
         let priority: number;
         let signal: AbortSignal;
         let format: apid.StreamFormat;
+        let tsmfRelTs: number;
 
         if (typeof args[0] === "object") {
             const opt = args[0];
@@ -327,6 +328,7 @@ export class Client {
             priority = opt.priority;
             signal = opt.signal;
             format = opt.format;
+            tsmfRelTs = opt.tsmfRelTs;
         } else {
             type = args[0];
             channel = args[1];
@@ -338,7 +340,8 @@ export class Client {
             type,
             channel,
             decode: decode ? 1 : 0,
-            ...(format ? { format } : {})
+            ...(format ? { format } : {}),
+            ...(tsmfRelTs ? { tsmfRelTs } : {})
         }, { priority, signal });
     }
 

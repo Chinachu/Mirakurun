@@ -24,7 +24,7 @@ import ChannelItem from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
 import TSFilter from "./TSFilter";
 import TSDecoder from "./TSDecoder";
-import { DETECT_BYTES, DETECT_SKIP_BYTES, detectStreamFormat, detectTSMFStreamFormat } from "./StreamFormat";
+import { DETECT_BYTES, DETECT_SKIP_BYTES, TSMFStream, detectStreamFormat, detectTSMFStreamFormat, detectTSMFStreams } from "./StreamFormat";
 
 // the TLV decoders (descrambling via a server, converting) take a while to output
 const TLV_DECODER_STARTUP_TIMEOUT = 10000;
@@ -92,9 +92,23 @@ class FormatProbe extends EventEmitter {
     }
 }
 
-interface TunerCandidate {
+/** a channel and the relative stream of TSMF to receive */
+export interface StreamTarget {
     channel: ChannelItem;
+    /** the relative stream of TSMF */
+    relTs?: number;
+}
+
+interface TunerCandidate extends StreamTarget {
     devices: TunerDevice[];
+    /** the format to receive */
+    format: apid.StreamFormat;
+}
+
+interface DetectedFormat {
+    format: apid.StreamFormat;
+    /** the relative streams of TSMF (detected only if `tsmfRelTs` of the channel is not specified) */
+    tsmf: TSMFStream[] | null;
 }
 
 export class Tuner {
@@ -126,7 +140,7 @@ export class Tuner {
      * @returns the channel a tuner is available for, `null` if no tuners for the channels
      */
     async readyForJob(channels: ChannelItem | ChannelItem[]): Promise<ChannelItem> {
-        const candidates = this._getCandidates(Array.isArray(channels) ? channels : [channels]);
+        const candidates = this._getCandidates((Array.isArray(channels) ? channels : [channels]).map(channel => ({ channel })));
         if (candidates.every(candidate => candidate.devices.length === 0)) {
             log.error("readyForJob: no tuners for channel %s", candidates.map(({ channel }) => `${channel.type}/${channel.channel}`).join(", "));
             return null;
@@ -134,9 +148,9 @@ export class Tuner {
 
         while (true) {
             const picked = this._pickTunerDevice(
-                candidates.map(({ channel, devices }) => ({
-                    channel,
-                    devices: devices.filter(device => !this._readyForJobPickedDeviceSet.has(device))
+                candidates.map(candidate => ({
+                    ...candidate,
+                    devices: candidate.devices.filter(device => !this._readyForJobPickedDeviceSet.has(device))
                 })),
                 -1
             );
@@ -166,17 +180,18 @@ export class Tuner {
 
     /**
      * the output format of the stream request
+     * @param targets the channels (and the relative streams of TSMF) to receive the stream
      * @returns `null` if the format is unavailable
      */
-    getOutputFormat(channels: ChannelItem[], requested?: apid.StreamFormat): apid.StreamFormat | null {
-        const tlvChannels = channels.filter(channel => channel.isTlv);
-        if (tlvChannels.length === 0) {
+    getOutputFormat(targets: StreamTarget[], requested?: apid.StreamFormat): apid.StreamFormat | null {
+        const tlvTargets = targets.filter(({ channel, relTs }) => channel.getFormat(relTs) === "tlv");
+        if (tlvTargets.length === 0) {
             return requested === "tlv" ? null : "ts";
         }
 
-        // the channels of TS can output TS without the conversion
-        const canConvert = tlvChannels.length < channels.length ||
-            this._getCandidates(tlvChannels).some(({ devices }) => devices.some(device => !!device.config.tlvToTsDecoder));
+        // the streams of TS can output TS without the conversion
+        const canConvert = tlvTargets.length < targets.length ||
+            this._getCandidates(tlvTargets).some(({ devices }) => devices.some(device => !!device.config.tlvToTsDecoder));
         const format = requested || _.config.server.defaultTlvStreamFormat || "tlv";
         if (format === "ts" && canConvert === false) {
             return null;
@@ -184,11 +199,16 @@ export class Tuner {
         return format;
     }
 
-    initChannelStream(channel: ChannelItem, userReq: common.UserRequest, output: Writable): Promise<common.StreamFilter> {
+    /** @param relTs the relative stream of TSMF (default: `defaultRelTs` of the channel) */
+    initChannelStream(channel: ChannelItem, userReq: common.UserRequest, output: Writable, relTs?: number): Promise<common.StreamFilter> {
         let networkId: number;
 
+        relTs = relTs || channel.defaultRelTs;
+        const stream = channel.getStreamByRelTs(relTs);
         const services = channel.getServices();
-        if (services.length !== 0) {
+        if (stream !== null) {
+            networkId = stream.networkId;
+        } else if (services.length !== 0) {
             networkId = services[0].networkId;
         }
 
@@ -199,37 +219,38 @@ export class Tuner {
                 networkId,
                 parseEIT: true
             }
-        }, output);
+        }, output, [this._getCandidate(channel, relTs)]);
     }
 
     initServiceStream(service: ServiceItem, userReq: common.UserRequest, output: Writable): Promise<common.StreamFilter> {
-        const channels = service.channels;
+        const candidates = this._getCandidates(service.targets);
         return this._initTS({
             ...userReq,
             streamSetting: {
-                channel: channels[0],
+                channel: candidates[0].channel,
                 serviceId: service.serviceId,
                 networkId: service.networkId,
                 parseEIT: true
             }
-        }, output, channels);
+        }, output, candidates);
     }
 
     initProgramStream(program: apid.Program, userReq: common.UserRequest, output: Writable): Promise<common.StreamFilter> {
-        const channels = _.service.get(program.networkId, program.serviceId).channels;
+        const candidates = this._getCandidates(_.service.get(program.networkId, program.serviceId).targets);
         return this._initTS({
             ...userReq,
             streamSetting: {
-                channel: channels[0],
+                channel: candidates[0].channel,
                 serviceId: program.serviceId,
                 eventId: program.eventId,
                 networkId: program.networkId,
                 parseEIT: true
             }
-        }, output, channels);
+        }, output, candidates);
     }
 
-    async getEPG(channel: ChannelItem, time?: number): Promise<void> {
+    /** @param relTs the relative stream of TSMF (default: `defaultRelTs` of the channel) */
+    async getEPG(channel: ChannelItem, time?: number, relTs?: number): Promise<void> {
         let timeout: NodeJS.Timeout;
         if (!time) {
             time = _.config.server.epgRetrievalTime || 1000 * 60 * 10;
@@ -242,7 +263,8 @@ export class Tuner {
             throw new Error("no available services in channel");
         }
 
-        networkId = services[0].networkId;
+        relTs = relTs || channel.defaultRelTs;
+        networkId = channel.getStreamByRelTs(relTs)?.networkId ?? services[0].networkId;
 
         const tsFilter = await this._initTS({
             id: "Mirakurun:getEPG()",
@@ -253,7 +275,7 @@ export class Tuner {
                 networkId,
                 parseEIT: true
             }
-        });
+        }, undefined, [this._getCandidate(channel, relTs)]);
 
         if (tsFilter === null) {
             return;
@@ -285,15 +307,22 @@ export class Tuner {
             },
             ...user
         };
-        return this._scanServices(channel, userReq, channel.format, true);
+        return this._scanServices(channel, userReq, channel.getFormat(channel.tsmfRelTs), true);
     }
 
     /**
      * @param format the format to receive the stream
      * @param detect `true` to detect the format (only by the service scan, the streams use the format detected)
+     * @param relTs the relative stream of TSMF (default: `tsmfRelTs` of the channel)
      */
-    private async _scanServices(channel: ChannelItem, userReq: common.User, format: apid.StreamFormat, detect: boolean): Promise<apid.Service[]> {
-        const tsFilter = await this._initTS(userReq, undefined, undefined, format);
+    private async _scanServices(
+        channel: ChannelItem,
+        userReq: common.User,
+        format: apid.StreamFormat,
+        detect: boolean,
+        relTs = channel.tsmfRelTs
+    ): Promise<apid.Service[]> {
+        const tsFilter = await this._initTS(userReq, undefined, [this._getCandidate(channel, relTs, format)]);
         // the format is detected by the data of the same tuner, the scan does not wait for it
         const probe = detect ? this._startFormatProbe(userReq) : null;
         return new Promise<apid.Service[]>((resolve, reject) => {
@@ -304,16 +333,26 @@ export class Tuner {
             };
             let services: apid.Service[] = null;
             let retryFormat: apid.StreamFormat = null;
+            let tsmf: TSMFStream[] = null;
 
             const timeout = setTimeout(() => tsFilter.close(), 20000);
 
-            probe?.format.then(detected => {
-                // the scan has succeeded in the format
-                if (detected === null || detected === format || tsFilter.closed || (network.networkId !== -1 && services !== null)) {
+            probe?.detected.then(detected => {
+                if (detected === null || tsFilter.closed) {
                     return;
                 }
-                log.info("Tuner: the format of %s/%s is detected as `%s`, scanning again", channel.type, channel.channel, detected);
-                retryFormat = detected;
+                // the scan receives the relative streams mixed
+                if (detected.tsmf !== null) {
+                    tsmf = detected.tsmf;
+                    tsFilter.close();
+                    return;
+                }
+                // the scan has succeeded in the format
+                if (detected.format === format || (network.networkId !== -1 && services !== null)) {
+                    return;
+                }
+                log.info("Tuner: the format of %s/%s is detected as `%s`, scanning again", channel.type, channel.channel, detected.format);
+                retryFormat = detected.format;
                 tsFilter.close();
             });
 
@@ -333,13 +372,20 @@ export class Tuner {
                 })
             ]).then(() => tsFilter.close());
 
-            tsFilter.once("close", () => {
+            tsFilter.once("close", async () => {
                 tsFilter.removeAllListeners("network");
                 tsFilter.removeAllListeners("services");
                 clearTimeout(timeout);
+                // TSMF is known only by the detection (the data received by the scan is enough in most cases)
+                if (probe?.tsmf === true && retryFormat === null && tsmf === null) {
+                    tsmf = (await probe.detected)?.tsmf || null;
+                }
                 probe?.end();
 
-                if (retryFormat !== null) {
+                if (tsmf !== null) {
+                    // the tuner is kept tuned for a while, the streams of the scans join it
+                    resolve(this._scanTSMFServices(channel, userReq, tsmf));
+                } else if (retryFormat !== null) {
                     // the tuner is kept tuned for a while, the stream of the scan joins it
                     resolve(this._scanServices(channel, userReq, retryFormat, false));
                 } else if (network.networkId === -1) {
@@ -347,7 +393,8 @@ export class Tuner {
                 } else if (services === null) {
                     reject(new Error("stream has closed before get services"));
                 } else {
-                    if (services.length > 0 && _.channel.get(channel.type, channel.channel) === channel) {
+                    // the streams of all the relative streams of TSMF are saved together
+                    if (services.length > 0 && relTs === channel.tsmfRelTs && _.channel.get(channel.type, channel.channel) === channel) {
                         channel.setStream(services[0].networkId, services[0].streamId, format);
                     }
                     if (network.remoteControlKeyId !== -1) {
@@ -360,6 +407,47 @@ export class Tuner {
                 }
             });
         });
+    }
+
+    /**
+     * scans all the relative streams of TSMF at the same time
+     * (a relative stream may have no services, such as for the engineering)
+     */
+    private async _scanTSMFServices(channel: ChannelItem, userReq: common.User, streams: TSMFStream[]): Promise<apid.Service[]> {
+        log.info(
+            "Tuner: the relative streams of TSMF on %s/%s are detected: %s",
+            channel.type, channel.channel, streams.map(stream => `${stream.relTs}:${stream.format}(${stream.slots} slots)`).join(", ")
+        );
+
+        const results = await Promise.allSettled(streams.map(stream => this._scanServices(
+            channel,
+            { ...userReq, streamSetting: { ...userReq.streamSetting } },
+            stream.format,
+            false,
+            stream.relTs
+        )));
+
+        const services: apid.Service[] = [];
+        let lastError: Error = null;
+        results.forEach((result, i) => {
+            if (result.status === "fulfilled") {
+                services.push(...result.value);
+            } else {
+                lastError = result.reason;
+                log.warn(
+                    "Tuner: the services of the relative stream %d of TSMF on %s/%s are not received [%s]",
+                    streams[i].relTs, channel.type, channel.channel, lastError.message
+                );
+            }
+        });
+        if (services.length === 0 && lastError !== null) {
+            throw lastError;
+        }
+
+        if (_.channel.get(channel.type, channel.channel) === channel) {
+            channel.setStreams(streams.map(({ networkId, streamId, format, relTs, slots }) => ({ networkId, streamId, format, relTs, slots })));
+        }
+        return services;
     }
 
     private _load(): this {
@@ -437,11 +525,12 @@ export class Tuner {
     }
 
     /**
-     * detects the format of the stream by joining the tuner streaming to `user` (does not tune by itself)
+     * detects the format (and the relative streams of TSMF) of the stream by joining the tuner streaming to `user` (does not tune by itself)
      * @returns `null` if the format is not detected: the remote Mirakurun outputs the format by itself,
      * and only the tuners for TLV (MMT) detect, not to add any work to the environments only for TS
+     * (`tsmf`: whether the relative streams of TSMF are detected)
      */
-    private _startFormatProbe(user: common.User): { format: Promise<apid.StreamFormat | null>, end: () => void } | null {
+    private _startFormatProbe(user: common.User): { detected: Promise<DetectedFormat | null>, tsmf: boolean, end: () => void } | null {
         // the ID of the scan is not unique (the scans run on the tuners at the same time), `streamSetting` is of this scan
         const device = this._devices.find(device => device.users.some(deviceUser => deviceUser.streamSetting === user.streamSetting));
         if (!device || device.isRemote) {
@@ -452,42 +541,44 @@ export class Tuner {
             return null;
         }
 
-        // TSMF is TS outside, the relative stream is detected by the header
-        const channel = user.streamSetting.channel;
-        const probe = new FormatProbe(channel.tsmfRelTs ? data => detectTSMFStreamFormat(data, channel.tsmfRelTs) : detectStreamFormat);
-        const format = probe.detect(DETECT_TIMEOUT).then(detected => {
+        // TSMF is TS outside, the relative streams are detected by the header
+        const relTs = user.streamSetting.channel.tsmfRelTs;
+        let tsmf: TSMFStream[] = null;
+        const probe = new FormatProbe(relTs ? data => detectTSMFStreamFormat(data, relTs) : data => {
+            tsmf = detectTSMFStreams(data);
+            return tsmf === null ? detectStreamFormat(data) : "ts";
+        });
+        const detected = probe.detect(DETECT_TIMEOUT).then(format => {
             probe.end();
-            return detected;
+            return format === null ? null : { format, tsmf };
         });
         device.startStream({ ...user, id: `${user.id}#format` }, probe).catch(err => {
             log.debug("Tuner: the format detection has failed (%s)", err.message);
             probe.end();
         });
-        return { format, end: () => probe.end() };
+        return { detected, tsmf: !relTs, end: () => probe.end() };
     }
 
     /**
-     * @param channels candidate channels carrying the same stream (default: `streamSetting.channel`)
-     * @param format the format detected (default: `format` of the channel)
+     * @param candidates the channels (and the relative streams of TSMF) carrying the same stream (default: `streamSetting.channel`)
      */
-    private async _initTS(user: common.User, dest?: Writable, channels?: ChannelItem[], format?: apid.StreamFormat): Promise<common.StreamFilter | null> {
+    private async _initTS(user: common.User, dest?: Writable, candidates?: TunerCandidate[]): Promise<common.StreamFilter | null> {
         const setting = user.streamSetting;
 
         if (_.config.server.disableEITParsing === true) {
             setting.parseEIT = false;
         }
 
-        let candidates = this._getCandidates(channels || [setting.channel]);
-        // the format detected is only for `streamSetting.channel`
-        const isTlvChannel = (channel: ChannelItem) => (channels === undefined && format) ? format === "tlv" : channel.isTlv;
+        candidates = candidates || [this._getCandidate(setting.channel, setting.channel.defaultRelTs)];
         if (dest && user.outputFormat) {
-            candidates = candidates.map(({ channel, devices }) => {
-                if (isTlvChannel(channel)) {
+            candidates = candidates.map(candidate => {
+                const { devices } = candidate;
+                if (candidate.format === "tlv") {
                     // only the tuners can convert TLV to TS
-                    return { channel, devices: user.outputFormat === "ts" ? devices.filter(device => !!device.config.tlvToTsDecoder) : devices };
+                    return { ...candidate, devices: user.outputFormat === "ts" ? devices.filter(device => !!device.config.tlvToTsDecoder) : devices };
                 }
-                // the channels of TS cannot output TLV
-                return { channel, devices: user.outputFormat === "tlv" ? [] : devices };
+                // the streams of TS cannot output TLV
+                return { ...candidate, devices: user.outputFormat === "tlv" ? [] : devices };
             });
         }
         let tryCount = 50;
@@ -512,9 +603,12 @@ export class Tuner {
                 await new Promise(resolve => setTimeout(resolve, 250));
             } else {
                 // found
-                const { device, channel } = picked;
-                const isTlv = isTlvChannel(channel);
+                const { device, channel, candidate } = picked;
+                const isTlv = candidate.format === "tlv";
+                // the remote Mirakurun outputs the relative stream of its own (`tsmfRelTs` of the channel only, as before)
+                const relTs = device.isRemote ? channel.tsmfRelTs : candidate.relTs;
                 setting.channel = channel;
+                setting.tsmfRelTs = relTs;
                 log.debug("Tuner: picked TunerDevice#%d for user `%s` in %dms", device.index, user.id, Date.now() - startedAt);
 
                 let tsFilter: common.StreamFilter;
@@ -529,7 +623,7 @@ export class Tuner {
                         parseNIT: setting.parseNIT,
                         parseSDT: setting.parseSDT,
                         parseEIT: setting.parseEIT,
-                        tsmfRelTs: setting.channel.tsmfRelTs
+                        tsmfRelTs: relTs
                     });
                 } else {
                     let output: Writable;
@@ -550,7 +644,7 @@ export class Tuner {
                         parseNIT: setting.parseNIT,
                         parseSDT: setting.parseSDT,
                         parseEIT: setting.parseEIT,
-                        tsmfRelTs: setting.channel.tsmfRelTs
+                        tsmfRelTs: relTs
                     });
                 }
 
@@ -634,37 +728,37 @@ export class Tuner {
     private _pickTunerDevice(
         candidates: TunerCandidate[],
         priority: number
-    ): { device: TunerDevice, channel: ChannelItem } | null {
+    ): { device: TunerDevice, channel: ChannelItem, candidate: TunerCandidate } | null {
         // 1. join to existing
-        for (const { channel, devices } of candidates) {
-            for (const device of devices) {
-                if (device.isAvailable === true && device.channel === channel) {
-                    return { device, channel };
+        for (const candidate of candidates) {
+            for (const device of candidate.devices) {
+                if (device.isAvailable === true && device.channel === candidate.channel) {
+                    return { device, channel: candidate.channel, candidate };
                 }
             }
         }
 
         // 2. start as new
-        for (const { channel, devices } of candidates) {
-            for (const device of devices) {
+        for (const candidate of candidates) {
+            for (const device of candidate.devices) {
                 if (device.isFree === true) {
-                    return { device, channel };
+                    return { device, channel: candidate.channel, candidate };
                 }
             }
         }
 
         // 3. replace existing
-        for (const { channel, devices } of candidates) {
-            for (const device of devices) {
+        for (const candidate of candidates) {
+            for (const device of candidate.devices) {
                 if (device.isAvailable === true && device.users.length === 0) {
-                    return { device, channel };
+                    return { device, channel: candidate.channel, candidate };
                 }
             }
         }
 
         // 4. takeover existing
         if (priority >= 0) {
-            const targets = candidates.flatMap(({ channel, devices }) => devices.map(device => ({ device, channel })));
+            const targets = candidates.flatMap(candidate => candidate.devices.map(device => ({ device, channel: candidate.channel, candidate })));
             targets.sort((t1, t2) => t1.device.getPriority() - t2.device.getPriority());
             for (const target of targets) {
                 if (target.device.isUsing === true && target.device.getPriority() < priority) {
@@ -676,11 +770,18 @@ export class Tuner {
         return null;
     }
 
-    private _getCandidates(channels: ChannelItem[]): TunerCandidate[] {
-        return channels.map(channel => ({
+    private _getCandidates(targets: StreamTarget[]): TunerCandidate[] {
+        return targets.map(({ channel, relTs }) => this._getCandidate(channel, relTs));
+    }
+
+    /** @param format the format to receive (default: the format of the channel or the relative stream) */
+    private _getCandidate(channel: ChannelItem, relTs?: number, format?: apid.StreamFormat): TunerCandidate {
+        return {
             channel,
-            devices: this._getDevicesByType(channel.type, channel.route)
-        }));
+            devices: this._getDevicesByType(channel.type, channel.route),
+            relTs,
+            format: format || channel.getFormat(relTs)
+        };
     }
 
     private _getDevicesByType(type: apid.ChannelType, route?: apid.ChannelRoute): TunerDevice[] {

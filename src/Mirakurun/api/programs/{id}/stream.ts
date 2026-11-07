@@ -56,7 +56,7 @@ export const get: Operation = (req, res) => {
         return;
     }
 
-    api.responseStream(req, res, service.channels, userReq => _.tuner.initProgramStream(program, userReq, res))
+    api.responseStream(req, res, service.targets, userReq => _.tuner.initProgramStream(program, userReq, res))
         .then(tsFilter => {
             if (tsFilter) {
                 req.setTimeout(1000 * 60 * 10); // 10 minites

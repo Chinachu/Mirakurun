@@ -221,7 +221,7 @@ TLV (MMT) のチャンネルでは、タイプにかかわらず、`decoder` の
   # 以下はオプション
   route: TER # 列挙型 [TER|SAT|CATV|HIKARI] - 受信する経路。省略した場合、GR は TER、それ以外は SAT
   serviceId: 1234 # Integer - 指定しない場合、サービスは自動的にスキャンされます。
-  tsmfRelTs: 1 # 数値: 1~15 - TSMF の相対 TS 番号。TLV のチャンネルでは、拡張 TSMF で TLV を伝送する相対 TS 番号 (単一の搬送波のみ)
+  tsmfRelTs: 1 # 数値: 1~15 - TSMF の相対 TS 番号。指定しない場合、TLV 用のチューナーではサービスのスキャンで TSMF のすべての相対 TS を判別する
   format: tlv # 列挙型 [ts|tlv] - 指定しない場合、サービスのスキャンで判別した形式 (スキャンの前は BS4K なら tlv、それ以外は ts)
   commandVars: # オプションのコマンド変数 *@4.0.0~
     satellite: EXAMPLE-SAT4A
@@ -232,6 +232,14 @@ TLV (MMT) のチャンネルでは、タイプにかかわらず、`decoder` の
     exampleArg2: -arg2 "引用符を使用して空白を含むことができます"
   isDisabled: false # Boolean
 ```
+
+#### tsmfRelTs
+
+TSMF で多重化されたチャンネルの相対 TS 番号です。拡張 TSMF で TLV を伝送する相対 TS も指定できます (単一の搬送波のみ)。
+
+指定しない場合は、サービスのスキャンのときに TSMF の多重フレームヘッダーから、使われているすべての相対 TS と、それぞれが TS か TLV かを判別し、相対 TS ごとにサービスを登録します (`channels.json` に保存します)。サービスや番組のストリームは、サービスの相対 TS を受信します。判別するのは、`format` と同じく、タイプに `BS4K` を含むか、`tlvDecoder` / `tlvToTsDecoder` を設定したチューナーでスキャンした場合だけです。TS だけのチューナーで TSMF のチャンネルを受信する場合は、`tsmfRelTs` を指定してください。
+
+チャンネル単位のストリーム (`/api/channels/{type}/{channel}/stream`) では、`tsmfRelTs` のクエリで相対 TS を指定できます。指定しない場合は、channels.yml の `tsmfRelTs`、なければスロットの数がいちばん多い相対 TS (同じ数なら番号の小さいほう) を出力します。
 
 #### format
 

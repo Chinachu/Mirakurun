@@ -19,6 +19,8 @@ import _ from "./_";
 import * as apid from "../../api";
 import Event from "./Event";
 import ChannelItem from "./ChannelItem";
+import type { StreamLocation } from "./Channel";
+import type { StreamTarget } from "./Tuner";
 
 export default class ServiceItem {
     static getId(networkId: number, serviceId: number): number {
@@ -155,32 +157,50 @@ export default class ServiceItem {
 
     /** channels carrying the stream of the service, the channel scanned the service comes first. */
     get channels(): ChannelItem[] {
-        const channels: ChannelItem[] = [];
+        return [...new Set(this.locations.map(location => location.channel))];
+    }
+
+    /**
+     * the channels and the streams (the relative streams of TSMF) carrying the stream of the service.
+     * `stream` is `null` until the stream is received on the channel.
+     */
+    get locations(): StreamLocation[] {
+        const locations: StreamLocation[] = [];
 
         // until the stream is received on the channel, it is trusted as before
-        const stream = this._channel.stream;
-        if (
-            this._streamId === undefined ||
-            stream === null ||
-            (stream.networkId === this._networkId && stream.streamId === this._streamId)
-        ) {
-            channels.push(this._channel);
+        const streams = this._channel.streams;
+        if (this._streamId === undefined || streams.length === 0) {
+            locations.push({ channel: this._channel, stream: null });
         }
 
         if (this._streamId !== undefined) {
-            for (const channel of _.channel.findByStream(this._networkId, this._streamId)) {
-                if (channel !== this._channel) {
-                    channels.push(channel);
-                }
-            }
+            const found = _.channel.findStreamLocations(this._networkId, this._streamId);
+            // the channel scanned the service comes first
+            locations.push(...found.filter(location => location.channel === this._channel));
+            locations.push(...found.filter(location => location.channel !== this._channel));
         }
 
         // the stream has moved from the channel but not found elsewhere yet
-        if (channels.length === 0) {
-            channels.push(this._channel);
+        if (locations.length === 0) {
+            locations.push({ channel: this._channel, stream: null });
         }
 
-        return channels;
+        return locations;
+    }
+
+    /** the channels and the relative streams of TSMF to receive the service, the channel scanned the service comes first. */
+    get targets(): StreamTarget[] {
+        return this.locations.map(({ channel, stream }) => ({ channel, relTs: stream ? stream.relTs : channel.defaultRelTs }));
+    }
+
+    /** the format of the stream carrying the service */
+    get format(): apid.StreamFormat {
+        const location = this.locations[0];
+        return location.channel.getFormat(location.stream?.relTs);
+    }
+
+    get isTlv(): boolean {
+        return this.format === "tlv";
     }
 
     export(): apid.Service {

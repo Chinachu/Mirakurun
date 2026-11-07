@@ -23,6 +23,30 @@ import { StreamFilter, UserRequest, stringifyJSONArray } from "./common";
 import * as log from "./log";
 import _ from "./_";
 import type ChannelItem from "./ChannelItem";
+import type { StreamTarget } from "./Tuner";
+
+/** Service references on this carrier, including the relative TS needed to request each one. */
+export function getChannelServices(channel: ChannelItem): apid.Service[] {
+    const streams = channel.streams;
+    const hasRelativeStreams = streams.some(stream => stream.relTs !== undefined);
+    return channel.getServices().map(service => {
+        const result: apid.Service = {
+            id: service.id,
+            serviceId: service.serviceId,
+            networkId: service.networkId,
+            streamId: service.streamId,
+            name: service.name,
+            type: service.type
+        };
+        if (hasRelativeStreams) {
+            const relative = streams.find(stream => stream.networkId === service.networkId && stream.streamId === service.streamId)?.relTs;
+            if (relative !== undefined) {
+                result.tsmfRelTs = relative;
+            }
+        }
+        return result;
+    });
+}
 
 export interface Error {
     readonly code: number;
@@ -71,16 +95,16 @@ export const streamFormatParameter = {
 
 /**
  * responds a stream (GET and HEAD use the same output format)
- * @param channels the channels to receive the stream
+ * @param targets the channels (and the relative streams of TSMF) to receive the stream
  * @param start starts the stream with the user request
  */
 export function responseStream(
     req: express.Request,
     res: express.Response,
-    channels: ChannelItem[],
+    targets: StreamTarget[],
     start: (userReq: UserRequest) => Promise<StreamFilter>
 ): Promise<StreamFilter | null> {
-    const outputFormat = _.tuner.getOutputFormat(channels, req.query.format as apid.StreamFormat);
+    const outputFormat = _.tuner.getOutputFormat(targets, req.query.format as apid.StreamFormat);
     if (outputFormat === null) {
         responseError(res, 406, "Requested Stream Format Unavailable");
         return Promise.resolve(null);
