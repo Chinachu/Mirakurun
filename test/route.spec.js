@@ -605,6 +605,23 @@ describe("[route.spec] route / streamId", () => {
   });
 
   describe("Tuner: sharing bonded carriers", () => {
+    // 判別した相対 TS は、リモートの Mirakurun では受信できない (その Mirakurun の相対 TS を出力する)
+    it("does not pick the remote tuners for the carriers of the relative stream detected", () => {
+      setupChannels([0, 1].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` })));
+      const channels = _.channel.items;
+      channels.forEach((channel, i) => channel.setStreams([{ networkId: 11, streamId: 60001, relTs: 1, format: "tlv", slots: 52, groupId: 5, numberOfCarriers: 2, carrierSequence: i }]));
+      const local = fakeDevice(0, ["BS4K"], ["CATV"]);
+      const remote = fakeDevice(1, ["BS4K"], ["CATV"], { isRemote: true });
+      const t = tuner([local, remote]);
+      const candidate = t._getCandidate(channels[0], 1);
+
+      assert.strictEqual(t._pickCarrierDevices({ device: local, channel: channels[0], candidate }, 0), null);
+
+      const local2 = fakeDevice(2, ["BS4K"], ["CATV"]);
+      t._devices.push(local2);
+      assert.deepStrictEqual(t._pickCarrierDevices({ device: local, channel: channels[0], candidate }, 0).map(({ device }) => device), [local2]);
+    });
+
     it("accepts tsmfGroupId without tsmfRelTs for automatic relative-stream discovery", () => {
       const warn = mock.method(log, "warn", () => {});
       try {

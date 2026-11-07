@@ -803,9 +803,11 @@ export class Tuner {
             if (carrierChannel === channel) {
                 continue;
             }
+            // the tuners of the candidate (the relative stream detected is not received by the remote tuners)
+            const carrierCandidate = this._getCandidate(carrierChannel, candidate.relTs, candidate.format);
             const carrier = this._pickTunerDevice([{
-                ...this._getCandidate(carrierChannel, candidate.relTs, candidate.format),
-                devices: this._getDevicesByType(carrierChannel.type, carrierChannel.route).filter(d => used.has(d) === false)
+                ...carrierCandidate,
+                devices: carrierCandidate.devices.filter(d => used.has(d) === false)
             }], priority);
             if (carrier === null) {
                 return null;
