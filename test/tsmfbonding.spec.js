@@ -387,7 +387,8 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
       }
     }
     assert.deepStrictEqual(errors, []);
-    assert.ok(maxMs < 100, `a push took ${maxMs}ms`);
+    // 区切らない場合の 1 秒ほどと区別する (テスト全体を並行して実行する場合の遅れを見込む)
+    assert.ok(maxMs < 300, `a push took ${maxMs}ms`);
     const { matched } = assertTLV(Buffer.concat(out), tlv);
     assert.ok(matched > tlv.length / 3, `assembled ${matched} of ${tlv.length} TLV packets`);
   });
