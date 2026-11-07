@@ -1629,9 +1629,13 @@ describe("[route.spec] route / streamId", () => {
       await new Promise(resolve => setImmediate(resolve));
       assert.strictEqual(device.supportsRemoteRelTs, true);
 
+      // TSMF is detected by the remote Mirakurun (the relative stream without the services registered may be detected)
       device.getRemoteChannel = async () => ({ type: "BS", channel: "C46", services: [{ id: 1, serviceId: 265, networkId: 4, streamId: 18801, tsmfRelTs: 2 }] });
       assert.strictEqual(device.isRemoteChannelRelTsChecked(channel, 3), false);
-      assert.deepStrictEqual([await device.checkRemoteChannelRelTs(channel, 2), await device.checkRemoteChannelRelTs(channel, 3)], [true, false]);
+      assert.deepStrictEqual([await device.checkRemoteChannelRelTs(channel, 2), await device.checkRemoteChannelRelTs(channel, 3)], [true, true]);
+      // not detected
+      device.getRemoteChannel = async () => ({ type: "BS", channel: "C46", services: [{ id: 1, serviceId: 265, networkId: 4, streamId: 18801 }] });
+      assert.strictEqual(await device.checkRemoteChannelRelTs(channel, 3), false);
       assert.deepStrictEqual([device.isRemoteChannelRelTsChecked(channel, 3), device.canReceiveRemoteRelTs(channel, 2), device.canReceiveRemoteRelTs(channel, 3)], [true, true, false]);
       // not known (failed to get): requested
       device.getRemoteChannel = async () => { throw new Error("ECONNREFUSED"); };

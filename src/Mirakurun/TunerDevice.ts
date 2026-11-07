@@ -396,9 +396,10 @@ export default class TunerDevice extends EventEmitter {
     }
 
     /**
-     * checks whether the remote Mirakurun has detected the relative stream of the channel
+     * checks whether the remote Mirakurun has detected the relative streams of the channel
      * (`tsmfRelTs` of the services of the channel, or `tsmfRelTs` of its channels.yml),
-     * not requested for a while if not detected (refused: an empty stream), requested if not known (such as failed to get, or no services yet)
+     * not requested for a while if not detected (refused: an empty stream), requested if not known (such as failed to get, or no services yet).
+     * The relative stream without the services registered may be detected (refused by the remote Mirakurun if not, not requested for a while)
      */
     async checkRemoteChannelRelTs(channel: ChannelItem, relTs: number): Promise<boolean> {
         const key = `${channel.type}/${channel.channel}/${relTs}`;
@@ -406,7 +407,7 @@ export default class TunerDevice extends EventEmitter {
         try {
             const remoteChannel = await this.getRemoteChannel(channel.type, channel.channel);
             const services = remoteChannel.services || [];
-            detected = remoteChannel.tsmfRelTs === relTs || services.length === 0 || services.some(service => service.tsmfRelTs === relTs);
+            detected = remoteChannel.tsmfRelTs === relTs || services.length === 0 || services.some(service => service.tsmfRelTs !== undefined);
         } catch (err) {
             log.debug("TunerDevice#%d failed to get the channel %s/%s of the remote Mirakurun [%s]", this._index, channel.type, channel.channel, err.message);
             detected = true;
