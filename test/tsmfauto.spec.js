@@ -383,7 +383,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     }
   });
 
-  it("is ready for the job of the relative stream detected only by the local tuners", async () => {
+  it("is ready for the job of the relative stream detected by the local tuners first", async () => {
     const remote = { index: 0, config: { name: "remote", types: ["BS"] }, isRemote: true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
     const local = { index: 1, config: { name: "local", types: ["BS"] }, isRemote: false, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
     const t = Object.create(Tuner.prototype);
@@ -391,9 +391,15 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     t._readyForJobPickedDeviceSet = new Set();
     _.channel = { getStreams: () => [] };
     const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46" });
-    // the remote tuner is not picked (the former) for the relative stream detected
+    // the local tuner is picked first (the latter) for the relative stream detected
     assert.strictEqual(await t.readyForJob([{ channel, relTs: 5 }]), channel);
     assert.deepStrictEqual([...t._readyForJobPickedDeviceSet], [local]);
+    t._readyForJobPickedDeviceSet.clear();
+    // the remote tuner requests the relative stream detected
+    t._devices = [remote];
+    assert.strictEqual(await t.readyForJob([{ channel, relTs: 5 }]), channel);
+    assert.deepStrictEqual([...t._readyForJobPickedDeviceSet], [remote]);
+    t._devices = [remote, local];
     t._readyForJobPickedDeviceSet.clear();
     assert.strictEqual(await t.readyForJob([{ channel }]), channel);
     assert.deepStrictEqual([...t._readyForJobPickedDeviceSet], [remote]);
@@ -419,7 +425,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     }
   });
 
-  it("parses EIT of the network of TS for the stream as received, and does not receive the relative stream specified by the remote tuners", async () => {
+  it("parses EIT of the network of TS for the stream as received, and receives the relative stream specified by the remote tuners", async () => {
     const streams = [
       { networkId: 11, streamId: 45168, relTs: 1, slots: 28, format: "tlv" },
       { networkId: 4, streamId: 18801, relTs: 2, slots: 24, format: "ts" }
@@ -436,10 +442,11 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     await t.initChannelStream(channel, { id: "u" }, null, 1);
     assert.deepStrictEqual(users, [[4, undefined], [11, 1]]);
     t._devices = [{ config: { name: "remote", types: ["BS"] }, isRemote: true }];
-    await assert.rejects(t.initChannelStream(channel, { id: "u" }, null, 1), /no available tuners/);
+    await t.initChannelStream(channel, { id: "u" }, null, 1);
+    assert.deepStrictEqual(users[2], [11, 1]);
   });
 
-  it("receives the stream of the channel as before if only the remote tuners are left", async () => {
+  it("requests the relative stream detected from the remote tuners if only they are left", async () => {
     const remote = { index: 0, config: { name: "remote", types: ["BS"] }, isRemote: true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
     const t = Object.create(Tuner.prototype);
     t._devices = [remote];
@@ -447,8 +454,8 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     _.channel = { getStreams: () => [{ networkId: 11, streamId: 45168, relTs: 5, slots: 28, format: "tlv" }] };
     const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46" });
     const candidate = t._getCandidate(channel, 5);
-    assert.deepStrictEqual([candidate.relTs, candidate.format, candidate.devices], [undefined, "ts", [remote]]);
-    assert.strictEqual(t.getOutputFormat([{ channel, relTs: 5 }]), "ts");
+    assert.deepStrictEqual([candidate.relTs, candidate.format, candidate.devices], [5, "tlv", [remote]]);
+    assert.strictEqual(t.getOutputFormat([{ channel, relTs: 5 }]), "tlv");
     assert.strictEqual(await t.readyForJob([{ channel, relTs: 5 }]), channel);
     t._readyForJobPickedDeviceSet.clear();
   });
@@ -470,7 +477,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     assert.strictEqual(t.getOutputFormat([{ channel, relTs: 2 }, { channel, relTs: 5 }], "tlv"), "tlv");
   });
 
-  it("receives the relative streams detected only by the local tuners", () => {
+  it("receives the relative streams detected by the local tuners first, and by the remote tuners", () => {
     const local = { config: { name: "local", types: ["BS"] }, isRemote: false };
     const remote = { config: { name: "remote", types: ["BS"] }, isRemote: true };
     const t = Object.create(Tuner.prototype);
@@ -478,8 +485,10 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     _.channel = { getStreams: () => [] };
     const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46" });
     const configured = new ChannelItem({ name: "C", type: "BS", channel: "C47", tsmfRelTs: 5 });
-    // the remote Mirakurun outputs the relative stream of its own
-    assert.deepStrictEqual(t._getCandidate(channel, 5).devices, [local]);
+    // the remote Mirakurun outputs the relative stream specified (4.3.0 or before ignores it)
+    t._devices = [remote, local];
+    assert.deepStrictEqual(t._getCandidate(channel, 5).devices, [local, remote]);
+    t._devices = [local, remote];
     assert.deepStrictEqual(t._getCandidate(channel).devices, [local, remote]);
     assert.deepStrictEqual(t._getCandidate(configured, 5).devices, [local, remote]);
   });

@@ -25,7 +25,7 @@ describe("[remote.spec] lib/remote", () => {
 
   function run(port) {
     return new Promise(resolve => {
-      const proc = childProcess.spawn(process.execPath, ["lib/remote", "127.0.0.1", String(port), "BS4K", "C19", "decode", "tlv"], { cwd: root });
+      const proc = childProcess.spawn(process.execPath, ["lib/remote", "127.0.0.1", String(port), "BS4K", "C19", "decode", "tlv", "relTs=3"], { cwd: root });
       let stderr = "";
       proc.stderr.on("data", data => stderr += data);
       proc.on("close", code => resolve({ code, stderr }));
@@ -50,7 +50,7 @@ describe("[remote.spec] lib/remote", () => {
     try {
       const refused = await run(port);
       assert.strictEqual(refused.code, 2, refused.stderr);
-      assert.deepStrictEqual(requested, ["/api/channels/BS4K/C19/stream?decode=1&format=tlv"]);
+      assert.deepStrictEqual(requested, ["/api/channels/BS4K/C19/stream?decode=1&format=tlv&tsmfRelTs=3"]);
     } finally {
       await new Promise(resolve => server.close(resolve));
     }
