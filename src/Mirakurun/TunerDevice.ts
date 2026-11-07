@@ -396,19 +396,23 @@ export default class TunerDevice extends EventEmitter {
     }
 
     /**
-     * checks whether the remote Mirakurun has detected the relative stream of the channel (`tsmfRelTs` of the services of the channel),
-     * not requested for a while if not detected (refused: an empty stream), requested if not known (such as failed to get)
+     * checks whether the remote Mirakurun has detected the relative stream of the channel
+     * (`tsmfRelTs` of the services of the channel, or `tsmfRelTs` of its channels.yml),
+     * not requested for a while if not detected (refused: an empty stream), requested if not known (such as failed to get, or no services yet)
      */
     async checkRemoteChannelRelTs(channel: ChannelItem, relTs: number): Promise<boolean> {
         const key = `${channel.type}/${channel.channel}/${relTs}`;
-        this._remoteChannelRelTsCheckedAt.set(key, Date.now());
         let detected: boolean;
         try {
-            const services = (await this.getRemoteChannel(channel.type, channel.channel)).services || [];
-            detected = services.some(service => service.tsmfRelTs === relTs);
+            const remoteChannel = await this.getRemoteChannel(channel.type, channel.channel);
+            const services = remoteChannel.services || [];
+            detected = remoteChannel.tsmfRelTs === relTs || services.length === 0 || services.some(service => service.tsmfRelTs === relTs);
         } catch (err) {
             log.debug("TunerDevice#%d failed to get the channel %s/%s of the remote Mirakurun [%s]", this._index, channel.type, channel.channel, err.message);
-            return true;
+            detected = true;
+        } finally {
+            // checked when finished (not to check again while checking)
+            this._remoteChannelRelTsCheckedAt.set(key, Date.now());
         }
         if (!detected) {
             log.info("TunerDevice#%d the relative stream %d on %s/%s is not detected by the remote Mirakurun", this._index, relTs, channel.type, channel.channel);

@@ -44,6 +44,8 @@ export interface Channel {
     name?: string;
     /** receiving route. (default: `TER` for `GR`, `SAT` for others) */
     route?: ChannelRoute;
+    /** the relative stream of TSMF of channels.yml */
+    tsmfRelTs?: number;
     services?: Service[];
 }
 

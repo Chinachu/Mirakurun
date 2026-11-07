@@ -1636,6 +1636,19 @@ describe("[route.spec] route / streamId", () => {
       // not known (failed to get): requested
       device.getRemoteChannel = async () => { throw new Error("ECONNREFUSED"); };
       assert.strictEqual(await device.checkRemoteChannelRelTs(channel, 4), true);
+      // tsmfRelTs of channels.yml of the remote Mirakurun (its services have no tsmfRelTs), and no services yet: requested
+      device.getRemoteChannel = async () => ({ type: "BS", channel: "C46", tsmfRelTs: 5, services: [{ id: 1, serviceId: 265, networkId: 4, streamId: 18801 }] });
+      assert.deepStrictEqual([await device.checkRemoteChannelRelTs(channel, 5), device.canReceiveRemoteRelTs(channel, 5)], [true, true]);
+      device.getRemoteChannel = async () => ({ type: "BS", channel: "C46", services: [] });
+      assert.deepStrictEqual([await device.checkRemoteChannelRelTs(channel, 6), device.canReceiveRemoteRelTs(channel, 6)], [true, true]);
+      // checked when finished (not while checking)
+      let respond;
+      device.getRemoteChannel = () => new Promise(resolve => respond = resolve);
+      const checking = device.checkRemoteChannelRelTs(channel, 7);
+      assert.strictEqual(device.isRemoteChannelRelTsChecked(channel, 7), false);
+      respond({ type: "BS", channel: "C46", services: [] });
+      await checking;
+      assert.strictEqual(device.isRemoteChannelRelTsChecked(channel, 7), true);
     });
 
     // リモートの Mirakurun に断られた相対 TS (リモートで判別されていないなど) は、しばらくそのチューナーで要求しない
