@@ -29,6 +29,9 @@ export interface ChannelStream {
     readonly relTs?: number;
     /** TSMF: the slots of the relative stream in a frame */
     readonly slots?: number;
+    readonly groupId?: number;
+    readonly numberOfCarriers?: number;
+    readonly carrierSequence?: number;
 }
 
 export default class ChannelItem {
@@ -37,8 +40,8 @@ export default class ChannelItem {
     readonly route: apid.ChannelRoute;
     readonly channel: string;
     readonly tsmfRelTs: number;
-    readonly tsmfGroupId: number;
     readonly commandVars: apid.ConfigChannelsItem["commandVars"];
+    private _configuredTsmfGroupId: number;
     private _format: apid.StreamFormat;
     /** as configured (for the output) */
     private _configuredTsmfRelTs: number;
@@ -51,9 +54,13 @@ export default class ChannelItem {
         // `0` or empty is not specified
         this.tsmfRelTs = config.tsmfRelTs || undefined;
         this._configuredTsmfRelTs = config.tsmfRelTs;
-        this.tsmfGroupId = config.tsmfGroupId;
+        this._configuredTsmfGroupId = config.tsmfGroupId;
         this.commandVars = config.commandVars;
         this._format = config.format;
+    }
+
+    get tsmfGroupId(): number {
+        return this._configuredTsmfGroupId ?? this.streams.find(stream => stream.groupId > 0)?.groupId;
     }
 
     /** the streams received last time (the relative streams of TSMF). `[]` until received once. */
@@ -154,7 +161,7 @@ export default class ChannelItem {
             route: this.route,
             tsmfRelTs: this._configuredTsmfRelTs,
             format: this._format,
-            tsmfGroupId: this.tsmfGroupId,
+            tsmfGroupId: this._configuredTsmfGroupId,
             commandVars: this.commandVars
         };
     }
@@ -164,7 +171,10 @@ export default class ChannelItem {
         if (!this.tsmfGroupId) {
             return null;
         }
-        return _.channel.items.filter(item => item.type === this.type && item.tsmfGroupId === this.tsmfGroupId);
+        return _.channel.items.filter(item => item.type === this.type && (this._configuredTsmfGroupId !== undefined || item.route === this.route) && item.tsmfGroupId === this.tsmfGroupId &&
+            (this._configuredTsmfGroupId !== undefined || this.streams.some(stream => stream.format === "tlv" &&
+                item.streams.some(other => other.format === "tlv" && other.networkId === stream.networkId && other.streamId === stream.streamId &&
+                    other.relTs === stream.relTs && other.numberOfCarriers === stream.numberOfCarriers))));
     }
 
     getServices(): ServiceItem[] {

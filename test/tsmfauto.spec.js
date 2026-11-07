@@ -292,7 +292,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     }
   });
 
-  it("does not decide by the headers not in a row, nor by the frames of multiple carriers", async () => {
+  it("requires consecutive headers and discovers multiple carriers without using a previous channel header", async () => {
     _.channel = { getStreams: () => [] };
     const streams = [[2, 24, false, 18801, 4], [5, 28, true, 45168, 11]];
     const nullPackets = n => Buffer.concat(Array.from({ length: n }, () => Buffer.from([0x47, 0x1F, 0xFF, 0x10, ...new Array(184).fill(0xFF)])));
@@ -307,7 +307,10 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     // 判別は 64KB を読み飛ばした後の 64KB で行う (continuity_counter が毎回飛ぶ: パケットの欠落)
     for (const [data, expected] of [
       [Buffer.concat(Array.from({ length: 1400 }, (_, i) => header(streams, i * 2))), null],
-      [Buffer.concat(Array.from({ length: 1400 }, (_, i) => multiCarrier(header(streams, i)))), { format: "ts", tsmf: null }],
+      [Buffer.concat(Array.from({ length: 1400 }, (_, i) => multiCarrier(header(streams, i)))), { format: "ts", tsmf: [
+        { relTs: 2, slots: 24, format: "ts", streamId: 18801, networkId: 4, groupId: 255, numberOfCarriers: 2, carrierSequence: 1 },
+        { relTs: 5, slots: 28, format: "tlv", streamId: 45168, networkId: 11, groupId: 255, numberOfCarriers: 2, carrierSequence: 1 }
+      ] }],
       // a header of multiple carriers of the channel tuned before remains
       // (the first 64KB are skipped, the header is right after them)
       [Buffer.concat([nullPackets(349), multiCarrier(header(streams, 0)), ...Array.from({ length: 1400 }, (_, i) => header(streams, 3 + i))]), { format: "ts", tsmf: [

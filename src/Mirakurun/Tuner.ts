@@ -217,6 +217,10 @@ export class Tuner {
         }
     }
 
+    canReceiveTsmfCarriers(channel: ChannelItem, count: number): boolean {
+        return this._getDevicesByType(channel.type, channel.route).filter(device => !device.isRemote).length >= count;
+    }
+
     typeExists(type: apid.ChannelType, route?: apid.ChannelRoute): boolean {
         return this._getDevicesByType(type, route).length > 0;
     }
@@ -486,7 +490,35 @@ export class Tuner {
             channel.type, channel.channel, streams.map(stream => `${stream.relTs}:${stream.format}(${stream.slots} slots)`).join(", ")
         );
 
-        const results = await Promise.allSettled(streams.map(stream => this._scanServices(
+        let scanStreams = streams;
+        const discovery = streams.find(stream => stream.numberOfCarriers > 1 && stream.format === "tlv");
+        if (discovery) {
+            const discoveryChanged = streams.some(stream => {
+                const saved = channel.getStreamByRelTs(stream.relTs);
+                return !saved || saved.groupId !== stream.groupId || saved.numberOfCarriers !== stream.numberOfCarriers ||
+                    saved.carrierSequence !== stream.carrierSequence || saved.networkId !== stream.networkId || saved.streamId !== stream.streamId;
+            });
+            if (_.channel.get(channel.type, channel.channel) === channel) {
+                channel.setStreams(streams);
+            }
+            const carriers = channel.getBondedChannels() || [];
+            const sequences = carriers.map(item => item.streams.find(stream => stream.format === "tlv" &&
+                stream.networkId === discovery.networkId && stream.streamId === discovery.streamId)?.carrierSequence);
+            const ordered = [...sequences].sort((a, b) => a - b);
+            if (!discovery.groupId || !this.canReceiveTsmfCarriers(channel, discovery.numberOfCarriers) || carriers.length !== discovery.numberOfCarriers || new Set(sequences).size !== discovery.numberOfCarriers ||
+                !ordered.every((sequence, i) => sequence === i + ordered[0]) || (ordered[0] !== 0 && ordered[0] !== 1)) {
+                // TS services on a shared carrier do not require the other carriers.
+                scanStreams = streams.filter(stream => stream.format === "ts");
+            } else if (discoveryChanged) {
+                for (const carrier of carriers) {
+                    if (carrier !== channel) {
+                        _.service.queueDiscoveredTsmfScan(carrier);
+                    }
+                }
+            }
+        }
+
+        const results = await Promise.allSettled(scanStreams.map(stream => this._scanServices(
             channel,
             { ...userReq, streamSetting: { ...userReq.streamSetting } },
             stream.format,
@@ -497,8 +529,9 @@ export class Tuner {
         const services: apid.Service[] = [];
         let lastError: Error = null;
         // the stream of the services scanned (the same as without TSMF), the one of the TSMF header if no services
-        const channelStreams = streams.map(({ networkId, streamId, format, relTs, slots }) => ({ networkId, streamId, format, relTs, slots }));
-        results.forEach((result, i) => {
+        const channelStreams = streams.map(stream => ({ ...stream }));
+        results.forEach((result, index) => {
+            const i = scanStreams === streams ? index : streams.indexOf(scanStreams[index]);
             if (result.status === "fulfilled") {
                 services.push(...result.value);
                 if (result.value.length > 0) {
@@ -513,7 +546,7 @@ export class Tuner {
                 // the stream received before is kept (the format detected may be wrong if the scan has failed)
                 const saved = channel.getStreamByRelTs(streams[i].relTs);
                 if (saved !== null) {
-                    channelStreams[i] = { networkId: saved.networkId, streamId: saved.streamId, format: saved.format, relTs: saved.relTs, slots: streams[i].slots };
+                    channelStreams[i] = { ...channelStreams[i], networkId: saved.networkId, streamId: saved.streamId, format: saved.format };
                 }
             }
         });
@@ -618,7 +651,7 @@ export class Tuner {
         const relTs = user.streamSetting.channel.tsmfRelTs;
         let tsmf: TSMFStream[] = null;
         const probe = new FormatProbe(relTs ? data => detectTSMFStreamFormat(data, relTs) : data => {
-            tsmf = detectTSMFStreams(data, false);
+            tsmf = detectTSMFStreams(data);
             if (tsmf !== null && tsmf.length === 0) {
                 // TSMF but not decided, not to replace the relative streams detected before
                 tsmf = null;

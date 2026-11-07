@@ -54,6 +54,9 @@ export interface TSMFStream {
     /** stream_id of the TSMF header (transport_stream_id or tlv_stream_id) */
     streamId: number;
     networkId: number;
+    groupId?: number;
+    numberOfCarriers?: number;
+    carrierSequence?: number;
 }
 
 /**
@@ -101,7 +104,8 @@ export function detectTSMFStreams(data: Buffer, multiCarrier = true): TSMFStream
                 slots,
                 format: ((header.streamTypeBits >> (15 - relTs)) & 1) === 0 ? "tlv" : "ts",
                 streamId: payload.readUInt16BE(offset),
-                networkId: payload.readUInt16BE(offset + 2)
+                networkId: payload.readUInt16BE(offset + 2),
+                ...(header.numberOfCarriers > 1 && { groupId: header.groupId, numberOfCarriers: header.numberOfCarriers, carrierSequence: header.carrierSequence })
             });
         }
 

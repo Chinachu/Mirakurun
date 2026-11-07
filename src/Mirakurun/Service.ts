@@ -102,6 +102,7 @@ export class Service {
 
     private _items: ServiceItem[] = [];
     private _saveTimerId: NodeJS.Timeout;
+    private _pendingTsmfAdd: Set<ChannelItem> = null;
     private _channelIndex: Map<ChannelItem, ServiceItem[]> = null;
 
     get items(): ServiceItem[] {
@@ -258,6 +259,14 @@ export class Service {
         setTimeout(() => this._initJobs(), 10000);
     }
 
+    queueDiscoveredTsmfScan(channel: ChannelItem): void {
+        if (this._pendingTsmfAdd?.has(channel) || channel.getServices().length === 0) {
+            this._queueScanToAdd(channel);
+        } else {
+            this._queueScanToUpdate(channel);
+        }
+    }
+
     private async _initJobs(): Promise<void> {
         log.debug("init service jobs...");
 
@@ -353,11 +362,18 @@ export class Service {
             key: `Service.Add.Check.${channel.type}.${channel.channel}.${serviceId}`,
             name: `Service Add Check ${channel.type}/${channel.channel}/${serviceId}`,
             fn: () => this._checkToAdd(channel, serviceId),
-            readyFn: async () => (await _.tuner.readyForJob(channel)) !== null,
+            readyFn: async () => this._readyForScan(channel),
             retryOnFail: true,
             retryMax: (1000 * 60 * 60 * 12) / (1000 * 60 * 3), // (12時間 / retryDelay) = 12時間～
             retryDelay: 1000 * 60 * 3
         });
+    }
+
+    private async _readyForScan(channel: ChannelItem): Promise<boolean> {
+        const stream = channel.streams.find(item => item.format === "tlv" && item.numberOfCarriers > 1);
+        const complete = stream && _.tuner.canReceiveTsmfCarriers(channel, stream.numberOfCarriers) &&
+            channel.getBondedChannels()?.length === stream.numberOfCarriers;
+        return (await _.tuner.readyForJob(complete ? [{ channel, relTs: stream.relTs }] : channel)) !== null;
     }
 
     private _queueScanToAdd(channel: ChannelItem): void {
@@ -365,7 +381,7 @@ export class Service {
             key: `Service.Add.Scan.${channel.type}.${channel.channel}`,
             name: `Service Add Scan ${channel.type}/${channel.channel}`,
             fn: async () => this._scan(channel, true),
-            readyFn: async () => (await _.tuner.readyForJob(channel)) !== null,
+            readyFn: async () => this._readyForScan(channel),
             retryOnFail: true,
             retryMax: (1000 * 60 * 60 * 12) / (1000 * 60 * 3), // (12時間 / retryDelay) = 12時間～
             retryDelay: 1000 * 60 * 3
@@ -377,7 +393,7 @@ export class Service {
             key: `Service.Update.Scan.${channel.type}.${channel.channel}`,
             name: `Service Update Scan ${channel.type}/${channel.channel}`,
             fn: async () => this._scan(channel, false),
-            readyFn: async () => (await _.tuner.readyForJob(channel)) !== null
+            readyFn: async () => this._readyForScan(channel)
         });
     }
 
@@ -428,6 +444,15 @@ export class Service {
         } catch (e) {
             log.warn("ChannelItem#'%s' service scan has failed [%s]", channel.name, e);
             throw new Error("Service scan failed");
+        }
+
+        const discovered = channel.streams.find(stream => stream.numberOfCarriers > 1);
+        if (discovered && add) {
+            (this._pendingTsmfAdd ??= new Set()).add(channel);
+        }
+        if (discovered && services.some(service => channel.streams.some(stream => stream.format === "tlv" &&
+            stream.networkId === service.networkId && stream.streamId === service.streamId))) {
+            this._pendingTsmfAdd?.delete(channel);
         }
 
         log.debug("ChannelItem#'%s' services: %s", channel.name, JSON.stringify(services, null, "  "));

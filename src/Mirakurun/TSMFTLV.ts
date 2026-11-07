@@ -35,6 +35,7 @@ export interface TSMFHeader {
     streamTypeBits: number;
     /** 1 unless the carriers are bonded (frame_type 0x2 may also have 1) */
     numberOfCarriers: number;
+    groupId: number;
     /** the order of the carrier (0 or 1..numberOfCarriers, the start is not specified), 1 for a single carrier */
     carrierSequence: number;
     /** the frames of a super frame */
@@ -73,6 +74,7 @@ export function parseTSMFHeader(packet: Buffer): TSMFHeader | null {
         slotMap,
         streamTypeBits: (payload[121] << 7) | (payload[122] >> 1),
         numberOfCarriers,
+        groupId: isMultiCarrier ? payload[123] : 0,
         carrierSequence,
         numberOfFrames: isMultiCarrier ? Math.max(payload[126] >> 4, 1) : 1,
         framePosition: isMultiCarrier ? payload[126] & 0x0F : 0

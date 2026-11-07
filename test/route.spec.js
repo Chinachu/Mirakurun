@@ -106,6 +106,139 @@ describe("[route.spec] route / streamId", () => {
   beforeEach(() => mock.timers.enable({ apis: ["setTimeout"] }));
   afterEach(() => mock.timers.reset());
 
+  describe("TSMF two-stage discovery", () => {
+    for (const order of [[0, 1, 2], [2, 0, 1]]) {
+      it(`defers service scans until three carriers are discovered (${order})`, async () => {
+        setupChannels([0, 1, 2].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` })));
+        const channels = _.channel.items;
+        const ready = mock.fn(async () => channels[0]);
+        _.tuner.readyForJob = ready;
+        _.tuner.canReceiveTsmfCarriers = () => true;
+        const t = tuner([0, 1, 2].map(i => fakeDevice(i, ["BS4K"], ["CATV"])));
+        const queued = mock.method(_.service, "queueDiscoveredTsmfScan", () => {});
+        const scan = mock.method(t, "_scanServices", async () => [{ networkId: 32752, streamId: 60001, serviceId: 701 }]);
+        const stream = i => [{ networkId: 32752, streamId: 60001, relTs: 2, format: "tlv", slots: i === 2 ? 20 : 52, groupId: 9, numberOfCarriers: 3, carrierSequence: i + (order[0] === 2 ? 1 : 0) }];
+        for (const i of order.slice(0, 2)) {
+          assert.deepStrictEqual(await t._scanTSMFServices(channels[i], { streamSetting: { channel: channels[i] } }, stream(i)), []);
+          assert.strictEqual(scan.mock.callCount(), 0);
+          assert.strictEqual(channels[i].tsmfGroupId, 9);
+          assert.strictEqual(channels[i].toJSON().tsmfGroupId, undefined);
+          await _.service._readyForScan(channels[i]);
+          assert.strictEqual(ready.mock.calls.at(-1).arguments[0], channels[i]);
+        }
+        const last = order[2];
+        const result = await t._scanTSMFServices(channels[last], { streamSetting: { channel: channels[last] } }, stream(last));
+        assert.strictEqual(result[0].serviceId, 701);
+        assert.strictEqual(scan.mock.callCount(), 1);
+        assert.strictEqual(queued.mock.callCount(), 2);
+        assert.deepStrictEqual(new Set(queued.mock.calls.map(c => c.arguments[0])), new Set(order.slice(0, 2).map(i => channels[i])));
+        assert.deepStrictEqual(channels[last].streams[0], stream(last)[0]);
+        assert.strictEqual(channels[last].getBondedChannels().length, 3);
+        await _.service._readyForScan(channels[last]);
+        assert.deepStrictEqual(ready.mock.calls.at(-1).arguments[0], [{ channel: channels[last], relTs: 2 }]);
+      });
+    }
+
+    it("does not assemble duplicate carrier sequences or unrelated streams sharing a group ID", async () => {
+      setupChannels([0, 1, 2].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` })));
+      const channels = _.channel.items;
+      const t = tuner([]);
+      t.canReceiveTsmfCarriers = () => true;
+      const scan = mock.method(t, "_scanServices", async () => { throw new Error("must not scan incomplete group"); });
+      const streams = channels.map((c, i) => [{ networkId: 32752, streamId: i === 2 ? 60002 : 60001, relTs: 2, format: "tlv", slots: 52, groupId: 9, numberOfCarriers: 3, carrierSequence: 0 }]);
+      for (let i = 0; i < 3; i++) {
+        assert.deepStrictEqual(await t._scanTSMFServices(channels[i], { streamSetting: { channel: channels[i] } }, streams[i]), []);
+      }
+      streams[2][0].streamId = 60001;
+      assert.deepStrictEqual(await t._scanTSMFServices(channels[2], { streamSetting: { channel: channels[2] } }, streams[2]), []);
+      assert.strictEqual(scan.mock.callCount(), 0);
+      scan.mock.restore();
+      const validScan = mock.method(t, "_scanServices", async () => []);
+      const queued = mock.method(_.service, "queueDiscoveredTsmfScan", () => {});
+      await t._scanTSMFServices(channels[1], { streamSetting: { channel: channels[1] } }, streams[1].map(s => ({ ...s, carrierSequence: 1 })));
+      assert.strictEqual(validScan.mock.callCount(), 0);
+      const corrected = streams[2].map(s => ({ ...s, carrierSequence: 2 }));
+      await t._scanTSMFServices(channels[2], { streamSetting: { channel: channels[2] } }, corrected);
+      assert.strictEqual(validScan.mock.callCount(), 1);
+      assert.strictEqual(queued.mock.callCount(), 2);
+      await t._scanTSMFServices(channels[2], { streamSetting: { channel: channels[2] } }, corrected);
+      assert.strictEqual(queued.mock.callCount(), 2);
+    });
+
+    it("scans shared TS immediately and preserves add mode for the deferred TLV scan", async () => {
+      setupChannels([{ name: "Shared", type: "BS4K", route: "CATV", channel: "C1" }]);
+      const channel = _.channel.items[0];
+      const streams = [
+        { networkId: 32752, streamId: 60001, relTs: 2, format: "tlv", slots: 20, groupId: 9, numberOfCarriers: 3, carrierSequence: 1 },
+        { networkId: 32752, streamId: 60002, relTs: 3, format: "ts", slots: 32, groupId: 9, numberOfCarriers: 3, carrierSequence: 1 }
+      ];
+      const t = tuner([]);
+      const scan = mock.method(t, "_scanServices", async (ch, user, format, detect, relTs) => {
+        assert.strictEqual(format, "ts");
+        assert.strictEqual(relTs, 3);
+        return [{ networkId: 32752, streamId: 60002, serviceId: 701, name: "Example", type: 1, logoId: -1, remoteControlKeyId: 1 }];
+      });
+      _.tuner = { getServices: ch => t._scanTSMFServices(ch, { streamSetting: { channel: ch } }, streams) };
+      await _.service._scan(channel, true);
+      assert.strictEqual(scan.mock.callCount(), 1);
+      assert.strictEqual(channel.getServices().length, 1);
+      const jobs = [];
+      _.job = { add: job => jobs.push(job) };
+      _.service.queueDiscoveredTsmfScan(channel);
+      assert.strictEqual(jobs.length, 1);
+      assert.ok(jobs[0].key.startsWith("Service.Add.Scan."));
+    });
+
+    for (const count of [1, 2]) {
+      it(`discovers with ${count} tuners without waiting for an impossible three-carrier scan`, async () => {
+        setupChannels([0, 1, 2].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` })));
+        const channels = _.channel.items;
+        const t = tuner(Array.from({ length: count }, (_, i) => fakeDevice(i, ["BS4K"], ["CATV"])));
+        _.tuner = t;
+        const ready = mock.method(t, "readyForJob", async channel => {
+          assert.ok(channel instanceof ChannelItem, "must only wait for one discovery tuner");
+          return channel;
+        });
+        const scan = mock.method(t, "_scanServices", async () => { throw new Error("TLV cannot be assembled"); });
+        const queued = mock.method(_.service, "queueDiscoveredTsmfScan", () => {});
+        for (let i = 0; i < channels.length; i++) {
+          const streams = [{ networkId: 32752, streamId: 60001, relTs: 2, format: "tlv", slots: 52, groupId: 9, numberOfCarriers: 3, carrierSequence: i }];
+          assert.deepStrictEqual(await t._scanTSMFServices(channels[i], { streamSetting: { channel: channels[i] } }, streams), []);
+        }
+        assert.strictEqual(scan.mock.callCount(), 0);
+        assert.strictEqual(queued.mock.callCount(), 0);
+        for (const channel of channels) {
+          assert.strictEqual(channel.streams[0].groupId, 9);
+          await _.service._readyForScan(channel);
+        }
+        assert.strictEqual(ready.mock.callCount(), 3);
+        t._devices.push(...Array.from({ length: 3 - count }, (_, i) => fakeDevice(count + i, ["BS4K"], ["CATV"])));
+        assert.strictEqual(t.canReceiveTsmfCarriers(channels[0], 3), true);
+        ready.mock.restore();
+        const nextReady = mock.method(t, "readyForJob", async targets => {
+          assert.deepStrictEqual(targets, [{ channel: channels[0], relTs: 2 }]);
+          return channels[0];
+        });
+        assert.strictEqual(await _.service._readyForScan(channels[0]), true);
+        assert.strictEqual(nextReady.mock.callCount(), 1);
+      });
+    }
+
+    it("restores discovery metadata from channels.json without modifying configured values", async () => {
+      const configs = [0, 1, 2].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` }));
+      setupChannels(configs);
+      const streams = i => [{ networkId: 32752, streamId: 60001, relTs: 2, format: "tlv", slots: 52, groupId: 9, numberOfCarriers: 3, carrierSequence: i }];
+      fs.writeFileSync(process.env.CHANNELS_DB_PATH, JSON.stringify([{ __integrity__: "test" }, ...configs.map((c, i) => ({ type: c.type, channel: c.channel, streams: streams(i) }))]));
+      await _.channel.load();
+      for (const [i, channel] of _.channel.items.entries()) {
+        assert.deepStrictEqual(channel.streams, streams(i));
+        assert.strictEqual(channel.tsmfGroupId, 9);
+        assert.strictEqual(channel.getBondedChannels().length, 3);
+        assert.strictEqual(channel.toJSON().tsmfRelTs, undefined);
+      }
+    });
+  });
+
   describe("ChannelItem", () => {
     it("defaults the route by the type and keeps the config properties in toJSON()", () => {
       setupChannels([]);
@@ -302,21 +435,27 @@ describe("[route.spec] route / streamId", () => {
   });
 
   describe("Tuner: sharing bonded carriers", () => {
-    it("warns tsmfGroupId without tsmfRelTs, which is not bonded", () => {
+    it("accepts tsmfGroupId without tsmfRelTs for automatic relative-stream discovery", () => {
       const warn = mock.method(log, "warn", () => {});
       try {
         setupChannels([{ name: "TLV", type: "BS4K", channel: "C1", route: "CATV", tsmfGroupId: 5 }]);
         assert.ok(_.channel.get("BS4K", "C1"));
-        assert.ok(warn.mock.calls.some(call => /`tsmfGroupId` without `tsmfRelTs`/.test(call.arguments[0])));
+        assert.ok(!warn.mock.calls.some(call => /`tsmfGroupId` without `tsmfRelTs`/.test(call.arguments[0])));
       } finally {
         warn.mock.restore();
       }
     });
 
-    for (const initialPriority of [-1, 0]) {
-      it(`keeps all three carriers and the priority ${initialPriority} user when a higher priority stream joins`, async () => {
-        const configs = [1, 2, 3].map(i => ({ name: `Carrier ${i}`, type: "BS4K", channel: `C${i}`, route: "CATV", format: "tlv", tsmfRelTs: 1, tsmfGroupId: 5 }));
+    for (const [initialPriority, automatic] of [[-1, false], [0, false], [-1, true]]) {
+      it(`keeps all three carriers and the priority ${initialPriority} user when a higher priority stream joins (automatic=${automatic})`, async () => {
+        const configs = [1, 2, 3].map(i => ({ name: `Carrier ${i}`, type: "BS4K", channel: `C${i}`, route: "CATV", ...(!automatic && { format: "tlv", tsmfRelTs: 1, tsmfGroupId: 5 }) }));
         setupChannels(configs);
+        if (automatic) {
+          configs.forEach((c, i) => _.channel.get(c.type, c.channel).setStreams([
+            { networkId: 11, streamId: 60001, relTs: 1, format: "tlv", slots: 52, groupId: 5, numberOfCarriers: 3, carrierSequence: i },
+            { networkId: 11, streamId: 60002, relTs: 2, format: "tlv", slots: 20, groupId: 5, numberOfCarriers: 3, carrierSequence: i }
+          ]));
+        }
         _.config.server.disableEITParsing = false;
         const channels = configs.map(c => _.channel.get(c.type, c.channel));
         const devices = configs.map((c, i) => {
