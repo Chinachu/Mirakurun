@@ -729,9 +729,6 @@ definitions:
       isScanning:
         type: boolean
         description: "Whether a scan is currently in progress"
-      type:
-        $ref: '#/definitions/ChannelType'
-        description: "Channel type being scanned"
       route:
         $ref: '#/definitions/ChannelRoute'
         description: "Receiving route being scanned"

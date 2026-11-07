@@ -256,7 +256,7 @@ Specify this when a TLV is transmitted by multiple carriers of CATV (channel bon
 
 - Tuners as many as the carriers are needed. The tuners of the carriers are shown in `/api/tuners` as the users `<user ID>#carrier<n>`.
 - Requests for the same carriers share the tuners with EPG acquisition and other streams. Joining the same reception does not stop existing users, even at a higher priority. Requests for other carriers follow the usual priority rules when no tuner is free.
-- When `tsmfRelTs` and `tsmfGroupId` are omitted, each channel scan saves the relative streams, stream IDs, group ID and carrier count from the headers in `channels.json`. Once all carriers of the same type, route and group carrying the same TLV have been discovered, service scanning uses the additional tuners. TS services sharing a carrier are scanned even before the other carriers have been discovered. If fewer compatible local tuners are registered than required, header information is saved and TLV service scanning is deferred. The channel scan (`/api/config/channels/scan`) checks the carriers one by one, so the carriers without TS services are not added. Write the channels of the carriers in channels.yml.
+- When `tsmfRelTs` and `tsmfGroupId` are omitted, each channel scan saves the relative streams, stream IDs, group ID and carrier count from the headers in `channels.json`. Once all carriers of the same type, route and group carrying the same TLV have been discovered, service scanning uses the additional tuners. TS services sharing a carrier are scanned even before the other carriers have been discovered. If fewer compatible local tuners are registered than required, header information is saved and TLV service scanning is deferred. The channel scan adds the carriers without TS services as channels of BS4K ([Channel Scan](#channel-scan)).
 - The skew of the carriers is found by checking the TLV assembled (the difference of the delays up to about 0.5 seconds). Nothing is output until it is found, usually within a second, but it may take about 10 seconds for 4 or more carriers.
 - The stream is closed when a carrier is not received for about 10 seconds (including starting the tuner) or the TLV can not be assembled.
 
@@ -286,3 +286,34 @@ Specify this when a TLV is transmitted by multiple carriers of CATV (channel bon
 The route to receive the channel. The same broadcast can also be configured as a channel of another route, such as BS received both through a satellite antenna and through CATV transmodulation.
 
 A service is associated with the channels by the stream received (`networkId` and `transport_stream_id`). If multiple channels can receive the same stream, the route with an available tuner is tuned (the channel scanned first is preferred). The stream received on each channel is saved in `channels.json` (environment variable: `CHANNELS_DB_PATH`, default: in the same directory as `services.json`).
+
+### Channel Scan
+
+"Channel Scan" of the Web UI (`PUT /api/config/channels/scan`) scans the channels of a receiving route (`route`), decides the type of each channel by the network of the services received (original_network_id), and adds them to channels.yml. CATV mixing terrestrial, BS, CS and BS4K is also added by one scan.
+
+| Network | Type |
+| --- | --- |
+| `4` | BS |
+| `6`, `7` | CS |
+| `1`, `3`, `10` | SKY |
+| TLV (MMT) | BS4K |
+| `0x7880`-`0x7FE8` (terrestrial), the networks of CATV (`0xFFF7`-`0xFFFF`, such as the community channels) | GR |
+
+The streams of the other networks are not added.
+
+The channels to scan (`source`):
+
+- `preset`: the channels of the route (the names of the tuner commands such as recpt1, recisdb)
+    - TER: `13`-`62`
+    - SAT: `BS01_0`-`BS23_3`, `CS2`-`CS24`
+    - CATV: `C13`-`C63`, `13`-`62`
+    - HIKARI: `13`-`62`, `BS01_0`-`BS23_3`, `CS2`-`CS24`
+- `dvbConf`: all the channels of the channel config files of dvbv5-zap (`-c`) of the tuners of the route (including the files not for DVB device direct access, such as DVB-C)
+- `list`: the channels specified (`channels`)
+- `format`: the format of the channel names (`channelNameFormat`, e.g. `C{ch}`) and the range
+
+- The tuners which can receive the route are used. Specify all the types to receive in `types` of the tuners of the route (such as `[GR, BS, CS, BS4K]` for CATV).
+- The scan detects the relative streams of TSMF also on the tuners not for TLV. If the type has only one relative stream on the channel, `tsmfRelTs` is added (any tuner receives it). If the type has more than one, `tsmfRelTs` is not added and the tuners for TLV detect them.
+- The carriers of a TLV transmitted by multiple carriers (such as BS8K) are added as channels of BS4K without the services (`tsmfRelTs` and `tsmfGroupId` are detected).
+- The entries of the channels scanned on the route (of any type) are replaced with the result. The entries of the channels not scanned and of the other routes remain. Without `refresh`, the channels with an enabled entry are not scanned and their entries remain.
+- The channels are distinguished by the type and the channel name. If another route has an entry of the same type and channel name, the entry remains and the channel scanned is not added.

@@ -36,7 +36,7 @@ import {
 import equal from "fast-deep-equal";
 import { state } from "../modules/state";
 import * as ui from "../modules/ui";
-import { ConfigChannels, ConfigChannelsItem, ChannelType, ChannelRoute, ChannelScanStatus } from "../../../api.d";
+import { ConfigChannels, ConfigChannelsItem, ChannelType, ChannelRoute, ChannelScanStatus, ChannelScanMode, ChannelScanSource } from "../../../api.d";
 
 import "./ChannelsConfigView.sass";
 
@@ -47,30 +47,22 @@ function sortTypes(types: ChannelType[]): ChannelType[] {
     return types.sort((a, b) => typesIndex.indexOf(a) - typesIndex.indexOf(b));
 }
 
-// チャンネル範囲を展開する関数（例: "14-16,18" → "14,15,16,18"）
-function expandChannelRanges(input: string): string {
-    if (!input) return "";
+// チャンネルの一覧を展開する関数 (同じ接頭辞の番号の範囲を展開し、チャンネル名はそのまま。例: "14-16,C18-C19,BS01_0" → ["14", "15", "16", "C18", "C19", "BS01_0"])
+function expandChannelRanges(input: string): string[] {
+    const result: string[] = [];
 
-    const parts = input.split(",");
-    const result: number[] = [];
-
-    for (const part of parts) {
-        if (part.includes("-")) {
-            const [start, end] = part.split("-").map(n => parseInt(n.trim(), 10));
-            if (!isNaN(start) && !isNaN(end)) {
-                for (let i = start; i <= end; i++) {
-                    result.push(i);
-                }
+    for (const part of input.split(",").map(p => p.trim()).filter(p => p !== "")) {
+        const range = /^([^\d-]*)(\d+)-([^\d-]*)(\d+)$/.exec(part);
+        if (range && range[1] === range[3]) {
+            for (let i = parseInt(range[2], 10); i <= parseInt(range[4], 10); i++) {
+                result.push(`${range[1]}${i}`);
             }
         } else {
-            const num = parseInt(part.trim(), 10);
-            if (!isNaN(num)) {
-                result.push(num);
-            }
+            result.push(part);
         }
     }
 
-    return [...new Set(result)].sort((a, b) => a - b).join(",");
+    return [...new Set(result)];
 }
 
 const migrateChannels = (channels: ConfigChannels): ConfigChannels => {
@@ -109,17 +101,17 @@ export const ChannelsConfigView: React.FC = () => {
 
     // チャンネルスキャンのためのステート
     const [showScanDialog, setShowScanDialog] = useState(false);
-    const [scanType, setScanType] = useState<ChannelType>("GR");
-    const [scanRoute, setScanRoute] = useState<ChannelRoute | "">("");
+    const [scanRoute, setScanRoute] = useState<ChannelRoute>("TER");
+    const [scanSource, setScanSource] = useState<ChannelScanSource>("preset");
+    const [scanChannels, setScanChannels] = useState("");
+    const [scanChannelNameFormat, setScanChannelNameFormat] = useState("C{ch}");
     const [scanMinCh, setScanMinCh] = useState("13");
-    const [scanMaxCh, setScanMaxCh] = useState("62");
-    const [scanSkipCh, setScanSkipCh] = useState("");
+    const [scanMaxCh, setScanMaxCh] = useState("63");
     const [scanMinSubCh, setScanMinSubCh] = useState("0");
     const [scanMaxSubCh, setScanMaxSubCh] = useState("3");
-    const [scanUseSubCh, setScanUseSubCh] = useState(true);
-    const [scanChannelNameFormatEnabled, setScanChannelNameFormatEnabled] = useState(false);
-    const [scanChannelNameFormat, setScanChannelNameFormat] = useState("");
-    const [scanSetDisabledOnAdd, setScanSetDisabledOnAdd] = useState(false);
+    const [scanSkipCh, setScanSkipCh] = useState("");
+    const [scanMode, setScanMode] = useState<ChannelScanMode | "">("");
+    const [scanSetDisabledOnAdd, setScanSetDisabledOnAdd] = useState<"" | "true" | "false">("");
     const [scanAutoApply, setScanAutoApply] = useState(false);
     const [scanRefresh, setScanRefresh] = useState(false);
     const [scanStatus, setScanStatus] = useState<ChannelScanStatus | null>(null);
@@ -150,33 +142,38 @@ export const ChannelsConfigView: React.FC = () => {
     const startScan = async () => {
         try {
             const params = new URLSearchParams();
-            params.append("type", scanType);
-            if (scanRoute !== "") {
-                params.append("route", scanRoute);
+            params.append("route", scanRoute);
+            params.append("source", scanSource);
+
+            if (scanSource === "list") {
+                params.append("channels", expandChannelRanges(scanChannels).join(","));
             }
-            params.append("minCh", scanMinCh);
-            params.append("maxCh", scanMaxCh);
+
+            if (scanSource === "format") {
+                params.append("channelNameFormat", scanChannelNameFormat.trim());
+                params.append("minCh", scanMinCh);
+                params.append("maxCh", scanMaxCh);
+                if (/{subch0*}/.test(scanChannelNameFormat)) {
+                    params.append("minSubCh", scanMinSubCh);
+                    params.append("maxSubCh", scanMaxSubCh);
+                }
+            }
 
             if (scanSkipCh.trim()) {
-                const expandedSkipCh = expandChannelRanges(scanSkipCh.trim());
-                params.append("skipCh", expandedSkipCh);
+                params.append("skipCh", expandChannelRanges(scanSkipCh).join(","));
             }
 
-            if (scanType === "BS" && scanUseSubCh) {
-                params.append("minSubCh", scanMinSubCh);
-                params.append("maxSubCh", scanMaxSubCh);
-                params.append("useSubCh", "true");
+            if (scanMode !== "") {
+                params.append("scanMode", scanMode);
+            }
+
+            if (scanSetDisabledOnAdd !== "") {
+                params.append("setDisabledOnAdd", scanSetDisabledOnAdd);
             }
 
             if (!scanAutoApply) {
                 params.append("dryRun", "true");
             }
-
-            if (scanChannelNameFormatEnabled && scanChannelNameFormat.trim()) {
-                params.append("channelNameFormat", scanChannelNameFormat.trim());
-            }
-
-            params.append("setDisabledOnAdd", scanSetDisabledOnAdd ? "true" : "false");
 
             if (scanRefresh) {
                 params.append("refresh", "true");
@@ -486,7 +483,7 @@ export const ChannelsConfigView: React.FC = () => {
             <div className="content">
                 {/* スキャン進行中/完了時のステータス表示 */}
                 {scanInProgress && scanStatus && (
-                    <Callout intent="primary" title={`チャンネルスキャン中 (${scanStatus.type}${scanStatus.route ? ` / ${scanStatus.route}` : ""})`}>
+                    <Callout intent="primary" title={`チャンネルスキャン中${scanStatus.route ? ` (${scanStatus.route})` : ""}`}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
                             <ProgressBar value={(scanStatus.progress || 0) / 100} />
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -506,7 +503,7 @@ export const ChannelsConfigView: React.FC = () => {
                 {!scanInProgress && scanStatus && (scanStatus.status === "completed" || (scanStatus.scanLog && scanStatus.scanLog.length > 0)) && (
                     <Callout
                         intent={scanStatus.status === "completed" ? "success" : "warning"}
-                        title={`前回のスキャン結果 (${scanStatus.type}${scanStatus.route ? ` / ${scanStatus.route}` : ""})`}
+                        title={`前回のスキャン結果${scanStatus.route ? ` (${scanStatus.route})` : ""}`}
                     >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
                             <div>
@@ -759,139 +756,134 @@ export const ChannelsConfigView: React.FC = () => {
                 isOpen={showScanDialog}
                 onClose={() => setShowScanDialog(false)}
                 title="Channel Scan"
-                style={{ width: "450px" }}
+                style={{ width: "520px" }}
             >
                 <DialogBody>
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                        <FormGroup label="Channel Type">
-                            <HTMLSelect
-                                value={scanType}
-                                onChange={(e) => {
-                                    const newType = e.target.value as ChannelType;
-                                    setScanType(newType);
-                                    switch (newType) {
-                                        case "GR":
-                                            setScanMinCh("13");
-                                            setScanMaxCh("62");
-                                            break;
-                                        case "BS":
-                                            setScanMinCh("1");
-                                            setScanMaxCh("23");
-                                            break;
-                                        case "CS":
-                                            setScanMinCh("2");
-                                            setScanMaxCh("24");
-                                            break;
-                                    }
-                                }}
-                                options={[
-                                    { value: "GR", label: "GR" },
-                                    { value: "BS", label: "BS" },
-                                    { value: "CS", label: "CS" }
-                                ]}
-                            />
-                        </FormGroup>
-
-                        <FormGroup label="Route">
+                        <FormGroup
+                            label="Route"
+                            helperText="The type of each channel (GR / BS / CS / SKY / BS4K) is decided by the network of the services received."
+                        >
                             <HTMLSelect
                                 value={scanRoute}
-                                onChange={(e) => setScanRoute(e.target.value as ChannelRoute | "")}
+                                onChange={(e) => setScanRoute(e.target.value as ChannelRoute)}
                                 options={[
-                                    { value: "", label: scanType === "GR" ? "(TER)" : "(SAT)" },
-                                    { value: "TER", label: "TER" },
-                                    { value: "SAT", label: "SAT" },
+                                    { value: "TER", label: "TER (Terrestrial)" },
+                                    { value: "SAT", label: "SAT (Satellite)" },
                                     { value: "CATV", label: "CATV" },
                                     { value: "HIKARI", label: "HIKARI" }
                                 ]}
                             />
                         </FormGroup>
 
-                        <div style={{ display: "flex", gap: "16px" }}>
-                            <FormGroup label="Min Channel" style={{ flex: 1 }}>
-                                <InputGroup
-                                    value={scanMinCh}
-                                    onChange={(e) => setScanMinCh(e.target.value)}
-                                />
-                            </FormGroup>
-                            <FormGroup label="Max Channel" style={{ flex: 1 }}>
-                                <InputGroup
-                                    value={scanMaxCh}
-                                    onChange={(e) => setScanMaxCh(e.target.value)}
-                                />
-                            </FormGroup>
-                        </div>
-
-                        <FormGroup
-                            label="Skip Channels (comma separated integers)"
-                            helperText="Enter channel numbers to skip. Range notation (e.g. 14-16) is supported."
-                        >
-                            <InputGroup
-                                placeholder="Example: 13,14-16,18"
-                                value={scanSkipCh}
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (val === "" || /^[0-9,\-]+$/.test(val)) {
-                                        setScanSkipCh(val);
-                                    }
-                                }}
+                        <FormGroup label="Channels">
+                            <HTMLSelect
+                                value={scanSource}
+                                onChange={(e) => setScanSource(e.target.value as ChannelScanSource)}
+                                options={[
+                                    { value: "preset", label: "Preset of the route" },
+                                    { value: "dvbConf", label: "Channel config files of dvbv5 (DVB tuners)" },
+                                    { value: "list", label: "List" },
+                                    { value: "format", label: "Format" }
+                                ]}
                             />
                         </FormGroup>
 
-                        {scanType === "BS" && (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                                <Switch
-                                    label="Use Subchannel Style (BS01_0)"
-                                    checked={scanUseSubCh}
-                                    onChange={(e) => setScanUseSubCh(e.currentTarget.checked)}
+                        {scanSource === "preset" && (
+                            <Callout>
+                                {scanRoute === "TER" && "13-62"}
+                                {scanRoute === "SAT" && "BS01_0-BS23_3, CS2-CS24"}
+                                {scanRoute === "CATV" && "C13-C63, 13-62"}
+                                {scanRoute === "HIKARI" && "13-62, BS01_0-BS23_3, CS2-CS24"}
+                            </Callout>
+                        )}
+
+                        {scanSource === "list" && (
+                            <FormGroup
+                                label="Channel List (comma separated)"
+                                helperText="Range notation (e.g. 14-16, C13-C20) is supported."
+                            >
+                                <InputGroup
+                                    placeholder="Example: C13-C20,27,BS01_0"
+                                    value={scanChannels}
+                                    onChange={(e) => setScanChannels(e.target.value)}
                                 />
-                                {scanUseSubCh && (
+                            </FormGroup>
+                        )}
+
+                        {scanSource === "format" && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                <FormGroup
+                                    label="Channel Name Format"
+                                    helperText="Supports placeholders like {ch}, {ch00}, {subch}."
+                                >
+                                    <InputGroup
+                                        placeholder="Example: C{ch}, BS{ch00}_{subch}"
+                                        value={scanChannelNameFormat}
+                                        onChange={(e) => setScanChannelNameFormat(e.target.value)}
+                                    />
+                                </FormGroup>
+                                <div style={{ display: "flex", gap: "16px" }}>
+                                    <FormGroup label="Min {ch}" style={{ flex: 1 }}>
+                                        <InputGroup value={scanMinCh} onChange={(e) => setScanMinCh(e.target.value)} />
+                                    </FormGroup>
+                                    <FormGroup label="Max {ch}" style={{ flex: 1 }}>
+                                        <InputGroup value={scanMaxCh} onChange={(e) => setScanMaxCh(e.target.value)} />
+                                    </FormGroup>
+                                </div>
+                                {/{subch0*}/.test(scanChannelNameFormat) && (
                                     <div style={{ display: "flex", gap: "16px" }}>
-                                        <FormGroup label="Min Subchannel" style={{ flex: 1 }}>
-                                            <InputGroup
-                                                value={scanMinSubCh}
-                                                onChange={(e) => setScanMinSubCh(e.target.value)}
-                                            />
+                                        <FormGroup label="Min {subch}" style={{ flex: 1 }}>
+                                            <InputGroup value={scanMinSubCh} onChange={(e) => setScanMinSubCh(e.target.value)} />
                                         </FormGroup>
-                                        <FormGroup label="Max Subchannel" style={{ flex: 1 }}>
-                                            <InputGroup
-                                                value={scanMaxSubCh}
-                                                onChange={(e) => setScanMaxSubCh(e.target.value)}
-                                            />
+                                        <FormGroup label="Max {subch}" style={{ flex: 1 }}>
+                                            <InputGroup value={scanMaxSubCh} onChange={(e) => setScanMaxSubCh(e.target.value)} />
                                         </FormGroup>
                                     </div>
                                 )}
                             </div>
                         )}
 
-                        <Switch
-                            label="Use Channel Name Format"
-                            checked={scanChannelNameFormatEnabled}
-                            onChange={(e) => setScanChannelNameFormatEnabled(e.currentTarget.checked)}
-                        />
+                        <FormGroup
+                            label="Skip Channels (comma separated)"
+                            helperText="Channel names. Range notation (e.g. 14-16, C13-C20) is supported."
+                        >
+                            <InputGroup
+                                placeholder="Example: 13,14-16,C18-C20"
+                                value={scanSkipCh}
+                                onChange={(e) => setScanSkipCh(e.target.value)}
+                            />
+                        </FormGroup>
 
-                        {scanChannelNameFormatEnabled && (
-                            <FormGroup
-                                label="Channel Name Format"
-                                helperText="Format to use for channel names. Supports placeholders like {ch}, {ch00}, {subch}."
-                            >
-                                <InputGroup
-                                    placeholder="Example: {ch}, BS{ch00}_{subch}"
-                                    value={scanChannelNameFormat}
-                                    onChange={(e) => setScanChannelNameFormat(e.target.value)}
+                        <div style={{ display: "flex", gap: "16px" }}>
+                            <FormGroup label="Scan Mode" style={{ flex: 1 }}>
+                                <HTMLSelect
+                                    value={scanMode}
+                                    onChange={(e) => setScanMode(e.target.value as ChannelScanMode | "")}
+                                    options={[
+                                        { value: "", label: "Auto (GR: Channel, others: Service)" },
+                                        { value: "Channel", label: "Channel" },
+                                        { value: "Service", label: "Service" }
+                                    ]}
                                 />
                             </FormGroup>
-                        )}
+                            <FormGroup label="Set Disabled on Add" style={{ flex: 1 }}>
+                                <HTMLSelect
+                                    value={scanSetDisabledOnAdd}
+                                    onChange={(e) => setScanSetDisabledOnAdd(e.target.value as "" | "true" | "false")}
+                                    options={[
+                                        { value: "", label: "Auto (GR: No, others: Yes)" },
+                                        { value: "true", label: "Yes" },
+                                        { value: "false", label: "No" }
+                                    ]}
+                                />
+                            </FormGroup>
+                        </div>
 
                         <Switch
                             label="Auto Apply Results (Restart required)"
                             checked={scanAutoApply}
                             onChange={(e) => setScanAutoApply(e.currentTarget.checked)}
-                        />
-
-                        <Switch
-                            label="Set Disabled on Add"
-                            checked={scanSetDisabledOnAdd}
-                            onChange={(e) => setScanSetDisabledOnAdd(e.currentTarget.checked)}
                         />
 
                         <Switch

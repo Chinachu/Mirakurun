@@ -397,7 +397,6 @@ export interface ConfigChannelsItem {
 export interface ChannelScanStatus {
     isScanning: boolean;
     status: ChannelScanPhase;
-    type?: ChannelType;
     route?: ChannelRoute;
     dryRun?: boolean;
     progress?: number;
@@ -411,6 +410,9 @@ export interface ChannelScanStatus {
 }
 
 export type ChannelScanMode = "Channel" | "Service";
+
+/** the channels to scan */
+export type ChannelScanSource = "preset" | "dvbConf" | "list" | "format";
 
 export type ChannelScanPhase = (
     "not_started" |

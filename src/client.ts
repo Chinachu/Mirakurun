@@ -79,18 +79,18 @@ export interface ServicesQuery {
 
 export interface ChannelScanOption {
     dryRun?: boolean;
-    type?: apid.ChannelType;
     route?: apid.ChannelRoute;
+    source?: apid.ChannelScanSource;
+    channels?: string[];
+    channelNameFormat?: string;
     minCh?: number;
     maxCh?: number;
     minSubCh?: number;
     maxSubCh?: number;
-    useSubCh?: boolean;
     scanMode?: apid.ChannelScanMode;
     setDisabledOnAdd?: boolean;
     refresh?: boolean;
-    skipCh?: number[];
-    channelNameFormat?: string;
+    skipCh?: string[];
     async?: boolean;
 }
 

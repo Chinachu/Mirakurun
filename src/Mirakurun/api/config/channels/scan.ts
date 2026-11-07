@@ -19,31 +19,36 @@ import * as apid from "../../../../../api";
 import * as config from "../../../config";
 import * as common from "../../../common";
 import ChannelItem from "../../../ChannelItem";
+import type { ScannedStream } from "../../../Tuner";
 import _ from "../../../_";
 
 /**
  * Options for a channel scan operation
  */
+/** the source of the channels to scan */
+export type ChannelScanSource = apid.ChannelScanSource;
+
 interface ChannelScanOption {
-    type: apid.ChannelType;          // Channel type
-    startCh?: number;                  // Start channel number
-    endCh?: number;                    // End channel number
-    startSubCh?: number;               // Start subchannel number (for BS)
-    endSubCh?: number;                 // End subchannel number (for BS)
-    useSubCh?: boolean;                // Use subchannel style (for BS)
-    scanMode?: apid.ChannelScanMode;               // Scan mode
-    setDisabledOnAdd?: boolean;        // Set disabled flag on newly added channels
-    refresh?: boolean;                 // Refresh existing channel configs
-    channelNameFormat?: string;        // Custom channel name format
+    route: apid.ChannelRoute;          // Receiving route
+    source?: ChannelScanSource;        // Source of the channels to scan
+    channels?: string[];               // Channels to scan (source: list)
+    dvbChannels?: string[];            // Channels of the channel config files of dvbv5 (source: dvbConf)
+    channelNameFormat?: string;        // Channel name format (source: format)
+    startCh?: number;                  // Start channel number (source: format)
+    endCh?: number;                    // End channel number (source: format)
+    startSubCh?: number;               // Start subchannel number (source: format, `{subch}` in the format)
+    endSubCh?: number;                 // End subchannel number (source: format, `{subch}` in the format)
+    scanMode?: apid.ChannelScanMode;   // Scan mode (default: by the type of the stream)
+    setDisabledOnAdd?: boolean;        // Set disabled flag on newly added channels (default: by the type of the stream)
 }
 
 /**
  * Configuration for a scan operation
  */
 interface ScanConfig {
-    readonly channels: string[];         // List of channel identifiers to scan
-    readonly scanMode: apid.ChannelScanMode;         // Scan mode to use
-    readonly setDisabledOnAdd: boolean;  // Whether to set disabled on new channels
+    readonly channels: string[];                 // List of channel identifiers to scan
+    readonly scanMode?: apid.ChannelScanMode;    // Scan mode to use (default: by the type)
+    readonly setDisabledOnAdd?: boolean;         // Whether to set disabled on new channels (default: by the type)
 }
 
 /**
@@ -78,14 +83,6 @@ const channelOrder: Record<apid.ChannelType, number> = {
 };
 
 /**
- * Channel name format templates
- */
-const CHANNEL_NAME_FORMAT_GR = "{ch}";                // GR channel format
-const CHANNEL_NAME_FORMAT_BS = "{ch}";                // BS channel format
-const CHANNEL_NAME_FORMAT_BS_SUBCH = "BS{ch00}_{subch}"; // BS subchannel format
-const CHANNEL_NAME_FORMAT_CS = "CS{ch}";              // CS channel format
-
-/**
  * Global flag to track if scan cancellation is requested
  */
 let isCancellationRequested = false;
@@ -106,7 +103,7 @@ const scanStatus: apid.ChannelScanStatus = {
  * @returns Array of numbers from start to end
  */
 function range(start: number, end: number): number[] {
-    return Array.from({ length: (end - start + 1) }, (_, i) => i + start);
+    return Array.from({ length: Math.max(0, end - start + 1) }, (_, i) => i + start);
 }
 
 /**
@@ -157,107 +154,180 @@ function formatChannelName(format: string, ch: number, subch?: number): string {
     return formatted;
 }
 
+/** the channels of a format in the ranges (`{subch}` in the format for the subchannels) */
+function formatChannels(format: string, startCh: number, endCh: number, startSubCh = 0, endSubCh = 3): string[] {
+    const channels: string[] = [];
+    for (const ch of range(startCh, endCh)) {
+        if (/{subch0*}/.test(format)) {
+            channels.push(...range(startSubCh, endSubCh).map(subCh => formatChannelName(format, ch, subCh)));
+        } else {
+            channels.push(formatChannelName(format, ch));
+        }
+    }
+    return channels;
+}
+
 /**
- * Generates a scan configuration for a given channel type and options
+ * the channels to scan by default for each route (the names of the tuner commands such as recpt1, recisdb)
+ * - TER: the terrestrial channels (UHF 13-62)
+ * - SAT: the BS (`BS01_0`-`BS23_3`) and CS (`CS2`-`CS24`) channels
+ * - CATV: the cable channels (`C13`-`C63`) and the terrestrial channels passed through (13-62)
+ * - HIKARI: the terrestrial, BS and CS channels passed through
+ */
+export function getPresetChannels(route: apid.ChannelRoute): string[] {
+    const terrestrial = formatChannels("{ch}", 13, 62);
+    const satellite = [...formatChannels("BS{ch00}_{subch}", 1, 23, 0, 3), ...formatChannels("CS{ch}", 2, 24)];
+    switch (route) {
+        case "TER":
+            return terrestrial;
+        case "SAT":
+            return satellite;
+        case "CATV":
+            return [...formatChannels("C{ch}", 13, 63), ...terrestrial];
+        case "HIKARI":
+            return [...terrestrial, ...satellite];
+    }
+    return [];
+}
+
+/**
+ * Generates a scan configuration for the options
  *
- * @param option The scan options including channel type, ranges, and formatting
- * @returns A scan configuration with channels to scan and associated settings
+ * @param option The scan options including the route and the source of the channels
+ * @returns A scan configuration with channels to scan and associated settings, `undefined` if invalid
  */
 export function generateScanConfig(option: ChannelScanOption): ScanConfig | undefined {
-    // Remove undefined properties from options
-    Object.keys(option).forEach(key => option[key] === undefined && delete option[key]);
-
-    // Handle GR (Ground) channels
-    if (option.type === "GR") {
-        // Set GR-specific defaults
-        const grOptions = {
-            startCh: 13,
-            endCh: 62,
-            scanMode: "Channel" as const,
-            setDisabledOnAdd: false,
-            ...option
-        };
-
-        // Generate channel list using range and format
-        const channelFormat = grOptions.channelNameFormat || CHANNEL_NAME_FORMAT_GR;
-        return {
-            channels: range(grOptions.startCh, grOptions.endCh)
-                .map(ch => formatChannelName(channelFormat, ch)),
-            scanMode: grOptions.scanMode,
-            setDisabledOnAdd: grOptions.setDisabledOnAdd
-        };
+    if (common.channelRoutes.includes(option.route) === false) {
+        return undefined;
     }
 
-    // Default options for satellite channels (BS/CS)
-    const satelliteOptions = {
-        scanMode: "Service" as const,
-        setDisabledOnAdd: true,
-        ...option
-    };
-
-    // Handle BS (Broadcast Satellite) channels
-    if (option.type === "BS" || option.type === "BS4K") {
-        // Handle subchannel style BS scanning (e.g. BS01_0)
-        if (satelliteOptions.useSubCh) {
-            const bsSubchOptions = {
-                startCh: 1,
-                endCh: 23,
-                startSubCh: 0,
-                endSubCh: 3,
-                ...satelliteOptions
-            };
-
-            // Generate cross product of channels and subchannels
-            const channels: string[] = [];
-            const channelFormat = bsSubchOptions.channelNameFormat || CHANNEL_NAME_FORMAT_BS_SUBCH;
-
-            for (const ch of range(bsSubchOptions.startCh, bsSubchOptions.endCh)) {
-                for (const subCh of range(bsSubchOptions.startSubCh, bsSubchOptions.endSubCh)) {
-                    channels.push(formatChannelName(channelFormat, ch, subCh));
-                }
+    let channels: string[];
+    switch (option.source || "preset") {
+        case "preset":
+            channels = getPresetChannels(option.route);
+            break;
+        case "dvbConf":
+            channels = option.dvbChannels || [];
+            break;
+        case "list":
+            channels = (option.channels || []).map(channel => channel.trim()).filter(channel => channel !== "");
+            break;
+        case "format":
+            if (!option.channelNameFormat || option.startCh === undefined || option.endCh === undefined) {
+                return undefined;
             }
+            channels = formatChannels(option.channelNameFormat, option.startCh, option.endCh, option.startSubCh, option.endSubCh);
+            break;
+        default:
+            return undefined;
+    }
+    channels = [...new Set(channels)];
+    if (channels.length === 0) {
+        return undefined;
+    }
 
-            return {
-                channels,
-                scanMode: bsSubchOptions.scanMode,
-                setDisabledOnAdd: bsSubchOptions.setDisabledOnAdd
-            };
+    return {
+        channels,
+        ...(option.scanMode && { scanMode: option.scanMode }),
+        ...(option.setDisabledOnAdd !== undefined && { setDisabledOnAdd: option.setDisabledOnAdd })
+    };
+}
+
+/**
+ * the channel type of a stream by the network (original_network_id of the services)
+ * @returns `null` if unknown
+ */
+export function getChannelTypeByNetwork(networkId: number, format: apid.StreamFormat): apid.ChannelType | null {
+    if (format === "tlv") {
+        return "BS4K";
+    }
+    if (networkId === 4) {
+        return "BS";
+    }
+    if (networkId === 6 || networkId === 7) {
+        return "CS";
+    }
+    if (networkId === 1 || networkId === 3 || networkId === 10) {
+        return "SKY";
+    }
+    // the terrestrial (ARIB TR-B14), and the services of the cable television itself (as the terrestrial)
+    if ((networkId >= 0x7880 && networkId <= 0x7FE8) || common.CATV_NETWORK_IDS.includes(networkId)) {
+        return "GR";
+    }
+    return null;
+}
+
+/** the type of the channel item to tune for the scan by default */
+const scanChannelTypes: Record<apid.ChannelRoute, apid.ChannelType> = {
+    TER: "GR",
+    SAT: "BS",
+    CATV: "GR",
+    HIKARI: "GR"
+};
+
+/** the type of the channel item to tune for the scan (any type of the tuners of the route) */
+function getScanChannelType(route: apid.ChannelRoute): apid.ChannelType | null {
+    return [scanChannelTypes[route], ...common.channelTypes].find(type => _.tuner.typeExists(type, route)) || null;
+}
+
+/**
+ * the channel items of a channel scanned (by the type of each stream)
+ * @param log writes the notes
+ */
+export function generateScannedChannelItems(
+    channel: string,
+    route: apid.ChannelRoute,
+    streams: ScannedStream[],
+    scanConfig: ScanConfig,
+    log: (text: string) => void = () => undefined
+): apid.ConfigChannels {
+    const types = new Map<apid.ChannelType, { relTs: Set<number | undefined>, services: apid.Service[], bonded: boolean }>();
+    for (const stream of streams) {
+        const services = stream.services.filter(service => serviceTypes.includes(service.type));
+        const bonded = stream.format === "tlv" && stream.numberOfCarriers > 1;
+        // the carriers of a TLV of multiple carriers are added without the services (the services are scanned after all the carriers are known)
+        if (services.length === 0 && !bonded) {
+            continue;
+        }
+        const type = getChannelTypeByNetwork(services[0]?.networkId, stream.format);
+        if (type === null) {
+            log(`-> unknown network (networkId: ${services[0].networkId}${stream.relTs ? `, relTs: ${stream.relTs}` : ""}), skipped.\n`);
+            continue;
+        }
+        const entry = types.get(type) || { relTs: new Set(), services: [], bonded: false };
+        entry.relTs.add(stream.relTs);
+        entry.services.push(...services.filter(service => !entry.services.some(s => s.networkId === service.networkId && s.serviceId === service.serviceId)));
+        entry.bonded = entry.bonded || bonded;
+        types.set(type, entry);
+    }
+
+    const items: apid.ConfigChannels = [];
+    for (const [type, { relTs, services, bonded }] of types) {
+        const scanMode = scanConfig.scanMode || (type === "GR" ? "Channel" : "Service");
+        const setDisabledOnAdd = scanConfig.setDisabledOnAdd ?? type !== "GR";
+        // the relative stream of TSMF is specified if only one (any tuner receives it), the relative streams are detected if more than one
+        const tsmfRelTs = relTs.size === 1 && !bonded ? [...relTs][0] : undefined;
+        if (relTs.size > 1) {
+            log(`-> the ${relTs.size} relative streams of ${type} are detected by the tuners for TLV (the types including BS4K, or tlvDecoder / tlvToTsDecoder).\n`);
+        }
+        if (_.tuner.typeExists(type, route) === false) {
+            log(`-> no tuners of ${type} for the route ${route}, add ${type} to \`types\` of the tuners.\n`);
         }
 
-        // Regular BS channel style (e.g. 101-256)
-        const bsOptions = {
-            startCh: 101,
-            endCh: 256,
-            ...satelliteOptions
-        };
-
-        const channelFormat = bsOptions.channelNameFormat || CHANNEL_NAME_FORMAT_BS;
-        return {
-            channels: range(bsOptions.startCh, bsOptions.endCh)
-                .map(ch => formatChannelName(channelFormat, ch)),
-            scanMode: bsOptions.scanMode,
-            setDisabledOnAdd: bsOptions.setDisabledOnAdd
-        };
+        const typeItems = services.length > 0
+            ? generateChannelItems(scanMode, type, channel, services, setDisabledOnAdd)
+            : [{ name: `${type}${channel}`, type, channel, isDisabled: setDisabledOnAdd }];
+        for (const item of typeItems) {
+            if (route !== common.getDefaultChannelRoute(type)) {
+                item.route = route;
+            }
+            if (tsmfRelTs !== undefined) {
+                item.tsmfRelTs = tsmfRelTs;
+            }
+            items.push(item);
+        }
     }
-
-    // Handle CS (Communication Satellite) channels
-    if (option.type === "CS") {
-        const csOptions = {
-            startCh: 2,
-            endCh: 24,
-            ...satelliteOptions
-        };
-
-        const channelFormat = csOptions.channelNameFormat || CHANNEL_NAME_FORMAT_CS;
-        return {
-            channels: range(csOptions.startCh, csOptions.endCh)
-                .map(ch => formatChannelName(channelFormat, ch)),
-            scanMode: csOptions.scanMode,
-            setDisabledOnAdd: csOptions.setDisabledOnAdd
-        };
-    }
-
-    return undefined;
+    return items;
 }
 
 /**
@@ -423,31 +493,30 @@ type ScanStatusUpdate = PhaseScanStatusUpdate | StepScanStatusUpdate | ResultSca
  *
  * @param scanConfig Configuration for the scan including channels to scan
  * @param dryRun If true, don't save changes
- * @param type Channel type being scanned (GR, BS, CS, SKY)
  * @param route Receiving route being scanned
  * @param refresh Whether to rescan channels that already exist
  * @param outputWriter Optional function to write output text during scan
+ * @param skipCh Channels to skip (the names)
  * @returns Promise resolving to the final channel list
  */
 async function runChannelScan(
     scanConfig: ScanConfig,
     dryRun: boolean,
-    type: apid.ChannelType,
     route: apid.ChannelRoute,
     refresh: boolean,
     outputWriter?: (text: string) => void,
-    skipCh: number[] = []
+    skipCh: string[] = []
 ): Promise<apid.ConfigChannels> {
     try {
         // Initialize scan data
         const scanLog: string[] = [];
         const oldChannelItems = await config.loadChannels();
-        const defaultRoute = common.getDefaultChannelRoute(type);
-        const isScanTarget = (item: apid.ConfigChannelsItem): boolean => {
-            return item.type === type && (item.route || defaultRoute) === route;
-        };
-        // Filter out channels of the type and the route we're scanning (they'll be replaced)
-        const result: apid.ConfigChannels = oldChannelItems.filter(channel => !isScanTarget(channel));
+        const scanType = getScanChannelType(route);
+        // the entries of the channels scanned on the route (of any type) are replaced
+        const isOnRoute = (item: apid.ConfigChannelsItem): boolean => (item.route || common.getDefaultChannelRoute(item.type)) === route;
+        const isSkipped = (channel: string): boolean => skipCh.includes(channel);
+        const scannedChannels = new Set(scanConfig.channels.filter(channel => !isSkipped(channel)));
+        const result: apid.ConfigChannels = oldChannelItems.filter(item => !isOnRoute(item) || !scannedChannels.has(item.channel));
         let newCount = 0;
         let takeoverCount = 0;
 
@@ -455,7 +524,6 @@ async function runChannelScan(
         const now = Date.now();
         Object.assign(scanStatus, {
             status: "scanning" as const,
-            type,
             route,
             dryRun,
             progress: 0,
@@ -539,8 +607,8 @@ async function runChannelScan(
 
         // Print scan start message
         updateStepStatus(
-            { status: "started" as const, type },
-            `channel scanning... (type: "${type}")\n\n`
+            { status: "started" as const },
+            `channel scanning... (route: "${route}")\n\n`
         );
 
         // Process each channel in the scan configuration
@@ -558,8 +626,7 @@ async function runChannelScan(
             const progressPercent = Math.round((i + 1) / totalChannels * 100);
 
             // Check if this channel should be skipped based on skipCh parameter
-            const channelNumber = parseInt(channel.replace(/[^0-9]/g, ""), 10);
-            if (!isNaN(channelNumber) && skipCh.includes(channelNumber)) {
+            if (isSkipped(channel)) {
                 updateStepStatus(
                     {
                         status: "skipped" as const,
@@ -585,7 +652,7 @@ async function runChannelScan(
             // Check for existing enabled channels if we're not refreshing
             if (!refresh) {
                 const existingChannels = oldChannelItems.filter(
-                    item => isScanTarget(item) &&
+                    item => isOnRoute(item) &&
                            item.channel === channel &&
                            !item.isDisabled
                 );
@@ -604,8 +671,8 @@ async function runChannelScan(
                         `-> ${existingChannels.length} existing config found.\n`
                     );
 
-                    // Add each existing channel to results
-                    for (const channelItem of existingChannels) {
+                    // Add each existing channel to results (all the entries of the channel on the route)
+                    for (const channelItem of oldChannelItems.filter(item => isOnRoute(item) && item.channel === channel)) {
                         result.push(channelItem);
                         takeoverCount++;
                         scanStatus.takeoverCount = takeoverCount;
@@ -614,7 +681,7 @@ async function runChannelScan(
 
                     updateStepStatus(
                         {
-                        status: "skipped" as const,
+                            status: "skipped" as const,
                             channel,
                             reason: "existing_config"
                         },
@@ -625,13 +692,12 @@ async function runChannelScan(
                 }
             }
 
-            // Scan the channel for services
-            let services: apid.Service[];
+            // Scan the streams of the channel (the type is decided by the network of each stream)
+            let streams: ScannedStream[];
             try {
-                // Get services from the tuner
-                services = await _.tuner.getServices(new ChannelItem({
-                    name: `${type}:${channel}`,
-                    type,
+                streams = await _.tuner.scanChannel(new ChannelItem({
+                    name: `${route}:${channel}`,
+                    type: scanType,
                     channel,
                     route
                 }), {
@@ -658,43 +724,41 @@ async function runChannelScan(
                 continue; // Skip to next channel
             }
 
-            // Filter services
-            services = services.filter(service => serviceTypes.includes(service.type));
-
+            const serviceCount = streams.reduce((count, stream) => count + stream.services.filter(service => serviceTypes.includes(service.type)).length, 0);
             updateStepStatus(
                 {
                     status: "services_found" as const,
                     channel,
-                    count: services.length
+                    count: serviceCount
                 },
-                `-> ${services.length} services found.\n`
+                `-> ${serviceCount} services found.\n`
             );
 
-            // Skip if no services found
-            if (services.length === 0) {
+            // Generate channel items by the type of each stream
+            const scannedItems = generateScannedChannelItems(channel, route, streams, scanConfig, appendToLog);
+            if (scannedItems.length === 0) {
                 appendToLog("\n");
                 continue;
             }
 
-            // Generate channel items based on scan mode (Service or Channel)
-            const scannedChannelItems = generateChannelItems(
-                scanConfig.scanMode,
-                type,
-                channel,
-                services,
-                scanConfig.setDisabledOnAdd
-            );
+            // the channels are unique by the type and the channel (the entry of the other route is used)
+            const addedItems = scannedItems.filter(item => {
+                const other = result.find(o => o.type === item.type && o.channel === item.channel && !isOnRoute(o));
+                if (other) {
+                    appendToLog(`-> ${item.type} "${item.channel}" is already configured on the route ${other.route || common.getDefaultChannelRoute(other.type)}, not added.\n`);
+                }
+                return !other;
+            });
+            if (addedItems.length === 0) {
+                appendToLog("\n");
+                continue;
+            }
 
             // Add newly scanned items to results
-            const scannedItems: apid.ConfigChannels = [];
-            for (const newChannelItem of scannedChannelItems) {
-                if (route !== defaultRoute) {
-                    newChannelItem.route = route;
-                }
+            for (const newChannelItem of addedItems) {
                 result.push(newChannelItem);
                 newCount++;
                 scanStatus.newCount = newCount;
-                scannedItems.push(newChannelItem);
                 appendToLog(`-> ${JSON.stringify(newChannelItem)}\n`);
             }
 
@@ -702,9 +766,9 @@ async function runChannelScan(
                 {
                     status: "channels_found" as const,
                     channel,
-                    items: scannedItems
+                    items: addedItems
                 },
-                `Found ${scannedItems.length} channels for ${channel}\n\n`
+                `Found ${addedItems.length} channels for ${channel}\n\n`
             );
         }
 
@@ -723,13 +787,12 @@ async function runChannelScan(
             newCount,
             takeoverCount,
             totalTypeCount: newCount + takeoverCount,
-            totalCount: result.length,
-            type
+            totalCount: result.length
         };
 
         updateResultStatus(
             summaryData,
-            `-> total ${newCount + takeoverCount}/${result.length} (${type}/Any) channels configured.\n\n`
+            `-> total ${newCount + takeoverCount}/${result.length} (${route}/Any) channels configured.\n\n`
         );
 
         updateResultStatus(
@@ -824,25 +887,33 @@ export const put: Operation = async (req, res) => {
     // Extract query parameters
     const asyncMode = Boolean(req.query.async);
     const dryRun = Boolean(req.query.dryRun);
-    const type = req.query.type as apid.ChannelType;
-    const route = req.query.route as apid.ChannelRoute || common.getDefaultChannelRoute(type);
+    const route = (req.query.route as apid.ChannelRoute) || "TER";
     const refresh = Boolean(req.query.refresh);
+    const source = (req.query.source as ChannelScanSource) || "preset";
+    const toList = (value: unknown): string[] => (Array.isArray(value) ? value : value === undefined ? [] : [value]).map(String);
 
-    // Parse skipCh parameter
-    const skipCh: number[] = req.query?.skipCh as any as number[] || [];
+    // Parse skipCh parameter (the names)
+    const skipCh = toList(req.query.skipCh);
+
+    if (getScanChannelType(route) === null) {
+        scanStatus.isScanning = false;
+        api.responseError(res, 400, `No tuners for the route ${route}`);
+        return;
+    }
 
     // Parse channel configuration options
     const channelOptions: ChannelScanOption = {
-        type,
-        startCh: req.query.minCh ? Number(req.query.minCh) : undefined,
-        endCh: req.query.maxCh ? Number(req.query.maxCh) : undefined,
-        startSubCh: req.query.minSubCh ? Number(req.query.minSubCh) : undefined,
-        endSubCh: req.query.maxSubCh ? Number(req.query.maxSubCh) : undefined,
-        useSubCh: req.query.useSubCh !== undefined ? Boolean(req.query.useSubCh) : undefined,
+        route,
+        source,
+        channels: toList(req.query.channels),
+        dvbChannels: source === "dvbConf" ? await _.tuner.getDvbChannelNames(route) : undefined,
         channelNameFormat: req.query.channelNameFormat as string,
+        startCh: req.query.minCh !== undefined ? Number(req.query.minCh) : undefined,
+        endCh: req.query.maxCh !== undefined ? Number(req.query.maxCh) : undefined,
+        startSubCh: req.query.minSubCh !== undefined ? Number(req.query.minSubCh) : undefined,
+        endSubCh: req.query.maxSubCh !== undefined ? Number(req.query.maxSubCh) : undefined,
         scanMode: req.query.scanMode as apid.ChannelScanMode,
-        setDisabledOnAdd: req.query.setDisabledOnAdd !== undefined ?
-            Boolean(req.query.setDisabledOnAdd) : undefined
+        setDisabledOnAdd: req.query.setDisabledOnAdd !== undefined ? Boolean(req.query.setDisabledOnAdd) : undefined
     };
 
     // Generate scan configuration
@@ -851,7 +922,7 @@ export const put: Operation = async (req, res) => {
     // Handle missing scan configuration
     if (!scanConfig) {
         scanStatus.isScanning = false;
-        api.responseError(res, 400, "Invalid scan configuration");
+        api.responseError(res, 400, source === "dvbConf" ? "No channels in the channel config files of dvbv5 of the tuners" : "Invalid scan configuration");
         return;
     }
 
@@ -866,7 +937,7 @@ export const put: Operation = async (req, res) => {
         res.end();
 
         // Run scan in background
-        runChannelScan(scanConfig, dryRun, type, route, refresh, null, skipCh)
+        runChannelScan(scanConfig, dryRun, route, refresh, null, skipCh)
             .catch(error => {
                 console.error("Channel scan error:", error);
                 // Error is used only when the scan is stopped
@@ -892,7 +963,7 @@ export const put: Operation = async (req, res) => {
         };
 
         // Run scan with output streaming
-        await runChannelScan(scanConfig, dryRun, type, route, refresh, logTextOutput, skipCh);
+        await runChannelScan(scanConfig, dryRun, route, refresh, logTextOutput, skipCh);
         res.end();
     } catch (error) {
         console.error("Channel scan error:", error);
@@ -911,20 +982,31 @@ export const put: Operation = async (req, res) => {
 put.apiDoc = {
     tags: ["config"],
     summary: "Channel Scan",
-    description: `Entry rewriting specifications:
-- The scan is performed on a range of channels of the specified type and the entries for those channels, if any, are saved in the configuration file.
-- If the channel to be scanned is described in the configuration file and is enabled, the scan will not be performed for that channel and the entries described will remain intact. If you do not want to keep the entries, use the \`refresh\` option.
-- All entries outside the channel range of the specified type and route will be deleted.
-- All entries of a type or a route other than the specified ones will remain.
-- Only the tuners which can receive the specified route are used. The entries added have the \`route\` if it is not the default of the type.
+    description: `Scans the channels of a receiving route, and decides the type of each stream by its network (original_network_id of the services):
+- \`4\`: BS, \`6\` / \`7\`: CS, \`1\` / \`3\` / \`10\`: SKY, TLV (MMT): BS4K
+- \`0x7880\`-\`0x7FE8\` (terrestrial), and the networks of the cable television (\`0xFFF7\`-\`0xFFFF\`): GR
+- The streams of the other networks are not added.
 
-About BS Subchannel Style:
-- Only when scanning BS, you can specify the channel number in the subchannel style (e.g. BS01_0). To specify the channel number, use minSubCh and maxSubCh in addition to minCh and maxCh.
-- The subchannel number parameters (minSubCh, maxSubCh) are used only if the type is BS and are ignored otherwise.
-- Subchannel style scans scan in the following range:
-    From \`BS\${minCh}_\${minSubCh}\` to \`BS\${maxCh}_\${maxSubCh}\`
-- In the subchannel style, minCh and maxCh are zero padded to two digits. minSubCh and maxSubCh are not padded.
-- BS "non" subchannel style scans and GR scans are basically the same. Note that if you scan the wrong channel range, the GR channel will be registered as BS and the BS channel will be registered as GR. This problem does not occur because CS scan uses a character string with \`CS\` added as a channel number prefix.`,
+The channels to scan (\`source\`):
+- \`preset\`: the channels of the route (the names of the tuner commands such as recpt1, recisdb)
+    - TER: \`13\`-\`62\`
+    - SAT: \`BS01_0\`-\`BS23_3\`, \`CS2\`-\`CS24\`
+    - CATV: \`C13\`-\`C63\`, \`13\`-\`62\`
+    - HIKARI: \`13\`-\`62\`, \`BS01_0\`-\`BS23_3\`, \`CS2\`-\`CS24\`
+- \`dvbConf\`: the channels of the channel config files of dvbv5 of the tuners (DVB device direct access) for the route
+- \`list\`: the channels of \`channels\`
+- \`format\`: the channels of \`channelNameFormat\` in the range of \`minCh\`-\`maxCh\` (and \`minSubCh\`-\`maxSubCh\` with \`{subch}\`)
+
+The tuners which can receive the route are used, any of their types. The relative streams of TSMF are detected on any local tuner.
+The tuners of the route should have all the types to receive in \`types\` (such as \`[GR, BS, CS, BS4K]\` for CATV).
+
+Entry rewriting specifications:
+- The entries of the channels scanned on the route (of any type) are replaced with the result. The other entries remain.
+- If an enabled entry of the channel to be scanned is in the configuration file, the scan will not be performed for that channel and the entries of the channel remain intact. If you do not want to keep the entries, use the \`refresh\` option.
+- The entries added have the \`route\` if it is not the default of the type.
+- The channels are unique by the type and the channel. The entry of the type and the channel configured on another route remains, and the entry scanned is not added.
+- \`tsmfRelTs\` is added if the type has only one relative stream of TSMF on the channel. The relative streams are detected by the tuners for TLV if more than one.
+- The carriers of a TLV of multiple carriers (CATV channel bonding) are added as BS4K without the services (\`tsmfRelTs\` and \`tsmfGroupId\` are detected).`,
     operationId: "channelScan",
     produces: [
         "text/plain",
@@ -941,70 +1023,69 @@ About BS Subchannel Style:
         },
         {
             in: "query",
-            name: "type",
-            type: "string",
-            enum: ["GR", "BS", "CS", "BS4K"] as apid.ChannelType[],
-            default: "GR",
-            description: "Specifies the channel type to scan."
-        },
-        {
-            in: "query",
             name: "route",
             type: "string",
             enum: ["TER", "SAT", "CATV", "HIKARI"] as apid.ChannelRoute[],
-            description: "Specifies the receiving route to scan.\n\n" +
-                "_Default value (GR)_: TER\n" +
-                "_Default value (BS/CS)_: SAT"
+            default: "TER",
+            description: "Specifies the receiving route to scan."
+        },
+        {
+            in: "query",
+            name: "source",
+            type: "string",
+            enum: ["preset", "dvbConf", "list", "format"] as ChannelScanSource[],
+            default: "preset",
+            description: "Specifies the channels to scan."
+        },
+        {
+            in: "query",
+            name: "channels",
+            type: "array",
+            items: {
+                type: "string"
+            },
+            collectionFormat: "csv",
+            description: "Comma-separated list of the channels to scan (`source`: `list`)."
+        },
+        {
+            in: "query",
+            name: "channelNameFormat",
+            type: "string",
+            description: "The format of the channel names (`source`: `format`). Supports placeholders like {ch}, {ch00}, {subch}. (e.g. C{ch} -> C13, BS{ch00}_{subch} -> BS01_2)"
         },
         {
             in: "query",
             name: "minCh",
             type: "integer",
-            description: "Specifies the minimum number of channel numbers to scan."
+            description: "The minimum number of `{ch}` (`source`: `format`)."
         },
         {
             in: "query",
             name: "maxCh",
             type: "integer",
-            description: "Specifies the maximum number of channel numbers to scan."
+            description: "The maximum number of `{ch}` (`source`: `format`)."
+        },
+        {
+            in: "query",
+            name: "minSubCh",
+            type: "integer",
+            description: "The minimum number of `{subch}` (`source`: `format`, default: 0)."
+        },
+        {
+            in: "query",
+            name: "maxSubCh",
+            type: "integer",
+            description: "The maximum number of `{subch}` (`source`: `format`, default: 3)."
         },
         {
             in: "query",
             name: "skipCh",
             type: "array",
             items: {
-                type: "integer"
+                type: "string"
             },
             collectionFormat: "csv",
-            description: "Comma-separated list of channel numbers to skip during scanning.\n" +
-                "Example: `skipCh=13,14,15` will skip channels 13, 14, and 15."
-        },
-        {
-            in: "query",
-            name: "minSubCh",
-            type: "integer",
-            description: "Specifies the minimum number of subchannel numbers to scan. This parameter is only used if the type is `BS` and the useSubCh is `true`."
-        },
-        {
-            in: "query",
-            name: "maxSubCh",
-            type: "integer",
-            description: "Specifies the maximum number of subchannel numbers to scan. This parameter is only used if the type is `BS` and the useSubCh is `true`."
-        },
-        {
-            in: "query",
-            name: "useSubCh",
-            type: "boolean",
-            allowEmptyValue: true,
-            default: true,
-            description: "Specify true to use the subchannel style for channel numbers. Only used for BS scans. (e.g. BS01_0)"
-        },
-        {
-            in: "query",
-            name: "channelNameFormat",
-            type: "string",
-            allowEmptyValue: true,
-            description: "Override format to use for channel name. Supports placeholders like {ch}, {ch00}, {subch}. (e.g. {ch} -> 1, BS{ch00}_{subch} -> BS01_2)"
+            description: "Comma-separated list of the channels to skip (the names, e.g. `C13,27`)."
         },
         {
             in: "query",
@@ -1013,7 +1094,7 @@ About BS Subchannel Style:
             enum: ["Channel", "Service"] as apid.ChannelScanMode[],
             description: "Channel scan mode. Use `Service` mode to create separate entries per service.\n\n" +
                 "_Default value (GR)_: Channel\n" +
-                "_Default value (BS/CS)_: Service"
+                "_Default value (the others)_: Service"
         },
         {
             in: "query",
@@ -1022,7 +1103,7 @@ About BS Subchannel Style:
             allowEmptyValue: true,
             description: "If `true`, newly discovered channels will be added in disabled state.\n\n" +
                 "_Default value (GR)_: false\n" +
-                "_Default value (BS/CS)_: true"
+                "_Default value (the others)_: true"
         },
         {
             in: "query",
@@ -1032,7 +1113,7 @@ About BS Subchannel Style:
             default: false,
             description: "If `true`, update the existing channel configurations without preserving them.\n" +
                 "When false, enabled channels that already exist in the config will be preserved.\n" +
-                "Note: Channels of other types will always be preserved regardless of this setting."
+                "Note: The channels not scanned will always be preserved regardless of this setting."
         },
         {
             in: "query",
@@ -1068,7 +1149,7 @@ About BS Subchannel Style:
             }
         },
         400: {
-            description: "Invalid scan configuration",
+            description: "Invalid scan configuration, or no tuners for the route",
             schema: {
                 $ref: "#/definitions/Error"
             }
