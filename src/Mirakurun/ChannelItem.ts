@@ -32,6 +32,14 @@ export interface ChannelStream {
     readonly groupId?: number;
     readonly numberOfCarriers?: number;
     readonly carrierSequence?: number;
+    /** TSMF of multiple carriers: the IDs of the header (to associate the carriers, the IDs of the services may differ) */
+    readonly tsmfNetworkId?: number;
+    readonly tsmfStreamId?: number;
+}
+
+/** the same stream by the IDs of the TSMF header */
+function isSameTsmfStream(a: ChannelStream, b: ChannelStream): boolean {
+    return (a.tsmfNetworkId ?? a.networkId) === (b.tsmfNetworkId ?? b.networkId) && (a.tsmfStreamId ?? a.streamId) === (b.tsmfStreamId ?? b.streamId);
 }
 
 export default class ChannelItem {
@@ -180,7 +188,7 @@ export default class ChannelItem {
         return _.channel.items.filter(item => item.type === this.type && item.route === this.route &&
             item._configuredTsmfGroupId === undefined && item.tsmfGroupId === this.tsmfGroupId &&
             this.streams.some(stream => stream.format === "tlv" &&
-                item.streams.some(other => other.format === "tlv" && other.networkId === stream.networkId && other.streamId === stream.streamId &&
+                item.streams.some(other => other.format === "tlv" && isSameTsmfStream(other, stream) &&
                     other.relTs === stream.relTs && other.numberOfCarriers === stream.numberOfCarriers)));
     }
 
@@ -190,8 +198,7 @@ export default class ChannelItem {
      */
     hasAllCarriers(stream: ChannelStream): boolean {
         const carriers = this.getBondedChannels() || [];
-        const sequences = carriers.map(item => item.streams.find(other => other.format === "tlv" &&
-            other.networkId === stream.networkId && other.streamId === stream.streamId)?.carrierSequence);
+        const sequences = carriers.map(item => item.streams.find(other => other.format === "tlv" && isSameTsmfStream(other, stream))?.carrierSequence);
         const ordered = [...sequences].sort((a, b) => a - b);
         return stream.groupId !== undefined && carriers.length === stream.numberOfCarriers && new Set(sequences).size === stream.numberOfCarriers &&
             ordered.every((sequence, i) => sequence === i + ordered[0]) && (ordered[0] === 0 || ordered[0] === 1);

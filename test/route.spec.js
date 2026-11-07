@@ -132,7 +132,7 @@ describe("[route.spec] route / streamId", () => {
         assert.strictEqual(scan.mock.callCount(), 1);
         // the services of the TLV are scanned by this carrier, the other carriers do not scan it again
         assert.strictEqual(queued.mock.callCount(), 0);
-        assert.deepStrictEqual(channels[last].streams[0], stream(last)[0]);
+        assert.deepStrictEqual(channels[last].streams[0], { ...stream(last)[0], tsmfNetworkId: 32752, tsmfStreamId: 60001 });
         assert.strictEqual(channels[last].getBondedChannels().length, 3);
         await _.service._readyForScan(channels[last]);
         assert.deepStrictEqual(ready.mock.calls.at(-1).arguments[0], [{ channel: channels[last], relTs: 2 }]);
@@ -265,6 +265,55 @@ describe("[route.spec] route / streamId", () => {
       await assert.rejects(t._scanTSMFServices(channels[2], { streamSetting: { channel: channels[2] } }, stream(2)), /no available tuners/);
 
       assert.deepStrictEqual(new Set(queued.mock.calls.map(c => c.arguments[0])), new Set([channels[0], channels[1]]));
+    });
+
+    // TLV のサービスの ID (tlv_stream_id) がヘッダーと違っても、搬送波はヘッダーの ID で関連付ける
+    it("keeps associating the carriers by the IDs of the header after the TLV is scanned with the different IDs", async () => {
+      setupChannels([0, 1, 2].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` })));
+      const channels = _.channel.items;
+      const t = tuner([0, 1, 2].map(i => fakeDevice(i, ["BS4K"], ["CATV"])));
+      mock.method(_.service, "queueDiscoveredTsmfScan", () => {});
+      mock.method(t, "_scanServices", async () => [{ networkId: 11, streamId: 60099, serviceId: 701 }]);
+      const header = i => [{ networkId: 11, streamId: 60001, relTs: 2, format: "tlv", slots: 52, groupId: 9, numberOfCarriers: 3, carrierSequence: i }];
+      for (const i of [0, 1, 2]) {
+        await t._scanTSMFServices(channels[i], { streamSetting: { channel: channels[i] } }, header(i));
+      }
+
+      // the stream of the services (to find the services) and the IDs of the header (to associate the carriers)
+      assert.deepStrictEqual([channels[2].streams[0].streamId, channels[2].streams[0].tsmfStreamId], [60099, 60001]);
+      for (const channel of channels) {
+        assert.deepStrictEqual(channel.getBondedChannels(), channels);
+        assert.strictEqual(channel.hasAllCarriers(channel.streams[0]), true);
+      }
+      const candidate = t._getCandidate(channels[2], 2);
+      assert.strictEqual(t._pickCarrierDevices({ device: t._devices[2], channel: channels[2], candidate }, 0).length, 2);
+    });
+
+    // スキャンに失敗しても、前に受信したサービスのストリームの ID を残す (ヘッダーの ID で置き換えない)
+    it("keeps the IDs of the services received before when the scan fails", async () => {
+      setupChannels([{ name: "Shared", type: "BS4K", route: "CATV", channel: "S1" }]);
+      const channel = _.channel.items[0];
+      const t = tuner([fakeDevice(0, ["BS4K"], ["CATV"])]);
+      const header = [
+        { relTs: 1, slots: 10, format: "ts", streamId: 100, networkId: 4, groupId: 9, numberOfCarriers: 2, carrierSequence: 0 },
+        { relTs: 2, slots: 42, format: "tlv", streamId: 60001, networkId: 11, groupId: 9, numberOfCarriers: 2, carrierSequence: 0 }
+      ];
+      let fail = false;
+      mock.method(t, "_scanServices", async () => {
+        if (fail) {
+          throw new Error("stream has closed before get services");
+        }
+        return [{ networkId: 32752, streamId: 100, serviceId: 1, name: "TS", type: 1, logoId: -1, remoteControlKeyId: 1 }];
+      });
+      _.tuner = Object.assign(t, { getServices: ch => t._scanTSMFServices(ch, { streamSetting: { channel: ch } }, header) });
+      await _.service._scan(channel, true);
+      const service = _.service.items[0];
+      assert.deepStrictEqual(service.targets.map(target => target.relTs), [1]);
+
+      fail = true;
+      await assert.rejects(_.service._scan(channel, false));
+      assert.strictEqual(channel.getStreamByRelTs(1).networkId, 32752);
+      assert.deepStrictEqual(service.targets.map(target => target.relTs), [1]);
     });
 
     // ヘッダーの ID とスキャンしたサービスの ID が違っても、ヘッダーが変わらなければ他の搬送波を再スキャンし続けない

@@ -49,6 +49,8 @@ export interface ChannelStream {
     groupId?: number;
     numberOfCarriers?: number;
     carrierSequence?: number;
+    tsmfNetworkId?: number;
+    tsmfStreamId?: number;
 }
 
 export interface Program extends apid.Program {

@@ -20,7 +20,7 @@ import * as log from "./log";
 import * as apid from "../../api";
 import _ from "./_";
 import TunerDevice, { TunerDeviceStatus } from "./TunerDevice";
-import ChannelItem from "./ChannelItem";
+import ChannelItem, { ChannelStream } from "./ChannelItem";
 import ServiceItem from "./ServiceItem";
 import TSFilter from "./TSFilter";
 import type TLVFilter from "./TLVFilter";
@@ -493,16 +493,30 @@ export class Tuner {
 
         let scanStreams = streams;
         let carriersCompleted = false;
+        // the stream of the services scanned (the same as without TSMF), the one of the TSMF header if no services
+        let channelStreams: ChannelStream[] = streams.map(stream => ({ ...stream }));
         const discovery = streams.find(stream => stream.numberOfCarriers > 1 && stream.format === "tlv");
         if (discovery) {
-            // by the carriers of the header (the IDs saved may be of the services scanned, which may differ from the header)
+            // the IDs of the header associate the carriers (`tsmfNetworkId` / `tsmfStreamId`, the IDs of the services may differ),
+            // `networkId` / `streamId` of the services scanned are kept until scanned again (as received before if the scan fails)
+            channelStreams = streams.map(stream => {
+                const saved = channel.getStreamByRelTs(stream.relTs);
+                const sameStream = saved?.tsmfNetworkId === stream.networkId && saved?.tsmfStreamId === stream.streamId;
+                return {
+                    ...stream,
+                    ...(sameStream && { networkId: saved.networkId, streamId: saved.streamId }),
+                    tsmfNetworkId: stream.networkId,
+                    tsmfStreamId: stream.streamId
+                };
+            });
             const discoveryChanged = streams.some(stream => {
                 const saved = channel.getStreamByRelTs(stream.relTs);
                 return !saved || saved.groupId !== stream.groupId || saved.numberOfCarriers !== stream.numberOfCarriers ||
-                    saved.carrierSequence !== stream.carrierSequence;
+                    saved.carrierSequence !== stream.carrierSequence || saved.tsmfNetworkId !== stream.networkId || saved.tsmfStreamId !== stream.streamId;
             });
             if (_.channel.get(channel.type, channel.channel) === channel) {
-                channel.setStreams(streams);
+                // to find the other carriers (copied, the streams are updated by the scan)
+                channel.setStreams([...channelStreams]);
             }
             const canReceive = this.canReceiveTsmfCarriers(channel, discovery.numberOfCarriers);
             if (!canReceive || !channel.hasAllCarriers(discovery)) {
@@ -528,8 +542,6 @@ export class Tuner {
 
         const services: apid.Service[] = [];
         let lastError: Error = null;
-        // the stream of the services scanned (the same as without TSMF), the one of the TSMF header if no services
-        const channelStreams = streams.map(stream => ({ ...stream }));
         results.forEach((result, index) => {
             const i = scanStreams === streams ? index : streams.indexOf(scanStreams[index]);
             if (result.status === "fulfilled") {

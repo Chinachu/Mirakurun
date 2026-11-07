@@ -171,7 +171,8 @@ export class Channel {
                     ...(Number.isInteger(stream.groupId) && stream.groupId >= 0 && stream.groupId <= 255 &&
                         Number.isInteger(stream.numberOfCarriers) && stream.numberOfCarriers > 1 && stream.numberOfCarriers <= 255 &&
                         Number.isInteger(stream.carrierSequence) && stream.carrierSequence >= 0 && stream.carrierSequence <= stream.numberOfCarriers &&
-                        { groupId: stream.groupId, numberOfCarriers: stream.numberOfCarriers, carrierSequence: stream.carrierSequence })
+                        { groupId: stream.groupId, numberOfCarriers: stream.numberOfCarriers, carrierSequence: stream.carrierSequence,
+                            ...(Number.isInteger(stream.tsmfNetworkId) && Number.isInteger(stream.tsmfStreamId) && { tsmfNetworkId: stream.tsmfNetworkId, tsmfStreamId: stream.tsmfStreamId }) })
                 })));
         }
         // nothing changed by loading
