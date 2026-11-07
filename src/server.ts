@@ -26,6 +26,7 @@ if (!process.env.UV_THREADPOOL_SIZE) {
 
 import { execSync } from "child_process";
 import { createHash } from "crypto";
+import { dirname, join } from "path";
 
 if (process.platform !== "linux") {
     console.warn("running in not linux!");
@@ -59,8 +60,9 @@ function setEnv(name: string, value: string) {
 setEnv("SERVER_CONFIG_PATH", "/usr/local/etc/mirakurun/server.yml");
 setEnv("TUNERS_CONFIG_PATH", "/usr/local/etc/mirakurun/tuners.yml");
 setEnv("CHANNELS_CONFIG_PATH", "/usr/local/etc/mirakurun/channels.yml");
-setEnv("CHANNELS_DB_PATH", "/usr/local/var/db/mirakurun/channels.json");
 setEnv("SERVICES_DB_PATH", "/usr/local/var/db/mirakurun/services.json");
+// next to services.json (the path of services.json may be changed by the installations of older versions)
+setEnv("CHANNELS_DB_PATH", join(dirname(process.env.SERVICES_DB_PATH), "channels.json"));
 setEnv("PROGRAMS_DB_PATH", "/usr/local/var/db/mirakurun/programs.json");
 setEnv("LOGO_DATA_DIR_PATH", "/usr/local/var/db/mirakurun/logo-data");
 

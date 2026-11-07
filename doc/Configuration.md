@@ -285,4 +285,4 @@ Specify this when a TLV is transmitted by multiple carriers of CATV (channel bon
 
 The route to receive the channel. The same broadcast can also be configured as a channel of another route, such as BS received both through a satellite antenna and through CATV transmodulation.
 
-A service is associated with the channels by the stream received (`networkId` and `transport_stream_id`). If multiple channels can receive the same stream, the route with an available tuner is tuned (the channel scanned first is preferred). The stream received on each channel is saved in `channels.json` (environment variable: `CHANNELS_DB_PATH`).
+A service is associated with the channels by the stream received (`networkId` and `transport_stream_id`). If multiple channels can receive the same stream, the route with an available tuner is tuned (the channel scanned first is preferred). The stream received on each channel is saved in `channels.json` (environment variable: `CHANNELS_DB_PATH`, default: in the same directory as `services.json`).
