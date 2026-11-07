@@ -356,6 +356,43 @@ describe("[route.spec] route / streamId", () => {
         assert.deepStrictEqual(devices.map(d => d.users.length), [0, 0, 0]);
       });
     }
+    it("starts the tuners of all the carriers at once, not to be picked by another request while starting", async () => {
+      const configs = [1, 2, 3].map(i => ({ name: `Carrier ${i}`, type: "BS4K", channel: `C${i}`, route: "CATV", format: "tlv", tsmfRelTs: 1, tsmfGroupId: 5 }));
+      setupChannels([...configs, { name: "GR27", type: "GR", channel: "27" }]);
+      const tuned = [];
+      const devices = [0, 1, 2].map(i => {
+        const d = Object.create(TunerDevice.prototype);
+        Object.assign(d, { _index: i, _config: { name: `Tuner ${i}`, types: ["BS4K", "GR"] }, _users: new Set(), _isAvailable: true, _channel: null, _stream: null, _dvbActive: false, _isRemote: false, _endStreamTimer: null, _pendingBytes: 0, _flushTimer: null, _spawnedAt: 0 });
+        d._updated = () => {};
+        d._flushUsersBound = d._flushUsers.bind(d);
+        // the process starts at once, and the tuning takes time
+        d._spawn = channel => {
+          d._channel = channel;
+          d._stream = new EventEmitter();
+          return new Promise(resolve => tuned.push(resolve));
+        };
+        d._kill = async () => { d._channel = null; d._stream = null; };
+        return d;
+      });
+      const t = tuner(devices);
+      const bonded = _.channel.get("BS4K", "C1");
+      const gr = _.channel.get("GR", "27");
+      const filters = [];
+      try {
+        const starting = t._initTS({ id: "bonded", priority: 1, disableDecoder: true, streamSetting: { channel: bonded } }, undefined, [t._getCandidate(bonded, 1, "tlv")]);
+        await flush();
+        // 同じ優先度の別の要求は、搬送波のチューナーを使えない
+        t._initTS({ id: "gr", priority: 1, disableDecoder: true, streamSetting: { channel: gr } }, undefined, [t._getCandidate(gr)]).then(filter => filters.push(filter), () => {});
+        await flush();
+        for (const resolve of tuned) resolve();
+        filters.push(await starting);
+        assert.deepStrictEqual(devices.map(d => [d.channel.channel, d.users.map(u => u.id)]), [
+          ["C1", ["bonded"]], ["C2", ["bonded#carrier1"]], ["C3", ["bonded#carrier2"]]
+        ]);
+      } finally {
+        for (const filter of filters) filter.close();
+      }
+    });
   });
 
   describe("Tuner: route", () => {

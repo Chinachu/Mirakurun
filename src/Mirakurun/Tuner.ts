@@ -734,12 +734,15 @@ export class Tuner {
                 });
 
                 try {
-                    await device.startStream(user, tsFilter, setting.channel);
-                    await Promise.all(carriers.map(({ device: carrierDevice, channel: carrierChannel }, i) => carrierDevice.startStream(
-                        { ...user, id: `${user.id}#carrier${i + 1}`, streamSetting: { channel: carrierChannel } },
-                        new CarrierSink(tsFilter as TLVFilter, i + 1),
-                        carrierChannel
-                    )));
+                    // the tuners of the carriers are started at once, not to be picked by the other requests while starting the first one
+                    await Promise.all([
+                        device.startStream(user, tsFilter, setting.channel),
+                        ...carriers.map(({ device: carrierDevice, channel: carrierChannel }, i) => carrierDevice.startStream(
+                            { ...user, id: `${user.id}#carrier${i + 1}`, streamSetting: { channel: carrierChannel } },
+                            new CarrierSink(tsFilter as TLVFilter, i + 1),
+                            carrierChannel
+                        ))
+                    ]);
                     return tsFilter;
                 } catch (err) {
                     tsFilter.end();
