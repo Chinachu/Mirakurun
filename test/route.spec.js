@@ -251,6 +251,29 @@ describe("[route.spec] route / streamId", () => {
       });
     }
 
+    // ヘッダーの ID とスキャンしたサービスの ID が違っても、ヘッダーが変わらなければ他の搬送波を再スキャンし続けない
+    it("does not re-queue the other carriers by the IDs of the services different from the header", async () => {
+      setupChannels([0, 1].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` })));
+      const channels = _.channel.items;
+      const t = tuner([0, 1].map(i => fakeDevice(i, ["BS4K"], ["CATV"])));
+      const queued = mock.method(_.service, "queueDiscoveredTsmfScan", () => {});
+      // the TS of relTs 1: original_network_id 4 in the header, 32752 in SDT
+      mock.method(t, "_scanServices", async (channel, user, format, detect, relTs) => relTs === 1
+        ? [{ networkId: 32752, streamId: 100, serviceId: 1 }]
+        : [{ networkId: 11, streamId: 60001, serviceId: 2 }]);
+      const header = i => [
+        { relTs: 1, slots: 10, format: "ts", streamId: 100, networkId: 4, groupId: 9, numberOfCarriers: 2, carrierSequence: i },
+        { relTs: 2, slots: 42, format: "tlv", streamId: 60001, networkId: 11, groupId: 9, numberOfCarriers: 2, carrierSequence: i }
+      ];
+      for (let n = 0; n < 3; n++) {
+        for (const i of [0, 1]) {
+          await t._scanTSMFServices(channels[i], { streamSetting: { channel: channels[i] } }, header(i));
+        }
+      }
+      // only when the group is completed (the scan of the second carrier)
+      assert.strictEqual(queued.mock.callCount(), 1);
+    });
+
     // 搬送波番号が重複して結合できないグループでは、スキャンのために全搬送波のチューナーを待たない
     it("does not wait for the tuners of all the carriers when the carrier sequences are duplicated", async () => {
       setupChannels([0, 1, 2].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` })));

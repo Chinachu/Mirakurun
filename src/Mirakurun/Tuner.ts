@@ -494,10 +494,11 @@ export class Tuner {
         let scanStreams = streams;
         const discovery = streams.find(stream => stream.numberOfCarriers > 1 && stream.format === "tlv");
         if (discovery) {
+            // by the carriers of the header (the IDs saved may be of the services scanned, which may differ from the header)
             const discoveryChanged = streams.some(stream => {
                 const saved = channel.getStreamByRelTs(stream.relTs);
                 return !saved || saved.groupId !== stream.groupId || saved.numberOfCarriers !== stream.numberOfCarriers ||
-                    saved.carrierSequence !== stream.carrierSequence || saved.networkId !== stream.networkId || saved.streamId !== stream.streamId;
+                    saved.carrierSequence !== stream.carrierSequence;
             });
             if (_.channel.get(channel.type, channel.channel) === channel) {
                 channel.setStreams(streams);
