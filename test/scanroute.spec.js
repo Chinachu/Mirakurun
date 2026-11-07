@@ -140,6 +140,23 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
     }
   });
 
+  // 受信経路が正しくない設定は読み込まないため、ほかの経路の設定があっても追加する
+  it("adds the channel of the type and the name configured with an invalid route", async () => {
+    oldChannels.push({ name: "ter28", type: "GR", channel: "28", route: "ter" });
+    try {
+      const { saved } = await runScan(
+        { route: "CATV", source: "list", channels: ["28"], refresh: true },
+        () => [{ format: "ts", services: [service(0x7FE0, 28, "地上 28")] }]
+      );
+      assert.deepStrictEqual(saved.filter(item => item.channel === "28").map(item => [item.name, item.route]), [
+        ["ter28", "ter"],
+        ["地上 28", "CATV"]
+      ]);
+    } finally {
+      oldChannels.pop();
+    }
+  });
+
   // 受信経路にそのタイプのチューナーがない設定は読み込まないため、ほかの経路の設定があっても追加する
   it("adds the channel of the type and the name configured on another route without the tuners of the type", async () => {
     const logs = [];
@@ -165,6 +182,13 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
 
   // 準備中に中止を要求されて開始しなかった場合も、中止の要求を次のスキャンに残さない
   it("does not keep the cancellation requested while preparing a scan not started", async () => {
+    const getStatus = async () => {
+      return new Promise(resolve => scan.get({}, { setHeader() {}, status() {}, end(body) { resolve(JSON.parse(body)); } }));
+    };
+    await runScan({ route: "TER", source: "list", channels: ["27"], refresh: true, dryRun: true }, () => []);
+    const previous = await getStatus();
+    assert.strictEqual(previous.status, "completed");
+
     let result = await runScan({ route: "CATV", source: "dvbConf" }, () => [], {
       dvbChannels: () => {
         scan.del({}, { status() {}, setHeader() {}, json() {} });
@@ -172,6 +196,8 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
       }
     });
     assert.deepStrictEqual(result.errors.map(e => e.code), [400]);
+    // the status of the previous scan is kept
+    assert.deepStrictEqual(await getStatus(), previous);
 
     result = await runScan({ route: "CATV", source: "list", channels: ["C13"], refresh: true }, () => [{ format: "ts", services: [service(0xFFFE, 1, "ケーブル")] }]);
     assert.deepStrictEqual(result.tuned.map(t => t.channel), ["C13"]);

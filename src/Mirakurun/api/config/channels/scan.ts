@@ -87,6 +87,9 @@ const channelOrder: Record<apid.ChannelType, number> = {
  */
 let isCancellationRequested = false;
 
+/** the scan is being prepared (the status is of the previous scan) */
+let isPreparing = false;
+
 /**
  * Global object to track current scan status
  */
@@ -776,6 +779,7 @@ async function runChannelScan(
             // the disabled one and the one of the route without the tuners of the type are not loaded)
             const addedItems = scannedItems.filter(item => {
                 const other = result.find(o => o.type === item.type && o.channel === item.channel && !isOnRoute(o) && !o.isDisabled &&
+                    (o.route === undefined || common.channelRoutes.includes(o.route)) &&
                     _.tuner.typeExists(o.type, o.route || common.getDefaultChannelRoute(o.type)));
                 if (other) {
                     appendToLog(`-> ${item.type} "${item.channel}" is already configured on the route ${other.route || common.getDefaultChannelRoute(other.type)}, not added.\n`);
@@ -917,12 +921,14 @@ export const put: Operation = async (req, res) => {
     // the scan is not started (the cancellation requested while preparing is also reset)
     const reject = (reason: string): void => {
         scanStatus.isScanning = false;
+        isPreparing = false;
         isCancellationRequested = false;
         api.responseError(res, 400, reason);
     };
 
     // Set scanning flag
     scanStatus.isScanning = true;
+    isPreparing = true;
 
     // the scan by the type is replaced by the scan by the route (the type is decided by the network of each stream)
     if (req.query.type !== undefined) {
@@ -984,6 +990,7 @@ export const put: Operation = async (req, res) => {
         reject(source === "dvbConf" ? "No channels in the channel config files of dvbv5 of the tuners" : "Invalid scan configuration");
         return;
     }
+    isPreparing = false;
 
     // Handle asynchronous scan mode
     if (asyncMode) {
@@ -1249,9 +1256,20 @@ export const del: Operation = async (req, res) => {
     // Set cancellation flag to true to request scan to stop
     isCancellationRequested = true;
 
+    // while preparing, the status of the previous scan is kept (the scan stops when started, or is not started)
+    if (isPreparing) {
+        res.status(206);
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.json({
+            status: "stopping",
+            message: "Channel scan stop has been requested"
+        });
+        return;
+    }
+
     // Update the scan status
     scanStatus.status = "cancelled" as const;
-    scanStatus.scanLog?.push("Scan cancellation requested by user."); // no log while preparing the first scan
+    scanStatus.scanLog.push("Scan cancellation requested by user.");
 
     // Return success response
     res.status(206);
