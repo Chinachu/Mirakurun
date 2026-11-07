@@ -103,6 +103,14 @@ export default class ChannelItem {
         return this.format === "tlv";
     }
 
+    /**
+     * the format of the stream of the remote Mirakurun (the stream of the channel of its own as before,
+     * not the stream as received of TSMF detected by the local tuners)
+     */
+    get remoteFormat(): apid.StreamFormat {
+        return this._format || this.stream?.format || (common.tlvChannelTypes.includes(this.type) ? "tlv" : "ts");
+    }
+
     /** @param networkId the relative streams of the network come first (for the service not received on the channel yet) */
     getDefaultRelTs(networkId?: number): number {
         if (this.tsmfRelTs) {

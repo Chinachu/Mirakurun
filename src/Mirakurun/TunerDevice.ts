@@ -41,6 +41,8 @@ const DVB_CLOSE_DELAY = 1000;
 const DVB_RESPAWN_DELAY = 1000;
 /** DVB デバイスを開けない場合のうち、デバイスがないことを示すエラー */
 const DVB_MISSING_DEVICE_ERRORS = ["ENOENT", "ENODEV", "ENXIO"];
+/** リモートの Mirakurun が要求を断った場合 (406 や 503 など) の `lib/remote` の終了コード (起動し直しても同じく断られる) */
+const REMOTE_REFUSED_EXIT_CODE = 2;
 
 // koffi (FFI) は DVB デバイスを直接操作するチューナーがある場合だけ読み込む
 let dvbDeviceClass: typeof DvbDevice | null;
@@ -107,6 +109,8 @@ export default class TunerDevice extends EventEmitter {
 
     private _isAvailable = true;
     private _isRemote = false;
+    /** the relative stream of TSMF the remote Mirakurun outputs (`undefined`: the stream of the channel) */
+    private _remoteRelTs: number;
     private _isFault = false;
     private _fatalCount = 0;
     private _exited = false;
@@ -169,6 +173,11 @@ export default class TunerDevice extends EventEmitter {
 
     get isRemote(): boolean {
         return this._isRemote;
+    }
+
+    /** the relative stream of TSMF the remote Mirakurun outputs (`undefined`: the stream of the channel) */
+    get remoteRelTs(): number {
+        return this._remoteRelTs;
     }
 
     get isFree(): boolean {
@@ -246,18 +255,20 @@ export default class TunerDevice extends EventEmitter {
                 throw new Error(util.format("TunerDevice#%d is not supported for channel type `%s`", this._index, channel.type));
             }
 
+            // the remote Mirakurun outputs a relative stream of TSMF for each request
+            const relTs = this._isRemote ? user.streamSetting?.tsmfRelTs : undefined;
             if (this._isRunning) {
-                if (channel.channel !== this._channel.channel) {
+                if (channel.channel !== this._channel.channel || relTs !== this._remoteRelTs) {
                     if (user.priority <= this.getPriority()) {
                         throw new Error(util.format("TunerDevice#%d has higher priority user", this._index));
                     }
 
                     this._clearEndStreamTimer();
                     await this._kill(true);
-                    spawning = this._spawn(channel);
+                    spawning = this._spawn(channel, relTs);
                 }
             } else {
-                spawning = this._spawn(channel);
+                spawning = this._spawn(channel, relTs);
             }
         }
 
@@ -328,6 +339,19 @@ export default class TunerDevice extends EventEmitter {
         return programs;
     }
 
+    async getRemoteChannel(type: apid.ChannelType, channel: string): Promise<apid.Channel> {
+        if (!this._isRemote) {
+            throw new Error(util.format("TunerDevice#%d is not remote device", this._index));
+        }
+
+        const client = new Client();
+        client.host = this.config.remoteMirakurunHost;
+        client.port = this.config.remoteMirakurunPort || 40772;
+        client.userAgent = "Mirakurun (Remote)";
+
+        return client.getChannel(type, channel);
+    }
+
     private _clearEndStreamTimer(): void {
         clearTimeout(this._endStreamTimer);
         this._endStreamTimer = null;
@@ -389,14 +413,15 @@ export default class TunerDevice extends EventEmitter {
         log.info("TunerDevice#%d uses DVB device %s directly (frontend=%d, demux=%d)", this._index, this._dvb.path, options.frontend, options.demux);
     }
 
-    private async _spawn(ch: ChannelItem): Promise<void> {
+    private async _spawn(ch: ChannelItem, relTs = this._remoteRelTs): Promise<void> {
         if (this._dvb !== null) {
             return this._spawnDvb(ch);
         }
-        return this._spawnCommand(ch);
+        return this._spawnCommand(ch, relTs);
     }
 
-    private async _spawnCommand(ch: ChannelItem): Promise<void> {
+    /** @param relTs the relative stream of TSMF the remote Mirakurun outputs */
+    private async _spawnCommand(ch: ChannelItem, relTs?: number): Promise<void> {
         log.debug("TunerDevice#%d spawn...", this._index);
 
         if (this._process) {
@@ -414,8 +439,11 @@ export default class TunerDevice extends EventEmitter {
             if (this._config.remoteMirakurunDecoder === true) {
                 cmd += " decode";
             }
-            if (ch.isTlv) {
+            if ((relTs !== undefined ? ch.getFormat(relTs) : ch.remoteFormat) === "tlv") {
                 cmd += " tlv";
+            }
+            if (relTs !== undefined) {
+                cmd += " relTs=" + relTs;
             }
         } else {
             cmd = this._config.command;
@@ -436,6 +464,7 @@ export default class TunerDevice extends EventEmitter {
         this._spawnedAt = Date.now();
         this._command = cmd;
         this._channel = ch;
+        this._remoteRelTs = this._isRemote ? relTs : undefined;
 
         if (this._config.dvbDevicePath) {
             const cat = child_process.spawn("cat", [this._config.dvbDevicePath]);
@@ -495,6 +524,12 @@ export default class TunerDevice extends EventEmitter {
                 "TunerDevice#%d process has closed with exit code=%d by signal `%s` (pid=%d)",
                 this._index, code, signal, this._process.pid
             );
+
+            // the request refused by the remote Mirakurun is not respawned (refused again)
+            if (this._isRemote === true && code === REMOTE_REFUSED_EXIT_CODE && this._closing === false) {
+                log.warn("TunerDevice#%d the remote Mirakurun has refused the request, closing the streams", this._index);
+                this._closing = true;
+            }
 
             end();
         });
@@ -765,6 +800,7 @@ export default class TunerDevice extends EventEmitter {
             this._fatalCount = 0;
         }
         this._channel = null;
+        this._remoteRelTs = undefined;
         this._users.clear();
 
         if (this._isFault === false) {

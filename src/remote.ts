@@ -30,7 +30,9 @@ const opt = {
     channel: process.argv[5],
     decode: process.argv.includes("decode") === true,
     // the local TLVFilter needs TLV regardless of `defaultTlvStreamFormat` of the remote
-    format: process.argv.slice(6).includes("tlv") ? "tlv" as apid.StreamFormat : undefined
+    format: process.argv.slice(6).includes("tlv") ? "tlv" as apid.StreamFormat : undefined,
+    // the relative stream of TSMF detected (the remote Mirakurun of 4.3.0 or before ignores it, and outputs the stream of the channel)
+    tsmfRelTs: parseInt(process.argv.slice(6).find(arg => arg.startsWith("relTs="))?.slice(6), 10) || undefined
 };
 
 console.error("remote:", opt);
@@ -42,7 +44,7 @@ client.host = opt.host;
 client.port = opt.port;
 client.userAgent = "Mirakurun (Remote)";
 
-client.getChannelStream({ type: opt.type, channel: opt.channel, decode: opt.decode, format: opt.format })
+client.getChannelStream({ type: opt.type, channel: opt.channel, decode: opt.decode, format: opt.format, tsmfRelTs: opt.tsmfRelTs })
     .then(_stream => {
         stream = _stream;
         stream.pipe(process.stdout);
@@ -51,10 +53,13 @@ client.getChannelStream({ type: opt.type, channel: opt.channel, decode: opt.deco
     .catch(err => {
         if (err.req) {
             console.error("remote:", "(error)", err.req.path, err.statusCode, err.statusMessage);
+        } else if (err.statusCode) {
+            console.error("remote:", "(error)", err.statusCode, err.statusMessage);
         } else {
             console.error("remote:", "(error)", err.address, err.code);
         }
-        exit(1);
+        // the remote Mirakurun has refused the request (the same request is refused again)
+        exit(err.req || err.statusCode ? 2 : 1);
     });
 
 function exit(code = 0) {

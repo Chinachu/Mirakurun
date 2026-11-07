@@ -58,6 +58,8 @@ export type ChannelRoute = "TER" | "SAT" | "CATV" | "HIKARI";
 export interface Service {
     /** Relative TS on the carrier, when returned in Channel.services. */
     tsmfRelTs?: number;
+    /** the format of the relative TS (`tsmfRelTs`), when returned in Channel.services. */
+    format?: StreamFormat;
     id: ServiceItemId;
     serviceId: ServiceId;
     networkId: NetworkId;

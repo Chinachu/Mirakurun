@@ -40,9 +40,13 @@ export function getChannelServices(channel: ChannelItem): apid.Service[] {
             type: service.type
         };
         if (hasRelativeStreams) {
-            const relative = streams.find(stream => stream.networkId === service.networkId && stream.streamId === service.streamId)?.relTs;
-            if (relative !== undefined) {
-                result.tsmfRelTs = relative;
+            const relative = streams.find(stream => stream.networkId === service.networkId && stream.streamId === service.streamId);
+            if (relative?.relTs !== undefined) {
+                result.tsmfRelTs = relative.relTs;
+                // for the remote Mirakurun to receive the relative stream (`tsmfRelTs` and `format` of the channel stream)
+                if (relative.format) {
+                    result.format = relative.format;
+                }
             }
         }
         return result;

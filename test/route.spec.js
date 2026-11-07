@@ -701,6 +701,138 @@ describe("[route.spec] route / streamId", () => {
       assert.deepStrictEqual(t._pickCarrierDevices({ device: local, channel: channels[0], candidate }, 0).map(({ device }) => device), [local2]);
     });
 
+    // 判別した搬送波がそろわない (他の搬送波をリモートでスキャンした) 場合や、ローカルのチューナーが足りない場合は、単一の搬送波として受信しない (リモートの Mirakurun は自身で結合する)
+    it("does not receive the TLV of the carriers detected as a single carrier unless all the carriers and the local tuners are available", async () => {
+      setupChannels([1, 2, 3].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` })));
+      const channels = _.channel.items;
+      const discovered = i => [{ networkId: 11, streamId: 45280, relTs: 1, format: "tlv", slots: 52, groupId: 8, numberOfCarriers: 3, carrierSequence: i + 1 }];
+      channels[0].setStreams(discovered(0));
+      channels[1].setStreams([{ networkId: 11, streamId: 45280, format: "tlv" }]);
+      channels[2].setStreams([{ networkId: 11, streamId: 45280, format: "tlv" }]);
+      const local = fakeDevice(0, ["BS4K"], ["CATV"]);
+      const remote = fakeDevice(1, ["BS4K"], ["CATV"], { isRemote: true });
+      const t = tuner([local]);
+
+      assert.deepStrictEqual(t._getCandidate(channels[0], 1).devices, []);
+      await assert.rejects(t.initChannelStream(channels[0], { id: "u" }, null, 1), /no available tuners/);
+      t._devices.push(remote);
+      assert.deepStrictEqual(t._getCandidate(channels[0], 1).devices, [remote]);
+      assert.deepStrictEqual(t._pickCarrierDevices({ device: remote, channel: channels[0], candidate: t._getCandidate(channels[0], 1) }, 0), []);
+      // the channels scanned by the remote tuners are received as before
+      assert.deepStrictEqual(t._getCandidate(channels[1]).devices, [local, remote]);
+
+      // all the carriers found, but the local tuners are not enough
+      channels[1].setStreams(discovered(1));
+      channels[2].setStreams(discovered(2));
+      assert.deepStrictEqual(t._getCandidate(channels[0], 1).devices, [remote]);
+
+      const locals = [local, fakeDevice(2, ["BS4K"], ["CATV"]), fakeDevice(3, ["BS4K"], ["CATV"])];
+      t._devices.push(locals[1], locals[2]);
+      assert.deepStrictEqual(t._getCandidate(channels[0], 1).devices, [...locals, remote]);
+      // the carriers are received by the local tuners
+      const candidate = t._getCandidate(channels[0], 1);
+      assert.deepStrictEqual(t._pickCarrierDevices({ device: local, channel: channels[0], candidate }, 0).map(({ device }) => device), [locals[1], locals[2]]);
+    });
+
+    // リモートの Mirakurun はそのチャンネルのストリームを出力するため、TSMF を判別したチャンネルの受信したまま (TS) とは形式が違う
+    it("does not receive the stream as received of TSMF detected by the remote tuners of the other format", () => {
+      setupChannels([
+        { name: "4K", type: "BS4K", route: "CATV", channel: "C19" },
+        { name: "BS", type: "BS", route: "CATV", channel: "C46" }
+      ]);
+      const [tlv, ts] = _.channel.items;
+      tlv.setStreams([{ networkId: 11, streamId: 45168, relTs: 1, format: "tlv", slots: 52 }]);
+      ts.setStreams([{ networkId: 4, streamId: 18801, relTs: 2, format: "ts", slots: 24 }]);
+      assert.deepStrictEqual([tlv.format, tlv.remoteFormat], ["ts", "tlv"]);
+      assert.deepStrictEqual([ts.format, ts.remoteFormat], ["ts", "ts"]);
+
+      const local = fakeDevice(0, ["BS", "BS4K"], ["CATV"]);
+      const remote = fakeDevice(1, ["BS", "BS4K"], ["CATV"], { isRemote: true });
+      const t = tuner([local, remote]);
+      const candidate = t._getCandidate(tlv);
+      assert.deepStrictEqual([candidate.devices, candidate.format], [[local], "ts"]);
+      assert.strictEqual(t.getOutputFormat([{ channel: tlv }]), "ts");
+      // the scan of the stream as received
+      assert.deepStrictEqual(t._getCandidate(tlv, undefined, "ts").devices, [local]);
+      // the remote tuners of the same format
+      assert.deepStrictEqual(t._getCandidate(ts).devices, [local, remote]);
+
+      // only the remote tuners: the stream of the remote Mirakurun
+      t._devices = [remote];
+      const remoteCandidate = t._getCandidate(tlv);
+      assert.deepStrictEqual([remoteCandidate.devices, remoteCandidate.format], [[remote], "tlv"]);
+      assert.strictEqual(t.getOutputFormat([{ channel: tlv }]), "tlv");
+    });
+
+    // リモートのチューナーだけで受信するチャンネルは、リモートの Mirakurun が判別した相対 TS (Channel.services の tsmfRelTs と format) でスキャンする
+    it("scans the relative streams detected by the remote Mirakurun for the channel received only by the remote tuners", async () => {
+      setupChannels([
+        { name: "C46", type: "BS", route: "CATV", channel: "C46" },
+        { name: "C47", type: "BS", route: "CATV", channel: "C47", tsmfRelTs: 2 }
+      ]);
+      const [channel, configured] = _.channel.items;
+      let remoteChannel = {
+        type: "BS", channel: "C46", services: [
+          { id: 400265, serviceId: 265, networkId: 4, streamId: 18801, tsmfRelTs: 2, format: "ts" },
+          { id: 400266, serviceId: 266, networkId: 4, streamId: 18801, tsmfRelTs: 2, format: "ts" },
+          { id: 400260, serviceId: 260, networkId: 4, streamId: 18803, tsmfRelTs: 3, format: "ts" }
+        ]
+      };
+      const remote = fakeDevice(0, ["BS"], ["CATV"], { isRemote: true, getRemoteChannel: async () => remoteChannel });
+      const t = tuner([remote]);
+      const scanned = [];
+      mock.method(t, "_scanTSMFServices", async (ch, userReq, streams) => (scanned.push(["tsmf", ch.channel, streams]), []));
+      mock.method(t, "_scanServices", async (ch, userReq, format) => (scanned.push(["as before", ch.channel, format]), []));
+
+      await t.getServices(channel);
+      assert.deepStrictEqual(scanned.pop(), ["tsmf", "C46", [
+        { relTs: 2, slots: 0, format: "ts", streamId: 18801, networkId: 4 },
+        { relTs: 3, slots: 0, format: "ts", streamId: 18803, networkId: 4 }
+      ]]);
+      // tsmfRelTs of channels.yml
+      await t.getServices(configured);
+      assert.deepStrictEqual(scanned.pop(), ["as before", "C47", "ts"]);
+      // the remote Mirakurun of 4.3.0 or before, or not TSMF
+      remoteChannel = { type: "BS", channel: "C46", services: [{ id: 400101, serviceId: 101, networkId: 4, streamId: 16625 }] };
+      await t.getServices(channel);
+      assert.deepStrictEqual(scanned.pop(), ["as before", "C46", "ts"]);
+      // failed to get
+      remote.getRemoteChannel = async () => { throw new Error("ECONNREFUSED"); };
+      await t.getServices(channel);
+      assert.deepStrictEqual(scanned.pop(), ["as before", "C46", "ts"]);
+      // the local tuners detect by themselves
+      remote.getRemoteChannel = async () => { throw new Error("not called"); };
+      t._devices.push(fakeDevice(1, ["BS"], ["CATV"]));
+      await t.getServices(channel);
+      assert.deepStrictEqual(scanned.pop(), ["as before", "C46", "ts"]);
+    });
+
+    // リモートの Mirakurun は判別した相対 TS を取り出して出力するため、相対 TS ごとにチューナーを使い、TSMF として処理しない
+    it("joins the remote tuner only for the same relative stream, and does not filter the TSMF of its output", async () => {
+      setupChannels([{ name: "C46", type: "BS", route: "CATV", channel: "C46" }]);
+      const channel = _.channel.items[0];
+      channel.setStreams([
+        { networkId: 4, streamId: 18801, relTs: 2, format: "ts", slots: 24 },
+        { networkId: 4, streamId: 18803, relTs: 3, format: "ts", slots: 24 }
+      ]);
+      const started = [];
+      const remote = fakeDevice(0, ["BS"], ["CATV"], {
+        isRemote: true, channel, remoteRelTs: 2, isFree: false, isUsing: true, users: [{ id: "x", priority: 0 }], getPriority: () => 0,
+        decoder: null, startStream: async (user, filter) => started.push([user.streamSetting.tsmfRelTs, filter])
+      });
+      const t = tuner([remote]);
+      assert.strictEqual(t._pickTunerDevice([t._getCandidate(channel, 3)], 0), null);
+      assert.strictEqual(t._pickTunerDevice([t._getCandidate(channel, 2)], 0).device, remote);
+
+      const filter = await t._initTS({ id: "u", priority: 0, disableDecoder: true, streamSetting: { channel } }, undefined, [t._getCandidate(channel, 2)]);
+      try {
+        assert.strictEqual(started[0][0], 2);
+        assert.strictEqual(started[0][1]._tsmfTsNumber, 0);
+      } finally {
+        filter.close();
+      }
+    });
+
     it("accepts tsmfGroupId without tsmfRelTs for automatic relative-stream discovery", () => {
       const warn = mock.method(log, "warn", () => {});
       try {
@@ -976,6 +1108,98 @@ describe("[route.spec] route / streamId", () => {
       spawn.mock.restore();
     });
 
+    it("requests TLV from the remote Mirakurun by the format of its stream, not of the stream as received of TSMF detected", async () => {
+      setupChannels([{ name: "4K", type: "BS4K", route: "CATV", channel: "C19" }]);
+      const channel = _.channel.items[0];
+      channel.setStreams([{ networkId: 11, streamId: 45168, relTs: 1, format: "tlv", slots: 52 }]);
+      const proc = Object.assign(new EventEmitter(), { pid: 1, stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} });
+      const spawn = mock.method(child_process, "spawn", () => proc);
+      try {
+        const device = new TunerDevice(0, { name: "remote", types: ["BS4K"], remoteMirakurunHost: "remote", remoteMirakurunPort: 40772 });
+        const stream = Object.assign(new EventEmitter(), { closed: false, write() {}, flush() {}, end() {} });
+        await device.startStream({ id: "a", priority: 0 }, stream, channel);
+        assert.deepStrictEqual(spawn.mock.calls[0].arguments, ["node", ["lib/remote", "remote", "40772", "BS4K", "C19", "tlv"]]);
+      } finally {
+        spawn.mock.restore();
+      }
+    });
+
+    it("requests the relative stream detected from the remote Mirakurun, and spawns again for another relative stream", async () => {
+      setupChannels([{ name: "C46", type: "BS", route: "CATV", channel: "C46" }]);
+      const channel = _.channel.items[0];
+      channel.setStreams([
+        { networkId: 4, streamId: 18801, relTs: 2, format: "ts", slots: 24 },
+        { networkId: 4, streamId: 18803, relTs: 3, format: "ts", slots: 24 }
+      ]);
+      const procs = [];
+      const spawn = mock.method(child_process, "spawn", () => {
+        const proc = Object.assign(new EventEmitter(), { pid: procs.length + 1, stdout: new EventEmitter(), stderr: new EventEmitter(), stdin: { end() {} }, kill() {} });
+        procs.push(proc);
+        return proc;
+      });
+      try {
+        const device = new TunerDevice(0, { name: "remote", types: ["BS"], remoteMirakurunHost: "remote" });
+        const stream = () => Object.assign(new EventEmitter(), { closed: false, write() {}, flush() {}, end() {} });
+        await device.startStream({ id: "a", priority: 1, streamSetting: { channel, tsmfRelTs: 3 } }, stream(), channel);
+        assert.deepStrictEqual(spawn.mock.calls[0].arguments, ["node", ["lib/remote", "remote", "40772", "BS", "C46", "relTs=3"]]);
+        assert.strictEqual(device.remoteRelTs, 3);
+
+        // another relative stream of the same channel is not shared
+        device._kill = async () => {
+          device._process = null;
+          device._stream = null;
+        };
+        await device.startStream({ id: "b", priority: 2, streamSetting: { channel, tsmfRelTs: 2 } }, stream(), channel);
+        assert.deepStrictEqual(spawn.mock.calls[1].arguments, ["node", ["lib/remote", "remote", "40772", "BS", "C46", "relTs=2"]]);
+        assert.strictEqual(device.remoteRelTs, 2);
+      } finally {
+        spawn.mock.restore();
+      }
+    });
+
+    // リモートの Mirakurun が断った要求 (406 など) は、起動し直しても同じく断られるため、繰り返さずに終了する
+    it("closes the streams without respawning when the remote Mirakurun has refused the request", async () => {
+      setupChannels([{ name: "4K", type: "BS4K", route: "CATV", channel: "C19" }]);
+      const channel = _.channel.items[0];
+      const procs = [];
+      const close = (proc, code, signal = null) => {
+        proc.emit("exit", code, signal);
+        proc.emit("close", code, signal);
+      };
+      const spawn = mock.method(child_process, "spawn", () => {
+        const proc = Object.assign(new EventEmitter(), { pid: procs.length + 1, stdout: new EventEmitter(), stderr: new EventEmitter() });
+        proc.kill = () => setImmediate(() => close(proc, null, "SIGTERM"));
+        procs.push(proc);
+        return proc;
+      });
+      // setTimeout is mocked (the tuner is released 100ms after the process has closed)
+      const wait = async () => {
+        await new Promise(resolve => setImmediate(resolve));
+        mock.timers.tick(1000);
+        await new Promise(resolve => setImmediate(resolve));
+      };
+      try {
+        for (const [code, respawned] of [[2, false], [1, true]]) {
+          procs.length = 0;
+          const device = new TunerDevice(0, { name: "remote", types: ["BS4K"], remoteMirakurunHost: "remote" });
+          let ended = false;
+          const stream = Object.assign(new EventEmitter(), { closed: false, write() {}, flush() {}, end() { ended = true; } });
+          await device.startStream({ id: "scan", priority: -1 }, stream, channel);
+          close(procs[0], code);
+          await wait();
+          assert.deepStrictEqual([code, procs.length, ended], [code, respawned ? 2 : 1, !respawned]);
+          if (respawned) {
+            const killed = device._kill(true);
+            await wait();
+            await killed;
+          }
+          assert.strictEqual(device.isFree, true);
+        }
+      } finally {
+        spawn.mock.restore();
+      }
+    });
+
     it("accesses the DVB device directly with the channels file of each route", async () => {
       const device = new TunerDevice(0, {
         name: "dvb",
@@ -1011,11 +1235,13 @@ describe("channel service relative TS references", () => {
   it("distinguishes services on different relative streams of one carrier", () => {
     const { getChannelServices } = require("../lib/Mirakurun/api");
     const services = [701, 702].map((serviceId, i) => ({ id: 400000 + serviceId, serviceId, networkId: 4, streamId: 20225 + i, name: "Test", type: 1 }));
-    const channel = { getServices: () => services, streams: [{ networkId: 4, streamId: 20225, relTs: 2 }, { networkId: 4, streamId: 20226, relTs: 3 }] };
-    assert.deepStrictEqual(getChannelServices(channel).map(s => [s.serviceId, s.tsmfRelTs]), [[701, 2], [702, 3]]);
+    const channel = { getServices: () => services, streams: [{ networkId: 4, streamId: 20225, relTs: 2, format: "ts" }, { networkId: 4, streamId: 20226, relTs: 3, format: "tlv" }] };
+    // the format of the relative stream (for the remote Mirakurun)
+    assert.deepStrictEqual(getChannelServices(channel).map(s => [s.serviceId, s.tsmfRelTs, s.format]), [[701, 2, "ts"], [702, 3, "tlv"]]);
     // tsmfRelTs of channels.yml is of the channel, not output for the services as before
     assert.ok(getChannelServices({ ...channel, tsmfRelTs: 2 }).every(s => !("tsmfRelTs" in s)));
-    channel.streams = [{ networkId: 4, streamId: 20225 }];
-    assert.ok(getChannelServices(channel).every(s => !("tsmfRelTs" in s)));
+    assert.ok(getChannelServices({ ...channel, tsmfRelTs: 2 }).every(s => !("format" in s)));
+    channel.streams = [{ networkId: 4, streamId: 20225, format: "ts" }];
+    assert.ok(getChannelServices(channel).every(s => !("tsmfRelTs" in s) && !("format" in s)));
   });
 });

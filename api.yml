@@ -144,6 +144,9 @@ definitions:
         minimum: 1
         maximum: 15
         description: Relative TS on the carrier when included in Channel.services
+      format:
+        $ref: '#/definitions/StreamFormat'
+        description: Format of the relative TS (tsmfRelTs) when included in Channel.services
       streamId:
         type: integer
       channel:
