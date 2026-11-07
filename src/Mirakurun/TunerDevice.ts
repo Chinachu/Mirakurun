@@ -123,6 +123,7 @@ export default class TunerDevice extends EventEmitter {
     private _remoteRelTsSupported: boolean;
     private _remoteRelTsChecking: Promise<boolean> = null;
     private _remoteRelTsRetryTimer: NodeJS.Timeout = null;
+    private _remoteRelTsCheckFailed = false;
     /** the relative streams refused by the remote Mirakurun (`type/channel/relTs`: the time) */
     private _remoteRelTsRefused = new Map<string, number>();
     private _isFault = false;
@@ -402,7 +403,9 @@ export default class TunerDevice extends EventEmitter {
                     return this._remoteRelTsSupported;
                 })
                 .catch(err => {
-                    log.warn("TunerDevice#%d failed to check the remote Mirakurun [%s]", this._index, err.message);
+                    // logged once until checked
+                    log[this._remoteRelTsCheckFailed ? "debug" : "warn"]("TunerDevice#%d failed to check the remote Mirakurun [%s]", this._index, err.message);
+                    this._remoteRelTsCheckFailed = true;
                     if (this._remoteRelTsRetryTimer === null) {
                         this._remoteRelTsRetryTimer = setTimeout(() => {
                             this._remoteRelTsRetryTimer = null;

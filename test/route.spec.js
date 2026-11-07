@@ -1035,6 +1035,10 @@ describe("[route.spec] route / streamId", () => {
       const t = tuner([local, remote]);
       const devices = [];
       mock.method(t, "_scanServices", async (ch, userReq, format, detect, relTs) => (devices.push(t._getCandidate(ch, relTs, format).devices), [{ networkId: 11, serviceId: 101, streamId: 45168 }]));
+      // the stream as received is scanned by the local tuners (detecting TSMF), even if the remote tuner comes first
+      t._devices = [remote, local];
+      assert.deepStrictEqual(t._getCandidate(channel, undefined, channel.getFormat(undefined)).devices, [local]);
+      t._devices = [local, remote];
       await t._scanTSMFServices(channel, { streamSetting: { channel } }, [{ relTs: 1, slots: 52, format: "tlv", streamId: 45168, networkId: 11 }]);
       assert.deepStrictEqual(devices, [[local, remote]]);
       assert.deepStrictEqual(channel.streams, [{ relTs: 1, slots: 52, format: "tlv", streamId: 45168, networkId: 11 }]);

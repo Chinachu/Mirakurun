@@ -1233,8 +1233,12 @@ export class Tuner {
             // the remote Mirakurun of 4.3.0 or before outputs the stream of the channel (not the relative stream detected)
             const remote = devices.filter(device => device.isRemote && device.canReceiveRemoteRelTs(channel, relTs));
             devices = this._canReceiveDetectedCarriers(channel, relTs) ? [...devices.filter(device => !device.isRemote), ...remote] : remote;
-        } else if (channel.getFormat(relTs) !== channel.remoteFormat && (format === undefined || format === channel.getFormat(relTs))) {
-            // the stream of the remote Mirakurun is not the stream as received of TSMF detected by the local tuners
+        } else if (
+            (channel.getFormat(relTs) !== channel.remoteFormat || channel.streams.some(stream => stream.remote === true)) &&
+            (format === undefined || format === channel.getFormat(relTs))
+        ) {
+            // the stream of the remote Mirakurun is not the stream as received of TSMF detected by the local tuners,
+            // and the local tuners detect TSMF detected by the remote Mirakurun by themselves
             const local = devices.filter(device => !device.isRemote);
             if (local.length > 0) {
                 devices = local;
