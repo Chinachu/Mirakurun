@@ -224,6 +224,26 @@ describe("[route.spec] route / streamId", () => {
       });
     }
 
+    // 設定したグループに、ヘッダーのグループ ID がたまたま同じ、自動で判別した別のグループの搬送波を混ぜない
+    it("does not mix the carriers discovered into a configured group with the same group ID", () => {
+      setupChannels([
+        { name: "M1", type: "BS4K", route: "CATV", channel: "C1", tsmfRelTs: 1, tsmfGroupId: 1 },
+        { name: "M2", type: "BS4K", route: "CATV", channel: "C2", tsmfRelTs: 1, tsmfGroupId: 1 },
+        { name: "A1", type: "BS4K", route: "CATV", channel: "C3" },
+        { name: "A2", type: "BS4K", route: "CATV", channel: "C4" }
+      ]);
+      const [m1, m2, a1, a2] = _.channel.items;
+      const stream = i => [{ networkId: 11, streamId: 60009, relTs: 1, format: "tlv", slots: 52, groupId: 1, numberOfCarriers: 2, carrierSequence: i }];
+      a1.setStreams(stream(0));
+      a2.setStreams(stream(1));
+      // the configured carriers have received the same TLV (but they are not discovered)
+      m1.setStream(11, 60009, "tlv");
+      m2.setStream(11, 60009, "tlv");
+
+      assert.deepStrictEqual(m1.getBondedChannels(), [m1, m2]);
+      assert.deepStrictEqual(a1.getBondedChannels(), [a1, a2]);
+    });
+
     it("restores discovery metadata from channels.json without modifying configured values", async () => {
       const configs = [0, 1, 2].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` }));
       setupChannels(configs);

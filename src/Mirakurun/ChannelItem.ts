@@ -171,10 +171,16 @@ export default class ChannelItem {
         if (!this.tsmfGroupId) {
             return null;
         }
-        return _.channel.items.filter(item => item.type === this.type && (this._configuredTsmfGroupId !== undefined || item.route === this.route) && item.tsmfGroupId === this.tsmfGroupId &&
-            (this._configuredTsmfGroupId !== undefined || this.streams.some(stream => stream.format === "tlv" &&
+        // configured: the channels configured with the same group (the groups discovered are not mixed)
+        if (this._configuredTsmfGroupId !== undefined) {
+            return _.channel.items.filter(item => item.type === this.type && item._configuredTsmfGroupId === this._configuredTsmfGroupId);
+        }
+        // discovered: the channels of the same route carrying the same TLV in the same group
+        return _.channel.items.filter(item => item.type === this.type && item.route === this.route &&
+            item._configuredTsmfGroupId === undefined && item.tsmfGroupId === this.tsmfGroupId &&
+            this.streams.some(stream => stream.format === "tlv" &&
                 item.streams.some(other => other.format === "tlv" && other.networkId === stream.networkId && other.streamId === stream.streamId &&
-                    other.relTs === stream.relTs && other.numberOfCarriers === stream.numberOfCarriers))));
+                    other.relTs === stream.relTs && other.numberOfCarriers === stream.numberOfCarriers)));
     }
 
     getServices(): ServiceItem[] {
