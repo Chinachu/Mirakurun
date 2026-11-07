@@ -15,7 +15,7 @@ function crc32(data) {
   return crc >>> 0;
 }
 
-function header({ numberOfCarriers, carrierSequence, numberOfFrames, framePosition, cc }) {
+function header({ numberOfCarriers, carrierSequence, numberOfFrames, framePosition, cc, otherSlots = 0 }) {
   const p = Buffer.alloc(188, 0xFF);
   p[0] = 0x47;
   p[1] = 0x00;
@@ -25,8 +25,11 @@ function header({ numberOfCarriers, carrierSequence, numberOfFrames, framePositi
   payload[0] = 0x1A;
   payload[1] = 0x86;
   payload[2] = 0x02;
-  // all the slots are the relative stream 1 (TLV)
-  payload.fill(0x11, 69, 69 + 26);
+  // the slots are the relative stream 1 (TLV), the last `otherSlots` slots are the relative stream 2
+  const relTs = slot => slot < 52 - otherSlots ? 1 : 2;
+  for (let i = 0; i < 26; i++) {
+    payload[69 + i] = (relTs(i * 2) << 4) | relTs(i * 2 + 1);
+  }
   const streamTypeBits = 0x7FFF & ~(1 << 14);
   payload[121] = streamTypeBits >> 7;
   payload[122] = (streamTypeBits << 1) & 0xFF;
@@ -90,23 +93,42 @@ nullPacket[0] = 0x47;
 nullPacket[1] = 0x1F;
 nullPacket[2] = 0xFF;
 
+// a TS packet of the relative stream 2 (not of the group)
+const otherPacket = Buffer.alloc(188, 0xAA);
+otherPacket[0] = 0x47;
+otherPacket[1] = 0x01;
+otherPacket[2] = 0x00;
+otherPacket[3] = 0x10;
+
 // distributes the TS packets of TLV to the super frames of the carriers in the interleaved order
 // (followed by the super frames of the null packets up to `minSuperframes`)
-function carriers(packets, numberOfCarriers, numberOfFrames, minSuperframes = 0, firstSequence = 1) {
-  const perSuperframe = numberOfCarriers * numberOfFrames * 52;
+// `numberOfFrames`: the frames of a super frame (an array for each carrier), `otherSlots`: the slots of the relative stream 2 for each carrier
+function carriers(packets, numberOfCarriers, numberOfFrames, minSuperframes = 0, firstSequence = 1, otherSlots = []) {
+  const frames = Array.from({ length: numberOfCarriers }, (_, c) => Array.isArray(numberOfFrames) ? numberOfFrames[c] : numberOfFrames);
+  const others = Array.from({ length: numberOfCarriers }, (_, c) => otherSlots[c] || 0);
+  const maxFrames = Math.max(...frames);
+  const perSuperframe = frames.reduce((sum, n, c) => sum + n * (52 - others[c]), 0);
   const superframes = Math.max(Math.ceil(packets.length / perSuperframe), minSuperframes);
   const streams = Array.from({ length: numberOfCarriers }, () => []);
   let next = 0;
   const cc = new Array(numberOfCarriers).fill(0);
   for (let sf = 0; sf < superframes; sf++) {
-    const slots = Array.from({ length: numberOfCarriers }, () => Array.from({ length: numberOfFrames }, () => new Array(52)));
+    const slots = frames.map(n => Array.from({ length: n }, () => new Array(52)));
     for (let sub = 0; sub < 53; sub++) {
-      for (let position = 0; position < numberOfFrames; position++) {
+      for (let position = 0; position < maxFrames; position++) {
         for (let c = 0; c < numberOfCarriers; c++) {
-          const index = sub * numberOfFrames + position;
+          const n = frames[c];
+          if (position >= n) {
+            continue;
+          }
+          const index = sub * n + position;
           const frame = Math.floor(index / 53);
           const slot = index % 53 - 1;
           if (slot < 0) {
+            continue;
+          }
+          if (slot >= 52 - others[c]) {
+            slots[c][frame][slot] = otherPacket;
             continue;
           }
           slots[c][frame][slot] = next < packets.length ? packets[next++] : nullPacket;
@@ -115,8 +137,8 @@ function carriers(packets, numberOfCarriers, numberOfFrames, minSuperframes = 0,
     }
     for (let c = 0; c < numberOfCarriers; c++) {
       const sfPackets = [];
-      for (let frame = 0; frame < numberOfFrames; frame++) {
-        sfPackets.push(header({ numberOfCarriers, carrierSequence: firstSequence + c, numberOfFrames, framePosition: frame, cc: cc[c]++ }), ...slots[c][frame]);
+      for (let frame = 0; frame < frames[c]; frame++) {
+        sfPackets.push(header({ numberOfCarriers, carrierSequence: firstSequence + c, numberOfFrames: frames[c], framePosition: frame, cc: cc[c]++, otherSlots: others[c] }), ...slots[c][frame]);
       }
       streams[c].push(sfPackets);
     }
@@ -194,6 +216,28 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
 
     assert.deepStrictEqual(errors, []);
     assertTLV(out, tlv);
+  });
+
+  // 8K の例: 256QAM (4 フレーム) の 2 搬送波と、2K と共有する 64QAM (3 フレーム) の 1 搬送波
+  it("assembles TLV of the carriers of 256QAM and 64QAM, sharing a carrier with another stream", () => {
+    const tlv = tlvPackets(6000);
+    const streams = carriers(splitTLV(tlv), 3, [4, 4, 3], 0, 1, [0, 0, 20]);
+    const errors = [];
+    const out = feed(new TSMFBonding(1, 3, reason => errors.push(reason)), streams, [0, 2, 1]);
+
+    assert.deepStrictEqual(errors, []);
+    assertTLV(out, tlv);
+  });
+
+  it("aligns the carriers of 256QAM and 64QAM with a skew", () => {
+    const tlv = tlvPackets(28000);
+    const streams = carriers(splitTLV(tlv), 3, [4, 4, 3], 0, 1, [0, 0, 20]);
+    const errors = [];
+    const out = feed(new TSMFBonding(1, 3, reason => errors.push(reason)), streams, [0, 43, 17]);
+
+    assert.deepStrictEqual(errors, []);
+    const { matched } = assertTLV(out, tlv);
+    assert.ok(matched > tlv.length / 3);
   });
 
   it("reports an error when the channels of the group receive the same carrier", () => {
