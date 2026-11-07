@@ -16,6 +16,7 @@
 import * as apid from "../api";
 import Client from "./client";
 import { IncomingMessage } from "http";
+import { OpenAPIV2 } from "openapi-types";
 
 process.title = "Mirakurun: Remote";
 
@@ -44,7 +45,20 @@ client.host = opt.host;
 client.port = opt.port;
 client.userAgent = "Mirakurun (Remote)";
 
-client.getChannelStream({ type: opt.type, channel: opt.channel, decode: opt.decode, format: opt.format, tsmfRelTs: opt.tsmfRelTs })
+/** the remote Mirakurun outputs the relative stream of TSMF specified (not 4.3.0 or before, which outputs the stream of the channel) */
+async function supportsTsmfRelTs(): Promise<boolean> {
+    const docs = await client.getDocs();
+    const operation = docs.paths["/channels/{type}/{channel}/stream"]?.get as OpenAPIV2.OperationObject;
+    return (operation?.parameters || []).some(param => (param as OpenAPIV2.Parameter).name === "tsmfRelTs");
+}
+
+(async () => {
+    if (opt.tsmfRelTs !== undefined && await supportsTsmfRelTs() === false) {
+        console.error("remote:", "(error)", "tsmfRelTs is not supported");
+        exit(3);
+    }
+    return client.getChannelStream({ type: opt.type, channel: opt.channel, decode: opt.decode, format: opt.format, tsmfRelTs: opt.tsmfRelTs });
+})()
     .then(_stream => {
         stream = _stream;
         stream.pipe(process.stdout);
@@ -58,8 +72,9 @@ client.getChannelStream({ type: opt.type, channel: opt.channel, decode: opt.deco
         } else {
             console.error("remote:", "(error)", err.address, err.code);
         }
-        // the remote Mirakurun has refused the request (the same request is refused again)
-        exit(err.req || err.statusCode ? 2 : 1);
+        // the remote Mirakurun has refused the request (the same request is refused again),
+        // respawned if not available for now (such as 503 for the tuners in use, as before)
+        exit([400, 404, 406].includes(err.statusCode) ? 2 : 1);
     });
 
 function exit(code = 0) {

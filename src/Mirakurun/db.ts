@@ -51,6 +51,8 @@ export interface ChannelStream {
     carrierSequence?: number;
     tsmfNetworkId?: number;
     tsmfStreamId?: number;
+    /** TSMF: detected by the remote Mirakurun */
+    remote?: boolean;
 }
 
 export interface Program extends apid.Program {

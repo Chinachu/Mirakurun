@@ -389,7 +389,7 @@ export class Tuner {
         // only the remote tuners: the relative streams of TSMF detected by the remote Mirakurun
         const remoteStreams = await this._getRemoteTSMFStreams(channel);
         if (remoteStreams !== null) {
-            return this._scanTSMFServices(channel, userReq, remoteStreams);
+            return this._scanTSMFServices(channel, userReq, remoteStreams, undefined, true);
         }
         return this._scanServices(channel, userReq, channel.getFormat(channel.tsmfRelTs), true);
     }
@@ -478,7 +478,15 @@ export class Tuner {
             services = (await devices[0].getRemoteChannel(channel.type, channel.channel)).services || [];
         } catch (err) {
             log.warn("Tuner: failed to get the channel %s/%s of the remote Mirakurun [%s]", channel.type, channel.channel, err.message);
-            return null;
+            // the relative streams detected by the remote Mirakurun before (not to replace them by the stream as received)
+            const saved = channel.streams.filter(stream => stream.remote === true && stream.relTs !== undefined);
+            return saved.length > 0 ? saved.map(stream => ({
+                relTs: stream.relTs,
+                slots: 0,
+                format: stream.format,
+                streamId: stream.streamId,
+                networkId: stream.networkId
+            })) : null;
         }
 
         const streams = new Map<number, TSMFStream>();
@@ -618,8 +626,17 @@ export class Tuner {
      * scans all the relative streams of TSMF at the same time
      * (a relative stream may have no services, such as for the engineering)
      */
-    /** @param collect collects the streams scanned (for the channel scan) */
-    private async _scanTSMFServices(channel: ChannelItem, userReq: common.User, streams: TSMFStream[], collect?: ScannedStream[]): Promise<apid.Service[]> {
+    /**
+     * @param collect collects the streams scanned (for the channel scan)
+     * @param remote the relative streams detected by the remote Mirakurun (the remote tuners receive them one by one)
+     */
+    private async _scanTSMFServices(
+        channel: ChannelItem,
+        userReq: common.User,
+        streams: TSMFStream[],
+        collect?: ScannedStream[],
+        remote = false
+    ): Promise<apid.Service[]> {
         log.info(
             "Tuner: the relative streams of TSMF on %s/%s are detected: %s",
             channel.type, channel.channel, streams.map(stream => `${stream.relTs}:${stream.format}(${stream.slots} slots)`).join(", ")
@@ -628,7 +645,8 @@ export class Tuner {
         let scanStreams = streams;
         let carriersCompleted = false;
         // the stream of the services scanned (the same as without TSMF), the one of the TSMF header if no services
-        let channelStreams: ChannelStream[] = streams.map(stream => ({ ...stream }));
+        // the stream as received of the remote Mirakurun is TS (TSMF)
+        let channelStreams: ChannelStream[] = streams.map(stream => ({ ...stream, ...(remote && { remote: true }) }));
         const discovery = streams.find(stream => stream.numberOfCarriers > 1 && stream.format === "tlv");
         if (discovery) {
             // the IDs of the header associate the carriers (`tsmfNetworkId` / `tsmfStreamId`, the IDs of the services may differ),
@@ -666,13 +684,22 @@ export class Tuner {
             }
         }
 
-        const results = await Promise.allSettled(scanStreams.map(stream => this._scanServices(
+        const scan = (stream: TSMFStream): Promise<apid.Service[]> => this._scanServices(
             channel,
             { ...userReq, streamSetting: { ...userReq.streamSetting } },
             stream.format,
             false,
             stream.relTs
-        )));
+        );
+        // the remote tuners receive a relative stream each (not to wait for the tuners until the timeout)
+        const results: PromiseSettledResult<apid.Service[]>[] = [];
+        if (remote) {
+            for (const stream of scanStreams) {
+                results.push(...await Promise.allSettled([scan(stream)]));
+            }
+        } else {
+            results.push(...await Promise.allSettled(scanStreams.map(scan)));
+        }
 
         const services: apid.Service[] = [];
         const streamServices: apid.Service[][] = streams.map(() => []);
@@ -894,6 +921,7 @@ export class Tuner {
                 setting.channel = channel;
                 // only the relative stream detected (`tsmfRelTs` of channels.yml is of the channel, as before)
                 setting.tsmfRelTs = relTs !== channel.tsmfRelTs ? relTs : undefined;
+                setting.format = candidate.format;
                 // the remote Mirakurun outputs the relative stream detected (extracted, and bonded)
                 const filterRelTs = device.isRemote && setting.tsmfRelTs !== undefined ? undefined : relTs;
                 log.debug("Tuner: picked TunerDevice#%d for user `%s` in %dms", device.index, user.id, Date.now() - startedAt);
@@ -1065,7 +1093,7 @@ export class Tuner {
         for (const candidate of candidates) {
             for (const device of candidate.devices) {
                 if (device.isAvailable === true && device.channel === candidate.channel &&
-                    (device.isRemote === false || device.remoteRelTs === this._getRemoteRelTs(candidate))) {
+                    (!device.isRemote || (device.remoteRelTs === this._getRemoteRelTs(candidate) && device.remoteFormat === candidate.format))) {
                     return { device, channel: candidate.channel, candidate };
                 }
             }
@@ -1120,7 +1148,8 @@ export class Tuner {
         // (the remote Mirakurun of 4.3.0 or before ignores it, and outputs the stream of the channel)
         if (relTs !== undefined && relTs !== channel.tsmfRelTs) {
             // the local tuners come first, and the TLV of the carriers discovered is bonded only if all the carriers are found (not as a single carrier)
-            const remote = devices.filter(device => device.isRemote);
+            // the remote Mirakurun of 4.3.0 or before outputs the stream of the channel (not the relative stream detected)
+            const remote = devices.filter(device => device.isRemote && device.supportsRemoteRelTs);
             devices = this._canReceiveDetectedCarriers(channel, relTs) ? [...devices.filter(device => !device.isRemote), ...remote] : remote;
         } else if (channel.getFormat(relTs) !== channel.remoteFormat && (format === undefined || format === channel.getFormat(relTs))) {
             // the stream of the remote Mirakurun is not the stream as received of TSMF detected by the local tuners

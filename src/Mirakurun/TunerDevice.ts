@@ -41,8 +41,10 @@ const DVB_CLOSE_DELAY = 1000;
 const DVB_RESPAWN_DELAY = 1000;
 /** DVB デバイスを開けない場合のうち、デバイスがないことを示すエラー */
 const DVB_MISSING_DEVICE_ERRORS = ["ENOENT", "ENODEV", "ENXIO"];
-/** リモートの Mirakurun が要求を断った場合 (406 や 503 など) の `lib/remote` の終了コード (起動し直しても同じく断られる) */
+/** リモートの Mirakurun が要求を断った場合 (400 / 404 / 406。起動し直しても同じく断られる) の `lib/remote` の終了コード */
 const REMOTE_REFUSED_EXIT_CODE = 2;
+/** リモートの Mirakurun が判別した相対 TS の指定 (`tsmfRelTs`) に対応しない場合 (4.3.0 以前) の `lib/remote` の終了コード */
+const REMOTE_RELTS_UNSUPPORTED_EXIT_CODE = 3;
 
 // koffi (FFI) は DVB デバイスを直接操作するチューナーがある場合だけ読み込む
 let dvbDeviceClass: typeof DvbDevice | null;
@@ -111,6 +113,10 @@ export default class TunerDevice extends EventEmitter {
     private _isRemote = false;
     /** the relative stream of TSMF the remote Mirakurun outputs (`undefined`: the stream of the channel) */
     private _remoteRelTs: number;
+    /** the format the remote Mirakurun outputs */
+    private _remoteFormat: apid.StreamFormat;
+    /** the remote Mirakurun does not support `tsmfRelTs` (4.3.0 or before, until restarted) */
+    private _remoteRelTsUnsupported = false;
     private _isFault = false;
     private _fatalCount = 0;
     private _exited = false;
@@ -178,6 +184,16 @@ export default class TunerDevice extends EventEmitter {
     /** the relative stream of TSMF the remote Mirakurun outputs (`undefined`: the stream of the channel) */
     get remoteRelTs(): number {
         return this._remoteRelTs;
+    }
+
+    /** the format the remote Mirakurun outputs */
+    get remoteFormat(): apid.StreamFormat {
+        return this._remoteFormat;
+    }
+
+    /** the remote Mirakurun outputs the relative stream of TSMF detected (`false` if found not supported) */
+    get supportsRemoteRelTs(): boolean {
+        return this._remoteRelTsUnsupported === false;
     }
 
     get isFree(): boolean {
@@ -257,18 +273,20 @@ export default class TunerDevice extends EventEmitter {
 
             // the remote Mirakurun outputs a relative stream of TSMF for each request
             const relTs = this._isRemote ? user.streamSetting?.tsmfRelTs : undefined;
+            // the format to receive (the remote Mirakurun outputs it)
+            const format = this._isRemote ? user.streamSetting?.format : undefined;
             if (this._isRunning) {
-                if (channel.channel !== this._channel.channel || relTs !== this._remoteRelTs) {
+                if (channel.channel !== this._channel.channel || relTs !== this._remoteRelTs || (format !== undefined && format !== this._remoteFormat)) {
                     if (user.priority <= this.getPriority()) {
                         throw new Error(util.format("TunerDevice#%d has higher priority user", this._index));
                     }
 
                     this._clearEndStreamTimer();
                     await this._kill(true);
-                    spawning = this._spawn(channel, relTs);
+                    spawning = this._spawn(channel, relTs, format);
                 }
             } else {
-                spawning = this._spawn(channel, relTs);
+                spawning = this._spawn(channel, relTs, format);
             }
         }
 
@@ -413,15 +431,19 @@ export default class TunerDevice extends EventEmitter {
         log.info("TunerDevice#%d uses DVB device %s directly (frontend=%d, demux=%d)", this._index, this._dvb.path, options.frontend, options.demux);
     }
 
-    private async _spawn(ch: ChannelItem, relTs = this._remoteRelTs): Promise<void> {
+    /** respawned with the relative stream and the format of the remote Mirakurun as before */
+    private async _spawn(ch: ChannelItem, relTs = this._remoteRelTs, format = this._remoteFormat): Promise<void> {
         if (this._dvb !== null) {
             return this._spawnDvb(ch);
         }
-        return this._spawnCommand(ch, relTs);
+        return this._spawnCommand(ch, relTs, format);
     }
 
-    /** @param relTs the relative stream of TSMF the remote Mirakurun outputs */
-    private async _spawnCommand(ch: ChannelItem, relTs?: number): Promise<void> {
+    /**
+     * @param relTs the relative stream of TSMF the remote Mirakurun outputs
+     * @param format the format the remote Mirakurun outputs (the format of the stream filter)
+     */
+    private async _spawnCommand(ch: ChannelItem, relTs?: number, format?: apid.StreamFormat): Promise<void> {
         log.debug("TunerDevice#%d spawn...", this._index);
 
         if (this._process) {
@@ -439,7 +461,8 @@ export default class TunerDevice extends EventEmitter {
             if (this._config.remoteMirakurunDecoder === true) {
                 cmd += " decode";
             }
-            if ((relTs !== undefined ? ch.getFormat(relTs) : ch.remoteFormat) === "tlv") {
+            format = format || (relTs !== undefined ? ch.getFormat(relTs) : ch.remoteFormat);
+            if (format === "tlv") {
                 cmd += " tlv";
             }
             if (relTs !== undefined) {
@@ -465,6 +488,7 @@ export default class TunerDevice extends EventEmitter {
         this._command = cmd;
         this._channel = ch;
         this._remoteRelTs = this._isRemote ? relTs : undefined;
+        this._remoteFormat = this._isRemote ? format : undefined;
 
         if (this._config.dvbDevicePath) {
             const cat = child_process.spawn("cat", [this._config.dvbDevicePath]);
@@ -528,6 +552,12 @@ export default class TunerDevice extends EventEmitter {
             // the request refused by the remote Mirakurun is not respawned (refused again)
             if (this._isRemote === true && code === REMOTE_REFUSED_EXIT_CODE && this._closing === false) {
                 log.warn("TunerDevice#%d the remote Mirakurun has refused the request, closing the streams", this._index);
+                this._closing = true;
+            }
+            // the remote Mirakurun outputs the stream of the channel for the relative stream detected (not used for it)
+            if (this._isRemote === true && code === REMOTE_RELTS_UNSUPPORTED_EXIT_CODE && this._closing === false) {
+                log.warn("TunerDevice#%d the remote Mirakurun does not support the relative stream of TSMF detected, closing the streams", this._index);
+                this._remoteRelTsUnsupported = true;
                 this._closing = true;
             }
 
@@ -801,6 +831,7 @@ export default class TunerDevice extends EventEmitter {
         }
         this._channel = null;
         this._remoteRelTs = undefined;
+        this._remoteFormat = undefined;
         this._users.clear();
 
         if (this._isFault === false) {

@@ -23,9 +23,9 @@ describe("[remote.spec] lib/remote", () => {
     }
   };
 
-  function run(port) {
+  function run(port, args = ["decode", "tlv", "relTs=3"]) {
     return new Promise(resolve => {
-      const proc = childProcess.spawn(process.execPath, ["lib/remote", "127.0.0.1", String(port), "BS4K", "C19", "decode", "tlv", "relTs=3"], { cwd: root });
+      const proc = childProcess.spawn(process.execPath, ["lib/remote", "127.0.0.1", String(port), "BS4K", "C19", ...args], { cwd: root });
       let stderr = "";
       proc.stderr.on("data", data => stderr += data);
       proc.on("close", code => resolve({ code, stderr }));
@@ -34,16 +34,18 @@ describe("[remote.spec] lib/remote", () => {
 
   it("exits with 2 if the remote Mirakurun has refused the request, and with 1 if not connected", async () => {
     const requested = [];
+    let statusCode = 406;
+    let remoteDocs = docs;
     const server = http.createServer((req, res) => {
       if (req.url === "/api/docs") {
         res.setHeader("Content-Type", "application/json");
-        res.end(JSON.stringify(docs));
+        res.end(JSON.stringify(remoteDocs));
         return;
       }
       requested.push(req.url);
-      res.statusCode = 406;
+      res.statusCode = statusCode;
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ code: 406, reason: "Requested Stream Format Unavailable" }));
+      res.end(JSON.stringify({ code: statusCode }));
     });
     await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
     const { port } = server.address();
@@ -51,6 +53,24 @@ describe("[remote.spec] lib/remote", () => {
       const refused = await run(port);
       assert.strictEqual(refused.code, 2, refused.stderr);
       assert.deepStrictEqual(requested, ["/api/channels/BS4K/C19/stream?decode=1&format=tlv&tsmfRelTs=3"]);
+
+      // refused again (400 / 404 / 406): 2, not available for now (such as 503 for the tuners in use): 1 (respawned as before)
+      for (const [status, code] of [[400, 2], [404, 2], [500, 1], [503, 1]]) {
+        statusCode = status;
+        const result = await run(port);
+        assert.strictEqual(result.code, code, `${status}: ${result.stderr}`);
+      }
+
+      // the remote Mirakurun of 4.3.0 or before: tsmfRelTs is not supported (3, not requested), the stream of the channel as before
+      requested.length = 0;
+      remoteDocs = JSON.parse(JSON.stringify(docs));
+      remoteDocs.paths["/channels/{type}/{channel}/stream"].get.parameters = [{ in: "query", name: "decode" }];
+      const unsupported = await run(port);
+      assert.strictEqual(unsupported.code, 3, unsupported.stderr);
+      assert.deepStrictEqual(requested, []);
+      statusCode = 404;
+      assert.strictEqual((await run(port, ["decode"])).code, 2);
+      assert.deepStrictEqual(requested, ["/api/channels/BS4K/C19/stream?decode=1"]);
     } finally {
       await new Promise(resolve => server.close(resolve));
     }

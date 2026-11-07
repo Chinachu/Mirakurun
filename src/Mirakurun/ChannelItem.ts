@@ -35,6 +35,8 @@ export interface ChannelStream {
     /** TSMF of multiple carriers: the IDs of the header (to associate the carriers, the IDs of the services may differ) */
     readonly tsmfNetworkId?: number;
     readonly tsmfStreamId?: number;
+    /** TSMF: the relative stream detected by the remote Mirakurun (its stream as received is TS) */
+    readonly remote?: boolean;
 }
 
 /** the same stream by the IDs of the TSMF header */
@@ -105,10 +107,16 @@ export default class ChannelItem {
 
     /**
      * the format of the stream of the remote Mirakurun (the stream of the channel of its own as before,
-     * not the stream as received of TSMF detected by the local tuners)
+     * not the stream as received of TSMF detected by the local tuners, TS if TSMF is detected by the remote Mirakurun)
      */
     get remoteFormat(): apid.StreamFormat {
-        return this._format || this.stream?.format || (common.tlvChannelTypes.includes(this.type) ? "tlv" : "ts");
+        if (this._format) {
+            return this._format;
+        }
+        if (this.streams.some(stream => stream.remote === true)) {
+            return "ts";
+        }
+        return this.stream?.format || (common.tlvChannelTypes.includes(this.type) ? "tlv" : "ts");
     }
 
     /** @param networkId the relative streams of the network come first (for the service not received on the channel yet) */
