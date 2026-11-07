@@ -16,7 +16,7 @@ const oldChannels = [
 const service = (networkId, serviceId, name) => ({ networkId, serviceId, name, type: 1, streamId: 1 });
 
 // scanTypes: the types to try (by default, a tuner of all the types)
-async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"], dvbChannels = [], logs = [], scanTypes, routes } = {}) {
+async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"], dvbChannels = [], logs = [], scanTypes, routes, relTsByRemote = [] } = {}) {
   const saved = [];
   const tuned = [];
   const errors = [];
@@ -26,7 +26,7 @@ async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"],
   };
   _.tuner = {
     typeExists: (type, route) => types.includes(type) && (!routes || routes.includes(route)),
-    receivesRelTsByRemote: () => false,
+    receivesRelTsByRemote: async (type, route, channel) => relTsByRemote.includes(`${type}/${route}/${channel}`),
     getScanAttempts: (route, order) => (scanTypes ? order.filter(type => scanTypes.includes(type)) : order.filter(type => types.includes(type)).slice(0, 1))
       .map(type => ({ type, devices: [`tuner of ${type}`] })),
     getDvbChannelNames: async () => typeof dvbChannels === "function" ? dvbChannels() : dvbChannels,
@@ -171,6 +171,19 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
       ["地上 13", "CATV"]
     ]);
     assert.ok(!logs.some(text => /already configured/.test(text)));
+  });
+
+  // リモートのチューナーだけで受信し、リモートの Mirakurun が相対 TS を出力するタイプには tsmfRelTs を書かない
+  it("does not write tsmfRelTs for the type received only by the remote tuners outputting the relative streams", async () => {
+    const { saved } = await runScan(
+      { route: "CATV", source: "list", channels: ["C30"], refresh: true },
+      () => [
+        { relTs: 1, format: "ts", networkId: 0xFFFE, services: [service(0xFFFE, 1, "ケーブル")] },
+        { relTs: 2, format: "ts", networkId: 4, services: [service(4, 101, "BS")] }
+      ],
+      { relTsByRemote: ["BS/CATV/C30"] }
+    );
+    assert.deepStrictEqual(saved.filter(item => item.channel === "C30").map(item => [item.type, item.tsmfRelTs]), [["GR", 1], ["BS", undefined]]);
   });
 
   // 互換性のない変更: タイプではなく受信経路でスキャンする

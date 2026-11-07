@@ -291,6 +291,7 @@ function getScanErrorRank(error: unknown): number {
  * the channel items of a channel scanned (by the type of each stream)
  * @param log writes the notes
  * @param remoteType the type of the channel received by the remote tuners (the remote Mirakurun receives only the channel of the type configured)
+ * @param relTsByRemote the types received only by the remote tuners outputting the relative streams of the channel (`Tuner.receivesRelTsByRemote()`)
  */
 export function generateScannedChannelItems(
     channel: string,
@@ -298,7 +299,8 @@ export function generateScannedChannelItems(
     streams: ScannedStream[],
     scanConfig: ScanConfig,
     log: (text: string) => void = () => undefined,
-    remoteType?: apid.ChannelType
+    remoteType?: apid.ChannelType,
+    relTsByRemote: apid.ChannelType[] = []
 ): apid.ConfigChannels {
     const types = new Map<apid.ChannelType, { relTs: Set<number | undefined>, services: apid.Service[], bonded: boolean }>();
     for (const stream of streams) {
@@ -339,7 +341,7 @@ export function generateScannedChannelItems(
         const setDisabledOnAdd = scanConfig.setDisabledOnAdd ?? type !== "GR";
         // the relative stream of TSMF is specified if only one (any tuner receives it), the relative streams are detected if more than one,
         // not specified for the remote tuners (the remote Mirakurun outputs the relative streams detected by itself)
-        const byRemote = remoteType !== undefined || _.tuner.receivesRelTsByRemote(type, route);
+        const byRemote = remoteType !== undefined || relTsByRemote.includes(type);
         const tsmfRelTs = relTs.size === 1 && !bonded && !byRemote ? [...relTs][0] : undefined;
         if (relTs.size > 1) {
             log(`-> the ${relTs.size} relative streams of ${type} are detected by the tuners for TLV (the types including BS4K, or tlvDecoder / tlvToTsDecoder).\n`);
@@ -790,7 +792,16 @@ async function runChannelScan(
 
             // Generate channel items by the type of each stream
             const remoteType = received.devices.every(device => device.isRemote) ? received.type : undefined;
-            const scannedItems = generateScannedChannelItems(channel, route, streams, scanConfig, appendToLog, remoteType);
+            // the types received only by the remote tuners outputting the relative streams (`tsmfRelTs` is not written)
+            const relTsByRemote: apid.ChannelType[] = [];
+            if (remoteType === undefined && streams.some(stream => stream.relTs !== undefined)) {
+                for (const type of routeTypes[route]) {
+                    if (await _.tuner.receivesRelTsByRemote(type, route, channel)) {
+                        relTsByRemote.push(type);
+                    }
+                }
+            }
+            const scannedItems = generateScannedChannelItems(channel, route, streams, scanConfig, appendToLog, remoteType, relTsByRemote);
             if (scannedItems.length === 0) {
                 appendToLog("\n");
                 continue;

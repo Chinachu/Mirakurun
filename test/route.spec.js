@@ -974,10 +974,15 @@ describe("[route.spec] route / streamId", () => {
       assert.deepStrictEqual(scans, [["tlv", 1, [remote]]]);
       assert.deepStrictEqual(streams.map(({ relTs, format, services }) => [relTs, format, services.map(service => service.serviceId)]), [[1, "tlv", [101]]]);
 
-      // only the remote tuners receive the type (supporting the relative streams detected)
-      assert.strictEqual(t.receivesRelTsByRemote("BS4K", "CATV"), true);
+      // only the remote tuners receive the channel of the type, and the remote Mirakurun outputs its relative streams
+      assert.strictEqual(await t.receivesRelTsByRemote("BS4K", "CATV", "C19"), true);
       t._devices.push(fakeDevice(1, ["BS4K"], ["CATV"]));
-      assert.strictEqual(t.receivesRelTsByRemote("BS4K", "CATV"), false);
+      assert.strictEqual(await t.receivesRelTsByRemote("BS4K", "CATV", "C19"), false);
+      t._devices.pop();
+      // the remote Mirakurun not supporting the relative streams detected
+      const old = fakeDevice(2, ["BS4K"], ["CATV"], { isRemote: true, supportsRemoteRelTs: false, config: { name: "old", types: ["BS4K"], routes: ["CATV"], remoteMirakurunHost: "old" } });
+      t._devices.push(old);
+      assert.strictEqual(await t.receivesRelTsByRemote("BS4K", "CATV", "C19"), false);
       t._devices.pop();
 
       // the relative stream reported is requested again even if refused before
@@ -988,6 +993,11 @@ describe("[route.spec] route / streamId", () => {
 
       // not detected by the remote Mirakurun: the stream as received, as before
       scans.length = 0;
+      remote.getRemoteChannel = async () => ({ type: "BS4K", channel: "C19", services: [{ id: 1, serviceId: 101, networkId: 11, streamId: 45168 }] });
+      // (filtered by tsmfRelTs locally)
+      assert.strictEqual(await t.receivesRelTsByRemote("BS4K", "CATV", "C19"), false);
+      remote.getRemoteChannel = async () => ({ type: "BS4K", channel: "C19", tsmfRelTs: 1, services: [{ id: 1, serviceId: 101, networkId: 11, streamId: 45168 }] });
+      assert.strictEqual(await t.receivesRelTsByRemote("BS4K", "CATV", "C19"), true);
       remote.getRemoteChannel = async () => ({ type: "BS4K", channel: "C19", services: [{ id: 1, serviceId: 101, networkId: 11, streamId: 45168 }] });
       scans.length = 0;
       await t.scanChannel(channel, {}, [remote]);

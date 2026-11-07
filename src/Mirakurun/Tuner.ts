@@ -254,10 +254,34 @@ export class Tuner {
         return this._getDevicesByType(type, route).length > 0;
     }
 
-    /** only the remote tuners receive the type, and the remote Mirakurun outputs the relative streams of TSMF detected by itself */
-    receivesRelTsByRemote(type: apid.ChannelType, route?: apid.ChannelRoute): boolean {
+    /**
+     * only the remote tuners receive the channel of the type, and every remote Mirakurun outputs its relative streams of TSMF
+     * (detected by itself, or `tsmfRelTs` of its channels.yml), not filtered by `tsmfRelTs` locally
+     */
+    async receivesRelTsByRemote(type: apid.ChannelType, route: apid.ChannelRoute, channel: string): Promise<boolean> {
         const devices = this._getDevicesByType(type, route);
-        return devices.length > 0 && devices.every(device => device.isRemote) && devices.some(device => device.supportsRemoteRelTs);
+        if (devices.length === 0 || devices.some(device => !device.isRemote)) {
+            return false;
+        }
+        await Promise.all(devices.map(device => device.checkRemoteRelTs()));
+        if (devices.some(device => !device.supportsRemoteRelTs)) {
+            return false;
+        }
+        const hosts = new Map<string, TunerDevice>();
+        for (const device of devices) {
+            hosts.set(`${device.config.remoteMirakurunHost}:${device.config.remoteMirakurunPort || 40772}`, device);
+        }
+        for (const device of hosts.values()) {
+            try {
+                const remoteChannel = await device.getRemoteChannel(type, channel);
+                if (remoteChannel.tsmfRelTs === undefined && !(remoteChannel.services || []).some(service => service.tsmfRelTs !== undefined)) {
+                    return false;
+                }
+            } catch (err) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
