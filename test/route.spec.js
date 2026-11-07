@@ -980,9 +980,15 @@ describe("[route.spec] route / streamId", () => {
       assert.strictEqual(await t.receivesRelTsByRemote("BS4K", "CATV", "C19"), false);
       t._devices.pop();
       // the remote Mirakurun not supporting the relative streams detected
-      const old = fakeDevice(2, ["BS4K"], ["CATV"], { isRemote: true, supportsRemoteRelTs: false, config: { name: "old", types: ["BS4K"], routes: ["CATV"], remoteMirakurunHost: "old" } });
+      const old = fakeDevice(2, ["BS4K"], ["CATV"], {
+        isRemote: true, supportsRemoteRelTs: false, config: { name: "old", types: ["BS4K"], routes: ["CATV"], remoteMirakurunHost: "old" },
+        getRemoteChannel: async () => ({ type: "BS4K", channel: "C19", services: [{ id: 1, serviceId: 101, networkId: 11, streamId: 45168, tsmfRelTs: 1 }] })
+      });
       t._devices.push(old);
       assert.strictEqual(await t.receivesRelTsByRemote("BS4K", "CATV", "C19"), false);
+      // tsmfRelTs of its channels.yml (the relative stream extracted, even of 4.3.0 or before)
+      old.getRemoteChannel = async () => ({ type: "BS4K", channel: "C19", tsmfRelTs: 1, services: [{ id: 1, serviceId: 101, networkId: 11, streamId: 45168 }] });
+      assert.strictEqual(await t.receivesRelTsByRemote("BS4K", "CATV", "C19"), true);
       t._devices.pop();
 
       // the relative stream reported is requested again even if refused before

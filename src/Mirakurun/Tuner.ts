@@ -256,7 +256,7 @@ export class Tuner {
 
     /**
      * only the remote tuners receive the channel of the type, and every remote Mirakurun outputs its relative streams of TSMF
-     * (detected by itself, or `tsmfRelTs` of its channels.yml), not filtered by `tsmfRelTs` locally
+     * (detected by itself, or `tsmfRelTs` of its channels.yml even of 4.3.0 or before), not filtered by `tsmfRelTs` locally
      */
     async receivesRelTsByRemote(type: apid.ChannelType, route: apid.ChannelRoute, channel: string): Promise<boolean> {
         const devices = this._getDevicesByType(type, route);
@@ -264,17 +264,17 @@ export class Tuner {
             return false;
         }
         await Promise.all(devices.map(device => device.checkRemoteRelTs()));
-        if (devices.some(device => !device.supportsRemoteRelTs)) {
-            return false;
-        }
-        const hosts = new Map<string, TunerDevice>();
+        const hosts = new Map<string, TunerDevice[]>();
         for (const device of devices) {
-            hosts.set(`${device.config.remoteMirakurunHost}:${device.config.remoteMirakurunPort || 40772}`, device);
+            const host = `${device.config.remoteMirakurunHost}:${device.config.remoteMirakurunPort || 40772}`;
+            hosts.set(host, [...(hosts.get(host) || []), device]);
         }
-        for (const device of hosts.values()) {
+        for (const hostDevices of hosts.values()) {
             try {
-                const remoteChannel = await device.getRemoteChannel(type, channel);
-                if (remoteChannel.tsmfRelTs === undefined && !(remoteChannel.services || []).some(service => service.tsmfRelTs !== undefined)) {
+                const remoteChannel = await hostDevices[0].getRemoteChannel(type, channel);
+                // detected by the remote Mirakurun, received by the tuners supporting it
+                const detected = hostDevices.every(device => device.supportsRemoteRelTs) && (remoteChannel.services || []).some(service => service.tsmfRelTs !== undefined);
+                if (remoteChannel.tsmfRelTs === undefined && !detected) {
                     return false;
                 }
             } catch (err) {
