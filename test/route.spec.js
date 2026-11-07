@@ -85,6 +85,7 @@ function fakeDevice(index, types, routes, state = {}) {
     },
     // the remote Mirakurun has detected the relative stream
     isRemoteChannelRelTsChecked: () => true,
+    isRemoteRelTsChecked: true,
     ...state
   };
 }
@@ -955,6 +956,45 @@ describe("[route.spec] route / streamId", () => {
       scanned.length = 0;
       await t.getServices(channel);
       assert.deepStrictEqual(scanned, [["ts", 2]]);
+    });
+
+    // リモートの Mirakurun の対応をまだ確かめられない場合は、リモートが判別した相対 TS を受信したままのストリームで置き換えない
+    it("keeps the relative streams detected by the remote Mirakurun until its support is checked", async () => {
+      setupChannels([{ name: "4K", type: "BS4K", route: "CATV", channel: "C19" }]);
+      const channel = _.channel.items[0];
+      const detected = [
+        { networkId: 11, streamId: 45168, relTs: 1, format: "tlv", slots: 0, remote: true },
+        { networkId: 4, streamId: 18801, relTs: 2, format: "ts", slots: 0, remote: true }
+      ];
+      channel.setStreams(detected);
+      const remote = fakeDevice(0, ["BS4K"], ["CATV"], { isRemote: true, supportsRemoteRelTs: false, isRemoteRelTsChecked: false });
+      const t = tuner([remote]);
+      const scanned = [];
+      mock.method(t, "_scanTSMFServices", async (ch, userReq, streams) => (scanned.push(streams.map(stream => stream.relTs)), []));
+      mock.method(t, "_scanServices", async () => (scanned.push("as before"), []));
+      await t.getServices(channel);
+      assert.deepStrictEqual(scanned.pop(), [1, 2]);
+      // not supported: as before
+      remote.isRemoteRelTsChecked = true;
+      await t.getServices(channel);
+      assert.deepStrictEqual(scanned.pop(), "as before");
+    });
+
+    // リモートの Mirakurun が後から登録した TLV のサービスも、サービスのない TLV として追加する
+    it("adds the services of the TLV detected by the remote Mirakurun registered later", async () => {
+      setupChannels([{ name: "4K", type: "BS4K", route: "CATV", channel: "C19" }]);
+      const channel = _.channel.items[0];
+      channel.setStreams([
+        { networkId: 11, streamId: 45168, relTs: 1, format: "tlv", slots: 0, remote: true },
+        { networkId: 4, streamId: 18801, relTs: 2, format: "ts", slots: 0, remote: true }
+      ]);
+      _.tuner = { getServices: async () => [
+        { networkId: 11, serviceId: 101, streamId: 45168, name: "4K", type: 1, logoId: -1, remoteControlKeyId: 0 },
+        { networkId: 4, serviceId: 201, streamId: 18801, name: "BS", type: 1, logoId: -1, remoteControlKeyId: 0 }
+      ] };
+      await _.service._scan(channel, false);
+      // only the TLV (the TS is added by the scan to add, as before)
+      assert.deepStrictEqual(_.service.items.map(item => item.serviceId), [101]);
     });
 
     // リモートのチャンネルは、判別した相対 TS に対応するリモートの Mirakurun に、ホストごとに問い合わせる

@@ -457,9 +457,10 @@ export class Service {
 
         // the TLV of the carriers discovered is scanned after all the carriers are discovered (later than the TS sharing the carrier),
         // its services are added unless any service of the TLV has been added, even by the scan to update (not kept in memory to survive restarts)
-        // (not for the channels of `serviceId`, only the services specified are added)
+        // (not for the channels of `serviceId`, only the services specified are added),
+        // the same for the TLV detected by the remote Mirakurun (the remote Mirakurun scans the carriers by itself, later)
         const serviceIdSpecified = _.config.channels.some(config => config.type === channel.type && config.channel === channel.channel && config.serviceId);
-        const newTlvStreams = serviceIdSpecified ? [] : channel.streams.filter(stream => stream.format === "tlv" && stream.numberOfCarriers > 1 &&
+        const newTlvStreams = serviceIdSpecified ? [] : channel.streams.filter(stream => stream.format === "tlv" && (stream.numberOfCarriers > 1 || stream.remote === true) &&
             this._items.some(item => item.networkId === stream.networkId && item.streamId === stream.streamId) === false);
 
         log.debug("ChannelItem#'%s' services: %s", channel.name, JSON.stringify(services, null, "  "));

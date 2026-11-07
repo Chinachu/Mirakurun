@@ -214,6 +214,11 @@ export default class TunerDevice extends EventEmitter {
         return this._remoteRelTsSupported === true;
     }
 
+    /** checked whether the remote Mirakurun supports the relative stream of TSMF detected (`supportsRemoteRelTs` is known) */
+    get isRemoteRelTsChecked(): boolean {
+        return this._remoteRelTsSupported !== undefined;
+    }
+
     get isFree(): boolean {
         return this._isAvailable === true && this._channel === null && this._users.size === 0;
     }

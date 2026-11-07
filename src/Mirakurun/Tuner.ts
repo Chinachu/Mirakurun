@@ -472,19 +472,6 @@ export class Tuner {
         if (channel.tsmfRelTs !== undefined || devices.length === 0 || devices.some(device => !device.isRemote)) {
             return null;
         }
-        // the remote Mirakurun of 4.3.0 or before does not output the relative stream detected (each host once)
-        await Promise.all(devices.map(device => device.checkRemoteRelTs()));
-        const hosts = new Map<string, TunerDevice>();
-        for (const device of devices.filter(item => item.supportsRemoteRelTs)) {
-            const host = `${device.config.remoteMirakurunHost}:${device.config.remoteMirakurunPort || 40772}`;
-            if (!hosts.has(host)) {
-                hosts.set(host, device);
-            }
-        }
-        if (hosts.size === 0) {
-            return null;
-        }
-
         // the relative streams detected by the remote Mirakurun before (not to replace them by the stream as received)
         const getSaved = (): TSMFStream[] | null => {
             const saved = channel.streams.filter(stream => stream.remote === true && stream.relTs !== undefined);
@@ -496,6 +483,20 @@ export class Tuner {
                 networkId: stream.networkId
             })) : null;
         };
+
+        // the remote Mirakurun of 4.3.0 or before does not output the relative stream detected (each host once)
+        await Promise.all(devices.map(device => device.checkRemoteRelTs()));
+        const hosts = new Map<string, TunerDevice>();
+        for (const device of devices.filter(item => item.supportsRemoteRelTs)) {
+            const host = `${device.config.remoteMirakurunHost}:${device.config.remoteMirakurunPort || 40772}`;
+            if (!hosts.has(host)) {
+                hosts.set(host, device);
+            }
+        }
+        if (hosts.size === 0) {
+            // not known yet (such as failed to check): as before
+            return devices.every(device => device.isRemoteRelTsChecked) ? null : getSaved();
+        }
 
         // the first remote Mirakurun detecting the relative streams
         let unknown = false;
