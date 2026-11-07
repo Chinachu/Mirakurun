@@ -257,17 +257,14 @@ export function getChannelTypeByNetwork(networkId: number, format: apid.StreamFo
     return null;
 }
 
-/** the type of the channel item to tune for the scan by default */
-const scanChannelTypes: Record<apid.ChannelRoute, apid.ChannelType> = {
-    TER: "GR",
-    SAT: "BS",
-    CATV: "GR",
-    HIKARI: "GR"
-};
-
-/** the type of the channel item to tune for the scan (any type of the tuners of the route) */
-function getScanChannelType(route: apid.ChannelRoute): apid.ChannelType | null {
-    return [scanChannelTypes[route], ...common.channelTypes].find(type => _.tuner.typeExists(type, route)) || null;
+/**
+ * the types of the channel item to tune a channel for the scan, covering all the tuners of the route
+ * (such as the tuners of ISDB-T and ISDB-S on HIKARI), the types of the satellite first for the channels named BS / CS
+ */
+export function getScanChannelTypes(route: apid.ChannelRoute, channel?: string): apid.ChannelType[] {
+    const satellite = channel !== undefined && /^(BS|CS)/i.test(channel);
+    const order: apid.ChannelType[] = satellite ? ["BS", "CS", "BS4K", "SKY", "GR"] : ["GR", "BS", "CS", "BS4K", "SKY"];
+    return _.tuner.getScanTypes(route, order);
 }
 
 /**
@@ -511,7 +508,6 @@ async function runChannelScan(
         // Initialize scan data
         const scanLog: string[] = [];
         const oldChannelItems = await config.loadChannels();
-        const scanType = getScanChannelType(route);
         // the entries of the channels scanned on the route (of any type) are replaced
         const isOnRoute = (item: apid.ConfigChannelsItem): boolean => (item.route || common.getDefaultChannelRoute(item.type)) === route;
         const isSkipped = (channel: string): boolean => skipCh.includes(channel);
@@ -692,19 +688,28 @@ async function runChannelScan(
                 }
             }
 
-            // Scan the streams of the channel (the type is decided by the network of each stream)
-            let streams: ScannedStream[];
-            try {
-                streams = await _.tuner.scanChannel(new ChannelItem({
-                    name: `${route}:${channel}`,
-                    type: scanType,
-                    channel,
-                    route
-                }), {
-                    id: "Mirakurun:API:channelScan",
-                    priority: 1
-                });
-            } catch (error) {
+            // Scan the streams of the channel (the type is decided by the network of each stream),
+            // by the tuners of each type until received (the tuners of the route may receive the different systems)
+            let streams: ScannedStream[] = null;
+            let lastError: Error = null;
+            for (const scanType of getScanChannelTypes(route, channel)) {
+                try {
+                    streams = await _.tuner.scanChannel(new ChannelItem({
+                        name: `${route}:${channel}`,
+                        type: scanType,
+                        channel,
+                        route
+                    }), {
+                        id: "Mirakurun:API:channelScan",
+                        priority: 1
+                    });
+                    break;
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+            if (streams === null) {
+                const error = lastError;
                 // Handle errors (often no signal)
                 const isNoSignalError = /stream has closed before get network/.test(String(error));
                 const errorInfo = {
@@ -908,18 +913,25 @@ export const put: Operation = async (req, res) => {
     // Parse skipCh parameter (the names)
     const skipCh = toList(req.query.skipCh);
 
-    const scanType = getScanChannelType(route);
-    if (scanType === null) {
+    const scanTypes = getScanChannelTypes(route);
+    if (scanTypes.length === 0) {
         reject(`No tuners for the route ${route}`);
         return;
     }
+    const getDvbChannelNames = async (): Promise<string[]> => {
+        const names = new Set<string>();
+        for (const type of scanTypes) {
+            (await _.tuner.getDvbChannelNames(route, type)).forEach(name => names.add(name));
+        }
+        return [...names];
+    };
 
     // Parse channel configuration options
     const channelOptions: ChannelScanOption = {
         route,
         source,
         channels: toList(req.query.channels),
-        dvbChannels: source === "dvbConf" ? await _.tuner.getDvbChannelNames(route, scanType) : undefined,
+        dvbChannels: source === "dvbConf" ? await getDvbChannelNames() : undefined,
         channelNameFormat: req.query.channelNameFormat as string,
         startCh: req.query.minCh !== undefined ? Number(req.query.minCh) : undefined,
         endCh: req.query.maxCh !== undefined ? Number(req.query.maxCh) : undefined,
@@ -1009,8 +1021,9 @@ The channels to scan (\`source\`):
 - \`list\`: the channels of \`channels\`
 - \`format\`: the channels of \`channelNameFormat\` in the range of \`minCh\`-\`maxCh\` (and \`minSubCh\`-\`maxSubCh\` with \`{subch}\`)
 
-The tuners which can receive the route are used, any of their types. The relative streams of TSMF are detected on any local tuner.
-The tuners of the route should have all the types to receive in \`types\` (such as \`[GR, BS, CS, BS4K]\` for CATV).
+The tuners of the route are used. The tuners of the different types (such as ISDB-T and ISDB-S) try each channel until received.
+The relative streams of TSMF are detected on any local tuner.
+A tuner receiving multiple systems should have all the types to receive in \`types\` (such as \`[GR, BS, CS, BS4K]\` for CATV).
 
 Entry rewriting specifications:
 - The entries of the channels scanned on the route (of any type) are replaced with the result. The other entries remain.

@@ -15,7 +15,8 @@ const oldChannels = [
 
 const service = (networkId, serviceId, name) => ({ networkId, serviceId, name, type: 1, streamId: 1 });
 
-async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"], dvbChannels = [], logs = [] } = {}) {
+// scanTypes: the types to try (by default, a tuner of all the types)
+async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"], dvbChannels = [], logs = [], scanTypes } = {}) {
   const saved = [];
   const tuned = [];
   const errors = [];
@@ -25,6 +26,7 @@ async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"],
   };
   _.tuner = {
     typeExists: type => types.includes(type),
+    getScanTypes: (route, order) => scanTypes ? order.filter(type => scanTypes.includes(type)) : order.filter(type => types.includes(type)).slice(0, 1),
     getDvbChannelNames: async () => typeof dvbChannels === "function" ? dvbChannels() : dvbChannels,
     scanChannel: async channel => {
       tuned.push({ channel: channel.channel, route: channel.route, type: channel.type });
@@ -140,6 +142,24 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
     result = await runScan({ route: "CATV", source: "list", channels: ["C13"], refresh: true }, () => [{ format: "ts", services: [service(0xFFFE, 1, "ケーブル")] }]);
     assert.deepStrictEqual(result.tuned.map(t => t.channel), ["C13"]);
     assert.ok(result.saved.some(item => item.name === "ケーブル"));
+  });
+
+  // ISDB-T と ISDB-S のチューナーが別の場合は、受信できるまでそれぞれのタイプのチューナーで試す
+  it("tries the tuners of each type until received", async () => {
+    const { saved, tuned } = await runScan(
+      { route: "HIKARI", source: "list", channels: ["27", "BS03_1", "C13"], refresh: true },
+      channel => {
+        if ((channel.type === "GR") !== /^\d+$/.test(channel.channel)) {
+          throw new Error("stream has closed before get network");
+        }
+        return [{ format: "ts", services: [service(channel.type === "GR" ? 0x7FE0 : 4, 101, channel.channel)] }];
+      },
+      { scanTypes: ["GR", "BS"] }
+    );
+
+    // the satellite types first for the channels named BS / CS, the other types if not received (C13 is received only by the tuner of BS)
+    assert.deepStrictEqual(tuned.map(t => [t.channel, t.type]), [["27", "GR"], ["BS03_1", "BS"], ["C13", "GR"], ["C13", "BS"]]);
+    assert.deepStrictEqual(saved.filter(item => item.route === "HIKARI").map(item => [item.type, item.channel]), [["GR", "27"], ["BS", "BS03_1"], ["BS", "C13"]]);
   });
 
   it("uses the tuners of any type of the route", async () => {

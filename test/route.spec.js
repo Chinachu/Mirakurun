@@ -812,6 +812,19 @@ describe("[route.spec] route / streamId", () => {
   });
 
   describe("Tuner: channel config files of dvbv5", () => {
+    // チャンネルスキャンで、受信経路のすべてのチューナーを使うタイプ
+    it("decides the types to scan covering all the tuners of the route", () => {
+      // ISDB-T and ISDB-S tuners
+      let t = tuner([fakeDevice(0, ["GR"], ["HIKARI"]), fakeDevice(1, ["BS", "CS"], ["HIKARI"]), fakeDevice(2, ["GR"])]);
+      assert.deepStrictEqual(t.getScanTypes("HIKARI"), ["GR", "BS"]);
+      assert.deepStrictEqual(t.getScanTypes("HIKARI", ["BS", "CS", "BS4K", "SKY", "GR"]), ["BS", "GR"]);
+      assert.deepStrictEqual(t.getScanTypes("TER"), ["GR"]);
+      // a tuner of all the types
+      t = tuner([fakeDevice(0, ["GR", "BS", "CS", "BS4K"], ["CATV"])]);
+      assert.deepStrictEqual(t.getScanTypes("CATV"), ["GR"]);
+      assert.deepStrictEqual(t.getScanTypes("SAT"), []);
+    });
+
     it("lists the channels of the channel config files of the tuners used for the scan (the type and the route)", async () => {
       const devices = [
         { index: 0, config: { types: ["GR"], routes: ["SAT"] }, getDvbChannelNames: async () => ["BS01_0"] },

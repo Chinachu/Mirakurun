@@ -400,6 +400,23 @@ export class Tuner {
         return [...names];
     }
 
+    /**
+     * the types to tune the channels of the route by the channel scan: the types covering all the tuners of the route
+     * (in the order of `types`, a tuner of multiple types is tried by one of them)
+     */
+    getScanTypes(route: apid.ChannelRoute, types: apid.ChannelType[] = common.channelTypes): apid.ChannelType[] {
+        const covered = new Set<TunerDevice>();
+        const scanTypes: apid.ChannelType[] = [];
+        for (const type of types) {
+            const devices = this._getDevicesByType(type, route);
+            if (devices.some(device => !covered.has(device))) {
+                scanTypes.push(type);
+                devices.forEach(device => covered.add(device));
+            }
+        }
+        return scanTypes;
+    }
+
     private _getScanUser(channel: ChannelItem, user: Partial<common.User>): common.User {
         return {
             id: "Mirakurun:getServices()",
