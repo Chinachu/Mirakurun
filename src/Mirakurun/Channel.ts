@@ -168,7 +168,7 @@ export class Channel {
                     ...((stream.format === "ts" || stream.format === "tlv") && { format: stream.format }),
                     ...(typeof stream.relTs === "number" && { relTs: stream.relTs }),
                     ...(typeof stream.slots === "number" && { slots: stream.slots }),
-                    ...(Number.isInteger(stream.groupId) && stream.groupId > 0 && stream.groupId <= 255 &&
+                    ...(Number.isInteger(stream.groupId) && stream.groupId >= 0 && stream.groupId <= 255 &&
                         Number.isInteger(stream.numberOfCarriers) && stream.numberOfCarriers > 1 && stream.numberOfCarriers <= 255 &&
                         Number.isInteger(stream.carrierSequence) && stream.carrierSequence >= 0 && stream.carrierSequence <= stream.numberOfCarriers &&
                         { groupId: stream.groupId, numberOfCarriers: stream.numberOfCarriers, carrierSequence: stream.carrierSequence })

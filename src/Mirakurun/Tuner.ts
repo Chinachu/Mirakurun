@@ -503,7 +503,13 @@ export class Tuner {
             if (_.channel.get(channel.type, channel.channel) === channel) {
                 channel.setStreams(streams);
             }
-            if (!this.canReceiveTsmfCarriers(channel, discovery.numberOfCarriers) || !channel.hasAllCarriers(discovery)) {
+            const canReceive = this.canReceiveTsmfCarriers(channel, discovery.numberOfCarriers);
+            if (!canReceive || !channel.hasAllCarriers(discovery)) {
+                log.info(
+                    "Tuner: the TLV of the relative stream %d on %s/%s is not scanned until all the %d carriers of the group %d are found (%s)",
+                    discovery.relTs, channel.type, channel.channel, discovery.numberOfCarriers, discovery.groupId,
+                    canReceive ? `carriers found: ${(channel.getBondedChannels() || []).length}, or carrier_sequence is invalid` : "not enough local tuners"
+                );
                 // TS services on a shared carrier do not require the other carriers.
                 scanStreams = streams.filter(stream => stream.format === "ts");
             } else if (discoveryChanged) {

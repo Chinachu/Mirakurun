@@ -60,7 +60,8 @@ export default class ChannelItem {
     }
 
     get tsmfGroupId(): number {
-        return this._configuredTsmfGroupId ?? this.streams.find(stream => stream.groupId > 0)?.groupId;
+        // the group discovered may be 0 (`tsmfGroupId` configured is 1 to 255)
+        return this._configuredTsmfGroupId ?? this.streams.find(stream => stream.groupId !== undefined)?.groupId;
     }
 
     /** the streams received last time (the relative streams of TSMF). `[]` until received once. */
@@ -168,7 +169,7 @@ export default class ChannelItem {
 
     /** the channels of the bonded carriers including this, `null` if not bonded */
     getBondedChannels(): ChannelItem[] | null {
-        if (!this.tsmfGroupId) {
+        if (this.tsmfGroupId === undefined) {
             return null;
         }
         // configured: the channels configured with the same group (the groups discovered are not mixed)
@@ -192,7 +193,7 @@ export default class ChannelItem {
         const sequences = carriers.map(item => item.streams.find(other => other.format === "tlv" &&
             other.networkId === stream.networkId && other.streamId === stream.streamId)?.carrierSequence);
         const ordered = [...sequences].sort((a, b) => a - b);
-        return !!stream.groupId && carriers.length === stream.numberOfCarriers && new Set(sequences).size === stream.numberOfCarriers &&
+        return stream.groupId !== undefined && carriers.length === stream.numberOfCarriers && new Set(sequences).size === stream.numberOfCarriers &&
             ordered.every((sequence, i) => sequence === i + ordered[0]) && (ordered[0] === 0 || ordered[0] === 1);
     }
 

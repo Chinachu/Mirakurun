@@ -309,6 +309,20 @@ describe("[route.spec] route / streamId", () => {
       assert.deepStrictEqual(a1.getBondedChannels(), [a1, a2]);
     });
 
+    // ヘッダーのグループ ID が 0 でも結合する (設定する tsmfGroupId は 1 から 255)
+    it("bonds the carriers discovered with the group ID 0", async () => {
+      const configs = [0, 1].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` }));
+      setupChannels(configs);
+      const streams = i => [{ networkId: 11, streamId: 60001, relTs: 1, format: "tlv", slots: 52, groupId: 0, numberOfCarriers: 2, carrierSequence: i }];
+      fs.writeFileSync(process.env.CHANNELS_DB_PATH, JSON.stringify([{ __integrity__: "test" }, ...configs.map((c, i) => ({ type: c.type, channel: c.channel, streams: streams(i) }))]));
+      await _.channel.load();
+      const channels = _.channel.items;
+
+      assert.strictEqual(channels[0].tsmfGroupId, 0);
+      assert.deepStrictEqual(channels[0].getBondedChannels(), channels);
+      assert.strictEqual(channels[0].hasAllCarriers(channels[0].streams[0]), true);
+    });
+
     it("restores discovery metadata from channels.json without modifying configured values", async () => {
       const configs = [0, 1, 2].map(i => ({ name: `Carrier ${i}`, type: "BS4K", route: "CATV", channel: `C${i}` }));
       setupChannels(configs);
