@@ -153,6 +153,14 @@ describe("[scan.spec] /api/config/channel/scan : generateScannedChannelItems", (
         assert.ok(logs.some(text => /received by the remote tuner as GR \(the network is of BS\)/.test(text)));
     });
 
+    // リモートの Mirakurun は判別した相対 TS を出力するため、リモートのチューナーで受信したチャンネルには tsmfRelTs を書かない
+    it("does not specify the relative stream for the channel received by the remote tuner", () => {
+        const items = scan.generateScannedChannelItems("C19", "CATV", [
+            { relTs: 1, format: "tlv", networkId: 11, services: [service(11, 101, "4K")] }
+        ], {}, () => undefined, "BS4K");
+        assert.deepStrictEqual(items, [{ name: "4K", type: "BS4K", channel: "C19", serviceId: 101, isDisabled: true, route: "CATV" }]);
+    });
+
     it("notes the types without the tuners of the route", () => {
         const logs = [];
         scan.generateScannedChannelItems("C23", "CATV", [{ relTs: 1, format: "ts", services: [service(10, 1, "SKY")] }], {}, text => logs.push(text));

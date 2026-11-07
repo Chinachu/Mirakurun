@@ -400,7 +400,14 @@ export class Tuner {
      */
     async scanChannel(channel: ChannelItem, user: Partial<common.User> = {}, devices?: TunerDevice[]): Promise<ScannedStream[]> {
         const streams: ScannedStream[] = [];
-        await this._scanServices(channel, this._getScanUser(channel, user), channel.getFormat(channel.tsmfRelTs), true, channel.tsmfRelTs, false, { anyTuner: true, streams, devices });
+        const userReq = this._getScanUser(channel, user);
+        // the remote tuners: the relative streams of TSMF detected by the remote Mirakurun (its stream as received is TS)
+        const remoteStreams = devices?.length > 0 && devices.every(device => device.isRemote) ? await this._getRemoteTSMFStreams(channel, devices) : null;
+        if (remoteStreams !== null) {
+            await this._scanTSMFServices(channel, userReq, remoteStreams, streams, true, devices);
+            return streams;
+        }
+        await this._scanServices(channel, userReq, channel.getFormat(channel.tsmfRelTs), true, channel.tsmfRelTs, false, { anyTuner: true, streams, devices });
         return streams;
     }
 
@@ -467,8 +474,8 @@ export class Tuner {
      * only for the channel received only by the remote tuners (the local tuners detect, such as the carriers to bond)
      * @returns `null` if not TSMF, or not known by the remote Mirakurun (such as 4.3.0 or before)
      */
-    private async _getRemoteTSMFStreams(channel: ChannelItem): Promise<TSMFStream[] | null> {
-        const devices = this._getDevicesByType(channel.type, channel.route);
+    /** @param devices the tuners to receive (default: the tuners of the channel) */
+    private async _getRemoteTSMFStreams(channel: ChannelItem, devices = this._getDevicesByType(channel.type, channel.route)): Promise<TSMFStream[] | null> {
         if (channel.tsmfRelTs !== undefined || devices.length === 0 || devices.some(device => !device.isRemote)) {
             return null;
         }
@@ -630,7 +637,7 @@ export class Tuner {
 
                 if (tsmf !== null) {
                     // the tuner is kept tuned for a while, the streams of the scans join it
-                    resolve(this._scanTSMFServices(channel, userReq, tsmf, options.streams));
+                    resolve(this._scanTSMFServices(channel, userReq, tsmf, options.streams, false, options.devices));
                 } else if (retryFormat !== null) {
                     // the tuner is kept tuned for a while, the stream of the scan joins it
                     // (`streamInfo` is defined on the user of each stream)
@@ -669,13 +676,15 @@ export class Tuner {
     /**
      * @param collect collects the streams scanned (for the channel scan)
      * @param remote the relative streams detected by the remote Mirakurun (the remote tuners receive them one by one)
+     * @param devices the tuners to receive (only by the channel scan)
      */
     private async _scanTSMFServices(
         channel: ChannelItem,
         userReq: common.User,
         streams: TSMFStream[],
         collect?: ScannedStream[],
-        remote = false
+        remote = false,
+        devices?: TunerDevice[]
     ): Promise<apid.Service[]> {
         log.info(
             "Tuner: the relative streams of TSMF on %s/%s are detected: %s",
@@ -732,7 +741,9 @@ export class Tuner {
             { ...userReq, streamSetting: { ...userReq.streamSetting } },
             stream.format,
             false,
-            stream.relTs
+            stream.relTs,
+            false,
+            { devices }
         );
         // the remote tuners receive a relative stream each (not to wait for the tuners until the timeout)
         const results: PromiseSettledResult<apid.Service[]>[] = [];

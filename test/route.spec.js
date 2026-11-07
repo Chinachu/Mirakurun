@@ -958,6 +958,28 @@ describe("[route.spec] route / streamId", () => {
       assert.deepStrictEqual(scanned, [["ts", 2]]);
     });
 
+    // チャンネルスキャンでは、リモートのチューナーで、リモートの Mirakurun が判別した相対 TS をスキャンする (受信したままのストリームは TS)
+    it("scans the relative streams detected by the remote Mirakurun for the channel scan by the remote tuners", async () => {
+      setupChannels([]);
+      const channel = new ChannelItem({ name: "CATV:C19", type: "BS4K", channel: "C19", route: "CATV" });
+      const remote = fakeDevice(0, ["BS4K"], ["CATV"], {
+        isRemote: true,
+        getRemoteChannel: async () => ({ type: "BS4K", channel: "C19", services: [{ id: 1, serviceId: 101, networkId: 11, streamId: 45168, tsmfRelTs: 1, format: "tlv" }] })
+      });
+      const t = tuner([remote]);
+      const scans = [];
+      mock.method(t, "_scanServices", async (ch, userReq, format, detect, relTs, notTSMF, options) => (scans.push([format, relTs, options.devices]), [{ networkId: 11, serviceId: 101, streamId: 45168 }]));
+      const streams = await t.scanChannel(channel, {}, [remote]);
+      assert.deepStrictEqual(scans, [["tlv", 1, [remote]]]);
+      assert.deepStrictEqual(streams.map(({ relTs, format, services }) => [relTs, format, services.map(service => service.serviceId)]), [[1, "tlv", [101]]]);
+
+      // not detected by the remote Mirakurun: the stream as received, as before
+      remote.getRemoteChannel = async () => ({ type: "BS4K", channel: "C19", services: [{ id: 1, serviceId: 101, networkId: 11, streamId: 45168 }] });
+      scans.length = 0;
+      await t.scanChannel(channel, {}, [remote]);
+      assert.deepStrictEqual(scans.map(([format, relTs]) => [format, relTs]), [["tlv", undefined]]);
+    });
+
     // リモートの Mirakurun の対応をまだ確かめられない場合は、リモートが判別した相対 TS を受信したままのストリームで置き換えない
     it("keeps the relative streams detected by the remote Mirakurun until its support is checked", async () => {
       setupChannels([{ name: "4K", type: "BS4K", route: "CATV", channel: "C19" }]);
