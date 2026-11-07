@@ -297,7 +297,7 @@ A service is associated with the channels by the stream received (`networkId` an
 | `6`, `7` | CS |
 | `1`, `3`, `10` | SKY |
 | TLV (MMT) | BS4K |
-| `0x7880`-`0x7FE8` (terrestrial), the networks of CATV (`0xFFF7`-`0xFFFF`, such as the community channels) | GR |
+| `0x7880`-`0x7FE8` (terrestrial), the networks of CATV (`0xFFF7`, `0xFFF9`, `0xFFFA`, `0xFFFD`, `0xFFFE`, `0xFFFF`, such as the community channels) | GR |
 
 The streams of the other networks are not added.
 
@@ -308,7 +308,7 @@ The channels to scan (`source`):
     - SAT: `BS01_0`-`BS23_3`, `CS2`-`CS24`
     - CATV: `C13`-`C63`, `13`-`62`
     - HIKARI: `13`-`62`, `BS01_0`-`BS23_3`, `CS2`-`CS24`
-- `dvbConf`: all the channels of the channel config files of dvbv5-zap (`-c`) of the tuners of the route (including the files not for DVB device direct access, such as DVB-C)
+- `dvbConf`: all the channels of the channel config files of dvbv5-zap (`-c`) of the tuners used for the scan (including the files not for DVB device direct access, such as DVB-C)
 - `list`: the channels specified (`channels`)
 - `format`: the format of the channel names (`channelNameFormat`, e.g. `C{ch}`) and the range
 

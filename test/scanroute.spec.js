@@ -25,7 +25,7 @@ async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"],
   };
   _.tuner = {
     typeExists: type => types.includes(type),
-    getDvbChannelNames: async () => dvbChannels,
+    getDvbChannelNames: async () => typeof dvbChannels === "function" ? dvbChannels() : dvbChannels,
     scanChannel: async channel => {
       tuned.push({ channel: channel.channel, route: channel.route, type: channel.type });
       return scanChannel(channel);
@@ -117,6 +117,29 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
       { name: "地上 27", type: "GR", channel: "27", isDisabled: false, route: "CATV" }
     ]);
     assert.ok(logs.some(text => /GR "13" is already configured on the route TER, not added/.test(text)));
+  });
+
+  // 互換性のない変更: タイプではなく受信経路でスキャンする
+  it("rejects the type, which is no longer supported", async () => {
+    const result = await runScan({ type: "BS" }, () => []);
+    assert.deepStrictEqual(result.errors.map(e => e.code), [400]);
+    assert.deepStrictEqual(result.tuned, []);
+    assert.strictEqual(result.saved, undefined);
+  });
+
+  // 準備中に中止を要求されて開始しなかった場合も、中止の要求を次のスキャンに残さない
+  it("does not keep the cancellation requested while preparing a scan not started", async () => {
+    let result = await runScan({ route: "CATV", source: "dvbConf" }, () => [], {
+      dvbChannels: () => {
+        scan.del({}, { status() {}, setHeader() {}, json() {} });
+        return [];
+      }
+    });
+    assert.deepStrictEqual(result.errors.map(e => e.code), [400]);
+
+    result = await runScan({ route: "CATV", source: "list", channels: ["C13"], refresh: true }, () => [{ format: "ts", services: [service(0xFFFE, 1, "ケーブル")] }]);
+    assert.deepStrictEqual(result.tuned.map(t => t.channel), ["C13"]);
+    assert.ok(result.saved.some(item => item.name === "ケーブル"));
   });
 
   it("uses the tuners of any type of the route", async () => {

@@ -297,7 +297,7 @@ Web UI の「Channel Scan」(`PUT /api/config/channels/scan`) は、受信経路
 | `6`, `7` | CS |
 | `1`, `3`, `10` | SKY |
 | TLV (MMT) | BS4K |
-| `0x7880`~`0x7FE8` (地上波)、CATV のネットワーク (`0xFFF7`~`0xFFFF`、自主放送など) | GR |
+| `0x7880`~`0x7FE8` (地上波)、CATV のネットワーク (`0xFFF7`、`0xFFF9`、`0xFFFA`、`0xFFFD`、`0xFFFE`、`0xFFFF`。自主放送など) | GR |
 
 それ以外のネットワークのストリームは追加しません。
 
@@ -308,7 +308,7 @@ Web UI の「Channel Scan」(`PUT /api/config/channels/scan`) は、受信経路
     - SAT: `BS01_0`~`BS23_3`、`CS2`~`CS24`
     - CATV: `C13`~`C63`、`13`~`62`
     - HIKARI: `13`~`62`、`BS01_0`~`BS23_3`、`CS2`~`CS24`
-- `dvbConf`: 受信経路のチューナーの dvbv5-zap のチャンネル設定ファイル (`-c`) のすべてのチャンネル (DVB-C など、直接操作できないチャンネル設定ファイルも含む)
+- `dvbConf`: スキャンに使うチューナーの dvbv5-zap のチャンネル設定ファイル (`-c`) のすべてのチャンネル (DVB-C など、直接操作できないチャンネル設定ファイルも含む)
 - `list`: 指定したチャンネル (`channels`)
 - `format`: チャンネル名の書式 (`channelNameFormat`、例: `C{ch}`) と範囲
 

@@ -881,8 +881,21 @@ export const put: Operation = async (req, res) => {
         return;
     }
 
+    // the scan is not started (the cancellation requested while preparing is also reset)
+    const reject = (reason: string): void => {
+        scanStatus.isScanning = false;
+        isCancellationRequested = false;
+        api.responseError(res, 400, reason);
+    };
+
     // Set scanning flag
     scanStatus.isScanning = true;
+
+    // the scan by the type is replaced by the scan by the route (the type is decided by the network of each stream)
+    if (req.query.type !== undefined) {
+        reject("`type` is no longer supported, specify `route` (the type is decided by the network of each stream)");
+        return;
+    }
 
     // Extract query parameters
     const asyncMode = Boolean(req.query.async);
@@ -895,9 +908,9 @@ export const put: Operation = async (req, res) => {
     // Parse skipCh parameter (the names)
     const skipCh = toList(req.query.skipCh);
 
-    if (getScanChannelType(route) === null) {
-        scanStatus.isScanning = false;
-        api.responseError(res, 400, `No tuners for the route ${route}`);
+    const scanType = getScanChannelType(route);
+    if (scanType === null) {
+        reject(`No tuners for the route ${route}`);
         return;
     }
 
@@ -906,7 +919,7 @@ export const put: Operation = async (req, res) => {
         route,
         source,
         channels: toList(req.query.channels),
-        dvbChannels: source === "dvbConf" ? await _.tuner.getDvbChannelNames(route) : undefined,
+        dvbChannels: source === "dvbConf" ? await _.tuner.getDvbChannelNames(route, scanType) : undefined,
         channelNameFormat: req.query.channelNameFormat as string,
         startCh: req.query.minCh !== undefined ? Number(req.query.minCh) : undefined,
         endCh: req.query.maxCh !== undefined ? Number(req.query.maxCh) : undefined,
@@ -921,8 +934,7 @@ export const put: Operation = async (req, res) => {
 
     // Handle missing scan configuration
     if (!scanConfig) {
-        scanStatus.isScanning = false;
-        api.responseError(res, 400, source === "dvbConf" ? "No channels in the channel config files of dvbv5 of the tuners" : "Invalid scan configuration");
+        reject(source === "dvbConf" ? "No channels in the channel config files of dvbv5 of the tuners" : "Invalid scan configuration");
         return;
     }
 
@@ -984,7 +996,7 @@ put.apiDoc = {
     summary: "Channel Scan",
     description: `Scans the channels of a receiving route, and decides the type of each stream by its network (original_network_id of the services):
 - \`4\`: BS, \`6\` / \`7\`: CS, \`1\` / \`3\` / \`10\`: SKY, TLV (MMT): BS4K
-- \`0x7880\`-\`0x7FE8\` (terrestrial), and the networks of the cable television (\`0xFFF7\`-\`0xFFFF\`): GR
+- \`0x7880\`-\`0x7FE8\` (terrestrial), and the networks of the cable television (\`0xFFF7\`, \`0xFFF9\`, \`0xFFFA\`, \`0xFFFD\`, \`0xFFFE\`, \`0xFFFF\`): GR
 - The streams of the other networks are not added.
 
 The channels to scan (\`source\`):
@@ -993,7 +1005,7 @@ The channels to scan (\`source\`):
     - SAT: \`BS01_0\`-\`BS23_3\`, \`CS2\`-\`CS24\`
     - CATV: \`C13\`-\`C63\`, \`13\`-\`62\`
     - HIKARI: \`13\`-\`62\`, \`BS01_0\`-\`BS23_3\`, \`CS2\`-\`CS24\`
-- \`dvbConf\`: the channels of the channel config files of dvbv5 of the tuners (DVB device direct access) for the route
+- \`dvbConf\`: the channels of the channel config files of dvbv5-zap (\`-c\`) of the tuners used for the scan
 - \`list\`: the channels of \`channels\`
 - \`format\`: the channels of \`channelNameFormat\` in the range of \`minCh\`-\`maxCh\` (and \`minSubCh\`-\`maxSubCh\` with \`{subch}\`)
 
@@ -1149,7 +1161,7 @@ Entry rewriting specifications:
             }
         },
         400: {
-            description: "Invalid scan configuration, or no tuners for the route",
+            description: "Invalid scan configuration, no tuners for the route, or \`type\` specified (no longer supported)",
             schema: {
                 $ref: "#/definitions/Error"
             }

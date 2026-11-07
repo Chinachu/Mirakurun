@@ -387,13 +387,10 @@ export class Tuner {
         return streams;
     }
 
-    /** the channels of the channel config files of dvbv5 of the tuners for the route (DVB device direct access, in the order of the files) */
-    async getDvbChannelNames(route: apid.ChannelRoute): Promise<string[]> {
+    /** the channels of the channel config files of dvbv5-zap of the tuners of the type for the route (in the order of the files) */
+    async getDvbChannelNames(route: apid.ChannelRoute, type: apid.ChannelType): Promise<string[]> {
         const names = new Set<string>();
-        for (const device of this._devices) {
-            if (device.config.routes && device.config.routes.includes(route) === false) {
-                continue;
-            }
+        for (const device of this._getDevicesByType(type, route)) {
             const deviceNames = await device.getDvbChannelNames(route).catch(err => {
                 log.warn("Tuner: the channel config file of TunerDevice#%d is not read (%s)", device.index, err.message);
                 return null;
