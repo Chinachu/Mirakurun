@@ -225,6 +225,30 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     assert.strictEqual(t.getOutputFormat([{ channel, relTs: 2 }, { channel, relTs: 5 }], "tlv"), "tlv");
   });
 
+  it("scans again in the format detected with the tuner (not the user of the first scan)", async () => {
+    const channel = new ChannelItem({ name: "GR", type: "GR", channel: "27" });
+    _.channel = { get: () => channel, getStreams: () => [], setStreams: () => {} };
+    const filters = [];
+    const device = {
+      index: 0, config: { name: "t", types: ["GR"], tlvToTsDecoder: "mmt2ts" }, isRemote: false, isAvailable: true, isFree: true, users: [], channel: null,
+      decoder: null, getPriority: () => -2,
+      async startStream(user, filter) {
+        this.channel = channel;
+        filters.push(filter);
+      }
+    };
+    const t = Object.create(Tuner.prototype);
+    t._devices = [device];
+    t._startFormatProbe = () => ({ detected: Promise.resolve({ format: "tlv", tsmf: null }), tsmf: true, end: () => {} });
+    const scanned = t.getServices(channel);
+    while (filters.length < 2) {
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    filters[1].close();
+    await assert.rejects(scanned, /stream has closed before get network/);
+    assert.strictEqual(filters[1].constructor.name, "TLVFilter");
+  });
+
   describe("service scan", () => {
     const detected = [
       { relTs: 2, slots: 24, format: "ts", streamId: 18801, networkId: 4 },

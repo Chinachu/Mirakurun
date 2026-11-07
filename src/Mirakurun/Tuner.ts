@@ -387,7 +387,8 @@ export class Tuner {
                     resolve(this._scanTSMFServices(channel, userReq, tsmf));
                 } else if (retryFormat !== null) {
                     // the tuner is kept tuned for a while, the stream of the scan joins it
-                    resolve(this._scanServices(channel, userReq, retryFormat, false));
+                    // (`streamInfo` is defined on the user of each stream)
+                    resolve(this._scanServices(channel, { ...userReq, streamSetting: { ...userReq.streamSetting } }, retryFormat, false));
                 } else if (network.networkId === -1) {
                     reject(new Error("stream has closed before get network"));
                 } else if (services === null) {
