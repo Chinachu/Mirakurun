@@ -323,7 +323,8 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
 
     function scanner(tsmf, detectDelay) {
       const t = Object.create(Tuner.prototype);
-      t._devices = [];
+      // the local tuner detected
+      t._devices = [{ config: { name: "4k", types: ["BS"], tlvToTsDecoder: "mmt2ts" }, isRemote: false }];
       t.scans = [];
       t._initTS = async (user, dest, candidates) => {
         const { relTs, format } = candidates[0];
@@ -368,8 +369,45 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
         assert.deepStrictEqual(t.scans.map(({ relTs, format }) => [relTs, format]), [[undefined, "ts"], [2, "ts"], [5, "tlv"], [9, "ts"]]);
         const relTsScans = t.scans.slice(1);
         assert.ok(Math.max(...relTsScans.map(s => s.startedAt)) <= Math.min(...relTsScans.map(s => s.closedAt)));
-        assert.deepStrictEqual(saved, [detected]);
+        // the stream of the services scanned is saved, the one of the TSMF header only without services
+        assert.deepStrictEqual(saved, [[
+          { ...detected[0], networkId: 4, streamId: 2 },
+          { ...detected[1], networkId: 4, streamId: 5 },
+          detected[2]
+        ]]);
       }
+    });
+
+    it("keeps the relative streams detected when the scan does not detect, and replaces them when the detection finds no TSMF", async () => {
+      const detecting = { config: { name: "4k", types: ["BS"], tlvToTsDecoder: "mmt2ts" }, isRemote: false };
+      const remote = { config: { name: "remote", types: ["BS"] }, isRemote: true };
+      for (const [probe, devices, replaced] of [
+        [null, [remote, detecting], false],
+        [{ detected: Promise.resolve({ format: "ts", tsmf: null }), tsmf: true, end: () => {} }, [detecting], true],
+        // no tuners detect any longer (the relative streams detected cannot be received by the remote tuners)
+        [null, [remote], true]
+      ]) {
+        const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV" });
+        let streams = detected.map(({ networkId, streamId, format, relTs, slots }) => ({ networkId, streamId, format, relTs, slots }));
+        _.channel = { get: () => channel, getStreams: () => streams, setStreams: (item, list) => streams = list };
+        const t = scanner(null, 0);
+        t._devices = devices;
+        // the tuners only for TS (or the remote tuners) do not detect
+        t._startFormatProbe = () => probe;
+        const services = await t.getServices(channel);
+        assert.deepStrictEqual(services.map(s => s.serviceId), [100]);
+        assert.strictEqual(streams.length === 1, replaced, JSON.stringify(streams));
+      }
+    });
+
+    it("keeps the stream received before for the relative stream whose scan has failed", async () => {
+      const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV" });
+      // relTs 9 was received as TS before, its scan fails this time
+      let streams = [{ networkId: 4, streamId: 9, format: "ts", relTs: 9, slots: 8 }];
+      _.channel = { get: () => channel, getStreams: () => streams, setStreams: (item, list) => streams = list };
+      const tlv9 = detected.map(stream => stream.relTs === 9 ? { ...stream, format: "tlv" } : stream);
+      await scanner(tlv9, 0).getServices(channel);
+      assert.deepStrictEqual(streams.find(stream => stream.relTs === 9), { networkId: 4, streamId: 9, format: "ts", relTs: 9, slots: 8 });
     });
 
     it("fails when no relative streams have services", async () => {
