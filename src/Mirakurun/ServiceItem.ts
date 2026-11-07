@@ -232,8 +232,9 @@ export default class ServiceItem {
         return ret;
     }
 
-    getStream(userRequest: common.UserRequest, output: stream.Writable): Promise<common.StreamFilter> {
-        return _.tuner.initServiceStream(this, userRequest, output);
+    /** @param targets the channels to receive the service (default: `targets`) */
+    getStream(userRequest: common.UserRequest, output: stream.Writable, targets: StreamTarget[] = this.targets): Promise<common.StreamFilter> {
+        return _.tuner.initServiceStream(this, userRequest, output, targets);
     }
 
     getOrder(): number {

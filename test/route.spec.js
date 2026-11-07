@@ -328,6 +328,64 @@ describe("[route.spec] route / streamId", () => {
     assert.deepStrictEqual(ordered(), [b, a]);
   });
 
+  describe("API: the stream of a service on a channel", () => {
+    // GR27 と GR28 (中継局) が同じストリームを受信できる
+    async function setupRelay() {
+      setupChannels([
+        { name: "GR27", type: "GR", channel: "27" },
+        { name: "GR28", type: "GR", channel: "28" }
+      ]);
+      fs.writeFileSync(process.env.CHANNELS_DB_PATH, JSON.stringify([
+        { __integrity__: "test" },
+        { type: "GR", channel: "27", streams: [{ networkId: 32752, streamId: 32752, format: "ts" }] },
+        { type: "GR", channel: "28", streams: [{ networkId: 32752, streamId: 32752, format: "ts" }] }
+      ]));
+      fs.writeFileSync(process.env.SERVICES_DB_PATH, JSON.stringify([
+        { __integrity__: "test" },
+        { id: 3275201024, serviceId: 1024, networkId: 32752, streamId: 32752, name: "A", type: 1, channel: { type: "GR", channel: "27" } }
+      ]));
+      await _.channel.load();
+      await _.service.load();
+    }
+
+    function request(type, channel, id) {
+      const req = new EventEmitter();
+      Object.assign(req, { method: "GET", params: { type, channel, id }, query: {}, ip: "127.0.0.1", url: "/", socket: { remotePort: 1 }, get: () => undefined });
+      const res = {
+        socket: { _writableState: {}, setNoDelay: () => {} },
+        writableHighWaterMark: 0,
+        statusCode: 200,
+        setHeader: () => {},
+        status(code) { this.statusCode = code; return this; },
+        end: () => {}
+      };
+      return { req, res };
+    }
+
+    it("receives the service on the channel requested, not on the other channel carrying the same stream", async () => {
+      await setupRelay();
+      let formatTargets;
+      let streamTargets;
+      _.tuner = {
+        typeExists: () => true,
+        getOutputFormat: targets => (formatTargets = targets, "ts"),
+        initServiceStream: (service, userReq, output, targets) => (streamTargets = targets, new Promise(() => {}))
+      };
+      const { get } = require("../lib/Mirakurun/api/channels/{type}/{channel}/services/{id}/stream");
+
+      const { req, res } = request("GR", "28", 3275201024);
+      get(req, res);
+      await flush();
+
+      const gr28 = _.channel.get("GR", "28");
+      assert.deepStrictEqual(formatTargets.map(target => target.channel), [gr28]);
+      assert.deepStrictEqual(streamTargets.map(target => target.channel), [gr28]);
+
+      // /api/services/{id}/stream は、どちらのチャンネルでも受信する
+      assert.deepStrictEqual(_.service.get(32752, 1024).targets.map(target => target.channel.channel), ["27", "28"]);
+    });
+  });
+
   describe("Tuner: sharing bonded carriers", () => {
     it("warns tsmfGroupId without tsmfRelTs, which is not bonded", () => {
       const warn = mock.method(log, "warn", () => {});

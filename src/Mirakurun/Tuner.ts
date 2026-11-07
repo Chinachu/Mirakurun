@@ -278,8 +278,9 @@ export class Tuner {
         }, output, [this._getCandidate(channel, relTs)]);
     }
 
-    initServiceStream(service: ServiceItem, userReq: common.UserRequest, output: Writable): Promise<common.StreamFilter> {
-        const candidates = this._getCandidates(service.targets);
+    /** @param targets the channels to receive the service (default: `targets` of the service) */
+    initServiceStream(service: ServiceItem, userReq: common.UserRequest, output: Writable, targets: StreamTarget[] = service.targets): Promise<common.StreamFilter> {
+        const candidates = this._getCandidates(targets);
         return this._initTS({
             ...userReq,
             streamSetting: {

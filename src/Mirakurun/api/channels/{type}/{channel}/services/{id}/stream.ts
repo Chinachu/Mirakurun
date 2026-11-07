@@ -67,12 +67,14 @@ export const get: Operation = (req, res) => {
     const reqId = req.params.id as any as number;
     const service = _.service.findByChannel(channel).find(sv => (sv.id === reqId || sv.serviceId === reqId));
 
-    if (!service) {
+    // receives the service on the channel requested (not on the other channels carrying the same stream)
+    const targets = service?.targets.filter(target => target.channel === channel) || [];
+    if (targets.length === 0) {
         api.responseError(res, 404);
         return;
     }
 
-    api.responseStream(req, res, service.targets, userReq => service.getStream(userReq, res));
+    api.responseStream(req, res, targets, userReq => service.getStream(userReq, res, targets));
 };
 
 get.apiDoc = {
