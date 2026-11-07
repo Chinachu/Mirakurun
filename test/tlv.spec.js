@@ -1,8 +1,9 @@
-const { describe, it, before, beforeEach, after } = require("node:test");
+const { describe, it, before, beforeEach, after, mock } = require("node:test");
 const assert = require("assert");
 const http = require("http");
 const path = require("path");
 const { Writable, PassThrough } = require("stream");
+const child_process = require("child_process");
 const { EventEmitter } = require("events");
 const express = require("express");
 
@@ -245,6 +246,28 @@ describe("[tlv.spec] TLV (MMT)", () => {
         assert.strictEqual(decoder._deadCount, 1);
         assert.strictEqual(output.writableEnded, false);
       } finally {
+        decoder.end();
+      }
+    });
+
+    // 4.3.0 と同じく、出力しないまま強制終了したプロセスは 2 回分の失敗として数える (2 回目のタイムアウトでパススルー)
+    it("passes through the input after the process does not respond twice", { timeout: 20000 }, async () => {
+      const chunks = [];
+      const output = new Writable({ write: (chunk, encoding, callback) => { chunks.push(chunk); callback(); } });
+      let spawned = 0;
+      const spawn = child_process.spawn;
+      mock.method(child_process, "spawn", (...args) => (++spawned, spawn(...args)));
+      const decoder = new TSDecoder({ output, command: `"${process.execPath}" -e "setInterval(() => {}, 1000)"`, withArgs: true, startupTimeout: 200 });
+      const timer = setInterval(() => decoder.write(Buffer.from("ts")), 50);
+      try {
+        while (chunks.length === 0) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        assert.strictEqual(spawned, 2);
+        assert.strictEqual(Buffer.concat(chunks).toString().startsWith("ts"), true);
+      } finally {
+        clearInterval(timer);
+        mock.restoreAll();
         decoder.end();
       }
     });

@@ -89,6 +89,9 @@ export default class TSDecoder extends stream.Writable {
             this._isNew = false;
             this._timeout = setTimeout(() => {
                 log.warn("TSDecoder#%d process will force killed because no respond...", this._id);
+                // counted as 2 failures as before (the process killed was also counted when it closed),
+                // falls back (or closes the stream) after 2 timeouts
+                ++this._deadCount;
                 this._dead();
             }, this._startupTimeout);
         }
