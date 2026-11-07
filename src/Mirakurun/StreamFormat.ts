@@ -59,11 +59,15 @@ export interface TSMFStream {
 /**
  * the relative streams of TSMF by the TSMF headers
  * (decided by 2 headers in a row of continuity_counter with the same contents, the frame of the channel tuned before may remain)
- * @returns `null` if not TSMF
+ * @param multiCarrier `false` to treat the frames of multiple carriers as not TSMF (they cannot be received)
+ * @returns `null` if not TSMF, `[]` if TSMF but not decided (packets lost)
  */
-export function detectTSMFStreams(data: Buffer): TSMFStream[] | null {
+export function detectTSMFStreams(data: Buffer, multiCarrier = true): TSMFStream[] | null {
     let parseTSMFHeader: typeof import("./TSMFTLV").parseTSMFHeader = null;
-    let last: { cc: number, key: string } = null;
+    let last: { cc: number, key: string, pos: number, slotMap: number[] } = null;
+    let found = false;
+    /** decided by the headers, the frame between them has lost packets to verify TLV */
+    let decided: TSMFStream[] = null;
     for (let i = 0; i + TS_PACKET_SIZE <= data.length; i++) {
         if (data[i] !== 0x47 || (((data[i + 1] & 0x1F) << 8) | data[i + 2]) !== 0x2F) {
             continue;
@@ -71,11 +75,17 @@ export function detectTSMFStreams(data: Buffer): TSMFStream[] | null {
         // keep the module of TSMF out of the path without TSMF
         parseTSMFHeader ??= (require("./TSMFTLV") as typeof import("./TSMFTLV")).parseTSMFHeader;
         const packet = data.subarray(i, i + TS_PACKET_SIZE);
+        // frame_sync: the headers broken (CRC) by the reception are TSMF but not decided
+        const frameSync = ((packet[4] << 8) | packet[5]) & 0x1FFF;
+        if (frameSync === 0x1A86 || frameSync === 0x0579) {
+            found = true;
+        }
         const header = parseTSMFHeader(packet);
         if (header === null) {
             last = null;
             continue;
         }
+        const pos = i;
         i += TS_PACKET_SIZE - 1;
 
         const payload = packet.subarray(4);
@@ -96,13 +106,57 @@ export function detectTSMFStreams(data: Buffer): TSMFStream[] | null {
         }
 
         const cc = packet[3] & 0x0F;
-        const key = JSON.stringify(streams);
+        const key = JSON.stringify([header.numberOfCarriers, streams]);
         if (last !== null && cc === ((last.cc + 1) & 0x0F) && key === last.key) {
-            return streams;
+            if (multiCarrier === false && header.numberOfCarriers > 1) {
+                return null;
+            }
+            // the frame between the headers (header + 52 slots) without the packets lost, of the slots of the header before it
+            if (pos - last.pos === (last.slotMap.length + 1) * TS_PACKET_SIZE) {
+                verifyTLV(data, last.pos, last.slotMap, streams);
+                return streams;
+            }
+            if (streams.some(stream => stream.format === "tlv") === false) {
+                return streams;
+            }
+            // TLV is verified by a later frame without the packets lost
+            decided ??= streams;
         }
-        last = { cc, key };
+        last = { cc, key, pos, slotMap: header.slotMap };
     }
-    return null;
+    return decided ?? (found ? [] : null);
+}
+
+/**
+ * TLV of TSMF is carried on PID 0x2D, the relative stream of stream_type TLV is TS if its packets in the frame are of the other PIDs
+ * (stream_type is reserved in TSMF before extended)
+ */
+function verifyTLV(data: Buffer, headerPos: number, slotMap: number[], streams: TSMFStream[]): void {
+    for (const stream of streams) {
+        if (stream.format !== "tlv") {
+            continue;
+        }
+        let tlv = 0;
+        let other = 0;
+        for (let slot = 0; slot < slotMap.length; slot++) {
+            if (slotMap[slot] !== stream.relTs) {
+                continue;
+            }
+            const p = headerPos + TS_PACKET_SIZE * (slot + 1);
+            const pid = ((data[p + 1] & 0x1F) << 8) | data[p + 2];
+            if (data[p] !== 0x47 || pid === 0x1FFF) {
+                continue;
+            }
+            if (pid === 0x2D) {
+                tlv++;
+            } else {
+                other++;
+            }
+        }
+        if (tlv === 0 && other > 0) {
+            stream.format = "ts";
+        }
+    }
 }
 
 /**

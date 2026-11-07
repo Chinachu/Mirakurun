@@ -86,7 +86,35 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
       { relTs: 2, slots: 24, format: "ts", streamId: 18801, networkId: 4 },
       { relTs: 3, slots: 24, format: "ts", streamId: 18803, networkId: 4 }
     ]);
-    assert.strictEqual(detectTSMFStreams(header(streams, 0)), null);
+    // TSMF but not decided by a header (packets lost), or by the headers broken (CRC)
+    assert.deepStrictEqual(detectTSMFStreams(header(streams, 0)), []);
+    const broken = [0, 1, 2].map(cc => {
+      const p = header(streams, cc);
+      p[100] ^= 0xFF;
+      return p;
+    });
+    assert.deepStrictEqual(detectTSMFStreams(Buffer.concat(broken)), []);
+    assert.strictEqual(detectTSMFStreams(Buffer.alloc(188 * 10)), null);
+  });
+
+  it("detects TS for the relative stream of stream_type TLV whose packets are not of TLV (TSMF before extended)", () => {
+    const streams = [[2, 26, true, 18801, 4], [5, 26, true, 45168, 11]];
+    // the slots in the order of header() (relTs 2 x 26, relTs 5 x 26)
+    const slotMap = [...new Array(26).fill(2), ...new Array(26).fill(5)];
+    const packet = pid => Buffer.from([0x47, pid >> 8, pid & 0xFF, 0x10, ...new Array(184).fill(0xFF)]);
+    // relTs 2: TS (PID 0x100), relTs 5: TLV (PID 0x2D)
+    const frame = cc => [header(streams, cc), ...slotMap.map(relTs => packet(relTs === 2 ? 0x100 : 0x2D))];
+    const formats = list => list.map(({ relTs, format }) => [relTs, format]);
+    assert.deepStrictEqual(formats(detectTSMFStreams(Buffer.concat([...frame(0), ...frame(1)]))), [[2, "ts"], [5, "tlv"]]);
+    // a later frame without the packets lost verifies (a packet lost in the first frame)
+    const lost = frame(0);
+    lost.splice(3, 1);
+    assert.deepStrictEqual(formats(detectTSMFStreams(Buffer.concat([...lost, ...frame(1), ...frame(2)]))), [[2, "ts"], [5, "tlv"]]);
+    // the slots of the frame are of the header before it (the order of the slots of the next header may differ)
+    const reversed = [streams[1], streams[0]];
+    assert.deepStrictEqual(formats(detectTSMFStreams(Buffer.concat([...frame(0), header(reversed, 1)]))), [[2, "ts"], [5, "tlv"]]);
+    // the packets lost (or the slots empty) do not decide
+    assert.deepStrictEqual(formats(detectTSMFStreams(Buffer.concat([header(streams, 0), header(streams, 1)]))), [[2, "tlv"], [5, "tlv"]]);
   });
 
   it("uses the relative stream of the most slots without specifying, the smaller number if the same", () => {
@@ -205,6 +233,42 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
       const probe = t._startFormatProbe({ id: "scan", priority: -1, streamSetting });
       assert.strictEqual(probe.tsmf, tsmfRelTs === undefined);
       assert.deepStrictEqual(await probe.detected, expected);
+    }
+  });
+
+  it("does not decide by the headers not in a row, nor by the frames of multiple carriers", async () => {
+    _.channel = { getStreams: () => [] };
+    const streams = [[2, 24, false, 18801, 4], [5, 28, true, 45168, 11]];
+    const nullPackets = n => Buffer.concat(Array.from({ length: n }, () => Buffer.from([0x47, 0x1F, 0xFF, 0x10, ...new Array(184).fill(0xFF)])));
+    const multiCarrier = p => {
+      const payload = p.subarray(4);
+      payload[2] = (payload[2] & 0xF0) | 0x02;
+      payload[124] = 2;
+      payload.writeUInt32BE(crc32(payload.subarray(0, 180)), 180);
+      return p;
+    };
+    // 判別は 64KB を読み飛ばした後の 64KB で行う (continuity_counter が毎回飛ぶ: パケットの欠落)
+    for (const [data, expected] of [
+      [Buffer.concat(Array.from({ length: 1400 }, (_, i) => header(streams, i * 2))), null],
+      [Buffer.concat(Array.from({ length: 1400 }, (_, i) => multiCarrier(header(streams, i)))), { format: "ts", tsmf: null }],
+      // a header of multiple carriers of the channel tuned before remains
+      // (the first 64KB are skipped, the header is right after them)
+      [Buffer.concat([nullPackets(349), multiCarrier(header(streams, 0)), ...Array.from({ length: 1400 }, (_, i) => header(streams, 3 + i))]), { format: "ts", tsmf: [
+        { relTs: 2, slots: 24, format: "ts", streamId: 18801, networkId: 4 },
+        { relTs: 5, slots: 28, format: "tlv", streamId: 45168, networkId: 11 }
+      ] }]
+    ]) {
+      const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV" });
+      const streamSetting = { channel };
+      const device = {
+        config: { name: "t", types: ["BS"], tlvToTsDecoder: "mmt2ts" }, isRemote: false, users: [{ id: "scan", streamSetting }],
+        async startStream(user, sink) {
+          setImmediate(() => sink.write(data));
+        }
+      };
+      const t = Object.create(Tuner.prototype);
+      t._devices = [device];
+      assert.deepStrictEqual(await t._startFormatProbe({ id: "scan", priority: -1, streamSetting }).detected, expected);
     }
   });
 

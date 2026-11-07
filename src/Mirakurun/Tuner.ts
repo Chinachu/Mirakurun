@@ -546,7 +546,12 @@ export class Tuner {
         const relTs = user.streamSetting.channel.tsmfRelTs;
         let tsmf: TSMFStream[] = null;
         const probe = new FormatProbe(relTs ? data => detectTSMFStreamFormat(data, relTs) : data => {
-            tsmf = detectTSMFStreams(data);
+            tsmf = detectTSMFStreams(data, false);
+            if (tsmf !== null && tsmf.length === 0) {
+                // TSMF but not decided, not to replace the relative streams detected before
+                tsmf = null;
+                return null;
+            }
             return tsmf === null ? detectStreamFormat(data) : "ts";
         });
         const detected = probe.detect(DETECT_TIMEOUT).then(format => {
