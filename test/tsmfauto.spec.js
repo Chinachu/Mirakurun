@@ -522,8 +522,8 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
       t._devices = [{ config: { name: "4k", types: ["BS"], tlvToTsDecoder: "mmt2ts" }, isRemote: false }];
       t.scans = [];
       t._initTS = async (user, dest, candidates) => {
-        const { relTs, format } = candidates[0];
-        const scan = { relTs, format, startedAt: Date.now() };
+        const { relTs, format, devices } = candidates[0];
+        const scan = { relTs, format, devices, startedAt: Date.now() };
         t.scans.push(scan);
         const filter = new EventEmitter();
         filter.closed = false;
@@ -576,6 +576,12 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
       assert.deepStrictEqual((await plain.scanChannel(channel)).map(({ relTs, format, services }) => [relTs, format, services.map(s => s.serviceId)]), [
         [undefined, "ts", [100]]
       ]);
+
+      // the tuners to try (the channel scan tries the tuners of the route one by one)
+      const another = { config: { name: "4k-2", types: ["BS"] }, isRemote: false };
+      plain._devices.push(another);
+      await plain.scanChannel(channel, {}, [another]);
+      assert.deepStrictEqual(plain.scans.at(-1).devices, [another]);
     });
 
     it("detects the format on the local tuners only for TS by the channel scan only", async () => {

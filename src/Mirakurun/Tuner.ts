@@ -152,9 +152,17 @@ export interface ScannedStream {
     numberOfCarriers?: number;
 }
 
+/** the tuners to try a channel by the channel scan, as the type */
+export interface ScanAttempt {
+    type: apid.ChannelType;
+    devices: TunerDevice[];
+}
+
 interface ScanOptions {
     /** detects the format and the relative streams of TSMF on any local tuner (only by the channel scan) */
     anyTuner?: boolean;
+    /** the tuners to receive (only by the channel scan) */
+    devices?: TunerDevice[];
     /** collects the streams scanned */
     streams?: ScannedStream[];
 }
@@ -381,9 +389,9 @@ export class Tuner {
      * scans the services of each stream (each relative stream of TSMF) of a channel for the channel scan (the channel is not registered),
      * the format and the relative streams of TSMF are detected on any local tuner
      */
-    async scanChannel(channel: ChannelItem, user: Partial<common.User> = {}): Promise<ScannedStream[]> {
+    async scanChannel(channel: ChannelItem, user: Partial<common.User> = {}, devices?: TunerDevice[]): Promise<ScannedStream[]> {
         const streams: ScannedStream[] = [];
-        await this._scanServices(channel, this._getScanUser(channel, user), channel.getFormat(channel.tsmfRelTs), true, channel.tsmfRelTs, false, { anyTuner: true, streams });
+        await this._scanServices(channel, this._getScanUser(channel, user), channel.getFormat(channel.tsmfRelTs), true, channel.tsmfRelTs, false, { anyTuner: true, streams, devices });
         return streams;
     }
 
@@ -401,21 +409,34 @@ export class Tuner {
     }
 
     /**
-     * the types to tune the channels of the route by the channel scan: the types covering all the tuners of the route
-     * (in the order of `types`, a local tuner of multiple types is tried by one of them,
-     * a remote tuner by each of them: the remote Mirakurun receives only the channel of the type configured)
+     * the tuners to try a channel of the route by the channel scan, covering all the tuners of the route (in the order of `types`):
+     * the local tuners of the same types are tried once by the first of the types (they receive the same),
+     * a remote tuner by each of the types (the remote Mirakurun receives only the channel of the type configured)
      */
-    getScanTypes(route: apid.ChannelRoute, types: apid.ChannelType[] = common.channelTypes): apid.ChannelType[] {
-        const covered = new Set<TunerDevice | string>();
-        const scanTypes: apid.ChannelType[] = [];
-        for (const type of types) {
-            const keys = this._getDevicesByType(type, route).map(device => device.isRemote ? `${device.index}:${type}` : device);
-            if (keys.some(key => !covered.has(key))) {
-                scanTypes.push(type);
-                keys.forEach(key => covered.add(key));
+    getScanAttempts(route: apid.ChannelRoute, types: apid.ChannelType[] = common.channelTypes): ScanAttempt[] {
+        const attempts: ScanAttempt[] = [];
+        const groups = new Map<string, ScanAttempt>();
+        for (const device of this._devices) {
+            const deviceTypes = types.filter(type => device.config.types.includes(type));
+            if (deviceTypes.length === 0 || (device.config.routes && device.config.routes.includes(route) === false)) {
+                continue;
+            }
+            if (device.isRemote) {
+                attempts.push(...deviceTypes.map(type => ({ type, devices: [device] })));
+                continue;
+            }
+            const key = deviceTypes.join(",");
+            const group = groups.get(key);
+            if (group) {
+                group.devices.push(device);
+            } else {
+                const attempt = { type: deviceTypes[0], devices: [device] };
+                groups.set(key, attempt);
+                attempts.push(attempt);
             }
         }
-        return scanTypes;
+        // the types in the order (stable)
+        return attempts.sort((a, b) => types.indexOf(a.type) - types.indexOf(b.type));
     }
 
     private _getScanUser(channel: ChannelItem, user: Partial<common.User>): common.User {
@@ -447,7 +468,11 @@ export class Tuner {
         notTSMF = false,
         options: ScanOptions = {}
     ): Promise<apid.Service[]> {
-        const tsFilter = await this._initTS(userReq, undefined, [this._getCandidate(channel, relTs, format)]);
+        const candidate = this._getCandidate(channel, relTs, format);
+        if (options.devices) {
+            candidate.devices = candidate.devices.filter(device => options.devices.includes(device));
+        }
+        const tsFilter = await this._initTS(userReq, undefined, [candidate]);
         // the format is detected by the data of the same tuner, the scan does not wait for it
         const probe = detect ? this._startFormatProbe(userReq, options.anyTuner === true) : null;
         return new Promise<apid.Service[]>((resolve, reject) => {

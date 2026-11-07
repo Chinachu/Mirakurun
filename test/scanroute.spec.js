@@ -26,9 +26,11 @@ async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"],
   };
   _.tuner = {
     typeExists: type => types.includes(type),
-    getScanTypes: (route, order) => scanTypes ? order.filter(type => scanTypes.includes(type)) : order.filter(type => types.includes(type)).slice(0, 1),
+    getScanAttempts: (route, order) => (scanTypes ? order.filter(type => scanTypes.includes(type)) : order.filter(type => types.includes(type)).slice(0, 1))
+      .map(type => ({ type, devices: [`tuner of ${type}`] })),
     getDvbChannelNames: async () => typeof dvbChannels === "function" ? dvbChannels() : dvbChannels,
-    scanChannel: async channel => {
+    scanChannel: async (channel, user, devices) => {
+      assert.deepStrictEqual(devices, [`tuner of ${channel.type}`]);
       tuned.push({ channel: channel.channel, route: channel.route, type: channel.type });
       return scanChannel(channel);
     }

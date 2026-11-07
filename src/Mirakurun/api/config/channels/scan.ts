@@ -19,7 +19,7 @@ import * as apid from "../../../../../api";
 import * as config from "../../../config";
 import * as common from "../../../common";
 import ChannelItem from "../../../ChannelItem";
-import type { ScannedStream } from "../../../Tuner";
+import type { ScanAttempt, ScannedStream } from "../../../Tuner";
 import _ from "../../../_";
 
 /**
@@ -266,13 +266,13 @@ const routeTypes: Record<apid.ChannelRoute, apid.ChannelType[]> = {
 };
 
 /**
- * the types of the channel item to tune a channel for the scan, covering all the tuners of the route
+ * the tuners (and the type of the channel item) to try a channel for the scan, covering all the tuners of the route
  * (such as the tuners of ISDB-T and ISDB-S on HIKARI), the types of the satellite first for the channels named BS / CS
  */
-export function getScanChannelTypes(route: apid.ChannelRoute, channel?: string): apid.ChannelType[] {
+export function getScanAttempts(route: apid.ChannelRoute, channel?: string): ScanAttempt[] {
     const satellite = channel !== undefined && /^(BS|CS)/i.test(channel);
     const order: apid.ChannelType[] = satellite ? ["BS", "CS", "BS4K", "SKY", "GR"] : ["GR", "BS", "CS", "BS4K", "SKY"];
-    return _.tuner.getScanTypes(route, order.filter(type => routeTypes[route].includes(type)));
+    return _.tuner.getScanAttempts(route, order.filter(type => routeTypes[route].includes(type)));
 }
 
 /**
@@ -697,23 +697,23 @@ async function runChannelScan(
             }
 
             // Scan the streams of the channel (the type is decided by the network of each stream),
-            // by the tuners of each type until received (the tuners of the route may receive the different systems)
+            // by the tuners of the route until received (the tuners of the route may receive the different systems)
             let streams: ScannedStream[] = null;
             let lastError: Error = null;
-            for (const scanType of getScanChannelTypes(route, channel)) {
+            for (const attempt of getScanAttempts(route, channel)) {
                 if (isCancellationRequested) {
                     break;
                 }
                 try {
                     streams = await _.tuner.scanChannel(new ChannelItem({
                         name: `${route}:${channel}`,
-                        type: scanType,
+                        type: attempt.type,
                         channel,
                         route
                     }), {
                         id: "Mirakurun:API:channelScan",
                         priority: 1
-                    });
+                    }, attempt.devices);
                     break;
                 } catch (error) {
                     // the error other than no signal is shown (the tuners of the other types may not receive the channel)
@@ -930,7 +930,7 @@ export const put: Operation = async (req, res) => {
     // Parse skipCh parameter (the names)
     const skipCh = toList(req.query.skipCh);
 
-    const scanTypes = getScanChannelTypes(route);
+    const scanTypes = [...new Set(getScanAttempts(route).map(attempt => attempt.type))];
     if (scanTypes.length === 0) {
         reject(`No tuners for the route ${route}`);
         return;
@@ -1038,7 +1038,7 @@ The channels to scan (\`source\`):
 - \`list\`: the channels of \`channels\`
 - \`format\`: the channels of \`channelNameFormat\` in the range of \`minCh\`-\`maxCh\` (and \`minSubCh\`-\`maxSubCh\` with \`{subch}\`)
 
-The tuners of the route are used. The tuners of the different types (such as ISDB-T and ISDB-S) try each channel until received
+The tuners of the route are used. The tuners of the different types (such as ISDB-T and ISDB-S) try each channel until received (the tuners of the same types once)
 (the types of the route: TER: GR, SAT: BS / CS / BS4K / SKY, CATV and HIKARI: any). The remote tuners are tried by each type.
 The relative streams of TSMF are detected on any local tuner.
 A tuner receiving multiple systems should have all the types to receive in \`types\` (such as \`[GR, BS, CS, BS4K]\` for CATV).
