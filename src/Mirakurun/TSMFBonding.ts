@@ -59,6 +59,11 @@ const KEEP_SUPERFRAMES = 2;
 const MAX_AHEAD_SUPERFRAMES = 60;
 /** a carrier is stalled if the others deliver this super frames each without it (about 10 seconds, including starting the tuner) */
 const STALL_SUPERFRAMES = 1200;
+/**
+ * the stream is closed if not aligned while the carriers deliver this super frames each (about 30 seconds),
+ * and the losses have interrupted finding the alignment `ALIGN_MAX_FAILURES` times in a row
+ */
+const ALIGN_TIMEOUT_SUPERFRAMES = 3600;
 
 /** receives the frames of a relative stream from a carrier (one tuner) */
 class CarrierInput {
@@ -196,6 +201,10 @@ export default class TSMFBonding {
     private _received = 0;
     /** `_received` when each carrier delivered a super frame last */
     private _lastReceived: number[] = [];
+    /** `_received` when the alignment was lost */
+    private _unalignedAt = 0;
+    /** the losses since a search of the alignment has finished */
+    private _interruptions = 0;
     /** finding the alignment in the samples of the super frames */
     private _search: { iterator: Iterator<void, number[] | null>, samples: Superframe[][], removed: number[] } = null;
     private _nextSliceAt = 0;
@@ -222,6 +231,9 @@ export default class TSMFBonding {
         const carrier = this._inputs[input];
         const received = carrier.superframes.length;
         carrier.push(chunk);
+        if (this._closed) {
+            return Buffer.alloc(0);
+        }
         carrier.commit();
         if (carrier.superframes.length > received) {
             this._received += carrier.superframes.length - received;
@@ -325,6 +337,7 @@ export default class TSMFBonding {
 
         const { samples, removed } = this._search;
         this._search = null;
+        this._interruptions = 0;
         this._nextAlignAt = Math.min(min + ALIGN_SUPERFRAMES, ALIGN_SAMPLE_SUPERFRAMES);
         const found = result.value;
         if (found === null) {
@@ -469,6 +482,9 @@ export default class TSMFBonding {
     }
 
     private _lost(carrier: CarrierInput): void {
+        if (this._closed) {
+            return;
+        }
         // a lost super frame shifts the alignment of the carrier
         if (this._offsets !== null) {
             const min = Math.min(...this._inputs.map(input => input.superframes.length));
@@ -476,11 +492,22 @@ export default class TSMFBonding {
                 input.lead = input.superframes.length - min;
             }
             this._offsets = null;
+            this._unalignedAt = this._received;
             this._nextAlignAt = ALIGN_SUPERFRAMES;
             for (const input of this._inputs) {
                 input.drop(input.superframes.length);
             }
         } else {
+            // the losses keep interrupting finding the alignment (not by the time to find, which depends on the CPU)
+            // (once for the bytes skipped to resync or the next header of a broken one, the super frames of the carrier have been dropped)
+            if (carrier.superframes.length > 0 || this._search !== null) {
+                ++this._interruptions;
+            }
+            if (this._interruptions >= ALIGN_MAX_FAILURES && this._received - this._unalignedAt > ALIGN_TIMEOUT_SUPERFRAMES * this._inputs.length) {
+                this._closed = true;
+                this._onError("can not align the carriers");
+                return;
+            }
             // the super frames before the loss do not continue to the later ones (aligned by them, the later ones are misaligned)
             carrier.drop(carrier.superframes.length);
         }
@@ -489,6 +516,9 @@ export default class TSMFBonding {
     }
 
     private _fail(reason: string): void {
+        if (this._offsets !== null) {
+            this._unalignedAt = this._received;
+        }
         this._offsets = null;
         this._search = null;
         ++this._failures;

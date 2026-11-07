@@ -235,6 +235,42 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
     assert.ok(matched > tlv.length / 2, `assembled ${matched} of ${tlv.length} TLV packets`);
   });
 
+  const lossCases = {
+    // 200 スーパーフレームごとに 1 つ失う
+    periodic: sf => sf % 200 === 199,
+    none: () => false,
+    // 時間がかかる探索 (遅い CPU) の途中で 1 回だけ失う
+    once: sf => sf === 3700,
+    // 1 つのパケットの同期バイトが壊れる (同期し直すまでの欠落は 1 回と数える)
+    sync: sf => sf === 3700 ? "sync" : false
+  };
+  for (const [losses, lost] of Object.entries(lossCases)) {
+    it(losses === "periodic" ? "reports an error when the losses keep interrupting finding the alignment" : `does not close the stream finding the alignment for long (a slow CPU), losses: ${losses}`, () => {
+      // ずれの候補を 1 回に 1 つだけ調べる (他の搬送波のずれが見込みから外れ、探索に時間がかかる)
+      TSMFBonding.alignSliceMs = 0;
+      // 約 30 秒の後に失うまで受信する
+      const streams = carriers(splitTLV(tlvPackets(3000)), 3, 1, 4200);
+      const starts = [0, 20, 0];
+      const errors = [];
+      const bonding = new TSMFBonding(1, 3, reason => errors.push(reason));
+      for (let sf = 0; sf + 20 < streams[0].length && errors.length === 0; sf++) {
+        for (let c = 0; c < 3; c++) {
+          const loss = c === 2 && lost(sf);
+          if (loss === true) {
+            continue;
+          }
+          const chunk = Buffer.concat(streams[c][starts[c] + sf]);
+          if (loss === "sync") {
+            chunk[188 * 10] = 0x00;
+          }
+          bonding.push(c, chunk);
+        }
+      }
+
+      assert.deepStrictEqual(errors, losses === "periodic" ? ["can not align the carriers"] : []);
+    });
+  }
+
   it("reports an error when a carrier has stalled", () => {
     const tlv = tlvPackets(40000);
     // 他の搬送波は、止まった後も約 10 秒分を受信する
