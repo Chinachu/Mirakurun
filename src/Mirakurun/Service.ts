@@ -102,7 +102,6 @@ export class Service {
 
     private _items: ServiceItem[] = [];
     private _saveTimerId: NodeJS.Timeout;
-    private _pendingTsmfAdd: Set<ChannelItem> = null;
     private _channelIndex: Map<ChannelItem, ServiceItem[]> = null;
 
     get items(): ServiceItem[] {
@@ -259,8 +258,10 @@ export class Service {
         setTimeout(() => this._initJobs(), 10000);
     }
 
+    /** scans the services of a carrier after all the carriers of the group are discovered */
     queueDiscoveredTsmfScan(channel: ChannelItem): void {
-        if (this._pendingTsmfAdd?.has(channel) || channel.getServices().length === 0) {
+        // the services of the TLV are added by the scan to update (`_scan()`)
+        if (channel.getServices().length === 0) {
             this._queueScanToAdd(channel);
         } else {
             this._queueScanToUpdate(channel);
@@ -449,14 +450,12 @@ export class Service {
             throw new Error("Service scan failed");
         }
 
-        const discovered = channel.streams.find(stream => stream.numberOfCarriers > 1);
-        if (discovered && add) {
-            (this._pendingTsmfAdd ??= new Set()).add(channel);
-        }
-        if (discovered && services.some(service => channel.streams.some(stream => stream.format === "tlv" &&
-            stream.networkId === service.networkId && stream.streamId === service.streamId))) {
-            this._pendingTsmfAdd?.delete(channel);
-        }
+        // the TLV of the carriers discovered is scanned after all the carriers are discovered (later than the TS sharing the carrier),
+        // its services are added unless any service of the TLV has been added, even by the scan to update (not kept in memory to survive restarts)
+        // (not for the channels of `serviceId`, only the services specified are added)
+        const serviceIdSpecified = _.config.channels.some(config => config.type === channel.type && config.channel === channel.channel && config.serviceId);
+        const newTlvStreams = serviceIdSpecified ? [] : channel.streams.filter(stream => stream.format === "tlv" && stream.numberOfCarriers > 1 &&
+            this._items.some(item => item.networkId === stream.networkId && item.streamId === stream.streamId) === false);
 
         log.debug("ChannelItem#'%s' services: %s", channel.name, JSON.stringify(services, null, "  "));
 
@@ -470,7 +469,7 @@ export class Service {
                     item.logoId = service.logoId;
                 }
                 item.remoteControlKeyId = service.remoteControlKeyId;
-            } else if (add === true) {
+            } else if (add === true || newTlvStreams.some(stream => stream.networkId === service.networkId && stream.streamId === service.streamId)) {
                 this.add(
                     new ServiceItem(
                         channel,

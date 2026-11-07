@@ -165,7 +165,7 @@ describe("[route.spec] route / streamId", () => {
       assert.strictEqual(queued.mock.callCount(), 2);
     });
 
-    it("scans shared TS immediately and preserves add mode for the deferred TLV scan", async () => {
+    it("scans shared TS immediately and adds the services of the deferred TLV by the scan to update", async () => {
       setupChannels([{ name: "Shared", type: "BS4K", route: "CATV", channel: "C1" }]);
       const channel = _.channel.items[0];
       const streams = [
@@ -186,7 +186,34 @@ describe("[route.spec] route / streamId", () => {
       _.job = { add: job => jobs.push(job) };
       _.service.queueDiscoveredTsmfScan(channel);
       assert.strictEqual(jobs.length, 1);
-      assert.ok(jobs[0].key.startsWith("Service.Add.Scan."));
+      assert.ok(jobs[0].key.startsWith("Service.Update.Scan."));
+
+      // 再起動 (メモリーの状態はない) の後、搬送波がそろって TLV もスキャンした
+      const items = _.service.items;
+      _.service = new Service();
+      _.service._items = items;
+      const tlvService = { networkId: 32752, streamId: 60001, serviceId: 901, name: "8K", type: 1, logoId: -1, remoteControlKeyId: 1 };
+      const tsService = { networkId: 32752, streamId: 60002, serviceId: 701, name: "Example", type: 1, logoId: -1, remoteControlKeyId: 1 };
+      _.tuner = { getServices: async () => [tlvService, { ...tlvService, serviceId: 902 }, tsService] };
+      await _.service._scan(channel, false);
+      assert.deepStrictEqual(channel.getServices().map(service => service.serviceId).sort(), [701, 901, 902]);
+
+      // TLV のサービスが登録された後は、これまでどおり更新のスキャンでは追加しない
+      _.tuner = { getServices: async () => [tlvService, { ...tlvService, serviceId: 903 }, tsService, { ...tsService, serviceId: 702 }] };
+      await _.service._scan(channel, false);
+      assert.deepStrictEqual(channel.getServices().map(service => service.serviceId).sort(), [701, 901, 902]);
+    });
+
+    // channels.yml で serviceId を指定したチャンネルは、指定したサービスだけを登録する
+    it("does not add the services of the TLV discovered on the channels of serviceId", async () => {
+      setupChannels([{ name: "Shared", type: "BS4K", route: "CATV", channel: "C1", serviceId: 701 }]);
+      const channel = _.channel.items[0];
+      channel.setStreams([{ networkId: 32752, streamId: 60001, relTs: 2, format: "tlv", slots: 20, groupId: 9, numberOfCarriers: 3, carrierSequence: 1 }]);
+      const tsService = { networkId: 32752, streamId: 60002, serviceId: 701, name: "Example", type: 1, logoId: -1, remoteControlKeyId: 1 };
+      _.service.add(new (require("../lib/Mirakurun/ServiceItem").default)(channel, 32752, 701, "Example", 1, -1, 1, false, 0, 60002));
+      _.tuner = { getServices: async () => [{ ...tsService, streamId: 60001, serviceId: 901, name: "8K" }, tsService] };
+      await _.service._scan(channel, false);
+      assert.deepStrictEqual(channel.getServices().map(service => service.serviceId), [701]);
     });
 
     for (const count of [1, 2]) {
