@@ -254,15 +254,16 @@ function getMMTPOffset(packet: Buffer): number {
             if (packet.length < 7) {
                 return -1;
             }
-            // CID (12 bits), SN (4 bits), CID_header_type (ARIB STD-B32)
+            // CID (12 bits), SN (4 bits), CID_header_type, the compressed header (ARIB STD-B32 Part 3, 3.7)
             switch (packet[6]) {
-                case 0x21:
-                case 0x61:
+                case 0x20: // the partial IPv4 header (16 bytes) and the partial UDP header (4 bytes)
+                    return 7 + 20;
+                case 0x21: // identification of the IPv4 header (2 bytes)
+                    return 7 + 2;
+                case 0x60: // the partial IPv6 header (38 bytes) and the partial UDP header (4 bytes)
+                    return 7 + 42;
+                case 0x61: // no compressed header
                     return 7;
-                case 0x20:
-                    return 4 + 23;
-                case 0x60:
-                    return 4 + 45;
             }
             return -1;
         }

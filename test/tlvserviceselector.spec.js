@@ -4,13 +4,21 @@ const assert = require("assert");
 let TLVServiceSelector;
 let createMMTTLVReader;
 
-// TLV packet with the compressed IP header (CID_header_type 0x61) and MMTP packet
-function mmtpPacket(packetId, payloadType, payload) {
+// the length of the compressed header of CID_header_type (ARIB STD-B32 Part 3, 3.7)
+const COMPRESSED_HEADER_SIZE = { 0x20: 20, 0x21: 2, 0x60: 42, 0x61: 0 };
+
+// TLV packet with the compressed IP header (CID_header_type 0x61 by default) and MMTP packet
+function mmtpPacket(packetId, payloadType, payload, headerType = 0x61) {
   const mmtp = Buffer.alloc(12);
   mmtp[0] = 0x40;
   mmtp[1] = payloadType;
   mmtp.writeUInt16BE(packetId, 2);
-  const body = Buffer.concat([Buffer.from([0x00, 0x01, 0x61]), mmtp, payload]);
+  // the compressed header is filled with the packet ID dropped, not to be read as MMTP
+  const compressed = Buffer.alloc(COMPRESSED_HEADER_SIZE[headerType]);
+  for (let i = 0; i + 1 < compressed.length; i += 2) {
+    compressed.writeUInt16BE(0x0100, i);
+  }
+  const body = Buffer.concat([Buffer.from([0x00, 0x01, headerType]), compressed, mmtp, payload]);
   const header = Buffer.from([0x7F, 0x03, 0, 0]);
   header.writeUInt16BE(body.length, 2);
   return Buffer.concat([header, body]);
@@ -106,6 +114,17 @@ describe("[tlvserviceselector.spec] TLVServiceSelector", () => {
     const out = Buffer.concat([s.push(data.subarray(0, 50)), s.push(data.subarray(50))]);
 
     assert.deepStrictEqual(out, Buffer.concat([packets[0], packets[2]]));
+  });
+
+  it("reads MMTP after the compressed header of each CID_header_type", () => {
+    for (const headerType of [0x20, 0x21, 0x60, 0x61]) {
+      const kept = mmtpPacket(0x0101, 0x00, Buffer.alloc(10), headerType);
+      const dropped = mmtpPacket(0x0100, 0x00, Buffer.alloc(10), headerType);
+
+      const out = selector().push(Buffer.concat([kept, dropped]));
+
+      assert.deepStrictEqual(out, kept, `CID_header_type 0x${headerType.toString(16)}`);
+    }
   });
 
   it("passes the packets which are not MMTP", () => {
