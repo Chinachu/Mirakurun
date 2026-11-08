@@ -812,6 +812,7 @@ export default class TSFilter extends EventEmitter {
                     networkId: data.original_network_id,
                     serviceId: service.service_id,
                     streamId: data.transport_stream_id,
+                    isFree: service.free_CA_mode === 0,
                     name: name,
                     type: type,
                     logoId: logoId

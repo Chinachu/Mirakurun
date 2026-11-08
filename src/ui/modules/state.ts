@@ -70,6 +70,7 @@ class State extends EventEmitter<StateEventTypes> {
 
     status?: Status;
     services: Service[] = [];
+    private _serviceIndex = new Map<number, Map<number, Service>>();
     tuners: TunerDevice[] = [];
     jobs: JobItem[] = [];
     jobSchedules: JobScheduleItem[] = [];
@@ -94,12 +95,27 @@ class State extends EventEmitter<StateEventTypes> {
         this._setTodayTime();
         this._initRPC();
 
+        this.on("services", services => {
+            this._serviceIndex.clear();
+            for (const service of services) {
+                let network = this._serviceIndex.get(service.networkId);
+                if (!network) {
+                    network = new Map();
+                    this._serviceIndex.set(service.networkId, network);
+                }
+                network.set(service.serviceId, service);
+            }
+        });
         this.on("tuners", () => this._updateIdleStatus());
         this.on("statusIconKey", key => ui.setFavicon(iconSrcMap[key]));
     }
 
     get statusIconSrc() {
         return iconSrcMap[this.statusIconKey];
+    }
+
+    getService(networkId: number, serviceId: number): Service | undefined {
+        return this._serviceIndex.get(networkId)?.get(serviceId);
     }
 
     async fetchStatus(): Promise<Status> {

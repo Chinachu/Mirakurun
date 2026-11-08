@@ -149,6 +149,8 @@ definitions:
         description: Format of the relative TS (tsmfRelTs) when included in Channel.services
       streamId:
         type: integer
+      isFree:
+        type: boolean
       channel:
         $ref: '#/definitions/Channel'
       channels:

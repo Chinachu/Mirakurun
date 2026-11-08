@@ -16,7 +16,8 @@
 import * as React from "react";
 import { useMemo } from "react";
 import * as regexp from "../modules/regexp";
-import { ProgramAttributeMap } from "../modules/constants";;
+import { ProgramAttributeMap, ProgramAttributeClassMap, ProgramAttributeNormalizationMap } from "../modules/constants";
+import { state } from "../modules/state";
 import { Program } from "../../../api.d";
 
 import "./ProgramTitle.sass";
@@ -42,6 +43,9 @@ export const ProgramTitle: React.FC<ProgramTitleProps> = ({ program }) => {
     }
     name = name.replace(regexp.squaredUnicode, "").replace(regexp.legacyAttributeFormat, "");
 
+    // `false` if the service is normally scrambled, `undefined` if unknown
+    const serviceIsFree = program.isFree ? state.getService(program.networkId, program.serviceId)?.isFree : undefined;
+
     const attributes = useMemo(() => {
         const attrSet = new Set<keyof typeof ProgramAttributeMap>();
         const attributeSource = (program.name || "") + (program.description || "");
@@ -50,18 +54,20 @@ export const ProgramTitle: React.FC<ProgramTitleProps> = ({ program }) => {
                 ...attributeSource.match(regexp.enclosedAttributeUnicode) || [],
                 ...attributeSource.match(regexp.legacyAttributeFormat) || [],
             ];
-            if (program.networkId >= 0x01 && program.networkId <= 0x0C && program.isFree) {
+            // 通常有料のサービスで無料の番組 (サービスが分からない場合は従来どおり BS/CS の無料の番組)
+            if (program.isFree && (serviceIsFree === false || (serviceIsFree === undefined && program.networkId >= 0x01 && program.networkId <= 0x0C))) {
                 items.push("無");
             }
             for (const item of items) {
-                const attrKey = item.replace(/[\[\]()［］]/g, "").normalize("NFKC");
+                const normalized = item.replace(/[\[\]()［］]/g, "").normalize("NFKC");
+                const attrKey = ProgramAttributeNormalizationMap[normalized] || normalized;
                 if (ProgramAttributeMap[attrKey]) {
                     attrSet.add(attrKey as any);
                 }
             }
         }
         return [...attrSet];
-    }, [program.name, program.description]);
+    }, [program.name, program.description, program.isFree, serviceIsFree]);
 
     const labels = useMemo(() => {
         const pre: JSX.Element[] = [];
@@ -75,7 +81,7 @@ export const ProgramTitle: React.FC<ProgramTitleProps> = ({ program }) => {
 
             const label = (
                 <span key={`attribute-${attribute}`}
-                    className={`attribute bg-attribute-${attribute}`}
+                    className={`attribute bg-attribute-${ProgramAttributeClassMap[attribute] || attribute}`}
                     title={ProgramAttributeMap[attribute]}>
                     {attribute}
                 </span>

@@ -96,6 +96,34 @@ const StatusSection: React.FC<{ status: Status }> = ({ status }) => {
 
 // --- Services Section ---
 
+const ServiceTooltip: React.FC<{ service: Service }> = ({ service }) => (
+    <div className="service-tooltip">
+        <div>#{service.id}</div>
+        {service.streamId !== undefined && <div>StreamID: 0x{service.streamId.toString(16).toUpperCase()} ({service.streamId})</div>}
+        <div>SID: 0x{service.serviceId.toString(16).toUpperCase()} ({service.serviceId})</div>
+        <div>NID: 0x{service.networkId.toString(16).toUpperCase()} ({service.networkId})</div>
+        <div>Type: 0x{service.type.toString(16).toUpperCase()} ({service.type})</div>
+        {(() => {
+            const channels = service.channels?.length ? service.channels : [service.channel];
+            const groups = new Map<string, { route: string; type: string; channels: string[] }>();
+            for (const channel of channels) {
+                if (!channel) { continue; }
+                const route = channel.route || (channel.type === "GR" ? "TER" : "SAT");
+                const key = `${route}|${channel.type}`;
+                const group = groups.get(key);
+                if (group) {
+                    group.channels.push(channel.channel);
+                } else {
+                    groups.set(key, { route, type: channel.type, channels: [channel.channel] });
+                }
+            }
+            return Array.from(groups.values()).map((group, index) => (
+                <div key={index}>Channel{groups.size > 1 ? ` (${group.route})` : ""}: {group.type} / {group.channels.join(",")}</div>
+            ));
+        })()}
+    </div>
+);
+
 const ServicesSection: React.FC<{
     status: Status;
     services: Service[];
@@ -142,13 +170,7 @@ const ServicesSection: React.FC<{
                     <Tooltip
                         key={service.id}
                         content={
-                            <div className="service-tooltip">
-                                <div>#{service.id}</div>
-                                <div>SID: 0x{service.serviceId.toString(16).toUpperCase()} ({service.serviceId})</div>
-                                <div>NID: 0x{service.networkId.toString(16).toUpperCase()} ({service.networkId})</div>
-                                <div>Type: 0x{service.type.toString(16).toUpperCase()} ({service.type})</div>
-                                <div>Channel: {service.channel?.type} / {service.channel?.channel}</div>
-                            </div>
+                            <ServiceTooltip service={service} />
                         }
                         placement="bottom"
                         hoverOpenDelay={300}
