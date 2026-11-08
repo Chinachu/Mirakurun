@@ -134,13 +134,19 @@ export type ProgramVideoFrameRate = "15" | "23.976" | "24" | "25" | "29.97" | "3
 export type ProgramVideoTransferCharacteristics = "bt709" | "iec61966" | "bt2020" | "bt2100-pq" | "bt2100-hlg";
 
 export type ProgramVideoResolution = (
+    "180i" |
+    "180p" |
+    "240i" |
     "240p" |
     "480i" |
     "480p" |
+    "720i" |
     "720p" |
     "1080i" |
     "1080p" |
+    "2160i" |
     "2160p" |
+    "4320i" |
     "4320p"
 );
 
