@@ -796,7 +796,7 @@ export const ChannelsConfigView: React.FC = () => {
                             <Callout>
                                 {scanRoute === "TER" && "13-62"}
                                 {scanRoute === "SAT" && "BS01_0-BS23_3, CS2-CS24"}
-                                {scanRoute === "CATV" && "C13-C63, 13-62"}
+                                {scanRoute === "CATV" && "1-12, C13-C63, 13-62"}
                                 {scanRoute === "HIKARI" && "13-62, BS01_0-BS23_3, CS2-CS24"}
                             </Callout>
                         )}

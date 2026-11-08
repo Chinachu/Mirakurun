@@ -174,7 +174,7 @@ function formatChannels(format: string, startCh: number, endCh: number, startSub
  * the channels to scan by default for each route (the names of the tuner commands such as recpt1, recisdb)
  * - TER: the terrestrial channels (UHF 13-62)
  * - SAT: the BS (`BS01_0`-`BS23_3`) and CS (`CS2`-`CS24`) channels
- * - CATV: the cable channels (`C13`-`C63`) and the terrestrial channels passed through (13-62)
+ * - CATV: the cable channels (VHF `1`-`12`, `C13`-`C63`) and the terrestrial channels passed through (13-62)
  * - HIKARI: the terrestrial, BS and CS channels passed through
  */
 export function getPresetChannels(route: apid.ChannelRoute): string[] {
@@ -186,7 +186,7 @@ export function getPresetChannels(route: apid.ChannelRoute): string[] {
         case "SAT":
             return satellite;
         case "CATV":
-            return [...formatChannels("C{ch}", 13, 63), ...terrestrial];
+            return [...formatChannels("{ch}", 1, 12), ...formatChannels("C{ch}", 13, 63), ...terrestrial];
         case "HIKARI":
             return [...terrestrial, ...satellite];
     }
@@ -1089,7 +1089,7 @@ The channels to scan (\`source\`):
 - \`preset\`: the channels of the route (the names of the tuner commands such as recpt1, recisdb)
     - TER: \`13\`-\`62\`
     - SAT: \`BS01_0\`-\`BS23_3\`, \`CS2\`-\`CS24\`
-    - CATV: \`C13\`-\`C63\`, \`13\`-\`62\`
+    - CATV: \`1\`-\`12\`, \`C13\`-\`C63\`, \`13\`-\`62\`
     - HIKARI: \`13\`-\`62\`, \`BS01_0\`-\`BS23_3\`, \`CS2\`-\`CS24\`
 - \`dvbConf\`: the channels of the channel config files of dvbv5-zap (\`-c\`) of the tuners used for the scan
 - \`list\`: the channels of \`channels\`

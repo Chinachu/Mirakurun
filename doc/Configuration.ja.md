@@ -306,7 +306,7 @@ Web UI の「Channel Scan」(`PUT /api/config/channels/scan`) は、受信経路
 - `preset`: 受信経路ごとの既定のチャンネル (recpt1 や recisdb などのチャンネル名)
     - TER: `13`~`62`
     - SAT: `BS01_0`~`BS23_3`、`CS2`~`CS24`
-    - CATV: `C13`~`C63`、`13`~`62`
+    - CATV: `1`~`12` (VHF)、`C13`~`C63`、`13`~`62`
     - HIKARI: `13`~`62`、`BS01_0`~`BS23_3`、`CS2`~`CS24`
 - `dvbConf`: スキャンに使うチューナーの dvbv5-zap のチャンネル設定ファイル (`-c`) のすべてのチャンネル (DVB-C など、直接操作できないチャンネル設定ファイルも含む)
 - `list`: 指定したチャンネル (`channels`)

@@ -306,7 +306,7 @@ The channels to scan (`source`):
 - `preset`: the channels of the route (the names of the tuner commands such as recpt1, recisdb)
     - TER: `13`-`62`
     - SAT: `BS01_0`-`BS23_3`, `CS2`-`CS24`
-    - CATV: `C13`-`C63`, `13`-`62`
+    - CATV: `1`-`12` (VHF), `C13`-`C63`, `13`-`62`
     - HIKARI: `13`-`62`, `BS01_0`-`BS23_3`, `CS2`-`CS24`
 - `dvbConf`: all the channels of the channel config files of dvbv5-zap (`-c`) of the tuners used for the scan (including the files not for DVB device direct access, such as DVB-C)
 - `list`: the channels specified (`channels`)
