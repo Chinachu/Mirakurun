@@ -41,7 +41,7 @@ import { channelRoutes, getChannelRouteLabel } from "../modules/constants";
 import "./TunersConfigView.sass";
 
 const configAPI = "/api/config/tuners";
-const typesIndex = ["GR", "BS", "CS", "SKY", "BS4K"];
+const typesIndex = ["GR", "BS", "CS", "SKY", "BS4K", "CATV"];
 const routesIndex: ChannelRoute[] = channelRoutes;
 
 function sortTypes(types: ChannelType[]): ChannelType[] {
@@ -266,7 +266,7 @@ export const TunersConfigView: React.FC = () => {
                                 </td>
                                 <td>
                                     <div className="types-checkboxes">
-                                        {(["GR", "BS", "CS", "SKY", "BS4K"] as ChannelType[]).map((type) => {
+                                        {(["GR", "BS", "CS", "SKY", "BS4K", "CATV"] as ChannelType[]).map((type) => {
                                             const checked = tuner.types?.includes(type) ?? false;
                                             return (
                                                 <Checkbox

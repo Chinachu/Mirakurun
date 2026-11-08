@@ -22,6 +22,7 @@ export const channelTypeMap = {
     CS: "CS",
     SKY: "SKY",
     BS4K: "BS4K",
+    CATV: "CATV",
 };
 
 /** the name of the route (in the order of the routes) */
@@ -37,7 +38,7 @@ export const channelRoutes = Object.keys(channelRouteMap) as ChannelRoute[];
 
 /** the route of the channel without `route` (the same as the server) */
 export function getDefaultChannelRoute(type: ChannelType): ChannelRoute {
-    return type === "GR" ? "TER" : type === "SKY" ? "SKY" : "SAT";
+    return type === "GR" ? "TER" : type === "SKY" ? "SKY" : type === "CATV" ? "CATV" : "SAT";
 }
 
 /** the label of the route with the value of the config (e.g. `地上波 (TER)`, `CATV`) */

@@ -42,7 +42,7 @@ import { channelRoutes, getChannelRouteLabel, getDefaultChannelRoute } from "../
 import "./ChannelsConfigView.sass";
 
 const configAPI = "/api/config/channels";
-const typesIndex = ["GR", "BS", "CS", "SKY", "BS4K"];
+const typesIndex = ["GR", "BS", "CS", "SKY", "BS4K", "CATV"];
 
 function sortTypes(types: ChannelType[]): ChannelType[] {
     return types.sort((a, b) => typesIndex.indexOf(a) - typesIndex.indexOf(b));
@@ -570,7 +570,8 @@ export const ChannelsConfigView: React.FC = () => {
                                             { value: "BS", label: "BS" },
                                             { value: "CS", label: "CS" },
                                             { value: "SKY", label: "SKY" },
-                                            { value: "BS4K", label: "BS4K" }
+                                            { value: "BS4K", label: "BS4K" },
+                                            { value: "CATV", label: "CATV" }
                                         ]}
                                     />
                                 </td>
@@ -764,7 +765,7 @@ export const ChannelsConfigView: React.FC = () => {
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                         <FormGroup
                             label="Route"
-                            helperText="The type of each channel (GR / BS / CS / SKY / BS4K) is decided by the network of the services received."
+                            helperText="The type of each channel (GR / BS / CS / SKY / BS4K / CATV) is decided by the network of the services received."
                         >
                             <HTMLSelect
                                 value={scanRoute}

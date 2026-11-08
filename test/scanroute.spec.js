@@ -72,12 +72,12 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
     assert.deepStrictEqual(tuned, [{ channel: "C13", route: "CATV", type: "GR" }, { channel: "C21", route: "CATV", type: "GR" }]);
     assert.deepStrictEqual(saved, [
       { name: "TER13", type: "GR", channel: "13" },
-      { name: "ケーブル", type: "GR", channel: "C13", isDisabled: false, route: "CATV" },
       { name: "CATV14", type: "GR", channel: "C14", route: "CATV" },
       { name: "BS01", type: "BS", channel: "BS01_0" },
       { name: "CATVBS", type: "BS", channel: "C14", route: "CATV", serviceId: 101 },
       { name: "BS 1", type: "BS", channel: "C21", serviceId: 101, isDisabled: true, route: "CATV", tsmfRelTs: 1 },
-      { name: "CS 1", type: "CS", channel: "C21", serviceId: 201, isDisabled: true, route: "CATV", tsmfRelTs: 2 }
+      { name: "CS 1", type: "CS", channel: "C21", serviceId: 201, isDisabled: true, route: "CATV", tsmfRelTs: 2 },
+      { name: "ケーブル", type: "CATV", channel: "C13", serviceId: 1, isDisabled: true }
     ]);
   });
 
@@ -183,7 +183,7 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
       ],
       { relTsByRemote: ["BS/CATV/C30"] }
     );
-    assert.deepStrictEqual(saved.filter(item => item.channel === "C30").map(item => [item.type, item.tsmfRelTs]), [["GR", 1], ["BS", undefined]]);
+    assert.deepStrictEqual(saved.filter(item => item.channel === "C30").map(item => [item.type, item.tsmfRelTs]), [["BS", undefined], ["CATV", 1]]);
   });
 
   // 4.3.0 との互換: type を指定すると、そのタイプのチューナーで、そのタイプの既定の受信経路の 4.3.0 と同じチャンネルをスキャンする

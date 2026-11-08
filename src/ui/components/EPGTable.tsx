@@ -39,6 +39,7 @@ const scrollState = {
         CS: -1,
         SKY: -1,
         BS4K: -1,
+        CATV: -1,
     },
     top: -1,
 };

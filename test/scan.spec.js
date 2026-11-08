@@ -77,7 +77,8 @@ describe("[scan.spec] /api/config/channel/scan : getChannelTypeByNetwork", () =>
         assert.strictEqual(scan.getChannelTypeByNetwork(0x7FE0, "ts"), "GR");
         assert.strictEqual(scan.getChannelTypeByNetwork(0x7880, "ts"), "GR");
         // the services of the cable television itself
-        assert.strictEqual(scan.getChannelTypeByNetwork(0xFFFE, "ts"), "GR");
+        assert.strictEqual(scan.getChannelTypeByNetwork(0xFFFE, "ts"), "CATV");
+        assert.strictEqual(scan.getChannelTypeByNetwork(0xFFF7, "ts"), "CATV");
         assert.strictEqual(scan.getChannelTypeByNetwork(11, "tlv"), "BS4K");
         assert.strictEqual(scan.getChannelTypeByNetwork(0x1234, "ts"), null);
     });
@@ -107,7 +108,8 @@ describe("[scan.spec] /api/config/channel/scan : generateScannedChannelItems", (
         assert.deepStrictEqual(items, [
             { name: "BS 1", type: "BS", channel: "C21", serviceId: 101, isDisabled: true, route: "CATV", tsmfRelTs: 1 },
             { name: "BS 2", type: "BS", channel: "C21", serviceId: 102, isDisabled: true, route: "CATV", tsmfRelTs: 1 },
-            { name: "コミュニティ", type: "GR", channel: "C21", isDisabled: false, route: "CATV", tsmfRelTs: 2 },
+            { name: "コミュニティ", type: "CATV", channel: "C21", serviceId: 1, isDisabled: true, tsmfRelTs: 2 },
+            { name: "コミュニティ", type: "CATV", channel: "C21", serviceId: 2, isDisabled: true, tsmfRelTs: 2 },
             { name: "4K", type: "BS4K", channel: "C21", serviceId: 101, isDisabled: true, route: "CATV", tsmfRelTs: 3 }
         ]);
         assert.ok(logs.some(text => /unknown network/.test(text)));
@@ -136,7 +138,7 @@ describe("[scan.spec] /api/config/channel/scan : generateScannedChannelItems", (
 
         assert.deepStrictEqual(items.map(item => [item.type, item.serviceId, item.tsmfRelTs]), [["BS", 101, undefined]]);
         assert.ok(logs.some(text => /relative stream 2 \(BS\) are not received/.test(text)));
-        assert.ok(logs.some(text => /relative stream 3 \(GR\) are not received/.test(text)));
+        assert.ok(logs.some(text => /relative stream 3 \(CATV\) are not received/.test(text)));
     });
 
     it("adds the carriers of a TLV of multiple carriers without the services", () => {
@@ -194,7 +196,7 @@ describe("[scan.spec] /api/config/channel/scan : generateScannedChannelItems", (
             { relTs: 1, format: "ts", networkId: 0xFFFE, services: [service(0xFFFE, 1, "コミュニティ")] },
             { relTs: 2, format: "tlv", networkId: 11, services: [service(11, 101, "4K")] }
         ], {}, () => undefined, undefined, ["BS4K"]);
-        assert.deepStrictEqual(mixed.map(item => [item.type, item.tsmfRelTs]), [["GR", 1], ["BS4K", undefined]]);
+        assert.deepStrictEqual(mixed.map(item => [item.type, item.tsmfRelTs]), [["CATV", 1], ["BS4K", undefined]]);
     });
 
     it("notes the types without the tuners of the route", () => {

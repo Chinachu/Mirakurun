@@ -275,6 +275,9 @@ export default class ServiceItem {
             case "BS4K":
                 order = "5";
                 break;
+            case "CATV":
+                order = "6";
+                break;
         }
 
         if (this._remoteControlKeyId) {

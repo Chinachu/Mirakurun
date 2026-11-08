@@ -49,7 +49,7 @@ export interface Channel {
     services?: Service[];
 }
 
-export type ChannelType = "GR" | "BS" | "CS" | "SKY" | "BS4K";
+export type ChannelType = "GR" | "BS" | "CS" | "SKY" | "BS4K" | "CATV";
 
 /** `tlv` for the channels of TLV (MMT), such as `BS4K`. */
 export type StreamFormat = "ts" | "tlv";

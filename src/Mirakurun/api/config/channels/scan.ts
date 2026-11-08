@@ -79,7 +79,8 @@ const channelOrder: Record<apid.ChannelType, number> = {
     BS: 2,
     CS: 3,
     SKY: 4,
-    BS4K: 5
+    BS4K: 5,
+    CATV: 6
 };
 
 /**
@@ -309,9 +310,13 @@ export function getChannelTypeByNetwork(networkId: number, format: apid.StreamFo
     if (networkId === 1 || networkId === 3 || networkId === 10) {
         return "SKY";
     }
-    // the terrestrial (ARIB TR-B14), and the services of the cable television itself (as the terrestrial)
-    if ((networkId >= 0x7880 && networkId <= 0x7FE8) || common.CATV_NETWORK_IDS.includes(networkId)) {
+    // the terrestrial (ARIB TR-B14)
+    if (networkId >= 0x7880 && networkId <= 0x7FE8) {
         return "GR";
+    }
+    // the services of the cable television itself (such as the community channels)
+    if (common.CATV_NETWORK_IDS.includes(networkId)) {
+        return "CATV";
     }
     return null;
 }
@@ -321,8 +326,8 @@ const routeTypes: Record<apid.ChannelRoute, apid.ChannelType[]> = {
     TER: ["GR"],
     SAT: ["BS", "CS", "BS4K"],
     SKY: ["SKY"],
-    CATV: ["GR", "BS", "CS", "BS4K", "SKY"],
-    FTTH: ["GR", "BS", "CS", "BS4K", "SKY"]
+    CATV: ["GR", "BS", "CS", "BS4K", "SKY", "CATV"],
+    FTTH: ["GR", "BS", "CS", "BS4K", "SKY", "CATV"]
 };
 
 /**
@@ -331,7 +336,7 @@ const routeTypes: Record<apid.ChannelRoute, apid.ChannelType[]> = {
  */
 export function getScanAttempts(route: apid.ChannelRoute, channel?: string, types: apid.ChannelType[] = routeTypes[route]): ScanAttempt[] {
     const satellite = channel !== undefined && /^(BS|CS)/i.test(channel);
-    const order: apid.ChannelType[] = satellite ? ["BS", "CS", "BS4K", "SKY", "GR"] : ["GR", "BS", "CS", "BS4K", "SKY"];
+    const order: apid.ChannelType[] = satellite ? ["BS", "CS", "BS4K", "SKY", "GR", "CATV"] : ["GR", "BS", "CS", "BS4K", "SKY", "CATV"];
     return _.tuner.getScanAttempts(route, order.filter(type => routeTypes[route].includes(type) && types.includes(type)));
 }
 
@@ -1173,7 +1178,8 @@ put.apiDoc = {
     summary: "Channel Scan",
     description: `Scans the channels of a receiving route, and decides the type of each stream by its network (original_network_id of the services):
 - \`4\`: BS, \`6\` / \`7\`: CS, \`1\` / \`3\` / \`10\`: SKY, TLV (MMT): BS4K
-- \`0x7880\`-\`0x7FE8\` (terrestrial), and the networks of the cable television (\`0xFFF7\`, \`0xFFF9\`, \`0xFFFA\`, \`0xFFFD\`, \`0xFFFE\`, \`0xFFFF\`): GR
+- \`0x7880\`-\`0x7FE8\` (terrestrial): GR
+- the networks of the cable television (\`0xFFF7\`, \`0xFFF9\`, \`0xFFFA\`, \`0xFFFD\`, \`0xFFFE\`, \`0xFFFF\`, such as the community channels): CATV
 - The streams of the other networks are not added.
 
 The channels to scan (\`source\`):
@@ -1190,7 +1196,7 @@ The channels to scan (\`source\`):
 The tuners of the route are used. The tuners of the different types (such as ISDB-T and ISDB-S) try each channel until received (the tuners of the same types once)
 (the types of the route: TER: GR, SAT: BS / CS / BS4K, SKY: SKY, CATV and FTTH: any). The remote tuners are tried by each type.
 The relative streams of TSMF are detected on any local tuner.
-A tuner receiving multiple systems should have all the types to receive in \`types\` (such as \`[GR, BS, CS, BS4K]\` for CATV).
+A tuner receiving multiple systems should have all the types to receive in \`types\` (such as \`[GR, BS, CS, BS4K, CATV]\` for CATV).
 
 Entry rewriting specifications:
 - The entries of the channels scanned on the route (of any type) are replaced with the result. The other entries remain.

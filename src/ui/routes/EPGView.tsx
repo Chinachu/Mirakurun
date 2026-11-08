@@ -168,6 +168,7 @@ export const EPGView: React.FC = () => {
                                     { value: "CS" },
                                     { value: "SKY" },
                                     { value: "BS4K" },
+                                    { value: "CATV" },
                                 ]}
                                 value={channelType || ""}
                                 onChange={event => {

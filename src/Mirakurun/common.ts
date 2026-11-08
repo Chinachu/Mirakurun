@@ -68,7 +68,7 @@ export interface StreamSink {
     once(event: "close", listener: () => void): unknown;
 }
 
-export const channelTypes: apid.ChannelType[] = ["GR", "BS", "CS", "SKY", "BS4K"];
+export const channelTypes: apid.ChannelType[] = ["GR", "BS", "CS", "SKY", "BS4K", "CATV"];
 
 /** the channel types of TLV (MMT) */
 export const tlvChannelTypes: apid.ChannelType[] = ["BS4K"];
@@ -91,7 +91,7 @@ export const CATV_NETWORK_IDS = [
 ];
 
 export function getDefaultChannelRoute(type: apid.ChannelType): apid.ChannelRoute {
-    return type === "GR" ? "TER" : type === "SKY" ? "SKY" : "SAT";
+    return type === "GR" ? "TER" : type === "SKY" ? "SKY" : type === "CATV" ? "CATV" : "SAT";
 }
 
 export class WhereQueryError extends Error {

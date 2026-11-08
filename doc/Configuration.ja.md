@@ -83,7 +83,7 @@
 ```yaml
 # 配列
 - name: チューナー識別名 # String
-  types: # (GR|BS|CS|SKY|BS4K)[]
+  types: # (GR|BS|CS|SKY|BS4K|CATV)[]
     - GR
     - BS
     - CS
@@ -109,7 +109,7 @@
   isDisabled: false # Boolean
 ```
 
-公開型 `ChannelType` に `BS4K` を追加しています。TypeScript で従来の4種を網羅する `switch` や `Record<ChannelType, ...>` を使っている場合は、`BS4K` の分岐やキーを追加してください。従来の `GR`・`BS`・`CS`・`SKY` も引き続き使用できます。
+公開型 `ChannelType` に `BS4K` と `CATV` (ケーブルテレビの自主放送など) を追加しています。TypeScript で従来の4種を網羅する `switch` や `Record<ChannelType, ...>` を使っている場合は、`BS4K` と `CATV` の分岐やキーを追加してください。従来の `GR`・`BS`・`CS`・`SKY` も引き続き使用できます。
 
 #### routes
 
@@ -216,10 +216,10 @@ TLV (MMT) のチャンネルでは、タイプにかかわらず、`decoder` の
 ```yaml
 # 配列
 - name: チャンネル識別名 # String
-  type: GR # 列挙型 [GR|BS|CS|SKY|BS4K]
+  type: GR # 列挙型 [GR|BS|CS|SKY|BS4K|CATV]
   channel: '0' # String
   # 以下はオプション
-  route: TER # 列挙型 [TER|SAT|SKY|CATV|FTTH] - 受信する経路。省略した場合、GR は TER、SKY は SKY、それ以外は SAT
+  route: TER # 列挙型 [TER|SAT|SKY|CATV|FTTH] - 受信する経路。省略した場合、GR は TER、SKY は SKY、CATV は CATV、それ以外は SAT
   serviceId: 1234 # Integer - 指定しない場合、サービスは自動的にスキャンされます。
   tsmfRelTs: 1 # 数値: 1~15 - TSMF の相対 TS 番号 (TS と TLV のどちらも)。指定しない場合、TLV 用のチューナー (タイプに BS4K を含むか、tlvDecoder / tlvToTsDecoder を設定したもの) ではサービスのスキャンで判別する。TS だけのチューナーでは指定が必要
   tsmfGroupId: 1 # 数値: 1~255 - 1 つの TLV を複数の搬送波で伝送する場合 (CATV のチャネルボンディング) のグループ。同じ値のチャンネルが同じグループの搬送波になる。tsmfRelTs とともに指定しない場合、TLV 用のチューナーではサービスのスキャンで判別する
@@ -295,7 +295,7 @@ CATV で 1 つの TLV を複数の搬送波に分けて伝送する場合 (チ�
 
 ### チャンネルスキャン
 
-Web UI の「Channel Scan」(`PUT /api/config/channels/scan`) は、受信経路 (`route`) ごとにチャンネルを調べ、受信したサービスのネットワーク (original_network_id) でチャンネルのタイプを決めて channels.yml に追加します。地上波・BS・CS・BS4K が混ざる CATV も、1 回のスキャンで追加できます。
+Web UI の「Channel Scan」(`PUT /api/config/channels/scan`) は、受信経路 (`route`) ごとにチャンネルを調べ、受信したサービスのネットワーク (original_network_id) でチャンネルのタイプを決めて channels.yml に追加します。地上波・BS・CS・BS4K・自主放送が混ざる CATV も、1 回のスキャンで追加できます。
 
 | ネットワーク | タイプ |
 | --- | --- |
@@ -303,7 +303,8 @@ Web UI の「Channel Scan」(`PUT /api/config/channels/scan`) は、受信経路
 | `6`, `7` | CS |
 | `1`, `3`, `10` | SKY |
 | TLV (MMT) | BS4K |
-| `0x7880`~`0x7FE8` (地上波)、CATV のネットワーク (`0xFFF7`、`0xFFF9`、`0xFFFA`、`0xFFFD`、`0xFFFE`、`0xFFFF`。自主放送など) | GR |
+| `0x7880`~`0x7FE8` (地上波) | GR |
+| CATV のネットワーク (`0xFFF7`、`0xFFF9`、`0xFFFA`、`0xFFFD`、`0xFFFE`、`0xFFFF`。自主放送など) | CATV |
 
 それ以外のネットワークのストリームは追加しません。
 
@@ -319,7 +320,7 @@ Web UI の「Channel Scan」(`PUT /api/config/channels/scan`) は、受信経路
 - `list`: 指定したチャンネル (`channels`)
 - `format`: チャンネル名の書式 (`channelNameFormat`、例: `C{ch}`) と範囲
 
-- スキャンには、受信経路のチューナーを使います。ISDB-T と ISDB-S のように種類の異なるチューナーがある場合は、受信できるまで、それぞれのチューナーで試します (`types` が同じチューナーは 1 回) (受信経路のタイプ: TER は GR、SAT は BS / CS / BS4K、SKY は SKY、CATV と FTTH はすべて)。リモートの Mirakurun のチューナーは、その Mirakurun に設定されたタイプのチャンネルだけを受信するため、タイプごとに試します。1 つのチューナーで複数の放送を受信する場合は、チューナーの `types` に受信するタイプをすべて指定してください (CATV では `[GR, BS, CS, BS4K]` など)。
+- スキャンには、受信経路のチューナーを使います。ISDB-T と ISDB-S のように種類の異なるチューナーがある場合は、受信できるまで、それぞれのチューナーで試します (`types` が同じチューナーは 1 回) (受信経路のタイプ: TER は GR、SAT は BS / CS / BS4K、SKY は SKY、CATV と FTTH はすべて)。リモートの Mirakurun のチューナーは、その Mirakurun に設定されたタイプのチャンネルだけを受信するため、タイプごとに試します。1 つのチューナーで複数の放送を受信する場合は、チューナーの `types` に受信するタイプをすべて指定してください (CATV では `[GR, BS, CS, BS4K, CATV]` など)。
 - スキャンでは、TLV 用でないチューナーでも TSMF の相対 TS を判別します。チャンネルにそのタイプの相対 TS が 1 つだけの場合は `tsmfRelTs` を追加します (どのチューナーでも受信できます)。同じタイプの相対 TS が複数ある場合は `tsmfRelTs` を追加せず、TLV 用のチューナーで判別します。リモートのチューナーでは、リモートの Mirakurun が判別した相対 TS をスキャンし、`tsmfRelTs` は追加しません (リモートの Mirakurun が相対 TS を出力するため)。リモートのチューナーだけで受信するタイプも、すべてのリモートの Mirakurun がそのチャンネルの相対 TS を出力する場合 (判別したか、4.3.0 以前も含めて channels.yml の `tsmfRelTs`) は同じです。サービスを受信できなかった相対 TS も、ヘッダーのネットワークで数えます (ログに出します。そのチャンネルを `refresh` を指定してもう一度スキャンすると追加します)。
 - 複数の搬送波で伝送する TLV (BS8K など) の搬送波は、サービスがなくても BS4K のチャンネルとして追加します (`tsmfRelTs` と `tsmfGroupId` は判別します)。
 - スキャンしたチャンネルの、その受信経路の設定 (タイプにかかわらず) をスキャン結果で置き換えます。スキャンしないチャンネルや、ほかの受信経路の設定は残します。`refresh` を指定しない場合は、有効な設定があるチャンネルはスキャンせず、そのチャンネルの設定を残します。

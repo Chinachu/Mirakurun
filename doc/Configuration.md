@@ -83,7 +83,7 @@
 ```yaml
 # Array
 - name: TunerIdentificationName # String
-  types: # (GR|BS|CS|SKY|BS4K)[]
+  types: # (GR|BS|CS|SKY|BS4K|CATV)[]
     - GR
     - BS
     - CS
@@ -109,7 +109,7 @@
   isDisabled: false # Boolean
 ```
 
-`BS4K` has been added to the public `ChannelType` union. TypeScript consumers with exhaustive switches or `Record<ChannelType, ...>` mappings for the previous four types need to add a `BS4K` case or key. `GR`, `BS`, `CS` and `SKY` remain supported.
+`BS4K` and `CATV` (such as the community channels of cable television) have been added to the public `ChannelType` union. TypeScript consumers with exhaustive switches or `Record<ChannelType, ...>` mappings for the previous four types need to add `BS4K` and `CATV` cases or keys. `GR`, `BS`, `CS` and `SKY` remain supported.
 
 #### routes
 
@@ -216,10 +216,10 @@ If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outp
 ```yaml
 # Array
 - name: ChannelIdentificationName # String
-  type: GR # Enum [GR|BS|CS|SKY|BS4K]
+  type: GR # Enum [GR|BS|CS|SKY|BS4K|CATV]
   channel: '0' # String
   # Optional parameters below
-  route: TER # Enum [TER|SAT|SKY|CATV|FTTH] - receiving route. `TER` for GR, `SKY` for SKY, `SAT` for others if omitted.
+  route: TER # Enum [TER|SAT|SKY|CATV|FTTH] - receiving route. `TER` for GR, `SKY` for SKY, `CATV` for CATV, `SAT` for others if omitted.
   serviceId: 1234 # Integer - Services will be automatically scanned if not specified.
   tsmfRelTs: 1 # Number: 1~15 - relative TS number of TSMF (for both TS and TLV). Detected by the service scan on the tuners for TLV (the types including BS4K, or tlvDecoder / tlvToTsDecoder configured) if not specified. Required for the tuners only for TS
   tsmfGroupId: 1 # Number: 1~255 - the group of the carriers transmitting a TLV (channel bonding of CATV). The channels of the same value are the carriers of the group. Detected by the service scan on the tuners for TLV if not specified together with tsmfRelTs
@@ -295,7 +295,7 @@ A service is associated with the channels by the stream received (`networkId` an
 
 ### Channel Scan
 
-"Channel Scan" of the Web UI (`PUT /api/config/channels/scan`) scans the channels of a receiving route (`route`), decides the type of each channel by the network of the services received (original_network_id), and adds them to channels.yml. CATV mixing terrestrial, BS, CS and BS4K is also added by one scan.
+"Channel Scan" of the Web UI (`PUT /api/config/channels/scan`) scans the channels of a receiving route (`route`), decides the type of each channel by the network of the services received (original_network_id), and adds them to channels.yml. CATV mixing terrestrial, BS, CS, BS4K and the community channels is also added by one scan.
 
 | Network | Type |
 | --- | --- |
@@ -303,7 +303,8 @@ A service is associated with the channels by the stream received (`networkId` an
 | `6`, `7` | CS |
 | `1`, `3`, `10` | SKY |
 | TLV (MMT) | BS4K |
-| `0x7880`-`0x7FE8` (terrestrial), the networks of CATV (`0xFFF7`, `0xFFF9`, `0xFFFA`, `0xFFFD`, `0xFFFE`, `0xFFFF`, such as the community channels) | GR |
+| `0x7880`-`0x7FE8` (terrestrial) | GR |
+| the networks of CATV (`0xFFF7`, `0xFFF9`, `0xFFFA`, `0xFFFD`, `0xFFFE`, `0xFFFF`, such as the community channels) | CATV |
 
 The streams of the other networks are not added.
 
@@ -319,7 +320,7 @@ The channels to scan (`source`):
 - `list`: the channels specified (`channels`)
 - `format`: the format of the channel names (`channelNameFormat`, e.g. `C{ch}`) and the range
 
-- The tuners of the route are used. If the route has the tuners of the different kinds (such as ISDB-T and ISDB-S), each channel is tried by them until received (once by the tuners of the same `types`) (the types of the route: TER: GR, SAT: BS / CS / BS4K, SKY: SKY, CATV and FTTH: any). The tuners of a remote Mirakurun are tried by each type, because they receive only the channels of the types configured on the remote. For a tuner receiving multiple broadcasts, specify all the types to receive in `types` (such as `[GR, BS, CS, BS4K]` for CATV).
+- The tuners of the route are used. If the route has the tuners of the different kinds (such as ISDB-T and ISDB-S), each channel is tried by them until received (once by the tuners of the same `types`) (the types of the route: TER: GR, SAT: BS / CS / BS4K, SKY: SKY, CATV and FTTH: any). The tuners of a remote Mirakurun are tried by each type, because they receive only the channels of the types configured on the remote. For a tuner receiving multiple broadcasts, specify all the types to receive in `types` (such as `[GR, BS, CS, BS4K, CATV]` for CATV).
 - The scan detects the relative streams of TSMF also on the tuners not for TLV. If the type has only one relative stream on the channel, `tsmfRelTs` is added (any tuner receives it). If the type has more than one, `tsmfRelTs` is not added and the tuners for TLV detect them. The remote tuners scan the relative streams detected by the remote Mirakurun, and `tsmfRelTs` is not added (the remote Mirakurun outputs the relative streams). The same for the types received only by the remote tuners, if every remote Mirakurun outputs the relative streams of the channel (detected, or `tsmfRelTs` of its channels.yml, even of 4.3.0 or before). The relative streams whose services are not received are also counted by the network of the header (logged, added by scanning the channel again with `refresh`).
 - The carriers of a TLV transmitted by multiple carriers (such as BS8K) are added as channels of BS4K without the services (`tsmfRelTs` and `tsmfGroupId` are detected).
 - The entries of the channels scanned on the route (of any type) are replaced with the result. The entries of the channels not scanned and of the other routes remain. Without `refresh`, the channels with an enabled entry are not scanned and their entries remain.
