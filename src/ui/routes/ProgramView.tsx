@@ -79,6 +79,15 @@ export const ProgramView: React.FC = () => {
         }
     }, [programId]);
 
+    // StreamID などのサービスの情報は、番組より後に届いたサービス一覧で表示する
+    useEffect(() => {
+        const onServices = () => setReload(Date.now());
+        state.on("services", onServices);
+        return () => {
+            state.off("services", onServices);
+        };
+    }, []);
+
     useEffect(() => {
         if (!program) {
             ui.setTitle("番組詳細...", true);
