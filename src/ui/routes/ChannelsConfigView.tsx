@@ -37,7 +37,7 @@ import equal from "fast-deep-equal";
 import { state } from "../modules/state";
 import * as ui from "../modules/ui";
 import { ConfigChannels, ConfigChannelsItem, ChannelType, ChannelRoute, ChannelScanStatus, ChannelScanMode, ChannelScanSource } from "../../../api.d";
-import { channelRouteMap, channelRoutes, getChannelRouteLabel } from "../modules/constants";
+import { channelRouteMap, channelRoutes, getChannelRouteLabel, getDefaultChannelRoute } from "../modules/constants";
 
 import "./ChannelsConfigView.sass";
 
@@ -589,7 +589,7 @@ export const ChannelsConfigView: React.FC = () => {
                                 </td>
                                 <td>
                                     <div className="channel-options-grid">
-                                        <FormGroup label="Route" style={{ width: "130px", marginBottom: 0 }}>
+                                        <FormGroup label="Route" style={{ width: "170px", marginBottom: 0 }}>
                                             <HTMLSelect
                                                 value={ch.route || ""}
                                                 onChange={(e) => {
@@ -601,7 +601,7 @@ export const ChannelsConfigView: React.FC = () => {
                                                     }
                                                 }}
                                                 options={[
-                                                    { value: "", label: `(${channelRouteMap[ch.type === "GR" ? "TER" : "SAT"]})` },
+                                                    { value: "", label: `(${channelRouteMap[getDefaultChannelRoute(ch.type)]})` },
                                                     ...channelRoutes.map(route => ({ value: route, label: getChannelRouteLabel(route) }))
                                                 ]}
                                             />
@@ -789,6 +789,7 @@ export const ChannelsConfigView: React.FC = () => {
                             <Callout>
                                 {scanRoute === "TER" && "13-62"}
                                 {scanRoute === "SAT" && "BS01_0-BS23_3, CS2-CS24"}
+                                {scanRoute === "SKY" && "なし (dvbv5 のチャンネル設定ファイルか一覧で指定してください)"}
                                 {scanRoute === "CATV" && "1-12, C13-C63, 13-62"}
                                 {scanRoute === "FTTH" && "13-62, BS01_0-BS23_3, CS2-CS24"}
                             </Callout>

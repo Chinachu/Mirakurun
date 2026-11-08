@@ -14,7 +14,7 @@
    limitations under the License.
 */
 import { IconName } from "@blueprintjs/core";
-import { ChannelRoute } from "../../../api.d";
+import { ChannelRoute, ChannelType } from "../../../api.d";
 
 export const channelTypeMap = {
     GR: "地上",
@@ -27,12 +27,18 @@ export const channelTypeMap = {
 /** the name of the route (in the order of the routes) */
 export const channelRouteMap: Record<ChannelRoute, string> = {
     TER: "地上波",
-    SAT: "衛星",
+    SAT: "BS/110度CS",
+    SKY: "124/128度CS",
     CATV: "CATV",
     FTTH: "ひかり",
 };
 
 export const channelRoutes = Object.keys(channelRouteMap) as ChannelRoute[];
+
+/** the route of the channel without `route` (the same as the server) */
+export function getDefaultChannelRoute(type: ChannelType): ChannelRoute {
+    return type === "GR" ? "TER" : type === "SKY" ? "SKY" : "SAT";
+}
 
 /** the label of the route with the value of the config (e.g. `地上波 (TER)`, `CATV`) */
 export function getChannelRouteLabel(route: ChannelRoute): string {

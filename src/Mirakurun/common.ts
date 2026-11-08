@@ -78,7 +78,7 @@ export function getEpgStreamKey(networkId: number, streamId: number): string {
     return `${networkId}/${streamId}`;
 }
 
-export const channelRoutes: apid.ChannelRoute[] = ["TER", "SAT", "CATV", "FTTH"];
+export const channelRoutes: apid.ChannelRoute[] = ["TER", "SAT", "SKY", "CATV", "FTTH"];
 
 // network_id of cable television (ARIB STD-B10)
 export const CATV_NETWORK_IDS = [
@@ -91,7 +91,7 @@ export const CATV_NETWORK_IDS = [
 ];
 
 export function getDefaultChannelRoute(type: apid.ChannelType): apid.ChannelRoute {
-    return type === "GR" ? "TER" : "SAT";
+    return type === "GR" ? "TER" : type === "SKY" ? "SKY" : "SAT";
 }
 
 export class WhereQueryError extends Error {

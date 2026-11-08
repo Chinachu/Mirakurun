@@ -174,6 +174,7 @@ function formatChannels(format: string, startCh: number, endCh: number, startSub
  * the channels to scan by default for each route (the names of the tuner commands such as recpt1, recisdb)
  * - TER: the terrestrial channels (UHF 13-62)
  * - SAT: the BS (`BS01_0`-`BS23_3`) and CS (`CS2`-`CS24`) channels
+ * - SKY: none (the channels of SKY are tuned by the channel config files of dvbv5)
  * - CATV: the cable channels (VHF `1`-`12`, `C13`-`C63`) and the terrestrial channels passed through (13-62)
  * - FTTH: the terrestrial, BS and CS channels passed through
  */
@@ -318,7 +319,8 @@ export function getChannelTypeByNetwork(networkId: number, format: apid.StreamFo
 /** the types of the broadcasts of each route (the tuners without `routes` receive any route) */
 const routeTypes: Record<apid.ChannelRoute, apid.ChannelType[]> = {
     TER: ["GR"],
-    SAT: ["BS", "CS", "BS4K", "SKY"],
+    SAT: ["BS", "CS", "BS4K"],
+    SKY: ["SKY"],
     CATV: ["GR", "BS", "CS", "BS4K", "SKY"],
     FTTH: ["GR", "BS", "CS", "BS4K", "SKY"]
 };
@@ -374,6 +376,11 @@ export function generateScannedChannelItems(
         }
         if (type === null) {
             log(`-> unknown network (networkId: ${networkId}${stream.relTs ? `, relTs: ${stream.relTs}` : ""}), skipped.\n`);
+            continue;
+        }
+        // such as SKY on SAT (the satellite of SKY is received on the route SKY)
+        if (routeTypes[route].includes(type) === false) {
+            log(`-> ${type} (networkId: ${networkId}) is not of the route ${route}, skipped.\n`);
             continue;
         }
         if (stream.failed) {
@@ -1099,7 +1106,8 @@ export const put: Operation = async (req, res) => {
 
     // Handle missing scan configuration
     if (!scanConfig) {
-        reject(source === "dvbConf" ? "No channels in the channel config files of dvbv5 of the tuners" : "Invalid scan configuration");
+        reject(source === "dvbConf" ? "No channels in the channel config files of dvbv5 of the tuners" :
+            source === "preset" ? `No channels of the preset for the route ${route}` : "Invalid scan configuration");
         return;
     }
     if (legacyType !== undefined) {
@@ -1172,6 +1180,7 @@ The channels to scan (\`source\`):
 - \`preset\`: the channels of the route (the names of the tuner commands such as recpt1, recisdb)
     - TER: \`13\`-\`62\`
     - SAT: \`BS01_0\`-\`BS23_3\`, \`CS2\`-\`CS24\`
+    - SKY: none
     - CATV: \`1\`-\`12\`, \`C13\`-\`C63\`, \`13\`-\`62\`
     - FTTH: \`13\`-\`62\`, \`BS01_0\`-\`BS23_3\`, \`CS2\`-\`CS24\`
 - \`dvbConf\`: the channels of the channel config files of dvbv5-zap (\`-c\`) of the tuners used for the scan
@@ -1179,7 +1188,7 @@ The channels to scan (\`source\`):
 - \`format\`: the channels of \`channelNameFormat\` in the range of \`minCh\`-\`maxCh\` (and \`minSubCh\`-\`maxSubCh\` with \`{subch}\`)
 
 The tuners of the route are used. The tuners of the different types (such as ISDB-T and ISDB-S) try each channel until received (the tuners of the same types once)
-(the types of the route: TER: GR, SAT: BS / CS / BS4K / SKY, CATV and FTTH: any). The remote tuners are tried by each type.
+(the types of the route: TER: GR, SAT: BS / CS / BS4K, SKY: SKY, CATV and FTTH: any). The remote tuners are tried by each type.
 The relative streams of TSMF are detected on any local tuner.
 A tuner receiving multiple systems should have all the types to receive in \`types\` (such as \`[GR, BS, CS, BS4K]\` for CATV).
 
@@ -1215,7 +1224,7 @@ only the entries of the type are replaced):
             in: "query",
             name: "route",
             type: "string",
-            enum: ["TER", "SAT", "CATV", "FTTH"] as apid.ChannelRoute[],
+            enum: ["TER", "SAT", "SKY", "CATV", "FTTH"] as apid.ChannelRoute[],
             default: "TER",
             description: "Specifies the receiving route to scan."
         },

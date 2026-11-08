@@ -55,7 +55,7 @@ export type ChannelType = "GR" | "BS" | "CS" | "SKY" | "BS4K";
 export type StreamFormat = "ts" | "tlv";
 
 /** how the tuner receives the channel. e.g. `CATV` for BS/CS via transmodulation. */
-export type ChannelRoute = "TER" | "SAT" | "CATV" | "FTTH";
+export type ChannelRoute = "TER" | "SAT" | "SKY" | "CATV" | "FTTH";
 
 export interface Service {
     /** Relative TS on the carrier, when returned in Channel.services. */

@@ -30,6 +30,8 @@ describe("[scan.spec] /api/config/channel/scan : generateScanConfig", () => {
         assert.deepStrictEqual(scan.generateScanConfig({ route: "SAT", source: "preset" }), { channels: [...bs, ...cs] });
         assert.deepStrictEqual(scan.generateScanConfig({ route: "CATV" }), { channels: [...range(1, 12, ch => `${ch}`), ...range(13, 63, ch => `C${ch}`), ...terrestrial] });
         assert.deepStrictEqual(scan.generateScanConfig({ route: "FTTH" }), { channels: [...terrestrial, ...bs, ...cs] });
+        // no preset of SKY (by the channel config files of dvbv5)
+        assert.strictEqual(scan.generateScanConfig({ route: "SKY" }), undefined);
     });
 
     it("dvbConf: the channels of the channel config files", () => {
@@ -154,6 +156,19 @@ describe("[scan.spec] /api/config/channel/scan : generateScannedChannelItems", (
             scan.generateScannedChannelItems("BS01_0", "SAT", [{ format: "ts", services: [service(4, 101, "BS 1")] }], { scanMode: "Channel", setDisabledOnAdd: false }),
             [{ name: "BS 1", type: "BS", channel: "BS01_0", isDisabled: false }]
         );
+        assert.deepStrictEqual(
+            scan.generateScannedChannelItems("CH585", "SKY", [{ format: "ts", services: [service(10, 585, "SKY 1")] }], { scanMode: "Channel", setDisabledOnAdd: false }),
+            [{ name: "SKY 1", type: "SKY", channel: "CH585", isDisabled: false }]
+        );
+    });
+
+    it("does not add the types not of the route (SKY on SAT)", () => {
+        const logs = [];
+        assert.deepStrictEqual(
+            scan.generateScannedChannelItems("BS01_0", "SAT", [{ format: "ts", services: [service(10, 585, "SKY 1")] }], {}, text => logs.push(text)),
+            []
+        );
+        assert.ok(logs.some(text => text.includes("SKY (networkId: 10) is not of the route SAT")), logs.join(""));
     });
 
     // リモートの Mirakurun は、その Mirakurun に設定されたタイプのチャンネルだけを受信する

@@ -88,12 +88,12 @@
     - BS
     - CS
     - SKY
-  routes: # (TER|SAT|CATV|FTTH)[] - routes the tuner can receive. All routes if omitted.
+  routes: # (TER|SAT|SKY|CATV|FTTH)[] - routes the tuner can receive. All routes if omitted.
     - TER
     - CATV
   # For chardev/dvb
   # "<template>" will be replaced with `commandVars[template]` or "(empty)" *@4.0.0~
-  # "<route>" will be replaced with the route of the channel in lowercase (ter|sat|catv|ftth)
+  # "<route>" will be replaced with the route of the channel in lowercase (ter|sat|sky|catv|ftth)
   command: cmd <channel> --arg1 --arg2 <exampleArg1> <exampleArg2>... # String
   # For dvb
   dvbDevicePath: /dev/dvb/adapter/dvr/path # String
@@ -219,7 +219,7 @@ If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outp
   type: GR # Enum [GR|BS|CS|SKY|BS4K]
   channel: '0' # String
   # Optional parameters below
-  route: TER # Enum [TER|SAT|CATV|FTTH] - receiving route. `TER` for GR, `SAT` for others if omitted.
+  route: TER # Enum [TER|SAT|SKY|CATV|FTTH] - receiving route. `TER` for GR, `SKY` for SKY, `SAT` for others if omitted.
   serviceId: 1234 # Integer - Services will be automatically scanned if not specified.
   tsmfRelTs: 1 # Number: 1~15 - relative TS number of TSMF (for both TS and TLV). Detected by the service scan on the tuners for TLV (the types including BS4K, or tlvDecoder / tlvToTsDecoder configured) if not specified. Required for the tuners only for TS
   tsmfGroupId: 1 # Number: 1~255 - the group of the carriers transmitting a TLV (channel bonding of CATV). The channels of the same value are the carriers of the group. Detected by the service scan on the tuners for TLV if not specified together with tsmfRelTs
@@ -286,7 +286,8 @@ Specify this when a TLV is transmitted by multiple carriers of CATV (channel bon
 The route to receive the channel. The same broadcast can also be configured as a channel of another route, such as BS received both through a satellite antenna and through CATV transmodulation.
 
 - `TER`: terrestrial antenna
-- `SAT`: satellite antenna
+- `SAT`: satellite antenna of BS / 110 degree CS
+- `SKY`: satellite antenna of 124 / 128 degree CS (SKY PerfecTV! Premium Service)
 - `CATV`: cable television
 - `FTTH`: television over optical fiber (terrestrial and BS / CS passed through). Use `CATV` for the transmodulation of cable television even over optical fiber (the default channels of the scan differ)
 
@@ -311,13 +312,14 @@ The channels to scan (`source`):
 - `preset`: the channels of the route (the names of the tuner commands such as recpt1, recisdb)
     - TER: `13`-`62`
     - SAT: `BS01_0`-`BS23_3`, `CS2`-`CS24`
+    - SKY: none (specify by `dvbConf` or `list`)
     - CATV: `1`-`12` (VHF), `C13`-`C63`, `13`-`62`
     - FTTH: `13`-`62`, `BS01_0`-`BS23_3`, `CS2`-`CS24`
 - `dvbConf`: all the channels of the channel config files of dvbv5-zap (`-c`) of the tuners used for the scan (including the files not for DVB device direct access, such as DVB-C)
 - `list`: the channels specified (`channels`)
 - `format`: the format of the channel names (`channelNameFormat`, e.g. `C{ch}`) and the range
 
-- The tuners of the route are used. If the route has the tuners of the different kinds (such as ISDB-T and ISDB-S), each channel is tried by them until received (once by the tuners of the same `types`) (the types of the route: TER: GR, SAT: BS / CS / BS4K / SKY, CATV and FTTH: any). The tuners of a remote Mirakurun are tried by each type, because they receive only the channels of the types configured on the remote. For a tuner receiving multiple broadcasts, specify all the types to receive in `types` (such as `[GR, BS, CS, BS4K]` for CATV).
+- The tuners of the route are used. If the route has the tuners of the different kinds (such as ISDB-T and ISDB-S), each channel is tried by them until received (once by the tuners of the same `types`) (the types of the route: TER: GR, SAT: BS / CS / BS4K, SKY: SKY, CATV and FTTH: any). The tuners of a remote Mirakurun are tried by each type, because they receive only the channels of the types configured on the remote. For a tuner receiving multiple broadcasts, specify all the types to receive in `types` (such as `[GR, BS, CS, BS4K]` for CATV).
 - The scan detects the relative streams of TSMF also on the tuners not for TLV. If the type has only one relative stream on the channel, `tsmfRelTs` is added (any tuner receives it). If the type has more than one, `tsmfRelTs` is not added and the tuners for TLV detect them. The remote tuners scan the relative streams detected by the remote Mirakurun, and `tsmfRelTs` is not added (the remote Mirakurun outputs the relative streams). The same for the types received only by the remote tuners, if every remote Mirakurun outputs the relative streams of the channel (detected, or `tsmfRelTs` of its channels.yml, even of 4.3.0 or before). The relative streams whose services are not received are also counted by the network of the header (logged, added by scanning the channel again with `refresh`).
 - The carriers of a TLV transmitted by multiple carriers (such as BS8K) are added as channels of BS4K without the services (`tsmfRelTs` and `tsmfGroupId` are detected).
 - The entries of the channels scanned on the route (of any type) are replaced with the result. The entries of the channels not scanned and of the other routes remain. Without `refresh`, the channels with an enabled entry are not scanned and their entries remain.
