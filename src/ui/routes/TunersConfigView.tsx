@@ -36,12 +36,13 @@ import { state } from "../modules/state";
 import * as ui from "../modules/ui";
 import { ConfigTuners, ConfigTunersItem, ChannelType, ChannelRoute } from "../../../api.d";
 import { parseCommandForSpawn } from "../../Mirakurun/command";
+import { channelRoutes, getChannelRouteLabel } from "../modules/constants";
 
 import "./TunersConfigView.sass";
 
 const configAPI = "/api/config/tuners";
 const typesIndex = ["GR", "BS", "CS", "SKY", "BS4K"];
-const routesIndex: ChannelRoute[] = ["TER", "SAT", "CATV", "FTTH"];
+const routesIndex: ChannelRoute[] = channelRoutes;
 
 function sortTypes(types: ChannelType[]): ChannelType[] {
     return types.sort((a, b) => typesIndex.indexOf(a) - typesIndex.indexOf(b));
@@ -296,7 +297,7 @@ export const TunersConfigView: React.FC = () => {
                                             return (
                                                 <Checkbox
                                                     key={route}
-                                                    label={route}
+                                                    label={getChannelRouteLabel(route)}
                                                     checked={checked}
                                                     inline
                                                     onChange={(e) => {

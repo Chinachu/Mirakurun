@@ -14,6 +14,7 @@
    limitations under the License.
 */
 import { IconName } from "@blueprintjs/core";
+import { ChannelRoute } from "../../../api.d";
 
 export const channelTypeMap = {
     GR: "地上",
@@ -22,6 +23,21 @@ export const channelTypeMap = {
     SKY: "SKY",
     BS4K: "BS4K",
 };
+
+/** the name of the route (in the order of the routes) */
+export const channelRouteMap: Record<ChannelRoute, string> = {
+    TER: "地上波",
+    SAT: "衛星",
+    CATV: "CATV",
+    FTTH: "ひかり",
+};
+
+export const channelRoutes = Object.keys(channelRouteMap) as ChannelRoute[];
+
+/** the label of the route with the value of the config (e.g. `地上波 (TER)`, `CATV`) */
+export function getChannelRouteLabel(route: ChannelRoute): string {
+    return channelRouteMap[route] && channelRouteMap[route] !== route ? `${channelRouteMap[route]} (${route})` : route;
+}
 
 export const relatedItemTypeMap = {
     shared: "イベント共有",

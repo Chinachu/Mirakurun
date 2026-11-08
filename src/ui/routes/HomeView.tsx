@@ -35,7 +35,8 @@ import {
 } from "@blueprintjs/core";
 import { state } from "../modules/state";
 import * as ui from "../modules/ui";
-import { Service, Status, StreamInfo, TunerDevice } from "../../../api.d";
+import { ChannelRoute, Service, Status, StreamInfo, TunerDevice } from "../../../api.d";
+import { channelRouteMap } from "../modules/constants";
 
 import "./HomeView.sass";
 
@@ -105,10 +106,10 @@ const ServiceTooltip: React.FC<{ service: Service }> = ({ service }) => (
         <div>Type: 0x{service.type.toString(16).toUpperCase()} ({service.type})</div>
         {(() => {
             const channels = service.channels?.length ? service.channels : [service.channel];
-            const groups = new Map<string, { route: string; type: string; channels: string[] }>();
+            const groups = new Map<string, { route: ChannelRoute; type: string; channels: string[] }>();
             for (const channel of channels) {
                 if (!channel) { continue; }
-                const route = channel.route || (channel.type === "GR" ? "TER" : "SAT");
+                const route: ChannelRoute = channel.route || (channel.type === "GR" ? "TER" : "SAT");
                 const key = `${route}|${channel.type}`;
                 const group = groups.get(key);
                 if (group) {
@@ -118,7 +119,7 @@ const ServiceTooltip: React.FC<{ service: Service }> = ({ service }) => (
                 }
             }
             return Array.from(groups.values()).map((group, index) => (
-                <div key={index}>Channel{groups.size > 1 ? ` (${group.route})` : ""}: {group.type} / {group.channels.join(",")}</div>
+                <div key={index}>Channel{groups.size > 1 ? ` (${channelRouteMap[group.route]})` : ""}: {group.type} / {group.channels.join(",")}</div>
             ));
         })()}
     </div>

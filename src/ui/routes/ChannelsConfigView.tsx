@@ -37,6 +37,7 @@ import equal from "fast-deep-equal";
 import { state } from "../modules/state";
 import * as ui from "../modules/ui";
 import { ConfigChannels, ConfigChannelsItem, ChannelType, ChannelRoute, ChannelScanStatus, ChannelScanMode, ChannelScanSource } from "../../../api.d";
+import { channelRouteMap, channelRoutes, getChannelRouteLabel } from "../modules/constants";
 
 import "./ChannelsConfigView.sass";
 
@@ -486,7 +487,7 @@ export const ChannelsConfigView: React.FC = () => {
             <div className="content">
                 {/* スキャン進行中/完了時のステータス表示 */}
                 {scanInProgress && scanStatus && (
-                    <Callout intent="primary" title={`チャンネルスキャン中${scanStatus.route ? ` (${scanStatus.route})` : ""}`}>
+                    <Callout intent="primary" title={`チャンネルスキャン中${scanStatus.route ? ` (${channelRouteMap[scanStatus.route] || scanStatus.route})` : ""}`}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
                             <ProgressBar value={(scanStatus.progress || 0) / 100} />
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -506,7 +507,7 @@ export const ChannelsConfigView: React.FC = () => {
                 {!scanInProgress && scanStatus && (scanStatus.status === "completed" || (scanStatus.scanLog && scanStatus.scanLog.length > 0)) && (
                     <Callout
                         intent={scanStatus.status === "completed" ? "success" : "warning"}
-                        title={`前回のスキャン結果${scanStatus.route ? ` (${scanStatus.route})` : ""}`}
+                        title={`前回のスキャン結果${scanStatus.route ? ` (${channelRouteMap[scanStatus.route] || scanStatus.route})` : ""}`}
                     >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
                             <div>
@@ -588,7 +589,7 @@ export const ChannelsConfigView: React.FC = () => {
                                 </td>
                                 <td>
                                     <div className="channel-options-grid">
-                                        <FormGroup label="Route" style={{ width: "90px", marginBottom: 0 }}>
+                                        <FormGroup label="Route" style={{ width: "130px", marginBottom: 0 }}>
                                             <HTMLSelect
                                                 value={ch.route || ""}
                                                 onChange={(e) => {
@@ -600,11 +601,8 @@ export const ChannelsConfigView: React.FC = () => {
                                                     }
                                                 }}
                                                 options={[
-                                                    { value: "", label: ch.type === "GR" ? "(TER)" : "(SAT)" },
-                                                    { value: "TER", label: "TER" },
-                                                    { value: "SAT", label: "SAT" },
-                                                    { value: "CATV", label: "CATV" },
-                                                    { value: "FTTH", label: "FTTH" }
+                                                    { value: "", label: `(${channelRouteMap[ch.type === "GR" ? "TER" : "SAT"]})` },
+                                                    ...channelRoutes.map(route => ({ value: route, label: getChannelRouteLabel(route) }))
                                                 ]}
                                             />
                                         </FormGroup>
@@ -770,12 +768,7 @@ export const ChannelsConfigView: React.FC = () => {
                             <HTMLSelect
                                 value={scanRoute}
                                 onChange={(e) => setScanRoute(e.target.value as ChannelRoute)}
-                                options={[
-                                    { value: "TER", label: "TER (Terrestrial)" },
-                                    { value: "SAT", label: "SAT (Satellite)" },
-                                    { value: "CATV", label: "CATV" },
-                                    { value: "FTTH", label: "FTTH" }
-                                ]}
+                                options={channelRoutes.map(route => ({ value: route, label: getChannelRouteLabel(route) }))}
                             />
                         </FormGroup>
 
