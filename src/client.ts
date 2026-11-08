@@ -79,6 +79,10 @@ export interface ServicesQuery {
 
 export interface ChannelScanOption {
     dryRun?: boolean;
+    /** @deprecated compatible with 4.3.0, use `route` and `source` */
+    type?: apid.ChannelType;
+    /** @deprecated with `type` (BS) */
+    useSubCh?: boolean;
     route?: apid.ChannelRoute;
     source?: apid.ChannelScanSource;
     channels?: string[];
@@ -90,7 +94,8 @@ export interface ChannelScanOption {
     scanMode?: apid.ChannelScanMode;
     setDisabledOnAdd?: boolean;
     refresh?: boolean;
-    skipCh?: string[];
+    /** the names (also the numbers in the names with `type`) */
+    skipCh?: (string | number)[];
     async?: boolean;
 }
 

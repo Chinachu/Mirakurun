@@ -743,6 +743,9 @@ definitions:
       route:
         $ref: '#/definitions/ChannelRoute'
         description: "Receiving route being scanned"
+      type:
+        $ref: '#/definitions/ChannelType'
+        description: "Deprecated: the type of the scan by `type` (compatible with 4.3.0)"
       dryRun:
         type: boolean
         description: "Whether this is a dry run (no changes will be saved)"

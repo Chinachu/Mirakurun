@@ -16,11 +16,11 @@ const oldChannels = [
 const service = (networkId, serviceId, name) => ({ networkId, serviceId, name, type: 1, streamId: 1 });
 
 // scanTypes: the types to try (by default, a tuner of all the types)
-async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"], dvbChannels = [], logs = [], scanTypes, routes, relTsByRemote = [] } = {}) {
+async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"], dvbChannels = [], logs = [], scanTypes, routes, relTsByRemote = [], extraChannels = [] } = {}) {
   const saved = [];
   const tuned = [];
   const errors = [];
-  config.loadChannels = async () => oldChannels.map(item => ({ ...item }));
+  config.loadChannels = async () => [...oldChannels, ...extraChannels].map(item => ({ ...item }));
   config.saveChannels = async items => {
     saved.push(items);
   };
@@ -186,12 +186,69 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
     assert.deepStrictEqual(saved.filter(item => item.channel === "C30").map(item => [item.type, item.tsmfRelTs]), [["GR", 1], ["BS", undefined]]);
   });
 
-  // 互換性のない変更: タイプではなく受信経路でスキャンする
-  it("rejects the type, which is no longer supported", async () => {
-    const result = await runScan({ type: "BS" }, () => []);
-    assert.deepStrictEqual(result.errors.map(e => e.code), [400]);
-    assert.deepStrictEqual(result.tuned, []);
-    assert.strictEqual(result.saved, undefined);
+  // 4.3.0 との互換: type を指定すると、そのタイプのチューナーで、そのタイプの既定の受信経路の 4.3.0 と同じチャンネルをスキャンする
+  it("scans the channels of the type of 4.3.0 by the tuners of the type", async () => {
+    const { saved, tuned, errors } = await runScan(
+      { type: "BS", minCh: 1, maxCh: 3, minSubCh: 0, maxSubCh: 1, skipCh: ["20"], refresh: true },
+      channel => [{ format: "ts", services: [service(4, 101, channel.channel)] }],
+      { scanTypes: ["GR", "BS", "CS"] }
+    );
+
+    assert.deepStrictEqual(errors, []);
+    // skipCh: the numbers in the names of 4.3.0 (BS02_0 -> 20)
+    assert.deepStrictEqual(tuned.map(t => [t.channel, t.route, t.type]), [
+      ["BS01_0", "SAT", "BS"], ["BS01_1", "SAT", "BS"], ["BS02_1", "SAT", "BS"], ["BS03_0", "SAT", "BS"], ["BS03_1", "SAT", "BS"]
+    ]);
+    // BS and CS are added in disabled state by default (as 4.3.0)
+    const added = saved.filter(item => item.channel === "BS01_1");
+    assert.deepStrictEqual(added.map(item => [item.type, item.route, item.isDisabled]), [["BS", undefined, true]]);
+
+    // GR: 13-62 by the tuners of GR, CS: CS2-CS24
+    const gr = await runScan({ type: "GR", dryRun: true, refresh: true }, () => [], { scanTypes: ["GR", "BS"] });
+    assert.deepStrictEqual(gr.tuned.map(t => t.channel), Array.from({ length: 50 }, (_, i) => `${i + 13}`));
+    assert.ok(gr.tuned.every(t => t.type === "GR" && t.route === "TER"));
+    const cs = await runScan({ type: "CS", minCh: 2, maxCh: 4, dryRun: true }, () => [], { scanTypes: ["BS", "CS"] });
+    assert.deepStrictEqual(cs.tuned.map(t => [t.channel, t.type]), [["CS2", "CS"], ["CS3", "CS"], ["CS4", "CS"]]);
+  });
+
+  it("replaces only the entries of the type of 4.3.0", async () => {
+    const old = config.loadChannels;
+    const { saved } = await runScan(
+      { type: "BS", minCh: 1, maxCh: 1, maxSubCh: 0, refresh: true },
+      // BS and a stream of the network of SKY (not of the type) on the channel
+      () => [{ format: "ts", relTs: 1, services: [service(4, 101, "BS")] }, { format: "ts", relTs: 2, services: [service(1, 102, "SKY")] }],
+      { scanTypes: ["BS"], extraChannels: [
+        { name: "BS4K", type: "BS4K", channel: "BS01_0", tsmfRelTs: 2 },
+        { name: "SKY", type: "SKY", channel: "BS01_0" }
+      ] }
+    );
+    config.loadChannels = old;
+
+    assert.deepStrictEqual(saved.filter(item => item.channel === "BS01_0").map(item => [item.type, item.name]).sort(),
+      [["BS", "BS"], ["BS4K", "BS4K"], ["SKY", "SKY"]]);
+  });
+
+  it("takes over only the entries of the type of 4.3.0", async () => {
+    const { saved, tuned } = await runScan(
+      { type: "BS", minCh: 1, maxCh: 2, maxSubCh: 0 },
+      channel => [{ format: "ts", services: [service(4, 101, channel.channel)] }],
+      { scanTypes: ["BS"], extraChannels: [{ name: "SKY1", type: "SKY", channel: "BS01_0" }] }
+    );
+
+    // BS01_0 has the enabled entry of BS (taken over), the entry of SKY remains once
+    assert.deepStrictEqual(tuned.map(t => t.channel), ["BS02_0"]);
+    assert.deepStrictEqual(saved.filter(item => item.channel === "BS01_0").map(item => [item.type, item.name]).sort(),
+      [["BS", "BS01"], ["SKY", "SKY1"]]);
+  });
+
+  it("rejects the type of 4.3.0 with the route or the source, and the other types", async () => {
+    // listed in the API document (the client of 4.3.0 sends only the parameters listed)
+    assert.ok(scan.put.apiDoc.parameters.some(parameter => parameter.name === "type"));
+    for (const query of [{ type: "BS", route: "CATV" }, { type: "GR", source: "list", channels: ["13"] }, { type: "SKY" }]) {
+      const result = await runScan(query, () => []);
+      assert.deepStrictEqual(result.errors.map(e => e.code), [400], JSON.stringify(query));
+      assert.deepStrictEqual(result.tuned, []);
+    }
   });
 
   // 準備中に中止を要求されて開始しなかった場合も、中止の要求を次のスキャンに残さない

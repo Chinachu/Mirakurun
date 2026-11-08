@@ -410,6 +410,8 @@ export interface ChannelScanStatus {
     isScanning: boolean;
     status: ChannelScanPhase;
     route?: ChannelRoute;
+    /** @deprecated the type of the scan by `type` (compatible with 4.3.0) */
+    type?: ChannelType;
     dryRun?: boolean;
     progress?: number;
     currentChannel?: string;

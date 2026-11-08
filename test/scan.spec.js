@@ -7,6 +7,20 @@ const scan = require("../lib/Mirakurun/api/config/channels/scan");
 const range = (start, end, f) => Array.from({ length: end - start + 1 }, (_, i) => f(i + start));
 
 describe("[scan.spec] /api/config/channel/scan : generateScanConfig", () => {
+    it("type of 4.3.0: the channels of the type by the parameters of 4.3.0", () => {
+        const bs = range(1, 23, ch => [0, 1, 2, 3].map(subCh => `BS${String(ch).padStart(2, "0")}_${subCh}`)).flat();
+        assert.deepStrictEqual(scan.generateLegacyScanConfig({ type: "GR" }), { channels: range(13, 62, ch => `${ch}`) });
+        assert.deepStrictEqual(scan.generateLegacyScanConfig({ type: "BS" }), { channels: bs });
+        assert.deepStrictEqual(scan.generateLegacyScanConfig({ type: "BS", useSubCh: false }), { channels: range(101, 256, ch => `${ch}`) });
+        assert.deepStrictEqual(scan.generateLegacyScanConfig({ type: "CS", startCh: 2, endCh: 3, scanMode: "Channel" }), { channels: ["CS2", "CS3"], scanMode: "Channel" });
+        assert.deepStrictEqual(scan.generateLegacyScanConfig({ type: "GR", channelNameFormat: "C{ch}", startCh: 13, endCh: 14 }), { channels: ["C13", "C14"] });
+        // the subchannels only for BS of the subchannel style
+        assert.deepStrictEqual(scan.generateLegacyScanConfig({ type: "CS", channelNameFormat: "CS{ch}_{subch}", startCh: 2, endCh: 2, startSubCh: 1, endSubCh: 2 }), { channels: ["CS2_0"] });
+        assert.strictEqual(scan.generateLegacyScanConfig({ type: "SKY" }), undefined);
+
+        assert.deepStrictEqual(scan.getLegacySkipChannels(["13", "14", "BS01_0", "CS4", "C15"], ["14", "10", "C15"]), ["14", "BS01_0", "C15"]);
+    });
+
     it("preset: the channels of each route", () => {
         const terrestrial = range(13, 62, ch => `${ch}`);
         const bs = range(1, 23, ch => [0, 1, 2, 3].map(subCh => `BS${String(ch).padStart(2, "0")}_${subCh}`)).flat();
