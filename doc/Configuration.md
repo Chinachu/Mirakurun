@@ -83,14 +83,13 @@
 ```yaml
 # Array
 - name: TunerIdentificationName # String
-  types: # (GR|BS|CS|SKY|BS4K|CATV)[]
+  types: # (GR|BS|CS|SKY|BS4K|CATV)[] - types the tuner can receive
     - GR
     - BS
     - CS
-    - SKY
-  routes: # (TER|SAT|SKY|CATV|FTTH)[] - routes the tuner can receive. All routes if omitted.
+  routes: # (TER|SAT|SKY|CATV|FTTH)[] - routes reaching the input of the tuner. All routes if omitted.
     - TER
-    - CATV
+    - SAT
   # For chardev/dvb
   # "<template>" will be replaced with `commandVars[template]` or "(empty)" *@4.0.0~
   # "<route>" will be replaced with the route of the channel in lowercase (ter|sat|sky|catv|ftth)
@@ -109,13 +108,22 @@
   isDisabled: false # Boolean
 ```
 
-`BS4K` and `CATV` (such as the community channels of cable television) have been added to the public `ChannelType` union. TypeScript consumers with exhaustive switches or `Record<ChannelType, ...>` mappings for the previous four types need to add `BS4K` and `CATV` cases or keys. `GR`, `BS`, `CS` and `SKY` remain supported.
+#### types / routes
 
-#### routes
+A channel is tuned by the tuners whose `types` include the type of the channel and whose `routes` include the route of the channel. See [Types and Routes](#types-and-routes) for the types and the routes.
 
-The routes the tuner can receive. A channel is tuned only by the tuners whose `routes` include the `route` of the channel. If omitted, the tuner is treated as receiving all routes (same as before).
+- `routes` are the routes reaching the input of the tuner. If omitted, the tuner is treated as receiving all routes (same as before).
+- Specify multiple routes when, for example, the terrestrial and BS / CS antennas are combined into one cable by a mixer.
 
-For example, specify `BS` in `types` and `CATV` in `routes` for a tuner receiving BS through CATV transmodulation. A tuner connected to the satellite antenna with `SAT` in `routes` is not used for the CATV channels.
+```mermaid
+flowchart LR
+    ter[Terrestrial antenna] --> mix[Mixer]
+    sat[BS / CS antenna] --> mix
+    mix --> t1["Tuner 1<br>types: [GR, BS, CS]<br>routes: [TER, SAT]"]
+    catv[Cable television] --> t2["Tuner 2<br>types: [GR, BS, CS, BS4K, CATV]<br>routes: [CATV]"]
+```
+
+In this example, the channels of the route `CATV` are tuned only by tuner 2, and the channels of `TER` and `SAT` only by tuner 1.
 
 #### DVB device direct access
 
@@ -169,12 +177,11 @@ While tuning directly, the following differ from running the command.
 
 Specify the CAS processing command as needed.
 
-```
-# Reference: MPEG-2 TS flow
-+-------------+    +----------+    +---------+    +--------+
-| TunerDevice | -> | TSFilter | -> | decoder | -> | (user) |
-+-------------+    +----------+    +---------+    +--------+
-               RAW           STRIPPED      DESCRAMBLED
+MPEG-2 TS flow (reference):
+
+```mermaid
+flowchart LR
+    tuner[TunerDevice] -- RAW --> filter[TSFilter] -- STRIPPED --> decoder -- DESCRAMBLED --> user["(user)"]
 ```
 
 ```sh
@@ -184,22 +191,21 @@ sudo npm install arib-b25-stream-test -g --unsafe-perm
 
 #### tlvDecoder / tlvToTsDecoder
 
-These are used instead of `decoder` for TLV (MMT) channels of any type. Both can be specified with arguments (quote the ones including spaces).
+These are used instead of `decoder` for TLV (MMT) channels of any type. Both can be specified with arguments (quote arguments that contain spaces).
 
 - `tlvDecoder`: CAS processing command that takes TLV and outputs TLV
 - `tlvToTsDecoder`: command that takes TLV and outputs MPEG-2 TS
 
-```
-# Reference: TLV flow
-+-------------+    +-----------+    +------------+    +----------------+    +--------+
-| TunerDevice | -> | TLVFilter | -> | tlvDecoder | -> | tlvToTsDecoder | -> | (user) |
-+-------------+    +-----------+    +------------+    +----------------+    +--------+
-               TLV             TLV               TLV                   TS
+TLV flow (reference):
+
+```mermaid
+flowchart LR
+    tuner[TunerDevice] -- TLV --> filter[TLVFilter] -- TLV --> tlvDecoder -- TLV --> tlvToTsDecoder -- TS --> user["(user)"]
 ```
 
-With `format=tlv`, the stream APIs output TLV without `tlvToTsDecoder`. With `format=ts`, only the tuners with `tlvToTsDecoder` are used to output TS. Without `format`, `defaultTlvStreamFormat` is followed. 406 is returned for the format that can not be output.
+With `format=tlv`, the stream APIs output TLV without `tlvToTsDecoder`. With `format=ts`, only the tuners with `tlvToTsDecoder` are used to output TS. Without `format`, `defaultTlvStreamFormat` is followed. If a format that cannot be output is requested, 406 is returned.
 
-If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outputting TLV. `tlvDecoder` passes through the input as `decoder` does.
+If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outputting TLV. If `tlvDecoder` keeps failing to start, the input is passed through as with `decoder`.
 
 ## 🗒️channels.yml
 
@@ -219,11 +225,11 @@ If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outp
   type: GR # Enum [GR|BS|CS|SKY|BS4K|CATV]
   channel: '0' # String
   # Optional parameters below
-  route: TER # Enum [TER|SAT|SKY|CATV|FTTH] - receiving route. `TER` for GR, `SKY` for SKY, `CATV` for CATV, `SAT` for others if omitted.
+  route: TER # Enum [TER|SAT|SKY|CATV|FTTH] - receiving route. Defaults to the default route of the type if omitted.
   serviceId: 1234 # Integer - Services will be automatically scanned if not specified.
-  tsmfRelTs: 1 # Number: 1~15 - relative TS number of TSMF (for both TS and TLV). Detected by the service scan on the tuners for TLV (the types including BS4K, or tlvDecoder / tlvToTsDecoder configured) if not specified. Required for the tuners only for TS
-  tsmfGroupId: 1 # Number: 1~255 - the group of the carriers transmitting a TLV (channel bonding of CATV). The channels of the same value are the carriers of the group. Detected by the service scan on the tuners for TLV if not specified together with tsmfRelTs
-  format: tlv # Enum [ts|tlv] - the format detected by the service scan if not specified (before the scan, tlv for BS4K, ts for others)
+  tsmfRelTs: 1 # Number: 1~15 - relative TS of TSMF
+  tsmfGroupId: 1 # Number: 1~255 - group of the TLV transmitted over multiple carriers
+  format: tlv # Enum [ts|tlv] - format of the data received
   commandVars: # Optional command variables *@4.0.0~
     satellite: EXAMPLE-SAT4A
     space: 0
@@ -234,31 +240,85 @@ If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outp
   isDisabled: false # Boolean
 ```
 
+### Types and Routes
+
+- Type (`type`): what the broadcast is. The channel scan decides it by the network of the services received.
+- Route (`route`): where it comes from. The same BS is `SAT` from a satellite antenna, and `CATV` from cable television.
+
+| Type | Broadcast | Network used by the scan to decide the type (original_network_id) | Route if `route` is omitted |
+| --- | --- | --- | --- |
+| `GR` | Digital terrestrial | `0x7880`-`0x7FE8` | `TER` |
+| `BS` | BS digital | `4` | `SAT` |
+| `CS` | 110 degree CS | `6`, `7` | `SAT` |
+| `SKY` | 124 / 128 degree CS (SKY PerfecTV! Premium Service) | `1`, `3`, `10` | `SKY` |
+| `BS4K` | TLV (MMT) broadcasts (such as BS 4K / 8K) | TLV (any network) | `SAT` |
+| `CATV` | Community channels of cable television, etc. | `0xFFF7`, `0xFFF9`, `0xFFFA`, `0xFFFD`, `0xFFFE`, `0xFFFF` | `CATV` |
+
+| Route | Connected to | Types added by the scan |
+| --- | --- | --- |
+| `TER` | Terrestrial antenna | `GR` |
+| `SAT` | BS / 110 degree CS antenna | `BS`, `CS`, `BS4K` |
+| `SKY` | 124 / 128 degree CS antenna | `SKY` |
+| `CATV` | Cable television (including transmodulation delivered over optical fiber) | All |
+| `FTTH` | Television over optical fiber (terrestrial and BS / CS passed through, SKY PerfecTV! Premium Service Hikari) | All |
+
+- When the same broadcast is received through multiple routes, it can be configured as a separate channel for each route. However, of the entries of the same type and channel, only the first one that is enabled and has a tuner of the type on its route is used. If multiple channels can receive the same stream, the route with an available tuner is tuned (the channel scanned first is preferred).
+- A service is associated with the routes by the stream received (`networkId` and `transport_stream_id`). The stream received on each channel is saved in `channels.json` (environment variable: `CHANNELS_DB_PATH`, default: in the same directory as `services.json`).
+
+> [!NOTE]
+> `BS4K` and `CATV` have been added to the public `ChannelType` union. TypeScript consumers covering the types with `switch` or `Record<ChannelType, ...>` need to add `BS4K` and `CATV`. `GR`, `BS`, `CS` and `SKY` remain supported.
+
 #### tsmfRelTs
 
-The relative TS number of the channel multiplexed by TSMF. The relative stream carrying TLV in extended TSMF can also be specified.
+TSMF transmits multiple streams (relative TSs) together over one carrier (such as CATV). `tsmfRelTs` specifies the number of the relative TS to receive. A relative TS of TLV can also be specified.
 
-If not specified, all the relative streams in use, and TS or TLV for each, are detected from the TSMF headers by the service scan, and the services are scanned for each relative stream (saved in `channels.json`). The services are newly registered only by the scan of the channel without services, as before. The streams of the services and the programs receive the relative stream of the service. Like `format`, they are detected only when the tuner of the scan has the type `BS4K` or `tlvDecoder` / `tlvToTsDecoder`. Specify `tsmfRelTs` to receive a channel of TSMF by the tuners only for TS.
+```mermaid
+flowchart LR
+    ch["Carrier of channel C21"] --> r1["Relative TS 1<br>BS (TS)"]
+    ch --> r2["Relative TS 2<br>CATV (TS)"]
+    ch --> r3["Relative TS 3<br>BS4K (TLV)"]
+```
 
-The stream of the channel (`/api/channels/{type}/{channel}/stream`) accepts the query `tsmfRelTs` to specify the relative stream. Without it, the relative stream of `tsmfRelTs` of channels.yml (the stream as received if not specified) is output as before, for the remote Mirakurun receiving it. The stream as received of a channel whose TSMF is detected is TS, even for the type `BS4K` (unless `format` is specified). When the relative stream of a service is unknown, the relative stream of the most slots (the smaller number if the same) of the network of the service (of all if none) is received. The relative streams detected are received by the local tuners first, and by the remote tuners specifying the query `tsmfRelTs` of the stream of the channel of the remote Mirakurun (the remote Mirakurun bonds the TLV of the multiple carriers). The relative stream needs to be detected by the remote Mirakurun too (without `tsmfRelTs` of channels.yml, or with the same one). Whether the remote Mirakurun supports the query is checked by its API docs. The remote tuners of the remote Mirakurun of 4.3.0 or before, which does not support it, and the ones not checked yet (checked again every 10 seconds if failed, every 10 minutes if not supported) are not used for them. The relative streams of the channel not detected by the remote Mirakurun (`tsmfRelTs` of `services` of `/api/channels/{type}/{channel}`), and the relative stream refused by it (for 10 minutes), are not requested from it either. The local tuners come first for the relative streams detected. The service scan of a channel received only by the remote tuners receives the relative streams detected by the remote Mirakurun (`tsmfRelTs` and `format` of `services` of `/api/channels/{type}/{channel}`). The stream as received of a channel by the remote tuners is received as the stream the remote Mirakurun outputs (`format` of channels.yml, TS if the remote Mirakurun has detected the relative streams, or the default format of the type). The remote tuners refused by the remote Mirakurun (400 / 404 / 406) end the streams without respawning, and respawn as before for the other errors (such as 503 for the tuners in use).
+- If specified, the relative TS is received. It needs to be specified if the local tuners that can tune the channel include no tuner for TLV (a tuner with `BS4K` in `types`, or with `tlvDecoder` / `tlvToTsDecoder`) (see below for the channels received only by the remote tuners).
+- If omitted, the service scan (Mirakurun automatically getting the services of the channels configured) on a local tuner for TLV detects the relative TSs and their formats (TS / TLV) from the TSMF headers, and saves them in `channels.json`. The services are scanned for each relative TS, and viewing and recording receive the relative TS of the service.
+- New services are registered only when the channel has no services, as before (the services of a TLV of multiple carriers and of a TLV detected by the remote Mirakurun are added if no service of the TLV is registered).
+- The channel scan adds `tsmfRelTs` if the channel has only one relative TS of the type ([TSMF channels](#tsmf-channels)).
+- When the relative TS of a service is unknown, the relative TS with the most slots is received, chosen from those of the network of the service (or from all relative TSs if there are none); ties go to the lower number.
+- The stream of the channel (`/api/channels/{type}/{channel}/stream`) accepts the query `tsmfRelTs` to specify the relative TS. Without it, the relative TS of `tsmfRelTs` of channels.yml is output, or the stream as received if not specified either. For a channel where TSMF is detected, the stream as received is TS, even for `BS4K` (unless `format` is specified).
+
+<details>
+<summary>Receiving by the tuners of a remote Mirakurun</summary>
+
+- The relative TSs detected are received by the local tuners first. The remote tuners receive them by the query `tsmfRelTs` on the stream of the channel of the remote Mirakurun (the remote Mirakurun bonds the TLV of multiple carriers).
+- The remote tuners are used to receive a detected relative TS only when all of the following are met:
+    - The remote Mirakurun supports the query (checked with the API definition of the remote; 4.3.0 and earlier do not support it. Checked again every 10 seconds if it cannot be checked, and every 10 minutes if not supported)
+    - The remote Mirakurun has also detected the relative TS of the channel (`tsmfRelTs` of `services` of `/api/channels/{type}/{channel}`. Omit `tsmfRelTs` in channels.yml of the remote, or set the same value)
+    - The remote has not refused the relative TS in the last 10 minutes
+- The service scan of a channel received only by the remote tuners receives the relative TSs detected by the remote Mirakurun (`tsmfRelTs` and `format` of `services`).
+- The stream as received by the remote tuners is treated as the format the remote Mirakurun outputs (`format` of channels.yml, TS for the channel whose relative TSs are detected by the remote Mirakurun, otherwise the format saved by the service scan or the default of the type).
+- The streams refused by the remote Mirakurun (400 / 404 / 406) end without respawning. For the other errors (such as 503 for the tuners in use), they respawn as before.
+
+</details>
 
 #### format
 
-The format of the data received on the channel. `tlv` for TLV (MMT).
+The format of the data received on the channel (`ts` / `tlv`): of the relative TS of `tsmfRelTs` if specified, otherwise of the stream as received.
 
-If not specified, the format is detected from the data received by the service scan, and saved in `channels.json`. It is detected only when the tuner of the scan has the type `BS4K` or `tlvDecoder` / `tlvToTsDecoder` (not to add any work to the environments only for TS). The streams for viewing and recording do not detect and use the format saved (not to delay the start of the streams of TS). Before the scan, `tlv` for the type `BS4K`, `ts` for the others.
-
-`format` is for the stream of the channel (the relative stream of `tsmfRelTs`, or the stream as received if not specified). When the relative streams of TSMF are detected without `tsmfRelTs`, each relative stream is received in the format detected.
+- If omitted, it is detected by the service scan on a local tuner for TLV, and saved in `channels.json` (to avoid extra processing in TS-only environments). Before the scan, `tlv` for `BS4K`, `ts` for the others.
+- The streams for viewing and recording do not detect it (to avoid delaying the start of TS streams).
+- If `tsmfRelTs` is omitted and the relative TSs are detected, each relative TS is received in the format detected.
 
 #### tsmfGroupId
 
-Specify this when a TLV is transmitted by multiple carriers of CATV (channel bonding). The channels of the same `type` and `tsmfGroupId` are the carriers of the group, tuned at the same time by the different tuners to assemble the TLV. Any channel of the group outputs the same TLV.
+The group of a TLV transmitted over multiple carriers (channel bonding of CATV). The channels of the same `type` and `tsmfGroupId` are tuned at the same time by separate tuners, and the TLV is assembled. Any channel of the group outputs the same TLV.
 
-- Tuners as many as the carriers are needed. The tuners of the carriers are shown in `/api/tuners` as the users `<user ID>#carrier<n>`.
-- Requests for the same carriers share the tuners with EPG acquisition and other streams. Joining the same reception does not stop existing users, even at a higher priority. Requests for other carriers follow the usual priority rules when no tuner is free.
-- When `tsmfRelTs` and `tsmfGroupId` are omitted, each channel scan saves the relative streams, stream IDs, group ID and carrier count from the headers in `channels.json`. Once all carriers of the same type, route and group carrying the same TLV have been discovered, service scanning uses the additional tuners. TS services sharing a carrier are scanned even before the other carriers have been discovered. If fewer compatible local tuners are registered than required, header information is saved and TLV service scanning is deferred. The channel scan adds the carriers without TS services as channels of BS4K ([Channel Scan](#channel-scan)).
-- The skew of the carriers is found by checking the TLV assembled (the difference of the delays up to about 0.5 seconds). Nothing is output until it is found, usually within a second, but it may take about 10 seconds for 4 or more carriers.
-- The stream is closed when a carrier is not received for about 10 seconds (including starting the tuner) or the TLV can not be assembled.
+```mermaid
+flowchart LR
+    c1["Channel 1"] --> t1[Tuner A] --> bond[Assemble the TLV]
+    c2["Channel 2"] --> t2[Tuner B] --> bond
+    c3["Channel 3"] --> t3[Tuner C] --> bond
+    bond --> out[Output]
+```
 
 ```yaml
 - name: TLV (1)
@@ -281,48 +341,68 @@ Specify this when a TLV is transmitted by multiple carriers of CATV (channel bon
   tsmfGroupId: 8
 ```
 
-#### route
-
-The route to receive the channel. The same broadcast can also be configured as a channel of another route, such as BS received both through a satellite antenna and through CATV transmodulation.
-
-- `TER`: terrestrial antenna
-- `SAT`: satellite antenna of BS / 110 degree CS
-- `SKY`: satellite antenna of 124 / 128 degree CS (SKY PerfecTV! Premium Service)
-- `CATV`: cable television
-- `FTTH`: television over optical fiber (terrestrial and BS / CS passed through). Use `CATV` for the transmodulation of cable television even over optical fiber (the default channels of the scan differ). SKY of SKY PerfecTV! Premium Service Hikari is also received on `FTTH` (scan by `dvbConf` or `list`)
-
-A service is associated with the channels by the stream received (`networkId` and `transport_stream_id`). If multiple channels can receive the same stream, the route with an available tuner is tuned (the channel scanned first is preferred). The stream received on each channel is saved in `channels.json` (environment variable: `CHANNELS_DB_PATH`, default: in the same directory as `services.json`).
+- As many tuners that can tune the channels as there are carriers are required (local tuners if `tsmfRelTs` and `tsmfGroupId` are omitted. With only remote tuners, the remote Mirakurun bonds the carriers). The tuners of the carriers are shown in `/api/tuners` as the users `<user ID>#carrier<n>`.
+- A tuner receiving the same carrier is shared with EPG gathering and the other streams. Joining a shared reception does not end the existing use even with a higher priority. If another carrier is needed and no tuner is available, the tuners are switched by priority as before.
+- If `tsmfRelTs` and `tsmfGroupId` are omitted, the service scan gets the relative TS, stream ID, group ID and number of carriers from the headers, and saves them in `channels.json`. When the channels of all the carriers transmitting the same TLV of the same type, route and group are enabled in channels.yml (they can be added by the [channel scan](#tsmf-channels). They are added disabled by default, so enable all of them), the services of the TLV are scanned using additional tuners. The services of TS on the same carrier are scanned even before that. If fewer local tuners are configured than there are carriers, getting the services of the TLV is put on hold.
+- The TLV assembled is output after it is confirmed to be continuous (up to about 0.5 seconds of difference in delay between the carriers). It usually takes less than 1 second, but can take about 10 seconds with 4 or more carriers.
+- The stream ends when any carrier cannot be received for about 10 seconds (including starting the tuner), or the TLV cannot be assembled for a while.
 
 ### Channel Scan
 
-"Channel Scan" of the Web UI (`PUT /api/config/channels/scan`) scans the channels of a receiving route (`route`), decides the type of each channel by the network of the services received (original_network_id), and adds them to channels.yml. CATV mixing terrestrial, BS, CS, BS4K and the community channels is also added by one scan.
+"Channel Scan" of the Web UI (`PUT /api/config/channels/scan`) scans the channels of a route and adds them to channels.yml. The channels of CATV mixing terrestrial, BS, CS, BS4K and community channels can also be added in a single scan. It is different from the "service scan", which automatically gets the services of the channels configured.
 
-| Network | Type |
-| --- | --- |
-| `4` | BS |
-| `6`, `7` | CS |
-| `1`, `3`, `10` | SKY |
-| TLV (MMT) | BS4K |
-| `0x7880`-`0x7FE8` (terrestrial) | GR |
-| the networks of CATV (`0xFFF7`, `0xFFF9`, `0xFFFA`, `0xFFFD`, `0xFFFE`, `0xFFFF`, such as the community channels) | CATV |
+```mermaid
+flowchart TD
+    a["Choose the route and the channels to scan (source)"] --> b[Tune by the tuners of the route]
+    b --> c["Decide the type by the network of the services received"]
+    c --> d{"Type added on the route?"}
+    d -- Yes --> e["Add to channels.yml (default)<br>GR: per channel, enabled<br>Others: per service, disabled"]
+    d -- "No / unknown network" --> f[Not added]
+```
 
-The streams of the other networks are not added.
+How the type is decided and which types are added on each route are shown in the tables of [Types and Routes](#types-and-routes) (for example, `SKY` received by a scan of the route `SAT` is not added). Whether entries are added per channel or per service, and whether they are added enabled, can be changed with "Scan Mode" and "Set Disabled on Add" of the Web UI (`scanMode` and `setDisabledOnAdd` of the API).
 
-The channels to scan (`source`):
+#### Channels to scan (`source`)
 
-- `preset`: the channels of the route (the names of the tuner commands such as recpt1, recisdb)
+- `preset`: the default channels of the route (the channel names of recpt1, recisdb, etc.)
     - TER: `13`-`62`
     - SAT: `BS01_0`-`BS23_3`, `CS2`-`CS24`
     - SKY: none (specify by `dvbConf` or `list`)
     - CATV: `1`-`12` (VHF), `C13`-`C63`, `13`-`62`
-    - FTTH: `13`-`62`, `BS01_0`-`BS23_3`, `CS2`-`CS24`
-- `dvbConf`: all the channels of the channel config files of dvbv5-zap (`-c`) of the tuners used for the scan (including the files not for DVB device direct access, such as DVB-C)
+    - FTTH: `13`-`62`, `BS01_0`-`BS23_3`, `CS2`-`CS24` (specify SKY of SKY PerfecTV! Premium Service Hikari by `dvbConf` or `list`)
+- `dvbConf`: all the channels of the channel config files of dvbv5-zap (`-c`) of the tuners used for the scan (including channel config files that DVB direct access cannot handle, such as DVB-C)
 - `list`: the channels specified (`channels`)
 - `format`: the format of the channel names (`channelNameFormat`, e.g. `C{ch}`) and the range
 
-- The tuners of the route are used. If the route has the tuners of the different kinds (such as ISDB-T and ISDB-S), each channel is tried by them until received (once by the tuners of the same `types`) (the types of the route: TER: GR, SAT: BS / CS / BS4K, SKY: SKY, CATV and FTTH: any). The tuners of a remote Mirakurun are tried by each type, because they receive only the channels of the types configured on the remote. For a tuner receiving multiple broadcasts, specify all the types to receive in `types` (such as `[GR, BS, CS, BS4K, CATV]` for CATV).
-- The scan detects the relative streams of TSMF also on the tuners not for TLV. If the type has only one relative stream on the channel, `tsmfRelTs` is added (any tuner receives it). If the type has more than one, `tsmfRelTs` is not added and the tuners for TLV detect them. The remote tuners scan the relative streams detected by the remote Mirakurun, and `tsmfRelTs` is not added (the remote Mirakurun outputs the relative streams). The same for the types received only by the remote tuners, if every remote Mirakurun outputs the relative streams of the channel (detected, or `tsmfRelTs` of its channels.yml, even of 4.3.0 or before). The relative streams whose services are not received are also counted by the network of the header (logged, added by scanning the channel again with `refresh`).
-- The carriers of a TLV transmitted by multiple carriers (such as BS8K) are added as channels of BS4K without the services (`tsmfRelTs` and `tsmfGroupId` are detected).
-- The entries of the channels scanned on the route (of any type) are replaced with the result. The entries of the channels not scanned and of the other routes remain. Without `refresh`, the channels with an enabled entry are not scanned and their entries remain.
-- The channels are distinguished by the type and the channel name. If another route has an enabled entry of the same type and channel name, the entry remains and the channel scanned is not added.
-- For compatibility with 4.3.0, `type` (`GR`, `BS` or `CS`, deprecated) can also be specified instead of `route` and `source`. The channels of 4.3.0 are scanned by the tuners of the type as the default route of the type (GR: TER, BS and CS: SAT) (GR: `13`-`62`, BS: `BS01_0`-`BS23_3` (`useSubCh`, default) or `101`-`256`, CS: `CS2`-`CS24`, changed by `minCh`, `maxCh`, `minSubCh`, `maxSubCh` and `channelNameFormat`). `skipCh` also matches the numbers in the channel names. Only the entries of the type are replaced, the entries of the other types remain.
+#### Tuners used
+
+- The tuners of the route (with the route in `routes` or without `routes`, and with a type added on the route in `types`) are used.
+- If there are tuners of different kinds (such as ISDB-T and ISDB-S), each channel is tried by them until received (tuners with the same `types` are tried only once).
+- For a tuner receiving multiple types, specify all the types to receive in `types`. If no tuner on the route can tune the type of an added channel, the scan log reports it.
+- The tuners of a remote Mirakurun are tried by each type, because they receive only the channels of the types configured on the remote.
+
+#### TSMF channels
+
+- The channel scan detects the relative TSs of TSMF even on the tuners not for TLV.
+- If the channel has only one relative TS of the type, `tsmfRelTs` is added (any tuner can receive it). If two or more, it is not added and left to the detection by the tuners for TLV (without a tuner for TLV, only the one specified by `tsmfRelTs` can be received).
+- The remote tuners scan the relative TSs detected by the remote Mirakurun, and `tsmfRelTs` is not added (the remote Mirakurun outputs the relative TS).
+- Even when scanned by the local tuners, `tsmfRelTs` is not added for a type received only by the remote tuners if every remote Mirakurun outputs the relative TS of the channel (detected, or `tsmfRelTs` in channels.yml of the remote; a remote of 4.3.0 or before also counts).
+- Relative TSs whose services could not be received are still counted toward the relative TSs of the type, based on the network in the header (so `tsmfRelTs` may not be added; this is logged). Their services are added by scanning the channel again with "Refresh" (`refresh`) on.
+- The carriers of a TLV transmitted over multiple carriers (such as BS8K) are added as `BS4K` channels even without services (disabled by default. `tsmfRelTs` and `tsmfGroupId` are not written, and are detected by the service scan).
+
+#### Rewriting channels.yml
+
+- The entries of the route (of any type) of the channels scanned are replaced with the result (the entries of the channels not received are deleted). The entries of the channels not scanned and of the other routes remain.
+- With "Refresh" of the Web UI (`refresh` of the API) off, the channels with an enabled entry on the route are not scanned, and the entries remain.
+- Channels are identified by the combination of type and channel. If an enabled entry of the same type and channel is on another route with a tuner of the type, that entry remains and the channel scanned is not added.
+- With "Auto Apply Results" of the Web UI off (default), the result is shown without rewriting channels.yml. 「スキャン結果を適用」 (apply the scan results) applies it to the settings being edited. With the API, channels.yml is not rewritten if `dryRun` is specified.
+
+#### Compatibility with 4.3.0 or before (deprecated)
+
+`type` (`GR`, `BS` or `CS`) can also be specified instead of `route` and `source`. The same channels as in 4.3.0 are scanned by the tuners of the type, treating it as the default route of the type (GR: TER, BS and CS: SAT).
+
+- GR: `13`-`62`
+- BS: `BS01_0`-`BS23_3` (`useSubCh`, default) or `101`-`256`
+- CS: `CS2`-`CS24`
+
+The range is changed by `minCh`, `maxCh`, `minSubCh`, `maxSubCh` and `channelNameFormat`. `skipCh` also matches the numbers in the channel names. Only the entries of the type are replaced, and the entries of the other types remain.
