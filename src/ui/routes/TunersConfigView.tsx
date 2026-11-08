@@ -291,7 +291,7 @@ export const TunersConfigView: React.FC = () => {
                                 </td>
                                 <td>
                                     {/* 未選択の場合はすべての経路 */}
-                                    <div className="types-checkboxes" title="Routes (all if none checked)">
+                                    <div className="types-checkboxes" title="未選択の場合はすべての経路">
                                         {routesIndex.map((route) => {
                                             const checked = tuner.routes?.includes(route) ?? false;
                                             return (

@@ -36,7 +36,7 @@ import {
 import { state } from "../modules/state";
 import * as ui from "../modules/ui";
 import { ChannelRoute, Service, Status, StreamInfo, TunerDevice } from "../../../api.d";
-import { channelRouteMap, getDefaultChannelRoute } from "../modules/constants";
+import { getChannelRouteLabel, getDefaultChannelRoute } from "../modules/constants";
 
 import "./HomeView.sass";
 
@@ -119,7 +119,7 @@ const ServiceTooltip: React.FC<{ service: Service }> = ({ service }) => (
                 }
             }
             return Array.from(groups.values()).map((group, index) => (
-                <div key={index}>Channel{groups.size > 1 ? ` (${channelRouteMap[group.route]})` : ""}: {group.type} / {group.channels.join(",")}</div>
+                <div key={index}>Channel{groups.size > 1 ? ` (${getChannelRouteLabel(group.route)})` : ""}: {group.type} / {group.channels.join(",")}</div>
             ));
         })()}
     </div>
