@@ -289,7 +289,7 @@ The route to receive the channel. The same broadcast can also be configured as a
 - `SAT`: satellite antenna of BS / 110 degree CS
 - `SKY`: satellite antenna of 124 / 128 degree CS (SKY PerfecTV! Premium Service)
 - `CATV`: cable television
-- `FTTH`: television over optical fiber (terrestrial and BS / CS passed through). Use `CATV` for the transmodulation of cable television even over optical fiber (the default channels of the scan differ)
+- `FTTH`: television over optical fiber (terrestrial and BS / CS passed through). Use `CATV` for the transmodulation of cable television even over optical fiber (the default channels of the scan differ). SKY of SKY PerfecTV! Premium Service Hikari is also received on `FTTH` (scan by `dvbConf` or `list`)
 
 A service is associated with the channels by the stream received (`networkId` and `transport_stream_id`). If multiple channels can receive the same stream, the route with an available tuner is tuned (the channel scanned first is preferred). The stream received on each channel is saved in `channels.json` (environment variable: `CHANNELS_DB_PATH`, default: in the same directory as `services.json`).
 
