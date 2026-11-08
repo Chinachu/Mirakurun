@@ -280,6 +280,77 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
     assert.ok(matched > tlv.length * 0.7, `assembled ${matched} of ${tlv.length} TLV packets`);
   });
 
+  it("keeps the alignment after a broken header (CRC) of a carrier, losing the frame after it", () => {
+    const tlv = tlvPackets(9000);
+    const streams = carriers(splitTLV(tlv), 3, 2);
+    const errors = [];
+    // without the broken header (the TLV packets before the alignment are not assembled)
+    const { matched: all } = assertTLV(feed(new TSMFBonding(1, 3, reason => errors.push(reason)), streams, [0, 0, 0]), tlv);
+    // 搬送波 2 のスーパーフレーム 30 の 2 番目のフレームのヘッダーが壊れる
+    const broken = Buffer.from(streams[1][30][53]);
+    broken[100] ^= 0xFF;
+    streams[1][30][53] = broken;
+    const out = feed(new TSMFBonding(1, 3, reason => errors.push(reason)), streams, [0, 0, 0]);
+
+    assert.deepStrictEqual(errors, []);
+    const { matched } = assertTLV(out, tlv);
+    // 並べ直さず、壊れたヘッダーの後のフレームのスロットにかかる TLV パケットだけを失う
+    // (そのスロットはスーパーフレーム全体に散らばる: 1 スーパーフレームは 3 x 2 x 52 スロット、TLV パケットは平均 554 バイト)
+    const perSuperframe = Math.ceil(3 * 2 * 52 * 184 / 554);
+    assert.ok(matched < all && matched > all - perSuperframe, `assembled ${matched} of ${all} TLV packets`);
+  });
+
+  it("aligns the carriers after a broken header (CRC) of a carrier not aligned yet", () => {
+    const tlv = tlvPackets(9000);
+    const streams = carriers(splitTLV(tlv), 3, 2);
+    // 位置合わせの前 (スーパーフレーム 3) に、搬送波 2 のヘッダーが壊れる
+    const broken = Buffer.from(streams[1][3][53]);
+    broken[100] ^= 0xFF;
+    streams[1][3][53] = broken;
+    const errors = [];
+    const bonding = new TSMFBonding(1, 3, reason => errors.push(reason));
+    const out = feed(bonding, streams, [0, 0, 0]);
+
+    assert.deepStrictEqual(errors, []);
+    // the frame lost is not in the super frames to find the alignment (it would fail the check)
+    assert.strictEqual(bonding._failures, 0);
+    const { last } = assertTLV(out, tlv);
+    assert.ok(last > tlv.length * 0.9, `the last TLV packet assembled: ${last} of ${tlv.length}`);
+  });
+
+  it("aligns the carriers again after a loss right after a broken header (CRC) of another carrier", () => {
+    const tlv = tlvPackets(9000);
+    const streams = carriers(splitTLV(tlv), 3, 2);
+    // 搬送波 2 のスーパーフレーム 30 の最初のヘッダーが壊れ、次のフレームが来る前に搬送波 1 のパケットを失う
+    // (搬送波 1 は 2 スーパーフレーム遅れて届く)
+    const broken = Buffer.from(streams[1][30][0]);
+    broken[100] ^= 0xFF;
+    streams[1][30][0] = broken;
+    const lost = Buffer.from(streams[0][28][25]);
+    lost[0] = 0x00;
+    streams[0][28][25] = lost;
+    const lag = Buffer.concat(new Array(53 * 2 * 2).fill(nullPacket));
+    const inputs = streams.map((s, c) => Buffer.concat([c === 0 ? lag : Buffer.alloc(0), ...s.flat()]));
+    const errors = [];
+    const bonding = new TSMFBonding(1, 3, reason => errors.push(reason));
+    const out = [];
+    for (let pos = 0, done = false; done === false; pos += 188 * 20) {
+      done = true;
+      inputs.forEach((input, c) => {
+        if (pos < input.length) {
+          done = false;
+          out.push(bonding.push(c, input.subarray(pos, pos + 188 * 20)));
+        }
+      });
+    }
+
+    assert.deepStrictEqual(errors, []);
+    // the frame lost is not in the super frames to find the alignment again
+    assert.strictEqual(bonding._failures, 0);
+    const { last } = assertTLV(Buffer.concat(out), tlv);
+    assert.ok(last > tlv.length * 0.9, `the last TLV packet assembled: ${last} of ${tlv.length}`);
+  });
+
   it("does not align by the super frames before a loss of a carrier not aligned yet", () => {
     const tlv = tlvPackets(15000);
     const streams = carriers(splitTLV(tlv), 3, 1);

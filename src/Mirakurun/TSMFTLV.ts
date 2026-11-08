@@ -295,6 +295,16 @@ export default class TSMFTLV {
         this._frame = [];
         const header = parseTSMFHeader(packet);
         if (header === null) {
+            // a header broken (CRC, transport_error_indicator): the frame before it is complete by the header before it,
+            // the frame after it is lost, and the next header continues by continuity_counter + 2
+            // (a header broken right after a broken one is not taken as a header)
+            const recovers = this._slotCounter === SLOT_COUNT && this._headerCC !== -1;
+            if (recovers) {
+                for (const selected of frame) {
+                    this._framer.push(selected, this._outputs);
+                }
+            }
+            this._headerCC = recovers ? (this._headerCC + 1) & 0x0F : -1;
             this._slotCounter = -1;
             this._framer.lost();
             return;

@@ -205,6 +205,28 @@ describe("[tsmftlv.spec] TSMFTLV.ts", () => {
     assert.deepStrictEqual(out, Buffer.concat([tlv[2], tlv[3]]));
   });
 
+  it("loses only the frame after a broken header (CRC)", () => {
+    const tlv = Array.from({ length: 400 }, (_, i) => tlvPacket(i & 0xFF, 96));
+    const ts = frames(slotMap, splitTLV(tlv));
+    // the header of the 4th frame of TLV (after the first frame without the contents)
+    const broken = Buffer.from(ts[53 * 4]);
+    broken[100] ^= 0xFF;
+    ts[53 * 4] = broken;
+    const out = new TSMFTLV(1).push(Buffer.concat(ts));
+
+    // the TLV packets in the original order
+    let k = 0;
+    for (let pos = 0; pos < out.length; pos += 100) {
+      while (k < tlv.length && tlv[k].equals(out.subarray(pos, pos + 100)) === false) {
+        k++;
+      }
+      assert.ok(k < tlv.length, `a TLV packet at ${pos}`);
+    }
+    // a frame has 26 slots of the relative stream 1 (and the TLV packets across the frames before and after it)
+    const lost = Buffer.concat(tlv).length - out.length;
+    assert.ok(lost > 0 && lost <= 26 * 185 + 2 * 100, `lost ${lost} bytes`);
+  });
+
   it("does not output the frame of the channel tuned before, remaining right after tuning", () => {
     // 前のチャンネルのフレーム (CRC は正しい) の後に、continuity_counter が飛んで、このチャンネルのフレームが続く
     const stale = [header({ slotMap, cc: 9 }), ...splitTLV([tlvPacket(9, 3000)]).slice(0, 26)];

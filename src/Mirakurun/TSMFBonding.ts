@@ -26,6 +26,8 @@ interface Frame {
 interface Superframe {
     numberOfFrames: number;
     frames: Frame[];
+    /** a frame is lost after a broken header (kept only while the carriers are aligned) */
+    lost?: true;
 }
 
 const TLV_TYPES = new Set([0x01, 0x02, 0x03, 0xFE, 0xFF]); // IPv4, IPv6, compressed IP, signalling, null
@@ -82,8 +84,13 @@ class CarrierInput {
     private _frame: Frame = null;
     private _slotCounter = -1;
     private _headerCC = -1;
+    /** number_of_frames of the header received last */
+    private _numberOfFrames = 0;
+    /** the frame after a broken header is in `_frame` */
+    private _afterBroken = false;
 
-    constructor(private _relTs: number, private _onLost: () => void, private _warn: (message: string) => void) {
+    /** @param _isAligned whether the super frames of the carriers are aligned (a frame lost keeps the alignment) */
+    constructor(private _relTs: number, private _onLost: () => void, private _warn: (message: string) => void, private _isAligned: () => boolean) {
     }
 
     push(chunk: Buffer): void {
@@ -99,8 +106,14 @@ class CarrierInput {
     /** moves the super frame completed by the slots of the last frame to `superframes` */
     commit(): void {
         if (this._completed !== null && this._slotCounter === SLOT_COUNT) {
-            this.superframes.push(this._completed);
+            const completed = this._completed;
             this._completed = null;
+            // the alignment has been lost after the broken header (the frame lost would fail finding the alignment)
+            if (completed.lost === true && this._isAligned() === false) {
+                this._lost();
+                return;
+            }
+            this.superframes.push(completed);
         }
     }
 
@@ -125,9 +138,10 @@ class CarrierInput {
     private _onHeader(packet: Buffer): void {
         const header = parseTSMFHeader(packet);
         if (header === null) {
-            this._lost();
+            this._onBrokenHeader();
             return;
         }
+        this._afterBroken = false;
 
         // the frames between were lost (or the frame of the channel tuned before remains right after tuning)
         const cc = packet[3] & 0x0F;
@@ -154,6 +168,7 @@ class CarrierInput {
         }
         this.carrierSequence = header.carrierSequence;
         this.numberOfCarriers = header.numberOfCarriers;
+        this._numberOfFrames = header.numberOfFrames;
 
         if (header.framePosition === 0) {
             this._superframe = { numberOfFrames: header.numberOfFrames, frames: [] };
@@ -170,6 +185,34 @@ class CarrierInput {
 
         if (this._superframe.frames.length === this._superframe.numberOfFrames) {
             // completed when the slots of the last frame are received
+            this._completed = this._superframe;
+            this._superframe = null;
+        }
+    }
+
+    /**
+     * a header broken (CRC, transport_error_indicator): the frame after it is lost, keeping the super frames aligned
+     * (the next header continues by continuity_counter + 2, a header broken right after a broken one is not taken as a header).
+     * The super frames are dropped while not aligned (the frame lost would fail the check of the alignment).
+     */
+    private _onBrokenHeader(): void {
+        if (this._frame === null || this._slotCounter !== SLOT_COUNT || this._headerCC === -1 || this._afterBroken || this._isAligned() === false) {
+            this._headerCC = -1;
+            this._afterBroken = false;
+            this._lost();
+            return;
+        }
+        this.commit();
+        this._headerCC = (this._headerCC + 1) & 0x0F;
+        this._afterBroken = true;
+
+        // the frame of the next position (the packets are not read), all the slots are lost
+        // (not by the slots of the frame before it: the slots may have changed, a slot of the stream not lost would join the TLV packets across it)
+        this._superframe ??= { numberOfFrames: this._numberOfFrames, frames: [] };
+        this._superframe.lost = true;
+        this._frame = { slotMap: new Array(SLOT_COUNT).fill(this._relTs), slots: new Array(SLOT_COUNT).fill(null) };
+        this._superframe.frames.push(this._frame);
+        if (this._superframe.frames.length === this._superframe.numberOfFrames) {
             this._completed = this._superframe;
             this._superframe = null;
         }
@@ -217,7 +260,7 @@ export default class TSMFBonding {
      */
     constructor(private _relTs: number, numberOfInputs: number, private _onError: (reason: string) => void) {
         for (let i = 0; i < numberOfInputs; i++) {
-            const input: CarrierInput = new CarrierInput(_relTs, () => this._lost(input), message => this._warn(message));
+            const input: CarrierInput = new CarrierInput(_relTs, () => this._lost(input), message => this._warn(message), () => this._offsets !== null);
             this._inputs.push(input);
             this._lastReceived.push(0);
         }
@@ -235,6 +278,10 @@ export default class TSMFBonding {
             return Buffer.alloc(0);
         }
         carrier.commit();
+        // closed by the super frame with the frame lost after the alignment has been lost
+        if (this._closed) {
+            return Buffer.alloc(0);
+        }
         if (carrier.superframes.length > received) {
             this._received += carrier.superframes.length - received;
             this._lastReceived[input] = this._received;
