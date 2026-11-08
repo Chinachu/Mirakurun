@@ -589,7 +589,7 @@ export const ChannelsConfigView: React.FC = () => {
                                 </td>
                                 <td>
                                     <div className="channel-options-grid">
-                                        <FormGroup label="Route" style={{ width: "170px", marginBottom: 0 }}>
+                                        <FormGroup label="Route" style={{ width: "210px", marginBottom: 0 }}>
                                             <HTMLSelect
                                                 value={ch.route || ""}
                                                 onChange={(e) => {
@@ -601,7 +601,8 @@ export const ChannelsConfigView: React.FC = () => {
                                                     }
                                                 }}
                                                 options={[
-                                                    { value: "", label: `(${channelRouteMap[getDefaultChannelRoute(ch.type)]})` },
+                                                    // 未指定 (タイプの既定の経路)
+                                                    { value: "", label: `既定: ${getChannelRouteLabel(getDefaultChannelRoute(ch.type))}` },
                                                     ...channelRoutes.map(route => ({ value: route, label: getChannelRouteLabel(route) }))
                                                 ]}
                                             />
