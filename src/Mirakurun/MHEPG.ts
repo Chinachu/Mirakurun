@@ -112,7 +112,8 @@ export default class MHEPG {
 
             if (!service[e.eventId]) {
                 const id = getProgramItemId(networkId, eit.serviceId, e.eventId);
-                if (!_.program.exists(id)) {
+                const added = !_.program.exists(id);
+                if (added) {
                     if (e.startTime === undefined) {
                         continue;
                     }
@@ -145,6 +146,21 @@ export default class MHEPG {
                     present: isP || undefined
                 };
 
+                // the schedule does not overwrite the program added by EIT[p/f] (as EPG.ts),
+                // the program existing (stored, or collected before) is updated by EIT[p/f] or the table received next
+                if (added) {
+                    state.version[toVersion(eit).table_id] = eit.versionNumber;
+                } else if (isPF && e.startTime !== undefined) {
+                    state.version[toVersion(eit).table_id] = eit.versionNumber;
+                    _.program.set(id, {
+                        startAt: mjdBCDToUnixEpoch(e.startTime) * 1000,
+                        duration: e.duration === undefined ? 1 : bcdTimeToSeconds(e.duration) * 1000,
+                        isFree: !e.freeCAMode,
+                        _pf: true, // for compatibility
+                        _isPresent: isP || undefined,
+                        _isFollowing: isF || undefined
+                    });
+                }
                 service[e.eventId] = state;
             } else {
                 state = service[e.eventId];

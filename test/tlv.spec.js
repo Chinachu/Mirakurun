@@ -152,6 +152,42 @@ describe("[tlv.spec] TLV (MMT)", () => {
       assert.strictEqual(present._isPresent, true);
       assert.strictEqual(following._isFollowing, true);
     });
+
+    it("updates the program existing (stored) by the table received next", () => {
+      const { getProgramItemId } = require("../lib/Mirakurun/Program");
+      const id = getProgramItemId(11, 101, 2);
+      programs.set(id, { id, startAt: Date.UTC(2025, 10, 21, 3, 0, 0), duration: 30 * 60 * 1000 });
+      const epg = new MHEPG();
+      const table = eit([{ eventId: 2, startTime: mjdBCD(61000, 13, 0, 0), duration: 0x003000, freeCAMode: false, descriptors: [] }], { versionNumber: 2 });
+      epg.write(table);
+      epg.write(table);
+
+      assert.strictEqual(programs.get(id).startAt, Date.UTC(2025, 10, 21, 4, 0, 0));
+    });
+
+    it("does not overwrite the program existing (stored) by the schedule after EIT[p/f]", () => {
+      const { getProgramItemId } = require("../lib/Mirakurun/Program");
+      const id = getProgramItemId(11, 101, 2);
+      programs.set(id, { id, startAt: Date.UTC(2025, 10, 21, 3, 0, 0), duration: 30 * 60 * 1000 });
+      const epg = new MHEPG();
+      const event = startTime => ({ eventId: 2, startTime, duration: 0x003000, freeCAMode: false, descriptors: [] });
+      epg.write(eit([event(mjdBCD(61000, 13, 0, 0))], { tableId: "EIT[p/f]", tableIdNumber: 0x8B, sectionNumber: 1 }));
+      epg.write(eit([event(mjdBCD(61000, 13, 5, 0))]));
+
+      assert.strictEqual(programs.get(id).startAt, Date.UTC(2025, 10, 21, 4, 0, 0));
+      assert.strictEqual(programs.get(id)._isFollowing, true);
+    });
+
+    it("does not overwrite the program by EIT[p/f] with the schedule", () => {
+      const epg = new MHEPG();
+      const event = startTime => ({ eventId: 2, startTime, duration: 0x003000, freeCAMode: false, descriptors: [] });
+      epg.write(eit([event(mjdBCD(61000, 13, 0, 0))], { tableId: "EIT[p/f]", tableIdNumber: 0x8B, sectionNumber: 1 }));
+      epg.write(eit([event(mjdBCD(61000, 13, 5, 0))]));
+
+      const [following] = programs.values();
+      assert.strictEqual(following._isFollowing, true);
+      assert.strictEqual(following.startAt, Date.UTC(2025, 10, 21, 4, 0, 0));
+    });
   });
 
   describe("TLVFilter", () => {
