@@ -66,7 +66,7 @@ export interface TSMFStream {
  * @returns `null` if not TSMF, `[]` if TSMF but not decided (packets lost)
  */
 export function detectTSMFStreams(data: Buffer, multiCarrier = true): TSMFStream[] | null {
-    let parseTSMFHeader: typeof import("./TSMFTLV").parseTSMFHeader = null;
+    let tsmf: typeof import("./TSMFTLV") = null;
     let last: { cc: number, key: string, pos: number, slotMap: number[] } = null;
     let found = false;
     /** decided by the headers, the frame between them has lost packets to verify TLV */
@@ -76,14 +76,14 @@ export function detectTSMFStreams(data: Buffer, multiCarrier = true): TSMFStream
             continue;
         }
         // keep the module of TSMF out of the path without TSMF
-        parseTSMFHeader ??= (require("./TSMFTLV") as typeof import("./TSMFTLV")).parseTSMFHeader;
+        tsmf ??= require("./TSMFTLV") as typeof import("./TSMFTLV");
         const packet = data.subarray(i, i + TS_PACKET_SIZE);
         // frame_sync: the headers broken (CRC) by the reception are TSMF but not decided
         const frameSync = ((packet[4] << 8) | packet[5]) & 0x1FFF;
         if (frameSync === 0x1A86 || frameSync === 0x0579) {
             found = true;
         }
-        const header = parseTSMFHeader(packet);
+        const header = tsmf.parseTSMFHeader(packet);
         if (header === null) {
             last = null;
             continue;
@@ -102,22 +102,22 @@ export function detectTSMFStreams(data: Buffer, multiCarrier = true): TSMFStream
             streams.push({
                 relTs,
                 slots,
-                format: ((header.streamTypeBits >> (15 - relTs)) & 1) === 0 ? "tlv" : "ts",
+                format: tsmf.isTLVStream(header, relTs) ? "tlv" : "ts",
                 streamId: payload.readUInt16BE(offset),
                 networkId: payload.readUInt16BE(offset + 2),
-                ...(header.numberOfCarriers > 1 && { groupId: header.groupId, numberOfCarriers: header.numberOfCarriers, carrierSequence: header.carrierSequence })
+                ...(tsmf.isBondedStream(header, relTs) && { groupId: header.groupId, numberOfCarriers: header.numberOfCarriers, carrierSequence: header.carrierSequence })
             });
         }
 
         const cc = packet[3] & 0x0F;
         const key = JSON.stringify([header.numberOfCarriers, streams]);
         if (last !== null && cc === ((last.cc + 1) & 0x0F) && key === last.key) {
-            if (multiCarrier === false && header.numberOfCarriers > 1) {
+            if (multiCarrier === false && streams.some(stream => stream.numberOfCarriers > 1)) {
                 return null;
             }
             // the frame between the headers (header + 52 slots) without the packets lost, of the slots of the header before it
             if (pos - last.pos === (last.slotMap.length + 1) * TS_PACKET_SIZE) {
-                verifyTLV(data, last.pos, last.slotMap, streams);
+                verifyTLV(data, last.pos, last.slotMap, streams, header.frameType === 0x01);
                 return streams;
             }
             if (streams.some(stream => stream.format === "tlv") === false) {
@@ -135,7 +135,7 @@ export function detectTSMFStreams(data: Buffer, multiCarrier = true): TSMFStream
  * TLV of TSMF is carried on PID 0x2D, the relative stream of stream_type TLV is TS if its packets in the frame are of the other PIDs
  * (stream_type is reserved in TSMF before extended)
  */
-function verifyTLV(data: Buffer, headerPos: number, slotMap: number[], streams: TSMFStream[]): void {
+function verifyTLV(data: Buffer, headerPos: number, slotMap: number[], streams: TSMFStream[], bondedTLVOnly: boolean): void {
     for (const stream of streams) {
         if (stream.format !== "tlv") {
             continue;
@@ -159,6 +159,12 @@ function verifyTLV(data: Buffer, headerPos: number, slotMap: number[], streams: 
         }
         if (tlv === 0 && other > 0) {
             stream.format = "ts";
+            // frame_type 0x1: the stream of TS is not of the bonded carriers
+            if (bondedTLVOnly) {
+                delete stream.groupId;
+                delete stream.numberOfCarriers;
+                delete stream.carrierSequence;
+            }
         }
     }
 }

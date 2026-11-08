@@ -28,7 +28,7 @@ function crc32(data) {
 
 let headerCC = 0;
 // TSMF の多重フレームヘッダー (slotMap: 52 スロットの相対 TS 番号、tlvRelTs: TLV の相対 TS 番号)
-function header({ slotMap, tlvRelTs = [1], numberOfCarriers = 1, carrierSequence = 1, numberOfFrames = 1, framePosition = 0, cc = headerCC++ }) {
+function header({ slotMap, tlvRelTs = [1], frameType = 0x02, numberOfCarriers = 1, carrierSequence = 1, numberOfFrames = 1, framePosition = 0, cc = headerCC++ }) {
   const p = Buffer.alloc(188, 0xFF);
   p[0] = 0x47;
   p[1] = 0x00;
@@ -37,7 +37,7 @@ function header({ slotMap, tlvRelTs = [1], numberOfCarriers = 1, carrierSequence
   const payload = p.subarray(4);
   payload[0] = 0x1A;
   payload[1] = 0x86;
-  payload[2] = 0x02; // frame_type: multi-carrier
+  payload[2] = frameType; // 0x1: multi-TS, 0x2: multi-carrier
   for (let i = 0; i < 52; i++) {
     const b = payload[69 + (i >> 1)];
     payload[69 + (i >> 1)] = (i & 1) === 0 ? (slotMap[i] << 4) | (b & 0x0F) : (b & 0xF0) | slotMap[i];
@@ -220,6 +220,17 @@ describe("[tsmftlv.spec] TSMFTLV.ts", () => {
 
     const bonded = Buffer.concat(frames(slotMap, splitTLV([tlvPacket(1, 1000)]), { numberOfCarriers: 3 }));
     assert.strictEqual(new TSMFTLV(1).push(bonded).length, 0);
+  });
+
+  it("outputs nothing for the stream of TLV bonded in frame_type 0x1 (extended TSMF), and assembles TLV of TSMF not extended", () => {
+    const tlv = [tlvPacket(1, 1000), tlvPacket(2, 300)];
+    // 拡張 TSMF: 複数 TS 伝送方式の信号と、複数搬送波伝送方式の信号の一部 (相対 TS 1 の TLV)
+    const bonded = Buffer.concat(frames(slotMap, splitTLV(tlv), { frameType: 0x01, numberOfCarriers: 2, carrierSequence: 1 }));
+    assert.strictEqual(new TSMFTLV(1).push(bonded).length, 0);
+
+    // 拡張されていない TSMF では拡張領域がすべて '1'
+    const single = Buffer.concat(frames(slotMap, splitTLV(tlv), { frameType: 0x01, numberOfCarriers: 0xFF, carrierSequence: 0xFF }));
+    assert.ok(new TSMFTLV(1).push(single).equals(Buffer.concat(tlv)));
   });
 
   it("assembles TLV of a single carrier of frame_type 0x2, whatever carrier_sequence is", () => {

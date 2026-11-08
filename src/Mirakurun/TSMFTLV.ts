@@ -29,11 +29,13 @@ const TLV_HEADER_SIZE = 4;
 
 /** the header of a TSMF frame (ARIB STD-B32 / JCTEA STD-002) */
 export interface TSMFHeader {
+    /** 0x1: multi-TS (the extended TSMF may have a part of the bonded carriers), 0x2: the bonded carriers only */
+    frameType: number;
     /** relative stream number of each slot (0 = unused) */
     slotMap: number[];
     /** bit of relative stream n (MSB = 1): 0 = TLV, 1 = TS */
     streamTypeBits: number;
-    /** 1 unless the carriers are bonded (frame_type 0x2 may also have 1) */
+    /** 1 unless the carriers are bonded (frame_type 0x2 may also have 1), see `isBondedStream()` */
     numberOfCarriers: number;
     groupId: number;
     /** the order of the carrier (0 or 1..numberOfCarriers, the start is not specified), 1 for a single carrier */
@@ -62,7 +64,12 @@ export function parseTSMFHeader(packet: Buffer): TSMFHeader | null {
         slotMap[i] = (i & 1) === 0 ? b >> 4 : b & 0x0F;
     }
 
-    const isMultiCarrier = (payload[2] & 0x0F) === 0x02;
+    const frameType = payload[2] & 0x0F;
+    // frame_type 0x1 of the extended TSMF may have a part of the bonded carriers with the streams of multi-TS,
+    // the extension is all '1' in TSMF not extended (number_of_carriers is 2-255, group_id is not 0)
+    // (high-level cable broadcasting interim report 4.3.3.4, 4.3.4, carrier_sequence may start from 0 as frame_type 0x2)
+    const isMultiCarrier = frameType === 0x02 || (frameType === 0x01 && payload[123] !== 0x00 &&
+        payload[124] >= 2 && payload[124] !== 0xFF && payload[125] <= payload[124]);
     // frame_type 0x2 (multi-carrier) of a single carrier is the same as the others
     const numberOfCarriers = isMultiCarrier ? Math.max(payload[124], 1) : 1;
     const carrierSequence = numberOfCarriers > 1 ? payload[125] : 1;
@@ -71,6 +78,7 @@ export function parseTSMFHeader(packet: Buffer): TSMFHeader | null {
     }
 
     return {
+        frameType,
         slotMap,
         streamTypeBits: (payload[121] << 7) | (payload[122] >> 1),
         numberOfCarriers,
@@ -83,6 +91,14 @@ export function parseTSMFHeader(packet: Buffer): TSMFHeader | null {
 
 export function isTLVStream(header: TSMFHeader, relTs: number): boolean {
     return ((header.streamTypeBits >> (15 - relTs)) & 1) === 0;
+}
+
+/**
+ * whether the relative stream is carried by the bonded carriers
+ * (frame_type 0x1 has the streams of multi-TS with a part of the bonded carriers, the stream of TLV is taken as the part)
+ */
+export function isBondedStream(header: TSMFHeader, relTs: number): boolean {
+    return header.numberOfCarriers > 1 && (header.frameType !== 0x01 || isTLVStream(header, relTs));
 }
 
 /** splits the chunks into the TS packets */
@@ -306,7 +322,7 @@ export default class TSMFTLV {
 
         // the frames of the carriers are interleaved, assembled by TSMFBonding
         // (the interleaving of the frames of a single carrier is the same order as the frames)
-        if (header.numberOfCarriers > 1 || isTLVStream(header, this._relTs) === false) {
+        if (isBondedStream(header, this._relTs) || isTLVStream(header, this._relTs) === false) {
             if (this._warned === false) {
                 this._warned = true;
                 log.warn(

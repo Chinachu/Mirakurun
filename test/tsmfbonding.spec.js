@@ -229,6 +229,23 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
     assertTLV(out, tlv);
   });
 
+  // 拡張 TSMF の frame_type 0x1: 複数 TS 伝送方式の信号 (相対 TS 2) と、複数搬送波伝送方式の信号の一部 (相対 TS 1 の TLV)
+  it("assembles TLV of the carriers of frame_type 0x1, sharing a carrier with the stream of multi-TS", () => {
+    const tlv = tlvPackets(6000);
+    const streams = carriers(splitTLV(tlv), 3, [4, 4, 3], 0, 1, [0, 0, 20]);
+    for (const p of streams.flat(2)) {
+      if (p[2] === 0x2F && p[1] === 0x00) {
+        p[6] = 0x01;
+        p.writeUInt32BE(crc32(p.subarray(4, 184)), 184);
+      }
+    }
+    const errors = [];
+    const out = feed(new TSMFBonding(1, 3, reason => errors.push(reason)), streams, [0, 2, 1]);
+
+    assert.deepStrictEqual(errors, []);
+    assertTLV(out, tlv);
+  });
+
   it("aligns the carriers of 256QAM and 64QAM with a skew", () => {
     const tlv = tlvPackets(28000);
     const streams = carriers(splitTLV(tlv), 3, [4, 4, 3], 0, 1, [0, 0, 20]);

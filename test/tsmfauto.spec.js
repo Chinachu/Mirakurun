@@ -30,8 +30,8 @@ function crc32(data) {
   return crc >>> 0;
 }
 
-// TSMF の多重フレームヘッダー (streams: [relTs, slots, isTlv, streamId, networkId])
-function header(streams, cc) {
+// TSMF の多重フレームヘッダー (streams: [relTs, slots, isTlv, streamId, networkId], extension: [group_id, number_of_carriers, carrier_sequence])
+function header(streams, cc, extension = null) {
   const p = Buffer.alloc(188, 0xFF);
   p[0] = 0x47;
   p[1] = 0x00;
@@ -62,6 +62,9 @@ function header(streams, cc) {
   }
   payload[121] = streamTypeBits >> 7;
   payload[122] = (streamTypeBits << 1) & 0xFF;
+  if (extension !== null) {
+    [payload[123], payload[124], payload[125]] = extension;
+  }
   payload.writeUInt32BE(crc32(payload.subarray(0, 180)), 180);
   return p;
 }
@@ -115,6 +118,28 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     assert.deepStrictEqual(formats(detectTSMFStreams(Buffer.concat([...frame(0), header(reversed, 1)]))), [[2, "ts"], [5, "tlv"]]);
     // the packets lost (or the slots empty) do not decide
     assert.deepStrictEqual(formats(detectTSMFStreams(Buffer.concat([header(streams, 0), header(streams, 1)]))), [[2, "tlv"], [5, "tlv"]]);
+  });
+
+  it("reads the stream of TLV of frame_type 0x1 (extended TSMF) as a part of the bonded carriers, not the streams of TS", () => {
+    const streams = [[1, 26, false, 18801, 4], [2, 26, true, 45168, 11]];
+    const data = Buffer.concat([header(streams, 0, [3, 2, 1]), header(streams, 1, [3, 2, 1])]);
+    assert.deepStrictEqual(detectTSMFStreams(data), [
+      { relTs: 1, slots: 26, format: "ts", streamId: 18801, networkId: 4 },
+      { relTs: 2, slots: 26, format: "tlv", streamId: 45168, networkId: 11, groupId: 3, numberOfCarriers: 2, carrierSequence: 1 }
+    ]);
+    // carrier_sequence from 0
+    assert.deepStrictEqual(detectTSMFStreams(Buffer.concat([header(streams, 0, [3, 2, 0]), header(streams, 1, [3, 2, 0])]))[1],
+      { relTs: 2, slots: 26, format: "tlv", streamId: 45168, networkId: 11, groupId: 3, numberOfCarriers: 2, carrierSequence: 0 });
+    // carrier_sequence out of number_of_carriers: not taken as the extension (the streams of TS are received)
+    assert.deepStrictEqual(detectTSMFStreams(Buffer.concat([header(streams, 0, [3, 2, 3]), header(streams, 1, [3, 2, 3])]))[0],
+      { relTs: 1, slots: 26, format: "ts", streamId: 18801, networkId: 4 });
+    // TSMF not extended (the extension is all '1'), and the stream of stream_type TLV whose packets are of TS
+    assert.deepStrictEqual(detectTSMFStreams(Buffer.concat([header(streams, 0), header(streams, 1)]))[1],
+      { relTs: 2, slots: 26, format: "tlv", streamId: 45168, networkId: 11 });
+    const packet = Buffer.from([0x47, 0x01, 0x00, 0x10, ...new Array(184).fill(0xFF)]);
+    const frame = cc => [header(streams, cc, [3, 2, 1]), ...new Array(52).fill(packet)];
+    assert.deepStrictEqual(detectTSMFStreams(Buffer.concat([...frame(0), ...frame(1)]))[1],
+      { relTs: 2, slots: 26, format: "ts", streamId: 45168, networkId: 11 });
   });
 
   it("treats tsmfRelTs of 0 or empty as not specified (outputs it as configured)", () => {
