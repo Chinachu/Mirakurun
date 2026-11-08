@@ -1385,13 +1385,13 @@ describe("[route.spec] route / streamId", () => {
     it("decides the tuners to try covering all the tuners of the route", () => {
       const attempts = (t, route, order) => t.getScanAttempts(route, order).map(({ type, devices }) => [type, devices.map(d => d.index)]);
       // ISDB-T and ISDB-S tuners (the tuner without routes receives any route)
-      let t = tuner([fakeDevice(0, ["GR"], ["HIKARI"]), fakeDevice(1, ["BS", "CS"], ["HIKARI"]), fakeDevice(2, ["GR"], ["HIKARI"]), fakeDevice(3, ["GR"])]);
-      assert.deepStrictEqual(attempts(t, "HIKARI"), [["GR", [0, 2, 3]], ["BS", [1]]]);
-      assert.deepStrictEqual(attempts(t, "HIKARI", ["BS", "CS", "BS4K", "SKY", "GR"]), [["BS", [1]], ["GR", [0, 2, 3]]]);
+      let t = tuner([fakeDevice(0, ["GR"], ["FTTH"]), fakeDevice(1, ["BS", "CS"], ["FTTH"]), fakeDevice(2, ["GR"], ["FTTH"]), fakeDevice(3, ["GR"])]);
+      assert.deepStrictEqual(attempts(t, "FTTH"), [["GR", [0, 2, 3]], ["BS", [1]]]);
+      assert.deepStrictEqual(attempts(t, "FTTH", ["BS", "CS", "BS4K", "SKY", "GR"]), [["BS", [1]], ["GR", [0, 2, 3]]]);
       assert.deepStrictEqual(attempts(t, "TER", ["GR"]), [["GR", [3]]]);
       // the tuner only for ISDB-T and the tuner of all the types are tried both
-      t = tuner([fakeDevice(0, ["GR"], ["HIKARI"]), fakeDevice(1, ["GR", "BS", "CS"], ["HIKARI"])]);
-      assert.deepStrictEqual(attempts(t, "HIKARI"), [["GR", [0]], ["GR", [1]]]);
+      t = tuner([fakeDevice(0, ["GR"], ["FTTH"]), fakeDevice(1, ["GR", "BS", "CS"], ["FTTH"])]);
+      assert.deepStrictEqual(attempts(t, "FTTH"), [["GR", [0]], ["GR", [1]]]);
       // the remote Mirakurun receives only the channels of the type configured on it
       t = tuner([fakeDevice(0, ["GR", "BS"], ["CATV"], { isRemote: true }), fakeDevice(1, ["GR", "BS", "CS", "BS4K"], ["CATV"])]);
       assert.deepStrictEqual(attempts(t, "CATV"), [["GR", [0]], ["GR", [1]], ["BS", [0]]]);
@@ -1420,7 +1420,7 @@ describe("[route.spec] route / streamId", () => {
       const t = tuner([fakeDevice(0, ["BS"], ["SAT"]), fakeDevice(1, ["BS"], ["CATV"]), fakeDevice(2, ["GR"])]);
 
       assert.strictEqual(t.typeExists("BS", "CATV"), true);
-      assert.strictEqual(t.typeExists("BS", "HIKARI"), false);
+      assert.strictEqual(t.typeExists("BS", "FTTH"), false);
       // routes を省略したチューナーは、すべての経路を受信できる
       assert.strictEqual(t.typeExists("GR", "CATV"), true);
       assert.deepStrictEqual(t._getDevicesByType("BS", "CATV").map(d => d.index), [1]);

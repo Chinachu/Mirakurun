@@ -29,7 +29,7 @@ describe("[scan.spec] /api/config/channel/scan : generateScanConfig", () => {
         assert.deepStrictEqual(scan.generateScanConfig({ route: "TER" }), { channels: terrestrial });
         assert.deepStrictEqual(scan.generateScanConfig({ route: "SAT", source: "preset" }), { channels: [...bs, ...cs] });
         assert.deepStrictEqual(scan.generateScanConfig({ route: "CATV" }), { channels: [...range(1, 12, ch => `${ch}`), ...range(13, 63, ch => `C${ch}`), ...terrestrial] });
-        assert.deepStrictEqual(scan.generateScanConfig({ route: "HIKARI" }), { channels: [...terrestrial, ...bs, ...cs] });
+        assert.deepStrictEqual(scan.generateScanConfig({ route: "FTTH" }), { channels: [...terrestrial, ...bs, ...cs] });
     });
 
     it("dvbConf: the channels of the channel config files", () => {

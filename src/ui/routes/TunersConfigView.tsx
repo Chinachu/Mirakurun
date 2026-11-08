@@ -41,7 +41,7 @@ import "./TunersConfigView.sass";
 
 const configAPI = "/api/config/tuners";
 const typesIndex = ["GR", "BS", "CS", "SKY", "BS4K"];
-const routesIndex: ChannelRoute[] = ["TER", "SAT", "CATV", "HIKARI"];
+const routesIndex: ChannelRoute[] = ["TER", "SAT", "CATV", "FTTH"];
 
 function sortTypes(types: ChannelType[]): ChannelType[] {
     return types.sort((a, b) => typesIndex.indexOf(a) - typesIndex.indexOf(b));

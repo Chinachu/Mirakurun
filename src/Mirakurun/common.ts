@@ -78,7 +78,7 @@ export function getEpgStreamKey(networkId: number, streamId: number): string {
     return `${networkId}/${streamId}`;
 }
 
-export const channelRoutes: apid.ChannelRoute[] = ["TER", "SAT", "CATV", "HIKARI"];
+export const channelRoutes: apid.ChannelRoute[] = ["TER", "SAT", "CATV", "FTTH"];
 
 // network_id of cable television (ARIB STD-B10)
 export const CATV_NETWORK_IDS = [

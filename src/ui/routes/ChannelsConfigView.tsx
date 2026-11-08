@@ -604,7 +604,7 @@ export const ChannelsConfigView: React.FC = () => {
                                                     { value: "TER", label: "TER" },
                                                     { value: "SAT", label: "SAT" },
                                                     { value: "CATV", label: "CATV" },
-                                                    { value: "HIKARI", label: "HIKARI" }
+                                                    { value: "FTTH", label: "FTTH" }
                                                 ]}
                                             />
                                         </FormGroup>
@@ -774,7 +774,7 @@ export const ChannelsConfigView: React.FC = () => {
                                     { value: "TER", label: "TER (Terrestrial)" },
                                     { value: "SAT", label: "SAT (Satellite)" },
                                     { value: "CATV", label: "CATV" },
-                                    { value: "HIKARI", label: "HIKARI" }
+                                    { value: "FTTH", label: "FTTH" }
                                 ]}
                             />
                         </FormGroup>
@@ -797,7 +797,7 @@ export const ChannelsConfigView: React.FC = () => {
                                 {scanRoute === "TER" && "13-62"}
                                 {scanRoute === "SAT" && "BS01_0-BS23_3, CS2-CS24"}
                                 {scanRoute === "CATV" && "1-12, C13-C63, 13-62"}
-                                {scanRoute === "HIKARI" && "13-62, BS01_0-BS23_3, CS2-CS24"}
+                                {scanRoute === "FTTH" && "13-62, BS01_0-BS23_3, CS2-CS24"}
                             </Callout>
                         )}
 

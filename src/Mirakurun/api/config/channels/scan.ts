@@ -175,7 +175,7 @@ function formatChannels(format: string, startCh: number, endCh: number, startSub
  * - TER: the terrestrial channels (UHF 13-62)
  * - SAT: the BS (`BS01_0`-`BS23_3`) and CS (`CS2`-`CS24`) channels
  * - CATV: the cable channels (VHF `1`-`12`, `C13`-`C63`) and the terrestrial channels passed through (13-62)
- * - HIKARI: the terrestrial, BS and CS channels passed through
+ * - FTTH: the terrestrial, BS and CS channels passed through
  */
 export function getPresetChannels(route: apid.ChannelRoute): string[] {
     const terrestrial = formatChannels("{ch}", 13, 62);
@@ -187,7 +187,7 @@ export function getPresetChannels(route: apid.ChannelRoute): string[] {
             return satellite;
         case "CATV":
             return [...formatChannels("{ch}", 1, 12), ...formatChannels("C{ch}", 13, 63), ...terrestrial];
-        case "HIKARI":
+        case "FTTH":
             return [...terrestrial, ...satellite];
     }
     return [];
@@ -320,12 +320,12 @@ const routeTypes: Record<apid.ChannelRoute, apid.ChannelType[]> = {
     TER: ["GR"],
     SAT: ["BS", "CS", "BS4K", "SKY"],
     CATV: ["GR", "BS", "CS", "BS4K", "SKY"],
-    HIKARI: ["GR", "BS", "CS", "BS4K", "SKY"]
+    FTTH: ["GR", "BS", "CS", "BS4K", "SKY"]
 };
 
 /**
  * the tuners (and the type of the channel item) to try a channel for the scan, covering all the tuners of the route
- * (such as the tuners of ISDB-T and ISDB-S on HIKARI), the types of the satellite first for the channels named BS / CS
+ * (such as the tuners of ISDB-T and ISDB-S on FTTH), the types of the satellite first for the channels named BS / CS
  */
 export function getScanAttempts(route: apid.ChannelRoute, channel?: string, types: apid.ChannelType[] = routeTypes[route]): ScanAttempt[] {
     const satellite = channel !== undefined && /^(BS|CS)/i.test(channel);
@@ -1173,13 +1173,13 @@ The channels to scan (\`source\`):
     - TER: \`13\`-\`62\`
     - SAT: \`BS01_0\`-\`BS23_3\`, \`CS2\`-\`CS24\`
     - CATV: \`1\`-\`12\`, \`C13\`-\`C63\`, \`13\`-\`62\`
-    - HIKARI: \`13\`-\`62\`, \`BS01_0\`-\`BS23_3\`, \`CS2\`-\`CS24\`
+    - FTTH: \`13\`-\`62\`, \`BS01_0\`-\`BS23_3\`, \`CS2\`-\`CS24\`
 - \`dvbConf\`: the channels of the channel config files of dvbv5-zap (\`-c\`) of the tuners used for the scan
 - \`list\`: the channels of \`channels\`
 - \`format\`: the channels of \`channelNameFormat\` in the range of \`minCh\`-\`maxCh\` (and \`minSubCh\`-\`maxSubCh\` with \`{subch}\`)
 
 The tuners of the route are used. The tuners of the different types (such as ISDB-T and ISDB-S) try each channel until received (the tuners of the same types once)
-(the types of the route: TER: GR, SAT: BS / CS / BS4K / SKY, CATV and HIKARI: any). The remote tuners are tried by each type.
+(the types of the route: TER: GR, SAT: BS / CS / BS4K / SKY, CATV and FTTH: any). The remote tuners are tried by each type.
 The relative streams of TSMF are detected on any local tuner.
 A tuner receiving multiple systems should have all the types to receive in \`types\` (such as \`[GR, BS, CS, BS4K]\` for CATV).
 
@@ -1215,7 +1215,7 @@ only the entries of the type are replaced):
             in: "query",
             name: "route",
             type: "string",
-            enum: ["TER", "SAT", "CATV", "HIKARI"] as apid.ChannelRoute[],
+            enum: ["TER", "SAT", "CATV", "FTTH"] as apid.ChannelRoute[],
             default: "TER",
             description: "Specifies the receiving route to scan."
         },

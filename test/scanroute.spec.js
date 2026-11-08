@@ -104,7 +104,7 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
 
   // 数値は、その名前のチャンネルだけをスキップする (BS01_3 や CS13 はスキップしない)
   it("skips only the channels of the names", async () => {
-    const { tuned } = await runScan({ route: "HIKARI", source: "list", channels: ["13", "BS01_3", "CS13"], skipCh: ["13"], refresh: true, dryRun: true }, () => []);
+    const { tuned } = await runScan({ route: "FTTH", source: "list", channels: ["13", "BS01_3", "CS13"], skipCh: ["13"], refresh: true, dryRun: true }, () => []);
     assert.deepStrictEqual(tuned.map(t => t.channel), ["BS01_3", "CS13"]);
   });
 
@@ -278,7 +278,7 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
   // ISDB-T と ISDB-S のチューナーが別の場合は、受信できるまでそれぞれのタイプのチューナーで試す
   it("tries the tuners of each type until received", async () => {
     const { saved, tuned } = await runScan(
-      { route: "HIKARI", source: "list", channels: ["27", "BS03_1", "C13"], refresh: true },
+      { route: "FTTH", source: "list", channels: ["27", "BS03_1", "C13"], refresh: true },
       channel => {
         if ((channel.type === "GR") !== /^\d+$/.test(channel.channel)) {
           throw new Error("stream has closed before get network");
@@ -290,7 +290,7 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
 
     // the satellite types first for the channels named BS / CS, the other types if not received (C13 is received only by the tuner of BS)
     assert.deepStrictEqual(tuned.map(t => [t.channel, t.type]), [["27", "GR"], ["BS03_1", "BS"], ["C13", "GR"], ["C13", "BS"]]);
-    assert.deepStrictEqual(saved.filter(item => item.route === "HIKARI").map(item => [item.type, item.channel]), [["GR", "27"], ["BS", "BS03_1"], ["BS", "C13"]]);
+    assert.deepStrictEqual(saved.filter(item => item.route === "FTTH").map(item => [item.type, item.channel]), [["GR", "27"], ["BS", "BS03_1"], ["BS", "C13"]]);
   });
 
   // 受信経路の放送のタイプだけを試す (routes のないチューナーは、すべての受信経路のチューナー)
@@ -306,7 +306,7 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
   it("shows the error other than no signal, and stops trying the types when cancelled", async () => {
     const logs = [];
     let result = await runScan(
-      { route: "HIKARI", source: "list", channels: ["27"], refresh: true, dryRun: true },
+      { route: "FTTH", source: "list", channels: ["27"], refresh: true, dryRun: true },
       channel => { throw new Error(channel.type === "GR" ? "spawn recpt1 ENOENT" : "stream has closed before get network"); },
       { scanTypes: ["GR", "BS"], logs }
     );
@@ -316,7 +316,7 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
     // no signal over the channel not in the channel config of dvbv5 of the tuners of the other type
     logs.length = 0;
     result = await runScan(
-      { route: "HIKARI", source: "list", channels: ["27"], refresh: true, dryRun: true },
+      { route: "FTTH", source: "list", channels: ["27"], refresh: true, dryRun: true },
       channel => { throw new Error(channel.type === "GR" ? "stream has closed before get network" : "channel 27 is not found in /etc/isdbs.conf"); },
       { scanTypes: ["GR", "BS"], logs }
     );
@@ -325,7 +325,7 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
     assert.ok(!logs.some(text => /is not found/.test(text)));
 
     result = await runScan(
-      { route: "HIKARI", source: "list", channels: ["27", "28"], refresh: true },
+      { route: "FTTH", source: "list", channels: ["27", "28"], refresh: true },
       () => {
         scan.del({}, { status() {}, setHeader() {}, json() {} });
         throw new Error("stream has closed before get network");
