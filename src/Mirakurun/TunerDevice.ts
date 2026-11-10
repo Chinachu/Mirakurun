@@ -28,6 +28,7 @@ import Client, { ProgramsQuery } from "../client";
 import type DvbDevice from "./dvb/DvbDevice";
 import { findDvbv5ZapChannelsConf, parseDvbv5ZapCommand } from "./dvb/dvbv5-zap";
 import { DvbChannels, findChannelParams, loadChannelsConf, readChannelNames, readChannelsConf } from "./dvb/DvbChannelConf";
+import { DTV } from "./dvb/constants";
 
 /** 出力をまとめて書き出すまでに保留する入力の上限 (バイト数とミリ秒) */
 const FLUSH_BYTES = 128 * 1024;
@@ -70,6 +71,13 @@ function loadDvbDevice(): typeof DvbDevice | null {
 
 interface User extends common.User {
     _stream?: common.StreamSink;
+}
+
+/** the channel in the channel config file of dvbv5-zap (FREQUENCY: kHz for the satellite) */
+export interface DvbChannelStream {
+    deliverySystem: number;
+    frequency: number;
+    streamId?: number;
 }
 
 export interface TunerDeviceStatus {
@@ -242,6 +250,23 @@ export default class TunerDevice extends EventEmitter {
     async getDvbChannelNames(route: apid.ChannelRoute): Promise<string[] | null> {
         const confPath = this._config.command ? findDvbv5ZapChannelsConf(this._config.command.replace(/<route>/g, route.toLowerCase())) : null;
         return confPath ? readChannelNames(confPath) : null;
+    }
+
+    /**
+     * the delivery system, the frequency and the stream (STREAM_ID) of a channel in the channel config file of dvbv5-zap of the command for the route,
+     * `undefined` if the command is not dvbv5-zap (with or without DVB device direct access), `null` if the channel is not in the file
+     */
+    async getDvbChannelStream(route: apid.ChannelRoute, channel: string): Promise<DvbChannelStream | null | undefined> {
+        const confPath = this._config.command ? findDvbv5ZapChannelsConf(this._config.command.replace(/<route>/g, route.toLowerCase())) : null;
+        if (!confPath) {
+            return undefined;
+        }
+        const params = (await readChannelsConf(confPath)).find(channel, this._dvbChannelByFrequency);
+        if (!params) {
+            return null;
+        }
+        const get = (cmd: number): number => params.properties.find(property => property[0] === cmd)?.[1];
+        return { deliverySystem: params.deliverySystem, frequency: get(DTV.FREQUENCY), streamId: get(DTV.STREAM_ID) };
     }
 
     getPriority(): number {

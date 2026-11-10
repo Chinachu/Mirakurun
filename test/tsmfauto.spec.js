@@ -620,6 +620,39 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
       assert.deepStrictEqual(plain.scans.at(-1).devices, [another]);
     });
 
+    // チャンネルスキャンが求めた場合は、NIT のすべてのセクションによるネットワークの TS の一覧を待って返す
+    it("waits for the streams of the network by NIT for the channel scan if requested", async () => {
+      const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV" });
+      _.channel = { get: () => null, getStreams: () => [], setStreams: () => {} };
+      const networkStreams = { networkId: 4, streams: [{ streamId: 16400, frequency: 11727480 }] };
+      const t = scanner(null, 0);
+      const initTS = t._initTS;
+      const requested = [];
+      t._initTS = async (user, dest, candidates) => {
+        requested.push(user.streamSetting.parseNetworkStreams);
+        const filter = await initTS(user, dest, candidates);
+        // after the network and the services
+        setTimeout(() => filter.emit("networkStreams", networkStreams), 30);
+        return filter;
+      };
+
+      assert.deepStrictEqual((await t.scanChannel(channel, {}, undefined, true)).map(stream => stream.networkStreams), [networkStreams]);
+      // not requested: not waited
+      const streams = await t.scanChannel(channel);
+      assert.deepStrictEqual(streams.map(stream => [stream.services.length, "networkStreams" in stream]), [[1, false]]);
+      assert.deepStrictEqual(requested, [true, undefined]);
+
+      // not notified until the stream is closed (as by the timeout): the scan succeeds without the streams of the network
+      t._initTS = async (user, dest, candidates) => {
+        const filter = await initTS(user, dest, candidates);
+        setTimeout(() => filter.close(), 30);
+        return filter;
+      };
+      const closed = await t.scanChannel(channel, {}, undefined, true);
+      assert.deepStrictEqual(closed.map(stream => [stream.services.length, "networkStreams" in stream]), [[1, false]]);
+      assert.ok(t.scans.at(-1).closedAt - t.scans.at(-1).startedAt >= 25);
+    });
+
     // 複数の搬送波の TLV は、ほかの搬送波が見つかるまでスキャンしないため、TS のスキャンに失敗しても搬送波を返す
     it("returns the carrier bonded for the channel scan, even if the scan of TS fails", async () => {
       const channel = new ChannelItem({ name: "C", type: "BS", channel: "C46", route: "CATV" });

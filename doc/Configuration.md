@@ -383,6 +383,17 @@ How the type is decided and which types are added on each route are shown in the
 - For a tuner receiving multiple types, specify all the types to receive in `types`. If no tuner on the route can tune the type of an added channel, the scan log reports it.
 - The tuners of a remote Mirakurun are tried by each type, because they receive only the channels of the types configured on the remote.
 
+#### BS channels not broadcast
+
+The scans of `preset` and `dvbConf` on the routes `SAT` and `FTTH` skip the BS channels not broadcast in TS, by the NIT of the first BS channel received (the TSID and the frequency of all the TS of BS), to save the wait for each channel not received. The skipped channels are shown in the scan log.
+
+- Tuners using a channel config file of dvbv5-zap: a channel is skipped if its `FREQUENCY` is of a BS transponder (right-hand circular polarization) and its `STREAM_ID` (TSID) is not in the TS of the transponder in the NIT. If `STREAM_ID` is not a TSID (the relative TS number 0-7, or omitted), the channel is handled by the transponder, as by the name below.
+- Tuners of the other commands: xx of the channel name `BSxx_y` is the transponder number. After all the TS of the transponder in the NIT are received by the channels of the transponder in the scan, the rest of the channels (such as `BS01_3`) are skipped. The channels are not skipped by the number of the TS, because the numbers of `_y` may have gaps (such as `BS09_0` and `BS09_2`).
+- The channels of the transponders not in the NIT are skipped on the tuners not for TLV. The transponders not in the NIT are those of TLV for 4K, and the even numbers (the left-hand circular polarization) handled by the name. TLV is not detected on the skipped channels, so they are not added as 4K channels either. Specify `BS4K` in `types` of the tuners receiving 4K.
+- The channels of the frequencies of the left-hand circular polarization in a channel config file of dvbv5-zap are not skipped, because they are not handled as BS transponders (right-hand circular polarization).
+- The TS of the channels taken over with "Refresh" (`refresh`) off are not received, so the rest of the channels of the transponder are scanned on the tuners handled by the name.
+- The channels specified by `list` and `format` are not skipped, nor are any channels if the NIT is not received (such as not completed within 20 seconds on the first BS channel received).
+
 #### TSMF channels
 
 - The channel scan detects the relative TSs of TSMF even on the tuners not for TLV.

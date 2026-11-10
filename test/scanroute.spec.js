@@ -16,7 +16,8 @@ const oldChannels = [
 const service = (networkId, serviceId, name) => ({ networkId, serviceId, name, type: 1, streamId: 1 });
 
 // scanTypes: the types to try (by default, a tuner of all the types)
-async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"], dvbChannels = [], logs = [], scanTypes, routes, relTsByRemote = [], extraChannels = [] } = {}) {
+// device: the tuner (or the tuners) of the type to try (by default, the name)
+async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"], dvbChannels = [], logs = [], scanTypes, routes, relTsByRemote = [], extraChannels = [], device = type => `tuner of ${type}` } = {}) {
   const saved = [];
   const tuned = [];
   const errors = [];
@@ -28,12 +29,12 @@ async function runScan(query, scanChannel, { types = ["GR", "BS", "CS", "BS4K"],
     typeExists: (type, route) => types.includes(type) && (!routes || routes.includes(route)),
     receivesRelTsByRemote: async (type, route, channel) => relTsByRemote.includes(`${type}/${route}/${channel}`),
     getScanAttempts: (route, order) => (scanTypes ? order.filter(type => scanTypes.includes(type)) : order.filter(type => types.includes(type)).slice(0, 1))
-      .map(type => ({ type, devices: [`tuner of ${type}`] })),
+      .map(type => ({ type, devices: [].concat(device(type)) })),
     getDvbChannelNames: async () => typeof dvbChannels === "function" ? dvbChannels() : dvbChannels,
-    scanChannel: async (channel, user, devices) => {
-      assert.deepStrictEqual(devices, [`tuner of ${channel.type}`]);
-      tuned.push({ channel: channel.channel, route: channel.route, type: channel.type });
-      return scanChannel(channel);
+    scanChannel: async (channel, user, devices, networkStreams) => {
+      assert.deepStrictEqual(devices, [].concat(device(channel.type)));
+      tuned.push({ channel: channel.channel, route: channel.route, type: channel.type, ...(networkStreams && { networkStreams }) });
+      return scanChannel(channel, networkStreams);
     }
   };
   const req = { query, setTimeout() {} };
@@ -349,6 +350,217 @@ describe("[scanroute.spec] /api/config/channels/scan : route", () => {
   it("uses the tuners of any type of the route", async () => {
     const { tuned } = await runScan({ route: "SAT", source: "list", channels: ["CS2"], refresh: true, dryRun: true }, () => [], { types: ["CS"] });
     assert.deepStrictEqual(tuned, [{ channel: "CS2", route: "SAT", type: "CS" }]);
+  });
+
+  describe("NIT of BS", () => {
+    // BS の NIT (2026-11 に受信したもの): 中継器ごとの TSID (BS09_1 と BS23_2 は放送されていない、BS15 は TSID の下位と番号がずれる)
+    const bsNit = {
+      1: [0x4010, 0x4011, 0x4012],
+      3: [0x4030, 0x4631, 0x4632],
+      5: [0x4450, 0x4451],
+      9: [0x4090, null, 0x4092],
+      13: [0x40D0, 0x40D1, 0x46D2],
+      15: [0x40F1, 0x40F2, 0x48F3],
+      19: [0x4730, 0x4731, 0x4732, 0x4733],
+      21: [0x4750, 0x4751, 0x4752],
+      23: [0x4770, 0x4971, null, 0x4973]
+    };
+    const bsName = (transponder, number) => `BS${String(transponder).padStart(2, "0")}_${number}`;
+    // the channels broadcast (the name: TSID)
+    const broadcast = Object.fromEntries(Object.entries(bsNit).flatMap(([transponder, streamIds]) =>
+      streamIds.map((streamId, number) => [bsName(transponder, number), streamId]).filter(([, streamId]) => streamId !== null)));
+    const networkStreams = {
+      networkId: 4,
+      streams: Object.entries(bsNit).flatMap(([transponder, streamIds]) =>
+        streamIds.filter(streamId => streamId !== null).map(streamId => ({ streamId, frequency: 11727480 + (transponder - 1) / 2 * 38360 })))
+    };
+    const names = Object.keys(broadcast).sort();
+    // nit: the stream of BS has the streams of the network if collected
+    const receive = (nit = true) => (channel, collects) => {
+      if (/^CS/.test(channel.channel)) {
+        return [{ format: "ts", services: [{ ...service(6, 1, channel.channel), streamId: 0x6000 }] }];
+      }
+      if (broadcast[channel.channel] === undefined) {
+        throw new Error("stream has closed before get network");
+      }
+      return [{ format: "ts", services: [{ ...service(4, 101, channel.channel), streamId: broadcast[channel.channel] }], ...(collects && nit && { networkStreams }) }];
+    };
+    const command = types => () => ({ config: { types }, getDvbChannelStream: async () => undefined });
+    const tunedBs = tuned => tuned.map(t => t.channel).filter(channel => /^BS/.test(channel));
+    const query = { route: "SAT", refresh: true, dryRun: true };
+
+    // 名前から TSID がわからないチューナー: NIT にない中継器と、中継器の TS をすべて受信した後の名前をスキップする
+    it("skips the channels of BS not broadcast by the names: the transponders not in NIT, and after all the streams of the transponder are received", async () => {
+      const logs = [];
+      const device = command(["BS", "CS"])();
+      const { tuned } = await runScan(query, receive(), { device: () => device, logs });
+
+      // BS09_1 and BS23_2 are tried (not broadcast, but the streams after them are)
+      assert.deepStrictEqual(tunedBs(tuned), [...names, "BS09_1", "BS23_2"].sort());
+      // the streams of the network are collected only by the first channel of BS received
+      assert.deepStrictEqual(tuned.filter(t => t.networkStreams).map(t => t.channel), ["BS01_0"]);
+      assert.strictEqual(tuned.filter(t => /^CS/.test(t.channel)).length, 23);
+      assert.strictEqual(logs.filter(text => /not broadcast in TS by NIT of BS, skipped/.test(text)).length, 92 - names.length - 2);
+      assert.ok(logs.some(text => /26 streams of BS are known by NIT/.test(text)));
+    });
+
+    // TLV 用のチューナー (types に BS4K を含むか、tlvDecoder / tlvToTsDecoder を設定したもの): NIT にない中継器 (TLV) はスキップしない
+    it("does not skip the transponders not in NIT on the tuners for TLV", async () => {
+      const transponders = [2, 4, 6, 7, 8, 10, 11, 12, 14, 16, 17, 18, 20, 22];
+      for (const config of [{ types: ["BS", "CS", "BS4K"] }, { types: ["BS", "CS"], tlvDecoder: "tlv" }, { types: ["BS", "CS"], tlvToTsDecoder: "mmt2ts" }]) {
+        const device = { ...command()(), config };
+        const { tuned } = await runScan(query, receive(), { device: () => device });
+
+        assert.deepStrictEqual(tunedBs(tuned), [...names, "BS09_1", "BS23_2", ...transponders.flatMap(transponder => [0, 1, 2, 3].map(number => bsName(transponder, number)))].sort());
+      }
+    });
+
+    // dvbv5 のチャンネル設定 (STREAM_ID が TSID): NIT にない TSID のチャンネルだけをスキップする
+    it("skips only the channels of the streams not in NIT by the channel config file of dvbv5", async () => {
+      // the streams not broadcast any longer (as dvbconf-for-isdb)
+      const conf = { ...broadcast, BS05_2: 0x4452, BS07_0: 0x4470, BS09_1: 0x4091, BS11_0: 0x46B0, BS17_0: 0x4310, BS23_2: 0x4972 };
+      const device = {
+        config: { types: ["BS", "CS"] },
+        getDvbChannelStream: async (route, channel) => conf[channel] === undefined ? null
+          : { deliverySystem: 9, frequency: 1049480 + (Number(channel.slice(2, 4)) - 1) / 2 * 38360, streamId: conf[channel] }
+      };
+      const logs = [];
+      const { tuned } = await runScan({ ...query, source: "dvbConf" }, receive(), { device: () => device, dvbChannels: [...Object.keys(conf).sort(), "CS2"], logs });
+
+      assert.deepStrictEqual(tuned.map(t => t.channel), [...names, "CS2"]);
+      assert.strictEqual(logs.filter(text => /not broadcast in TS by NIT of BS, skipped/.test(text)).length, 6);
+    });
+
+    // NIT を得られなければ、すべてのチャンネルを調べる (最初に受信した BS のチャンネルだけで NIT を待つ)
+    it("scans all the channels without NIT of BS", async () => {
+      const device = command(["BS", "CS"])();
+      const { tuned } = await runScan(query, receive(false), { device: () => device });
+
+      assert.strictEqual(tunedBs(tuned).length, 92);
+      assert.deepStrictEqual(tuned.filter(t => t.networkStreams).map(t => t.channel), ["BS01_0"]);
+    });
+
+    // 指定されたチャンネル (list / format / 4.3.0 の type) と、ほかの受信経路はスキップしない
+    it("does not skip the channels specified, and of the other routes", async () => {
+      const device = command(["GR", "BS", "CS"])();
+      for (const specified of [
+        { route: "SAT", source: "list", channels: ["BS01_0", "BS01_3", "BS07_0"] },
+        { route: "SAT", source: "format", channelNameFormat: "BS{ch00}_{subch}", minCh: 1, maxCh: 1 },
+        { type: "BS", minCh: 1, maxCh: 1 },
+        { route: "CATV", source: "dvbConf" }
+      ]) {
+        const { tuned } = await runScan({ ...specified, refresh: true, dryRun: true }, receive(), { device: () => device, dvbChannels: ["BS01_0", "BS01_3", "BS07_0"] });
+        assert.ok(tuned.some(t => t.channel === "BS01_3"), JSON.stringify(specified));
+        assert.strictEqual(tuned.some(t => t.networkStreams), false);
+      }
+    });
+
+    // FTTH の地上波のチューナーのチャンネル設定に BS のチャンネルはないため、衛星のチューナーで試さないチャンネルはスキップとして出す
+    it("shows the channel as skipped if the other tuners do not have it in the channel config files of dvbv5", async () => {
+      const conf = { BS09_0: 0x4090, BS09_1: 0x4091, BS09_2: 0x4092 };
+      const devices = {
+        GR: { config: { types: ["GR"] }, getDvbChannelStream: async () => null },
+        BS: {
+          config: { types: ["BS", "CS"] },
+          getDvbChannelStream: async (route, channel) => conf[channel] === undefined ? null : { deliverySystem: 9, frequency: 1202920, streamId: conf[channel] }
+        }
+      };
+      const logs = [];
+      const { tuned } = await runScan(
+        { route: "FTTH", source: "dvbConf", refresh: true, dryRun: true },
+        (channel, collects) => {
+          if (channel.type === "GR") {
+            throw new Error(`channel ${channel.channel} is not found in isdbt.conf`);
+          }
+          return receive()(channel, collects);
+        },
+        { device: type => devices[type], scanTypes: ["GR", "BS"], dvbChannels: Object.keys(conf), logs }
+      );
+
+      assert.deepStrictEqual(tuned.map(t => [t.channel, t.type]), [["BS09_0", "BS"], ["BS09_1", "GR"], ["BS09_2", "BS"]]);
+      assert.strictEqual(logs.filter(text => /not broadcast in TS by NIT of BS, skipped/.test(text)).length, 1);
+      assert.strictEqual(logs.some(text => /no signal/.test(text)), false);
+    });
+
+    // BS の TS を運ぶほかのチャンネル (ケーブルテレビなど) で受信した TS は、中継器の TS を受信済みと数えない
+    it("does not count the streams of BS received by the channels not of BS", async () => {
+      // the channels of the cable television carrying the streams of BS, before and after NIT of BS is known
+      const cable = { C38: 0x4030, C39: 0x4631, C40: 0x4011, C41: 0x4012, C42: 0x4632 };
+      const channels = ["C38", "C39", "BS01_0", "C40", "C41", "BS01_1", "BS01_2", "BS01_3", "C42", "BS03_0", "BS03_1", "BS03_2", "BS03_3"];
+      const device = command(["GR", "BS", "CS"])();
+      const { tuned } = await runScan(
+        { route: "FTTH", source: "dvbConf", refresh: true, dryRun: true },
+        (channel, collects) => cable[channel.channel] === undefined ? receive()(channel, collects)
+          : [{ format: "ts", services: [{ ...service(4, 101, channel.channel), streamId: cable[channel.channel] }] }],
+        { device: () => device, scanTypes: ["BS"], dvbChannels: channels }
+      );
+
+      // only BS01_3 and BS03_3 are skipped, after all the streams of the transponder are received by the channels of BS
+      assert.deepStrictEqual(tuned.map(t => t.channel), channels.filter(channel => !/^BS0[13]_3$/.test(channel)));
+      assert.deepStrictEqual(tuned.filter(t => t.networkStreams).map(t => t.channel), ["BS01_0"]);
+    });
+
+    // 同じタイプのチューナーが複数ある場合は、どれか 1 つでも放送されていないと判別できなければ試す
+    it("tries the channel unless not broadcast on all the tuners of the same types", async () => {
+      const conf = { BS05_0: 0x4450, BS05_1: 0x4451, BS05_2: 0x4452, BS09_0: 0x4090, BS09_1: 0x4091, BS09_2: 0x4092 };
+      const devices = [
+        {
+          config: { types: ["BS", "CS"] },
+          getDvbChannelStream: async (route, channel) => ({ deliverySystem: 9, frequency: channel.startsWith("BS05") ? 1126200 : 1202920, streamId: conf[channel] })
+        },
+        command(["BS", "CS"])()
+      ];
+      const { tuned } = await runScan({ ...query, source: "dvbConf" }, receive(), { device: () => devices, dvbChannels: Object.keys(conf) });
+
+      // BS05_2: not in NIT by the channel config file, and all the streams of BS-5 are received (by the name)
+      // BS09_1: not in NIT by the channel config file, but the streams of BS-9 are not all received yet (by the name)
+      assert.deepStrictEqual(tuned.map(t => t.channel), ["BS05_0", "BS05_1", "BS09_0", "BS09_1", "BS09_2"]);
+    });
+
+    // スキップしても、スキップしない場合 (list で同じチャンネルを指定) と同じ結果になる (4.3.0 の channels.yml からの更新)
+    it("saves the same channels as without skipping", async () => {
+      const extraChannels = [
+        { name: "NHK BS", type: "BS", channel: "BS15_0", serviceId: 101 },
+        { name: "BS12", type: "BS", channel: "BS09_2", serviceId: 222, isDisabled: true },
+        { name: "closed", type: "BS", channel: "BS23_2", serviceId: 999, isDisabled: true },
+        { name: "closed 2", type: "BS", channel: "BS07_0", serviceId: 998 },
+        { name: "shop", type: "CS", channel: "CS8", serviceId: 55 }
+      ];
+      const conf = { ...broadcast, BS05_2: 0x4452, BS07_0: 0x4470, BS09_1: 0x4091, BS11_0: 0x46B0, BS17_0: 0x4310, BS23_2: 0x4972 };
+      const dvb = {
+        config: { types: ["BS", "CS"] },
+        getDvbChannelStream: async (route, channel) => conf[channel] === undefined ? null
+          : { deliverySystem: 9, frequency: 1049480 + (Number(channel.slice(2, 4)) - 1) / 2 * 38360, streamId: conf[channel] }
+      };
+      for (const [source, device, channels] of [
+        ["preset", command(["BS", "CS"])(), scan.getPresetChannels("SAT")],
+        ["dvbConf", dvb, [...Object.keys(conf).sort(), "CS2", "CS8"]]
+      ]) {
+        for (const refresh of [true, false]) {
+          const options = { device: () => device, dvbChannels: channels, extraChannels };
+          const skipped = await runScan({ route: "SAT", source, ...(refresh && { refresh }) }, receive(), options);
+          const all = await runScan({ route: "SAT", source: "list", channels, ...(refresh && { refresh }) }, receive(), options);
+
+          assert.ok(skipped.tuned.length < all.tuned.length, `${source} ${refresh}`);
+          assert.deepStrictEqual(skipped.saved, all.saved, `${source} ${refresh}`);
+          // the entry enabled is taken over without `refresh`, the entries of the channels not broadcast are removed
+          assert.strictEqual(skipped.saved.some(item => item.name === "NHK BS"), !refresh);
+          assert.strictEqual(skipped.saved.some(item => item.name === "closed"), false);
+          assert.strictEqual(skipped.saved.some(item => item.name === "closed 2"), !refresh);
+        }
+      }
+    });
+
+    // 既存の設定を引き継いだチャンネルの TS は受信していないため、その中継器の残りの名前はスキップしない
+    it("does not skip the rest of the transponder with the channel taken over", async () => {
+      const device = command(["BS", "CS"])();
+      const { tuned } = await runScan({ route: "SAT", dryRun: true }, receive(), { device: () => device });
+
+      // BS01_0 is taken over (the streams of the network are collected by BS01_1)
+      assert.deepStrictEqual(tunedBs(tuned).slice(0, 4), ["BS01_1", "BS01_2", "BS01_3", "BS03_0"]);
+      assert.deepStrictEqual(tuned.filter(t => t.networkStreams).map(t => t.channel), ["BS01_1"]);
+      assert.strictEqual(tunedBs(tuned).includes("BS03_3"), false);
+    });
   });
 
   it("rejects the route without the tuners, and the channel config files without the channels", async () => {

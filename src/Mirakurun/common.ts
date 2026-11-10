@@ -43,10 +43,19 @@ interface StreamSetting {
     parseNIT?: boolean;
     parseSDT?: boolean;
     parseEIT?: boolean;
+    /** collects the streams of the network by all the sections of NIT (only by the channel scan) */
+    parseNetworkStreams?: boolean;
     /** the relative stream of TSMF */
     tsmfRelTs?: number;
     /** the format to receive (the remote Mirakurun outputs it) */
     format?: apid.StreamFormat;
+}
+
+/** the streams of a network by NIT */
+export interface NetworkStreams {
+    networkId: number;
+    /** `frequency`: kHz (of the satellite delivery system descriptor) */
+    streams: { streamId: number, frequency?: number }[];
 }
 
 export interface StreamInfo {
@@ -72,6 +81,11 @@ export const channelTypes: apid.ChannelType[] = ["GR", "BS", "CS", "SKY", "BS4K"
 
 /** the channel types of TLV (MMT) */
 export const tlvChannelTypes: apid.ChannelType[] = ["BS4K"];
+
+/** whether the tuner is for TLV (MMT): with a type of TLV in `types`, or with `tlvDecoder` / `tlvToTsDecoder` */
+export function isTlvTuner(tuner: Pick<apid.ConfigTunersItem, "types" | "tlvDecoder" | "tlvToTsDecoder">): boolean {
+    return !!tuner.tlvDecoder || !!tuner.tlvToTsDecoder || tuner.types.some(type => tlvChannelTypes.includes(type));
+}
 
 /** the key of `status.epgByStream` (MH-EIT carries only the events of its own TLV stream) */
 export function getEpgStreamKey(networkId: number, streamId: number): string {

@@ -16,7 +16,7 @@
 import { Writable } from "stream";
 import EventEmitter = require("eventemitter3");
 import { TsStreamLite, TsCrc32, TsChar, TsLogo, tsDataModule } from "@chinachu/aribts";
-import { CATV_NETWORK_IDS, StreamInfo, getTimeFromMJD } from "./common";
+import { CATV_NETWORK_IDS, NetworkStreams, StreamInfo, getTimeFromMJD } from "./common";
 import * as log from "./log";
 import { retainOutput } from "./OutputBuffer";
 import EPG from "./EPG";
@@ -36,6 +36,8 @@ interface TSFilterOptions {
     readonly parseNIT?: boolean;
     readonly parseSDT?: boolean;
     readonly parseEIT?: boolean;
+    /** collects the streams of the network by all the sections of NIT (with `parseNIT`) */
+    readonly parseNetworkStreams?: boolean;
     readonly tsmfRelTs?: number;
 }
 
@@ -146,6 +148,9 @@ export default class TSFilter extends EventEmitter {
     private _patMap: Map<number, number> = null; // <serviceId, pid>, for CATV ESS detection
     private _networkEmitted = false;
     private _networkMatched = false; // 自身の TS のセクションから通知したか
+    // the streams of each section of NIT (`null` if not collected, or already notified), of the network and the version
+    private _nitSections: Map<number, NetworkStreams["streams"]> = null;
+    private _nitVersion = -1;
     private _essMap = new Map<number, number>(); // <serviceId, pid>
     private _essEsPids = new Set<number>();
     private _dlDataMap = new Map<number, DownloadData>();
@@ -224,6 +229,9 @@ export default class TSFilter extends EventEmitter {
         }
         if (options.parseEIT === true) {
             this._parseEIT = true;
+        }
+        if (options.parseNetworkStreams === true) {
+            this._nitSections = new Map();
         }
 
         if (this._targetNetworkId) {
@@ -707,6 +715,10 @@ export default class TSFilter extends EventEmitter {
             return;
         }
 
+        if (this._nitSections !== null) {
+            this._collectNetworkStreams(data);
+        }
+
         const _network = {
             networkId: data.network_id,
             areaCode: -1,
@@ -744,10 +756,41 @@ export default class TSFilter extends EventEmitter {
             this.emit("network", _network);
         }
 
-        // for CATV, wait for the section of this transport stream
-        if (this._parsePids.has(pid) && (this._isCatv === false || matchedTs)) {
+        // for CATV, wait for the section of this transport stream (and all the sections if the streams of the network are collected)
+        if (this._parsePids.has(pid) && (this._isCatv === false || matchedTs) && this._nitSections === null) {
             this._parsePids.delete(pid);
         }
+    }
+
+    /** collects the streams of the network by all the sections of NIT, notified once */
+    private _collectNetworkStreams(data: any): void {
+        if (data.current_next_indicator === 0) {
+            return;
+        }
+        // the sections of the same network and the same version (the relative streams of TSMF mixed may carry the different networks)
+        const version = (data.network_id << 5) | data.version_number;
+        if (this._nitVersion !== version) {
+            this._nitVersion = version;
+            this._nitSections.clear();
+        }
+
+        this._nitSections.set(data.section_number, data.transport_streams.map(ts => {
+            const delivery = ts.transport_descriptors.find(desc => desc.descriptor_tag === 0x43); // satellite delivery system descriptor
+            // frequency: 8 digits of BCD (10 kHz)
+            const digits = delivery ? (delivery.frequency >>> 0).toString(16) : "";
+            return {
+                streamId: ts.transport_stream_id,
+                ...(/^[0-9]+$/.test(digits) && { frequency: parseInt(digits, 10) * 10 })
+            };
+        }));
+        if (this._nitSections.size <= data.last_section_number) {
+            return;
+        }
+
+        // in the order of the sections
+        const streams = [...this._nitSections.entries()].sort((a, b) => a[0] - b[0]).flatMap(section => section[1]);
+        this._nitSections = null;
+        this.emit("networkStreams", { networkId: data.network_id, streams });
     }
 
     private _detectEss(services: { service_id: number, service_type: number }[]): void {

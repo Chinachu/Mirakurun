@@ -247,6 +247,8 @@ interface StreamSetting {
     parseNIT?: boolean;
     parseSDT?: boolean;
     parseEIT?: boolean;
+    /** collects the streams of the network by all the sections of NIT (only by the channel scan) */
+    parseNetworkStreams?: boolean;
     /** the relative stream of TSMF */
     tsmfRelTs?: number;
     /** the format to receive (the remote Mirakurun outputs it) */

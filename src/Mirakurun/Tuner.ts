@@ -154,6 +154,8 @@ export interface ScannedStream {
     networkId?: number;
     /** the services of the relative stream are not received (the scan has failed) */
     failed?: boolean;
+    /** the streams of the network by NIT (if collected, only of TS not of TSMF) */
+    networkStreams?: common.NetworkStreams;
 }
 
 /** the tuners to try a channel by the channel scan, as the type */
@@ -167,6 +169,8 @@ interface ScanOptions {
     anyTuner?: boolean;
     /** the tuners to receive (only by the channel scan) */
     devices?: TunerDevice[];
+    /** waits for the streams of the network by all the sections of NIT (only by the channel scan) */
+    networkStreams?: boolean;
     /** collects the streams scanned */
     streams?: ScannedStream[];
 }
@@ -427,17 +431,21 @@ export class Tuner {
     /**
      * scans the services of each stream (each relative stream of TSMF) of a channel for the channel scan (the channel is not registered),
      * the format and the relative streams of TSMF are detected on any local tuner
+     * @param networkStreams collects the streams of the network by all the sections of NIT (`ScannedStream.networkStreams`)
      */
-    async scanChannel(channel: ChannelItem, user: Partial<common.User> = {}, devices?: TunerDevice[]): Promise<ScannedStream[]> {
+    async scanChannel(channel: ChannelItem, user: Partial<common.User> = {}, devices?: TunerDevice[], networkStreams = false): Promise<ScannedStream[]> {
         const streams: ScannedStream[] = [];
         const userReq = this._getScanUser(channel, user);
+        if (networkStreams) {
+            userReq.streamSetting.parseNetworkStreams = true;
+        }
         // the remote tuners: the relative streams of TSMF detected by the remote Mirakurun (its stream as received is TS)
         const remoteStreams = devices?.length > 0 && devices.every(device => device.isRemote) ? await this._getRemoteTSMFStreams(channel, devices) : null;
         if (remoteStreams !== null) {
             await this._scanTSMFServices(channel, userReq, remoteStreams, streams, true, devices);
             return streams;
         }
-        await this._scanServices(channel, userReq, channel.getFormat(channel.tsmfRelTs), true, channel.tsmfRelTs, false, { anyTuner: true, streams, devices });
+        await this._scanServices(channel, userReq, channel.getFormat(channel.tsmfRelTs), true, channel.tsmfRelTs, false, { anyTuner: true, streams, devices, networkStreams });
         return streams;
     }
 
@@ -618,6 +626,7 @@ export class Tuner {
                 remoteControlKeyId: -1
             };
             let services: apid.Service[] = null;
+            let networkStreams: common.NetworkStreams = null;
             let retryFormat: apid.StreamFormat = null;
             let tsmf: TSMFStream[] = null;
             let isNotTSMF = notTSMF;
@@ -657,12 +666,20 @@ export class Tuner {
                         services = _services;
                         resolve();
                     });
-                })
+                }),
+                // NIT of TS (until the timeout, the scan succeeds without the streams of the network)
+                ...(options.networkStreams === true && candidate.format === "ts" ? [new Promise<void>(resolve => {
+                    tsFilter.once("networkStreams", _networkStreams => {
+                        networkStreams = _networkStreams;
+                        resolve();
+                    });
+                })] : [])
             ]).then(() => tsFilter.close());
 
             tsFilter.once("close", async () => {
                 tsFilter.removeAllListeners("network");
                 tsFilter.removeAllListeners("services");
+                tsFilter.removeAllListeners("networkStreams");
                 clearTimeout(timeout);
                 // TSMF is known only by the detection (the data received by the scan is enough in most cases)
                 if (probe?.tsmf === true && retryFormat === null && tsmf === null) {
@@ -699,7 +716,7 @@ export class Tuner {
                         });
                     }
 
-                    options.streams?.push({ relTs, format: candidate.format, services });
+                    options.streams?.push({ relTs, format: candidate.format, services, ...(networkStreams !== null && { networkStreams }) });
                     resolve(services);
                 }
             });
@@ -1086,6 +1103,7 @@ export class Tuner {
                         parseNIT: setting.parseNIT,
                         parseSDT: setting.parseSDT,
                         parseEIT: setting.parseEIT,
+                        parseNetworkStreams: setting.parseNetworkStreams,
                         tsmfRelTs: filterRelTs
                     });
                 }
@@ -1289,8 +1307,7 @@ export class Tuner {
 
     /** the remote Mirakurun outputs the format by itself, only the tuners for TLV (MMT) detect the format (TS / TLV) */
     private _detectsFormat(device: TunerDevice): boolean {
-        const { types, tlvDecoder, tlvToTsDecoder } = device.config;
-        return !device.isRemote && (!!tlvDecoder || !!tlvToTsDecoder || types.some(type => common.tlvChannelTypes.includes(type)));
+        return !device.isRemote && common.isTlvTuner(device.config);
     }
 
     private _getCandidates(targets: StreamTarget[]): TunerCandidate[] {

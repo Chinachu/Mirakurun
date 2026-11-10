@@ -20,6 +20,8 @@ import * as config from "../../../config";
 import * as common from "../../../common";
 import ChannelItem from "../../../ChannelItem";
 import type { ScanAttempt, ScannedStream } from "../../../Tuner";
+import type TunerDevice from "../../../TunerDevice";
+import { SYS } from "../../../dvb/constants";
 import _ from "../../../_";
 
 /**
@@ -340,6 +342,94 @@ export function getScanAttempts(route: apid.ChannelRoute, channel?: string, type
     return _.tuner.getScanAttempts(route, order.filter(type => routeTypes[route].includes(type) && types.includes(type)));
 }
 
+/** the transponders of BS (right-hand circular polarization, BS-1, 3, ..., 23): kHz */
+const BS_FIRST_FREQUENCY = 11727480;
+const BS_FREQUENCY_STEP = 38360;
+/** the local oscillator of the LNB for BS (the frequencies of the channel config files of dvbv5 are of the IF) */
+const BS_LO_FREQUENCY = 10678000;
+
+/**
+ * the transponder of BS (1, 3, ..., 23) of a frequency (kHz, of the broadcast or of the IF)
+ * @returns `null` if not of BS (right-hand circular polarization)
+ */
+export function getBsTransponder(frequency: number): number | null {
+    for (const lo of [0, BS_LO_FREQUENCY]) {
+        const offset = frequency + lo - BS_FIRST_FREQUENCY;
+        const index = Math.round(offset / BS_FREQUENCY_STEP);
+        if (index >= 0 && index <= 11 && Math.abs(offset - index * BS_FREQUENCY_STEP) <= 2000) {
+            return index * 2 + 1;
+        }
+    }
+    return null;
+}
+
+/** the streams (TSID) of each transponder of BS by NIT */
+export type BsStreams = Map<number, number[]>;
+
+/** @returns `null` if not NIT of BS, or the transponder of a stream is unknown (the channels are not skipped) */
+export function getBsStreams(network: common.NetworkStreams): BsStreams | null {
+    if (network.networkId !== 4 || network.streams.length === 0) {
+        return null;
+    }
+    const bsStreams: BsStreams = new Map();
+    for (const stream of network.streams) {
+        const transponder = stream.frequency === undefined ? null : getBsTransponder(stream.frequency);
+        if (transponder === null) {
+            return null;
+        }
+        bsStreams.set(transponder, [...(bsStreams.get(transponder) || []), stream.streamId]);
+    }
+    return bsStreams;
+}
+
+/**
+ * the channel of BS on a tuner: the transponder (the even numbers are of the left-hand circular polarization, only of TLV),
+ * and the stream (TSID) if known by the channel config file of dvbv5
+ */
+export interface BsChannel {
+    transponder: number;
+    streamId?: number;
+}
+
+/**
+ * the channel of BS on a tuner, by the channel config file of dvbv5 (FREQUENCY and STREAM_ID),
+ * by the name (`BSxx_y`, xx: the transponder) on the tuners of the other commands
+ * @returns `null` if not of BS (by the channel config file of dvbv5, only of the right-hand circular polarization)
+ */
+export async function getBsChannel(device: TunerDevice, route: apid.ChannelRoute, channel: string): Promise<BsChannel | null> {
+    const conf = await device.getDvbChannelStream(route, channel).catch((): null => null);
+    if (conf === undefined) {
+        const name = /^BS(\d+)_\d+$/i.exec(channel);
+        const transponder = name ? parseInt(name[1], 10) : 0;
+        return transponder >= 1 && transponder <= 23 ? { transponder } : null;
+    }
+    const transponder = conf?.deliverySystem === SYS.ISDBS ? getBsTransponder(conf.frequency) : null;
+    if (transponder === null) {
+        return null;
+    }
+    // STREAM_ID is TSID, or the relative number of the stream in the transponder (0-7)
+    return { transponder, ...(conf.streamId > 7 && { streamId: conf.streamId }) };
+}
+
+/**
+ * whether a channel of BS is not broadcast in TS by NIT of BS:
+ * - the transponder not in NIT: not broadcast in TS (the transponders of TLV are not in NIT)
+ * - the stream (TSID) known: not in NIT
+ * - the stream unknown: all the streams of the transponder are already received by the scan (by the other channels)
+ * @param tlv the tuner receives TLV
+ * @param received the streams (TSID) received by the scan, by the channels of BS of the transponder
+ */
+export function isAbsentBsChannel(bsStreams: BsStreams, channel: BsChannel, tlv: boolean, received: Set<number>): boolean {
+    const streams = bsStreams.get(channel.transponder);
+    if (streams === undefined) {
+        return !tlv;
+    }
+    if (channel.streamId !== undefined) {
+        return !streams.includes(channel.streamId);
+    }
+    return streams.every(streamId => received.has(streamId));
+}
+
 /** the error of the scan of a channel to show: 2 = other errors, 1 = no signal, 0 = the channel not in the channel config of dvbv5 */
 function getScanErrorRank(error: unknown): number {
     const text = String(error);
@@ -603,6 +693,7 @@ type ScanStatusUpdate = PhaseScanStatusUpdate | StepScanStatusUpdate | ResultSca
  * @param outputWriter Optional function to write output text during scan
  * @param skipCh Channels to skip (the names)
  * @param legacyType the type of the scan by `type` of 4.3.0 (scanned by the tuners of the type)
+ * @param byNetwork skips the channels of BS not broadcast in TS by NIT of BS (`isAbsentBsChannel()`)
  * @returns Promise resolving to the final channel list
  */
 async function runChannelScan(
@@ -612,7 +703,8 @@ async function runChannelScan(
     refresh: boolean,
     outputWriter?: (text: string) => void,
     skipCh: string[] = [],
-    legacyType?: apid.ChannelType
+    legacyType?: apid.ChannelType,
+    byNetwork = false
 ): Promise<apid.ConfigChannels> {
     try {
         // Initialize scan data
@@ -627,6 +719,9 @@ async function runChannelScan(
         const result: apid.ConfigChannels = oldChannelItems.filter(item => !isReplaced(item) || !scannedChannels.has(item.channel));
         let newCount = 0;
         let takeoverCount = 0;
+        // the streams of BS by NIT (`undefined` until a channel of BS is received, `null` if not known by it)
+        let bsStreams: BsStreams | null | undefined = byNetwork ? undefined : null;
+        const receivedBsStreams = new Set<number>();
 
         // Initialize global scan status
         const now = Date.now();
@@ -806,7 +901,27 @@ async function runChannelScan(
             let streams: ScannedStream[] = null;
             let received: ScanAttempt = null;
             let lastError: Error = null;
-            for (const attempt of getScanAttempts(route, channel, legacyType && [legacyType])) {
+            let attempts = getScanAttempts(route, channel, legacyType && [legacyType]);
+            // the channel of BS on each tuner (by the first channel of BS received, the channels not broadcast are skipped)
+            const bsChannels = new Map<TunerDevice, BsChannel | null>();
+            if (bsStreams !== null) {
+                for (const device of attempts.flatMap(attempt => attempt.devices)) {
+                    bsChannels.set(device, await getBsChannel(device, route, channel));
+                }
+            }
+            // not tried by the tuners of BS
+            let absentInBs = false;
+            if (bsStreams) {
+                const knownStreams = bsStreams;
+                const count = attempts.length;
+                attempts = attempts.filter(attempt => attempt.devices.some(device => {
+                    const bsChannel = bsChannels.get(device);
+                    return !bsChannel || !isAbsentBsChannel(knownStreams, bsChannel, common.isTlvTuner(device.config), receivedBsStreams);
+                }));
+                absentInBs = attempts.length < count;
+            }
+            const collectsBsStreams = bsStreams === undefined && [...bsChannels.values()].some(bsChannel => bsChannel !== null);
+            for (const attempt of attempts) {
                 if (isCancellationRequested) {
                     break;
                 }
@@ -819,7 +934,7 @@ async function runChannelScan(
                     }), {
                         id: "Mirakurun:API:channelScan",
                         priority: 1
-                    }, attempt.devices);
+                    }, attempt.devices, collectsBsStreams);
                     received = attempt;
                     break;
                 } catch (error) {
@@ -832,6 +947,19 @@ async function runChannelScan(
             }
             if (isCancellationRequested) {
                 continue; // the cancellation is handled at the next channel
+            }
+            // not tried by any tuners, or the other tuners (such as of the terrestrial) do not have the channel in the channel config files of dvbv5
+            if (streams === null && absentInBs && (lastError === null || getScanErrorRank(lastError) === 0)) {
+                updateStepStatus(
+                    {
+                        status: "skipped" as const,
+                        channel,
+                        reason: "not_in_network",
+                        progress: progressPercent
+                    },
+                    "-> not broadcast in TS by NIT of BS, skipped.\n\n"
+                );
+                continue; // Skip to next channel
             }
             if (streams === null) {
                 const error = lastError;
@@ -863,6 +991,24 @@ async function runChannelScan(
                 },
                 `-> ${serviceCount} services found.\n`
             );
+
+            if (collectsBsStreams) {
+                const network = streams.find(stream => stream.networkStreams !== undefined)?.networkStreams;
+                bsStreams = network ? getBsStreams(network) : null;
+                if (bsStreams) {
+                    appendToLog(`-> ${network.streams.length} streams of BS are known by NIT, the channels of BS not broadcast in TS are skipped.\n`);
+                }
+            }
+            // the streams of the transponder received by the channel of BS on the tuners
+            // (not by the other channels carrying the streams of BS, such as of the cable television)
+            if (bsStreams) {
+                const transponderStreams = received.devices.flatMap(device => bsStreams.get(bsChannels.get(device)?.transponder) || []);
+                for (const stream of streams) {
+                    if (stream.services[0]?.networkId === 4 && transponderStreams.includes(stream.services[0].streamId)) {
+                        receivedBsStreams.add(stream.services[0].streamId);
+                    }
+                }
+            }
 
             // Generate channel items by the type of each stream
             const remoteType = received.devices.every(device => device.isRemote) ? received.type : undefined;
@@ -1065,6 +1211,8 @@ export const put: Operation = async (req, res) => {
     const refresh = Boolean(req.query.refresh);
     const source = legacyType !== undefined ? "format" : (req.query.source as ChannelScanSource) || "preset";
     const toList = (value: unknown): string[] => (Array.isArray(value) ? value : value === undefined ? [] : [value]).map(String);
+    // the channels of BS not broadcast in TS are skipped by NIT of BS (not the channels specified by `list` / `format`)
+    const byNetwork = legacyType === undefined && (source === "preset" || source === "dvbConf") && (route === "SAT" || route === "FTTH");
 
     // Parse skipCh parameter (the names, or the numbers of 4.3.0 with `type`)
     let skipCh = toList(req.query.skipCh);
@@ -1133,7 +1281,7 @@ export const put: Operation = async (req, res) => {
         res.end();
 
         // Run scan in background
-        runChannelScan(scanConfig, dryRun, route, refresh, null, skipCh, legacyType)
+        runChannelScan(scanConfig, dryRun, route, refresh, null, skipCh, legacyType, byNetwork)
             .catch(error => {
                 console.error("Channel scan error:", error);
                 // Error is used only when the scan is stopped
@@ -1159,7 +1307,7 @@ export const put: Operation = async (req, res) => {
         };
 
         // Run scan with output streaming
-        await runChannelScan(scanConfig, dryRun, route, refresh, logTextOutput, skipCh, legacyType);
+        await runChannelScan(scanConfig, dryRun, route, refresh, logTextOutput, skipCh, legacyType, byNetwork);
         res.end();
     } catch (error) {
         console.error("Channel scan error:", error);

@@ -1353,3 +1353,97 @@ describe("[scan.spec] /api/config/channel/scan : generateChannelItems", () => {
         assert.strictEqual("serviceId" in channelItems[0], false);
     });
 });
+
+// BS の NIT (2026-11 に受信したもの): 中継器ごとの TSID
+const bsNit = {
+    1: [0x4010, 0x4011, 0x4012],
+    3: [0x4030, 0x4631, 0x4632],
+    5: [0x4450, 0x4451],
+    9: [0x4090, 0x4092],
+    13: [0x40D0, 0x40D1, 0x46D2],
+    15: [0x40F1, 0x40F2, 0x48F3],
+    19: [0x4730, 0x4731, 0x4732, 0x4733],
+    21: [0x4750, 0x4751, 0x4752],
+    23: [0x4770, 0x4971, 0x4973]
+};
+const bsFrequency = transponder => 11727480 + (transponder - 1) / 2 * 38360;
+const bsNetwork = {
+    networkId: 4,
+    streams: Object.entries(bsNit).flatMap(([transponder, streamIds]) => streamIds.map(streamId => ({ streamId, frequency: bsFrequency(Number(transponder)) })))
+};
+
+describe("[scan.spec] /api/config/channel/scan : NIT of BS", () => {
+    it("the transponder of BS by the frequency of the broadcast and of the IF", () => {
+        assert.strictEqual(scan.getBsTransponder(11727480), 1);
+        assert.strictEqual(scan.getBsTransponder(11996000), 15);
+        assert.strictEqual(scan.getBsTransponder(12149440), 23);
+        // the IF (the channel config files of dvbv5)
+        assert.strictEqual(scan.getBsTransponder(1049480), 1);
+        assert.strictEqual(scan.getBsTransponder(1318000), 15);
+        assert.strictEqual(scan.getBsTransponder(1471440), 23);
+        // the left-hand circular polarization (BS-8), CS (ND2), the terrestrial (Hz)
+        assert.strictEqual(scan.getBsTransponder(11861680), null);
+        assert.strictEqual(scan.getBsTransponder(12291000), null);
+        assert.strictEqual(scan.getBsTransponder(1613000), null);
+        assert.strictEqual(scan.getBsTransponder(473142857), null);
+        assert.strictEqual(scan.getBsTransponder(12187800), null);
+    });
+
+    it("the streams of each transponder by NIT of BS", () => {
+        assert.deepStrictEqual(Object.fromEntries(scan.getBsStreams(bsNetwork)), bsNit);
+        // not of BS, no streams, or a stream without the frequency of BS
+        assert.strictEqual(scan.getBsStreams({ ...bsNetwork, networkId: 7 }), null);
+        assert.strictEqual(scan.getBsStreams({ networkId: 4, streams: [] }), null);
+        assert.strictEqual(scan.getBsStreams({ networkId: 4, streams: [...bsNetwork.streams, { streamId: 0x4091 }] }), null);
+        assert.strictEqual(scan.getBsStreams({ networkId: 4, streams: [{ streamId: 0x4091, frequency: 12291000 }] }), null);
+    });
+
+    it("the channel of BS on a tuner by the channel config file of dvbv5, or by the name", async () => {
+        const ISDBS = 9;
+        const conf = {
+            BS09_2: { deliverySystem: ISDBS, frequency: 1202920, streamId: 16530 },
+            BS09_REL: { deliverySystem: ISDBS, frequency: 1202920, streamId: 2 },
+            BS09_NONE: { deliverySystem: ISDBS, frequency: 1202920 },
+            CS2: { deliverySystem: ISDBS, frequency: 1613000, streamId: 24608 },
+            DVBS: { deliverySystem: 5, frequency: 1202920, streamId: 16530 }
+        };
+        const dvb = { getDvbChannelStream: async (route, channel) => conf[channel] || null };
+        assert.deepStrictEqual(await scan.getBsChannel(dvb, "SAT", "BS09_2"), { transponder: 9, streamId: 16530 });
+        // STREAM_ID is the relative number, or not defined
+        assert.deepStrictEqual(await scan.getBsChannel(dvb, "SAT", "BS09_REL"), { transponder: 9 });
+        assert.deepStrictEqual(await scan.getBsChannel(dvb, "SAT", "BS09_NONE"), { transponder: 9 });
+        // not of BS, not ISDB-S, not in the file (not by the name)
+        assert.strictEqual(await scan.getBsChannel(dvb, "SAT", "CS2"), null);
+        assert.strictEqual(await scan.getBsChannel(dvb, "SAT", "DVBS"), null);
+        assert.strictEqual(await scan.getBsChannel(dvb, "SAT", "BS01_0"), null);
+        // the file is not read
+        assert.strictEqual(await scan.getBsChannel({ getDvbChannelStream: async () => { throw new Error("ENOENT"); } }, "SAT", "BS01_0"), null);
+
+        // the other commands: by the name
+        const command = { getDvbChannelStream: async () => undefined };
+        assert.deepStrictEqual(await scan.getBsChannel(command, "SAT", "BS09_2"), { transponder: 9 });
+        assert.deepStrictEqual(await scan.getBsChannel(command, "SAT", "bs08_0"), { transponder: 8 });
+        for (const channel of ["BS00_0", "BS24_0", "BS09", "CS2", "101", "XBS09_2"]) {
+            assert.strictEqual(await scan.getBsChannel(command, "SAT", channel), null);
+        }
+    });
+
+    it("the channels of BS not broadcast by NIT of BS", () => {
+        const bsStreams = scan.getBsStreams(bsNetwork);
+        const none = new Set();
+        // the stream (TSID) known: BS09_2 (BS12) is broadcast though BS-9 has 2 streams, BS09_1 is not
+        assert.strictEqual(scan.isAbsentBsChannel(bsStreams, { transponder: 9, streamId: 0x4092 }, false, none), false);
+        assert.strictEqual(scan.isAbsentBsChannel(bsStreams, { transponder: 9, streamId: 0x4091 }, false, none), true);
+        // the stream unknown: until all the streams of the transponder are received
+        assert.strictEqual(scan.isAbsentBsChannel(bsStreams, { transponder: 9 }, false, none), false);
+        assert.strictEqual(scan.isAbsentBsChannel(bsStreams, { transponder: 9 }, false, new Set([0x4090])), false);
+        assert.strictEqual(scan.isAbsentBsChannel(bsStreams, { transponder: 9 }, false, new Set([0x4090, 0x4092, 0x4010])), true);
+        assert.strictEqual(scan.isAbsentBsChannel(bsStreams, { transponder: 9 }, true, new Set([0x4090, 0x4092])), true);
+        // the transponder not in NIT (TLV): only the tuners for TLV may receive
+        for (const transponder of [7, 8, 11, 17]) {
+            assert.strictEqual(scan.isAbsentBsChannel(bsStreams, { transponder }, false, none), true);
+            assert.strictEqual(scan.isAbsentBsChannel(bsStreams, { transponder }, true, none), false);
+            assert.strictEqual(scan.isAbsentBsChannel(bsStreams, { transponder, streamId: 0x4470 }, true, none), false);
+        }
+    });
+});

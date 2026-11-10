@@ -443,6 +443,8 @@ definitions:
             type: boolean
           parseEIT:
             type: boolean
+          parseNetworkStreams:
+            type: boolean
           tsmfRelTs:
             type: integer
           format:
