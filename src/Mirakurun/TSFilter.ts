@@ -71,11 +71,13 @@ const SERVICE_TYPE_ENGINEERING = 0xA4;
 
 interface DownloadData {
     downloadId: number;
-    // blockSize: number; // 4066
+    blockSize: number; // 4066 (ARIB TR-B15)
     moduleId: number;
     moduleVersion: number;
     moduleSize: number;
-    loadedBytes: number;
+    blockCount: number;
+    // received block numbers (the carousel repeats, so missing blocks are filled in the next cycle)
+    loadedBlocks: Set<number>;
     data?: Buffer;
 }
 
@@ -924,12 +926,21 @@ export default class TSFilter extends EventEmitter {
             const blockNumber: number = ddb.blockNumber;
             const blockDataByte: Buffer = ddb.blockDataByte;
 
-            blockDataByte.copy(dl.data, DSMCC_BLOCK_SIZE * blockNumber);
-            dl.loadedBytes += blockDataByte.length;
+            // ignore the blocks already received and the broken blocks (out of the module or the wrong size)
+            if (dl.loadedBlocks.has(blockNumber) || blockNumber >= dl.blockCount) {
+                return;
+            }
+            const offset = dl.blockSize * blockNumber;
+            if (blockDataByte.length !== Math.min(dl.blockSize, dl.moduleSize - offset)) {
+                return;
+            }
 
-            log.debug("TSFilter#_onDSMCC: detected DDB and logo data downloading... (downloadId=%d, %d/%d bytes)", downloadId, dl.loadedBytes, dl.moduleSize);
+            blockDataByte.copy(dl.data, offset);
+            dl.loadedBlocks.add(blockNumber);
 
-            if (dl.loadedBytes !== dl.moduleSize) {
+            log.debug("TSFilter#_onDSMCC: detected DDB and logo data downloading... (downloadId=%d, %d/%d blocks)", downloadId, dl.loadedBlocks.size, dl.blockCount);
+
+            if (dl.loadedBlocks.size !== dl.blockCount) {
                 return;
             }
 
@@ -938,6 +949,8 @@ export default class TSFilter extends EventEmitter {
 
             const dataModule = new tsDataModule.TsDataModuleLogo(dlData).decode();
             for (const logo of dataModule.logos) {
+                // all the services sharing the logo refer to it (ARIB TR-B15), and the logo data is saved per network
+                const savedNetworkIds = new Set<number>();
                 for (const logoService of logo.services) {
                     const service = _.service.get(logoService.original_network_id, logoService.service_id);
                     if (!service) {
@@ -946,11 +959,15 @@ export default class TSFilter extends EventEmitter {
 
                     service.logoId = logo.logo_id;
 
+                    if (savedNetworkIds.has(service.networkId)) {
+                        continue;
+                    }
+                    savedNetworkIds.add(service.networkId);
+
                     log.debug("TSFilter#_onDSMCC: received logo data (networkId=%d, logoId=%d)", service.networkId, service.logoId);
 
                     const logoData = new TsLogo(logo.data_byte).decode(); // png
                     Service.saveLogoData(service.networkId, service.logoId, logoData);
-                    break;
                 }
             }
         } else if (data.table_id === 0x3B) {
@@ -976,13 +993,15 @@ export default class TSFilter extends EventEmitter {
                     ) {
                         continue;
                     }
+                    const blockSize: number = dii.blockSize || DSMCC_BLOCK_SIZE;
                     this._dlDataMap.set(dii.downloadId, {
                         downloadId: dii.downloadId,
-                        // blockSize: dii.blockSize, // 4066
+                        blockSize,
                         moduleId: module.moduleId,
                         moduleVersion: module.moduleVersion,
                         moduleSize: module.moduleSize,
-                        loadedBytes: 0,
+                        blockCount: Math.ceil(module.moduleSize / blockSize),
+                        loadedBlocks: new Set(),
                         data: Buffer.allocUnsafeSlow(module.moduleSize).fill(0)
                     });
 

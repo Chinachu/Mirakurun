@@ -241,3 +241,106 @@ describe("[tsfilter-ess.spec] TSFilter.ts: ESS", () => {
     assert.strictEqual(logs.filter(([format]) => format.startsWith("TSFilter#_detectEss")).length, 0);
   });
 });
+
+// ロゴデータのモジュール (ARIB TR-B15 第一部 第一編 表 5-6): [logoId, [[networkId, tsid, serviceId], ...], data]
+function logoModule(logos) {
+  return Buffer.from([
+    0x05, ...u16(logos.length),
+    ...logos.flatMap(([logoId, services, data]) => [
+      ...u16(0xFE00 | logoId), services.length, ...services.flat().flatMap(u16), ...u16(data.length), ...data
+    ])
+  ]);
+}
+
+// DSM-CC は aribts の解析結果を直接渡す (DDB は複数のパケットにまたがるため)
+function dii(downloadId, moduleSize, blockSize, name = "LOGO-05") {
+  const modules = [{ moduleId: 3, moduleVersion: 0, moduleSize, moduleInfo: [{ descriptor_tag: 0x02, text_char: Buffer.from(name) }] }];
+  return { table_id: 0x3B, message: { downloadId, blockSize, modules } };
+}
+
+function ddb(downloadId, blockNumber, blockDataByte) {
+  return { table_id: 0x3C, message: { downloadId, moduleId: 3, moduleVersion: 0, blockNumber, blockDataByte } };
+}
+
+function blocks(data, blockSize) {
+  const list = [];
+  for (let i = 0; i < data.length; i += blockSize) {
+    list.push(data.subarray(i, i + blockSize));
+  }
+  return list;
+}
+
+describe("[tsfilter-ess.spec] TSFilter.ts: logo data in the ESS", () => {
+  const { TsLogo } = require("@chinachu/aribts");
+  let Service;
+  let saved;
+  let services;
+  before(() => {
+    Service = require("../lib/Mirakurun/Service").default;
+    Service.saveLogoData = (networkId, logoId, data) => saved.push([networkId, logoId, data]);
+    _.service = {
+      get: (networkId, serviceId) => services.find(s => s.networkId === networkId && s.serviceId === serviceId) || null,
+      findByNetworkId: () => []
+    };
+  });
+  beforeEach(() => {
+    saved = [];
+    services = [{ networkId: 4, serviceId: 101, logoId: -1 }];
+  });
+
+  it("assembles the module after all the blocks are received regardless of the order and duplicates", () => {
+    const data = [...Buffer.from("NHK BS LOGO DATA")];
+    const module = logoModule([[0x10, [[4, 16625, 101]], data]]);
+    const [f] = filter(4);
+
+    f._onDSMCC(0x771, dii(1, module.length, 8));
+    // 繰り返し送られるカルーセルで、重複したブロックを受け取り、1 つ目のブロックを取りこぼす
+    const list = blocks(module, 8);
+    for (const blockNumber of [0, 0, ...list.keys()].filter(n => n !== 1)) {
+      f._onDSMCC(0x771, ddb(1, blockNumber, list[blockNumber]));
+    }
+    assert.deepStrictEqual(saved, []);
+
+    // 次の周期で取りこぼしたブロックを受け取ると完成する
+    f._onDSMCC(0x771, ddb(1, 1, list[1]));
+    f.close();
+
+    assert.deepStrictEqual(saved, [[4, 0x10, TsLogo.decode(Buffer.from(data))]]);
+    assert.strictEqual(services[0].logoId, 0x10);
+  });
+
+  it("ignores the blocks out of the module or with the wrong size", () => {
+    const module = logoModule([[0x10, [[4, 16625, 101]], [...Buffer.from("LOGO")]]]);
+    const list = blocks(module, 8);
+    const [f] = filter(4);
+
+    f._onDSMCC(0x771, dii(1, module.length, 8));
+    f._onDSMCC(0x771, ddb(1, list.length, list[0]));
+    f._onDSMCC(0x771, ddb(1, 0, list[0].subarray(1)));
+    f._onDSMCC(0x771, ddb(1, list.length - 1, Buffer.alloc(8)));
+    for (const [blockNumber, block] of list.slice(0, -1).entries()) {
+      f._onDSMCC(0x771, ddb(1, blockNumber, block));
+    }
+    assert.deepStrictEqual(saved, []);
+
+    f._onDSMCC(0x771, ddb(1, list.length - 1, list[list.length - 1]));
+    f.close();
+
+    assert.deepStrictEqual(saved.map(([networkId, logoId]) => [networkId, logoId]), [[4, 0x10]]);
+  });
+
+  it("refers all the services sharing the logo to it and saves the logo data once per network", () => {
+    services.push({ networkId: 4, serviceId: 102, logoId: -1 }, { networkId: 6, serviceId: 55, logoId: -1 });
+    const data = [...Buffer.from("SHARED")];
+    // 登録されていないサービス (103) は飛ばす
+    const module = logoModule([[0x10, [[4, 16625, 103], [4, 16625, 101], [4, 16625, 102], [6, 24608, 55]], data]]);
+    const [f] = filter(4);
+
+    f._onDSMCC(0x771, dii(1, module.length, 4066));
+    f._onDSMCC(0x771, ddb(1, 0, module));
+    f.close();
+
+    assert.deepStrictEqual(services.map(s => s.logoId), [0x10, 0x10, 0x10]);
+    assert.deepStrictEqual(saved.map(([networkId, logoId]) => [networkId, logoId]), [[4, 0x10], [6, 0x10]]);
+  });
+});
