@@ -642,27 +642,31 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
       }
     });
 
-    it("detects the format on the local tuners only for TS by the channel scan only", async () => {
+    // TS だけの環境でも、サービスのスキャンで相対 TS を判別する (チャンネルスキャンで tsmfRelTs を書かない場合)
+    it("detects the relative streams on the local tuners only for TS by the service scan and the channel scan", async () => {
       _.channel = { getStreams: () => [] };
-      const data = Buffer.concat(Array.from({ length: 1400 }, (_, i) => header([[2, 24, false, 18801, 4]], i)));
+      const data = Buffer.concat(Array.from({ length: 1400 }, (_, i) => header([[1, 44, false, 16625, 4], [9, 8, false, 16663, 4]], i)));
       for (const isRemote of [false, true]) {
-        const channel = new ChannelItem({ name: "C", type: "GR", channel: "C46", route: "CATV" });
-        const streamSetting = { channel };
-        const device = {
-          config: { name: "t", types: ["GR"] }, isRemote, users: [{ id: "scan", streamSetting }],
-          async startStream(user, sink) {
-            setImmediate(() => sink.write(data));
+        for (const anyTuner of [false, true]) {
+          const channel = new ChannelItem({ name: "C", type: "BS", channel: "C45", route: "CATV" });
+          const streamSetting = { channel };
+          const device = {
+            config: { name: "t", types: ["GR", "BS", "CS"] }, isRemote, users: [{ id: "scan", streamSetting }],
+            async startStream(user, sink) {
+              setImmediate(() => sink.write(data));
+            }
+          };
+          const t = Object.create(Tuner.prototype);
+          t._devices = [device];
+          const probe = t._startFormatProbe({ id: "scan", priority: -1, streamSetting }, anyTuner);
+          if (isRemote) {
+            assert.strictEqual(probe, null);
+          } else {
+            assert.deepStrictEqual(await probe.detected, { format: "ts", tsmf: [
+              { relTs: 1, slots: 44, format: "ts", streamId: 16625, networkId: 4 },
+              { relTs: 9, slots: 8, format: "ts", streamId: 16663, networkId: 4 }
+            ] });
           }
-        };
-        const t = Object.create(Tuner.prototype);
-        t._devices = [device];
-        const user = { id: "scan", priority: -1, streamSetting };
-        assert.strictEqual(t._startFormatProbe(user), null);
-        const probe = t._startFormatProbe(user, true);
-        if (isRemote) {
-          assert.strictEqual(probe, null);
-        } else {
-          assert.deepStrictEqual(await probe.detected, { format: "ts", tsmf: [{ relTs: 2, slots: 24, format: "ts", streamId: 18801, networkId: 4 }] });
         }
       }
     });
@@ -690,6 +694,8 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
 
     it("keeps the relative streams detected when the scan does not detect, and replaces them when the detection finds no TSMF", async () => {
       const detecting = { config: { name: "4k", types: ["BS"], tlvToTsDecoder: "mmt2ts" }, isRemote: false };
+      // the local tuners only for TS also detect the relative streams
+      const tsOnly = { config: { name: "ts", types: ["BS"] }, isRemote: false };
       // the remote Mirakurun has not detected the relative streams (no services)
       const remote = {
         config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true, canReceiveRemoteRelTs: () => true,
@@ -697,6 +703,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
       };
       for (const [probe, devices, replaced] of [
         [null, [remote, detecting], false],
+        [null, [remote, tsOnly], false],
         [{ detected: Promise.resolve({ format: "ts", tsmf: null }), tsmf: true, end: () => {} }, [detecting], true],
         // no tuners detect any longer (the relative streams detected cannot be received by the remote tuners)
         [null, [remote], true]
@@ -706,7 +713,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
         _.channel = { get: () => channel, getStreams: () => streams, setStreams: (item, list) => streams = list };
         const t = scanner(null, 0);
         t._devices = devices;
-        // the tuners only for TS (or the remote tuners) do not detect
+        // the remote tuners do not detect (the scan has run on the remote tuner)
         t._startFormatProbe = () => probe;
         const services = await t.getServices(channel);
         assert.deepStrictEqual(services.map(s => s.serviceId), [100]);

@@ -610,7 +610,7 @@ export class Tuner {
         }
         const tsFilter = await this._initTS(userReq, undefined, [candidate]);
         // the format is detected by the data of the same tuner, the scan does not wait for it
-        const probe = detect ? this._startFormatProbe(userReq, options.anyTuner === true) : null;
+        const probe = detect ? this._startFormatProbe(userReq, options.anyTuner === true, candidate.format) : null;
         return new Promise<apid.Service[]>((resolve, reject) => {
             let network = {
                 networkId: -1,
@@ -685,10 +685,10 @@ export class Tuner {
                     reject(new Error("stream has closed before get services"));
                 } else {
                     // the streams of all the relative streams of TSMF are saved together,
-                    // and the scan without the detection (on the tuners only for TS) receives the relative streams detected mixed
-                    // (unless no tuners detect any longer, the relative streams detected cannot be received by the remote tuners)
+                    // and the scan without the detection (on the remote tuners) receives the relative streams detected mixed
+                    // (unless no local tuners detect any longer, the relative streams detected cannot be received by the remote tuners)
                     const keepsTSMF = relTs === undefined && isNotTSMF === false && channel.streams.some(stream => stream.relTs !== undefined) &&
-                        this._getDevicesByType(channel.type, channel.route).some(device => this._detectsFormat(device));
+                        this._getDevicesByType(channel.type, channel.route).some(device => !device.isRemote);
                     if (services.length > 0 && relTs === channel.tsmfRelTs && !keepsTSMF && _.channel.get(channel.type, channel.channel) === channel) {
                         // the format received (the format of the remote Mirakurun with only the remote tuners)
                         channel.setStream(services[0].networkId, services[0].streamId, candidate.format);
@@ -932,20 +932,29 @@ export class Tuner {
 
     /**
      * detects the format (and the relative streams of TSMF) of the stream by joining the tuner streaming to `user` (does not tune by itself)
-     * @returns `null` if the format is not detected: the remote Mirakurun outputs the format by itself,
-     * and only the tuners for TLV (MMT) detect, not to add any work to the environments only for TS
+     * @returns `null` if the format is not detected: the remote Mirakurun outputs the format by itself
      * (`tsmf`: whether the relative streams of TSMF are detected)
-     * @param anyTuner `true` to detect on any local tuner (only by the channel scan)
+     * @param anyTuner `true` to detect the format on any local tuner (only by the channel scan)
+     * @param format the format received (the tuners only for TS detect only the relative streams of TSMF by the service scan,
+     * not to add any work to the environments only for TS: the stream without TSMF is of this format)
      */
-    private _startFormatProbe(user: common.User, anyTuner = false): { detected: Promise<DetectedFormat | null>, tsmf: boolean, end: () => void } | null {
+    private _startFormatProbe(
+        user: common.User,
+        anyTuner = false,
+        format: apid.StreamFormat = "ts"
+    ): { detected: Promise<DetectedFormat | null>, tsmf: boolean, end: () => void } | null {
         // the ID of the scan is not unique (the scans run on the tuners at the same time), `streamSetting` is of this scan
         const device = this._devices.find(device => device.users.some(deviceUser => deviceUser.streamSetting === user.streamSetting));
-        if (!device || (anyTuner ? device.isRemote : this._detectsFormat(device) === false)) {
+        if (!device || device.isRemote) {
             return null;
         }
 
         // TSMF is TS outside, the relative streams are detected by the header
         const relTs = user.streamSetting.channel.tsmfRelTs;
+        const tsmfOnly = !anyTuner && this._detectsFormat(device) === false;
+        if (relTs && tsmfOnly) {
+            return null;
+        }
         let tsmf: TSMFStream[] = null;
         const probe = new FormatProbe(relTs ? data => detectTSMFStreamFormat(data, relTs) : data => {
             tsmf = detectTSMFStreams(data);
@@ -954,7 +963,10 @@ export class Tuner {
                 tsmf = null;
                 return null;
             }
-            return tsmf === null ? detectStreamFormat(data) : "ts";
+            if (tsmf !== null) {
+                return "ts";
+            }
+            return tsmfOnly ? format : detectStreamFormat(data);
         });
         const detected = probe.detect(DETECT_TIMEOUT).then(format => {
             probe.end();
@@ -1275,7 +1287,7 @@ export class Tuner {
         return null;
     }
 
-    /** the remote Mirakurun outputs the format by itself, only the tuners for TLV (MMT) detect */
+    /** the remote Mirakurun outputs the format by itself, only the tuners for TLV (MMT) detect the format (TS / TLV) */
     private _detectsFormat(device: TunerDevice): boolean {
         const { types, tlvDecoder, tlvToTsDecoder } = device.config;
         return !device.isRemote && (!!tlvDecoder || !!tlvToTsDecoder || types.some(type => common.tlvChannelTypes.includes(type)));

@@ -389,7 +389,9 @@ export function generateScannedChannelItems(
             continue;
         }
         if (stream.failed) {
-            log(`-> the services of the relative stream ${stream.relTs} (${type}) are not received, scan the channel again with refresh to add them.\n`);
+            // such as the relative stream for the engineering (without SDT), the scan does not add it
+            log(`-> the services of the relative stream ${stream.relTs} (${type}) are not received (it may have no services, such as for the engineering).` +
+                ` if it has services, scan the channel again with refresh to add them.\n`);
         }
         const entry = types.get(type) || { relTs: new Set(), services: [], bonded: false };
         entry.relTs.add(stream.relTs);
@@ -411,7 +413,7 @@ export function generateScannedChannelItems(
         const byRemote = remoteType !== undefined || relTsByRemote.includes(type);
         const tsmfRelTs = relTs.size === 1 && !bonded && !byRemote ? [...relTs][0] : undefined;
         if (relTs.size > 1) {
-            log(`-> the ${relTs.size} relative streams of ${type} are detected by the tuners for TLV (the types including BS4K, or tlvDecoder / tlvToTsDecoder).\n`);
+            log(`-> the ${relTs.size} relative streams of ${type} are detected by the service scan.\n`);
         }
         if (_.tuner.typeExists(type, route) === false) {
             log(`-> no tuners of ${type} for the route ${route}, add ${type} to \`types\` of the tuners.\n`);
@@ -1203,7 +1205,7 @@ Entry rewriting specifications:
 - If an enabled entry of the channel to be scanned is in the configuration file, the scan will not be performed for that channel and the entries of the channel remain intact. If you do not want to keep the entries, use the \`refresh\` option.
 - The entries added have the \`route\` if it is not the default of the type.
 - The channels are unique by the type and the channel. The enabled entry of the type and the channel configured on another route remains, and the entry scanned is not added.
-- \`tsmfRelTs\` is added if the type has only one relative stream of TSMF on the channel. The relative streams are detected by the tuners for TLV if more than one.
+- \`tsmfRelTs\` is added if the type has only one relative stream of TSMF on the channel. The relative streams are detected by the service scan if more than one.
 - The carriers of a TLV of multiple carriers (CATV channel bonding) are added as BS4K without the services (\`tsmfRelTs\` and \`tsmfGroupId\` are detected).
 
 The scan by \`type\` (deprecated, compatible with 4.3.0): the channels of the type are scanned by the tuners of the type on the default route of the type (GR: TER, BS / CS: SAT),

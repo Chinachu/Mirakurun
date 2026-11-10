@@ -205,6 +205,8 @@ flowchart LR
 
 With `format=tlv`, the stream APIs output TLV without `tlvToTsDecoder`. With `format=ts`, only the tuners with `tlvToTsDecoder` are used to output TS. Without `format`, `defaultTlvStreamFormat` is followed. If a format that cannot be output is requested, 406 is returned.
 
+The clients requesting the streams without `format`, such as EPGStation, record the TLV channels as TLV by default (`tlv`). To record them as TS, set `defaultTlvStreamFormat` to `ts` (the tuners receiving them need `tlvToTsDecoder`).
+
 If `tlvToTsDecoder` keeps failing to start, the stream is closed instead of outputting TLV. If `tlvDecoder` keeps failing to start, the input is passed through as with `decoder`.
 
 ## 🗒️channels.yml
@@ -279,8 +281,8 @@ flowchart LR
     ch --> r3["Relative TS 3<br>BS4K (TLV)"]
 ```
 
-- If specified, the relative TS is received. It needs to be specified if the local tuners that can tune the channel include no tuner for TLV (a tuner with `BS4K` in `types`, or with `tlvDecoder` / `tlvToTsDecoder`) (see below for the channels received only by the remote tuners).
-- If omitted, the service scan (Mirakurun automatically getting the services of the channels configured) on a local tuner for TLV detects the relative TSs and their formats (TS / TLV) from the TSMF headers, and saves them in `channels.json`. The services are scanned for each relative TS, and viewing and recording receive the relative TS of the service.
+- If specified, the relative TS is received (see below for the channels received only by the remote tuners).
+- If omitted, the service scan (Mirakurun automatically getting the services of the channels configured) on a local tuner detects the relative TSs and their formats (TS / TLV) from the TSMF headers, and saves them in `channels.json`. The services are scanned for each relative TS, and viewing and recording receive the relative TS of the service.
 - New services are registered only when the channel has no services, as before (the services of a TLV of multiple carriers and of a TLV detected by the remote Mirakurun are added if no service of the TLV is registered).
 - The channel scan adds `tsmfRelTs` if the channel has only one relative TS of the type ([TSMF channels](#tsmf-channels)).
 - When the relative TS of a service is unknown, the relative TS with the most slots is received, chosen from those of the network of the service (or from all relative TSs if there are none); ties go to the lower number.
@@ -304,7 +306,7 @@ flowchart LR
 
 The format of the data received on the channel (`ts` / `tlv`): of the relative TS of `tsmfRelTs` if specified, otherwise of the stream as received.
 
-- If omitted, it is detected by the service scan on a local tuner for TLV, and saved in `channels.json` (to avoid extra processing in TS-only environments). Before the scan, `tlv` for `BS4K`, `ts` for the others.
+- If omitted, it is detected by the service scan on a local tuner for TLV (a tuner with `BS4K` in `types`, or with `tlvDecoder` / `tlvToTsDecoder`), and saved in `channels.json` (to avoid extra processing in TS-only environments. The tuners not for TLV detect only the relative TSs of TSMF and their formats). Before the scan, `tlv` for `BS4K`, `ts` for the others.
 - The streams for viewing and recording do not detect it (to avoid delaying the start of TS streams).
 - If `tsmfRelTs` is omitted and the relative TSs are detected, each relative TS is received in the format detected.
 
@@ -384,10 +386,10 @@ How the type is decided and which types are added on each route are shown in the
 #### TSMF channels
 
 - The channel scan detects the relative TSs of TSMF even on the tuners not for TLV.
-- If the channel has only one relative TS of the type, `tsmfRelTs` is added (any tuner can receive it). If two or more, it is not added and left to the detection by the tuners for TLV (without a tuner for TLV, only the one specified by `tsmfRelTs` can be received).
+- If the channel has only one relative TS of the type, `tsmfRelTs` is added (any tuner can receive it). If two or more, it is not added and left to the detection by the service scan (also on the tuners not for TLV).
 - The remote tuners scan the relative TSs detected by the remote Mirakurun, and `tsmfRelTs` is not added (the remote Mirakurun outputs the relative TS).
 - Even when scanned by the local tuners, `tsmfRelTs` is not added for a type received only by the remote tuners if every remote Mirakurun outputs the relative TS of the channel (detected, or `tsmfRelTs` in channels.yml of the remote; a remote of 4.3.0 or before also counts).
-- Relative TSs whose services could not be received are still counted toward the relative TSs of the type, based on the network in the header (so `tsmfRelTs` may not be added; this is logged). Their services are added by scanning the channel again with "Refresh" (`refresh`) on.
+- Relative TSs whose services could not be received are still counted toward the relative TSs of the type, based on the network in the header (so `tsmfRelTs` may not be added; this is logged). Their services are added by scanning the channel again with "Refresh" (`refresh`) on. However, some relative TSs have no services (SDT) in the first place, such as for the engineering, and they are never added.
 - The carriers of a TLV transmitted over multiple carriers (such as BS8K) are added as `BS4K` channels even without services (disabled by default. `tsmfRelTs` and `tsmfGroupId` are not written, and are detected by the service scan).
 
 #### Rewriting channels.yml

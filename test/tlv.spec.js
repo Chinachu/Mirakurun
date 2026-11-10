@@ -588,21 +588,37 @@ describe("[tlv.spec] format detection", () => {
     assert.deepStrictEqual([device.started.user.id, device.started.ch], ["scan#format", undefined]);
   });
 
-  it("does not detect the format on the tuners only for TS", () => {
-    const channel = new ChannelItem({ name: "BS", type: "BS", channel: "BS01_0" });
+  // TS だけのチューナーは、サービスのスキャンで TSMF の相対 TS だけを判別する (TS か TLV かは判別しない)
+  it("does not detect the format on the tuners only for TS, but the relative streams of TSMF", async () => {
     const t = Object.create(Tuner.prototype);
     for (const config of [{ types: ["GR", "BS", "CS"] }, { types: ["BS4K"] }, { types: ["BS"], tlvDecoder: "dec" }]) {
-      const streamSetting = { channel };
-      const device = {
-        config: { name: "t", ...config }, isRemote: false, users: [{ id: "scan", streamSetting }],
-        async startStream(user) { this.started = user; }
-      };
-      t._devices = [device];
-      const probe = t._startFormatProbe({ id: "scan", priority: -1, streamSetting });
       const forTlv = !!config.tlvDecoder || config.types.includes("BS4K");
-      assert.strictEqual(probe !== null, forTlv, JSON.stringify(config));
-      assert.strictEqual(device.started !== undefined, forTlv, JSON.stringify(config));
-      probe?.end();
+      for (const tsmfRelTs of [undefined, 1]) {
+        const channel = new ChannelItem({ name: "BS", type: "BS", channel: "BS01_0", tsmfRelTs });
+        const streamSetting = { channel };
+        const device = {
+          config: { name: "t", ...config }, isRemote: false, users: [{ id: "scan", streamSetting }],
+          async startStream(user, sink) {
+            this.started = user;
+            setImmediate(() => sink.write(tlvData(65536 * 2 + 1000)));
+          }
+        };
+        t._devices = [device];
+        const probe = t._startFormatProbe({ id: "scan", priority: -1, streamSetting }, false, "ts");
+        const label = JSON.stringify({ ...config, tsmfRelTs });
+        // the relative stream specified: only the tuners for TLV detect its format
+        if (tsmfRelTs !== undefined && !forTlv) {
+          assert.strictEqual(probe, null, label);
+          assert.strictEqual(device.started, undefined, label);
+          continue;
+        }
+        if (tsmfRelTs !== undefined) {
+          probe.end();
+          continue;
+        }
+        // the stream without TSMF is of the format received on the tuners only for TS
+        assert.deepStrictEqual(await probe.detected, { format: forTlv ? "tlv" : "ts", tsmf: null }, label);
+      }
     }
   });
 
