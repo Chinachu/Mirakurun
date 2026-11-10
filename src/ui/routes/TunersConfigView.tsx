@@ -125,7 +125,7 @@ export const TunersConfigView: React.FC = () => {
         const newTuner: ConfigTunersItem = {
             name: `adapter${i}`,
             types: [],
-            command: `dvbv5-zap -a ${i} -c ./config/dvbconf-for-isdb/conf/dvbv5_channels_isdbs.conf -r -P <channel>`,
+            command: `dvbv5-zap -a ${i} -c ./config/dvbconf-for-isdb/conf/dvbv5_channels_<route>.conf -r -P <channel>`,
             dvbDevicePath: `/dev/dvb/adapter${i}/dvr0`,
             decoder: "arib-b25-stream-test",
             isDisabled: true

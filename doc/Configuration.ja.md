@@ -125,6 +125,34 @@ flowchart LR
 
 この例では、受信経路が `CATV` のチャンネルはチューナー 2 だけで、`TER` と `SAT` のチャンネルはチューナー 1 だけで選局します。
 
+#### dvbv5-zap のチャンネル設定ファイル
+
+同梱の [dvbconf-for-isdb](https://github.com/Chinachu/dvbconf-for-isdb) には、受信経路ごとのチャンネル設定ファイル `dvbv5_channels_<経路>.conf` があります。`-c` に `<route>` を書くと、選局するチャンネルの経路のファイルを使います。
+
+```yaml
+- name: adapter0
+  types:
+    - GR
+  routes:
+    - TER
+  command: dvbv5-zap -a 0 -c ./config/dvbconf-for-isdb/conf/dvbv5_channels_<route>.conf -r -P <channel>
+  dvbDevicePath: /dev/dvb/adapter0/dvr0
+```
+
+| ファイル | 受信経路 | チャンネル | 伝送方式 |
+|---|---|---|---|
+| `dvbv5_channels_ter.conf` | `TER` | `1`~`12`、`13`~`62`、`C13`~`C63` | ISDB-T |
+| `dvbv5_channels_sat.conf` | `SAT` | `BSxx_y`、`CSx` (4K / 8K を含む) | ISDB-S |
+| `dvbv5_channels_sky.conf` | `SKY` | `JCSAT3A-TPxx`、`JCSAT4B-TPxx` | DVB-S2 |
+| `dvbv5_channels_catv.conf` | `CATV` | `1`~`12`、`C13`~`C63`、`13`~`62` | DVB-C (J.83 Annex C を Annex A として選局) |
+| `dvbv5_channels_ftth.conf` | `FTTH` | `13`~`62`、`BSxx_y`、`CSx`、`73750`~`769250` | ISDB-T、ISDB-S、DVB-C (J.83 Annex B) |
+
+- 周波数がずれたチャンネルは、別の名前で入っています (`ter` と `catv` の `4-`~`7-`、`C22-`、`C24+`~`C27+` など)。`sat` には左旋の `BS14_0` もあります。詳細は dvbconf-for-isdb の README を参照してください。
+- チューナーの自動認識 (tuners.yml がない場合) は、このコマンドを設定し、ISDB-T のチューナーは `routes` を `TER`、ISDB-S のチューナーは `SAT` にします。受信経路が異なる場合は、`routes` を変えるだけで、その経路のファイルを使います。
+- `dvbv5_channels_catv.conf` は、トランスモジュレーション方式を DVB-C のチューナーで受信するためのものです。ISDB-T のチューナーでケーブルテレビのパススルー方式を受信する場合は、`<route>` を使わずに `dvbv5_channels_ter.conf` を指定してください (`routes` は `CATV` のままでかまいません)。
+- `dvbv5_channels_sky.conf` は、標準の `dvbv5-zap` では選局できません (dvbconf-for-isdb の README を参照)。
+- 4.3.0 までの `dvbv5_channels_isdbt.conf` と `dvbv5_channels_isdbs.conf` も残してあり、そのまま使えます。
+
 #### DVB デバイスの直接操作
 
 `command` に `dvbv5-zap` を指定したチューナーは、Mirakurun がコマンドを実行せずに DVB デバイスを直接操作して選局します。プロセスの起動と終了を待たないぶん、選局が速くなります。従来どおりコマンドを実行する場合は、`disableDvbDirect: true` を設定してください。
@@ -146,9 +174,9 @@ flowchart LR
 
 衛星では、LNB 給電、22kHz トーン、DiSEqC、周波数の変換を `dvbv5-zap` と同じように行い、チャンネル設定ファイルの `LNB`, `POLARIZATION`, `SAT_NUMBER` も同じように使います。LNBf を `-l` とチャンネル設定ファイルの `LNB` のどちらでも指定していない場合は、周波数を変換せず、LNB にも給電しません。
 
-対応している伝送方式は ISDB-T と ISDB-S です。
+対応している伝送方式は ISDB-T、ISDB-S、DVB-C (J.83 Annex A / B / C) です。DVB-S2 などのチャンネル設定ファイルでは、コマンドを実行します。
 
-`-c` には `<route>` を使えます (`-c ./conf/dvbv5_channels_<route>.conf` など)。この場合は、`routes` (省略した場合はすべての経路) のそれぞれのチャンネル設定ファイルを読み、選局するチャンネルの経路のファイルを使います。
+`-c` には `<route>` を使えます (`-c ./conf/dvbv5_channels_<route>.conf` など)。この場合は、`routes` (省略した場合はすべての経路) のそれぞれのチャンネル設定ファイルを読み、選局するチャンネルの経路のファイルを使います。読めないファイルがある経路 (対応していない伝送方式、ファイルがないなど) は、その経路のチャンネルを選局するときだけコマンドを実行します。
 
 ##### コマンドを実行する場合
 
@@ -159,7 +187,7 @@ flowchart LR
 - オプション以外の引数が `<channel>` だけではない
 - オプションの数値の先頭に 0 が付いている (`dvbv5-zap` は 8 進数として扱うため)
 - `dvbDevicePath` が、`-a` と `-d` から決まる `/dev/dvb/adapter<a>/dvr<d>` と異なる
-- チャンネル設定ファイルに、対応していない項目や重複した項目、`FREQUENCY` のないチャンネルがある
+- チャンネル設定ファイルに、対応していない伝送方式 (DVB-S2 など) や項目、重複した項目、`FREQUENCY` のないチャンネルがある
 - チャンネル設定ファイルに、`dvbv5-zap` とは解釈が変わる書き方がある (`=` の前に空白がない、値の末尾に空白がある、改行が CRLF である)
 
 起動後にチャンネル設定ファイルを編集して読み込めなくなった場合は、ファイルを直すまで、選局のたびにコマンドを実行します。
@@ -172,6 +200,7 @@ flowchart LR
 - 次の選局を速くするため、チューナーを解放した後も 1 秒間は frontend を開いたままにします。
 - 選局に失敗した場合 (デバイスを開けない、チャンネルが見つからないなど) は、選局をやり直さずにストリームの要求をエラーにします。
 - デバイスが見つからないことによる失敗が 3 回続くと、そのチューナーを故障として扱い、Mirakurun を再起動するまで使いません。USB チューナーを挿し直した場合も再起動が必要です。
+- frontend が対応していない伝送方式のチャンネルは、選局に失敗します。`dvbv5-zap` は、同じ種類で frontend が対応している伝送方式に置き換えて選局します (チャンネル設定ファイルが `DVBC/ANNEX_A` で、frontend が `DVBC/ANNEX_C` だけに対応する場合など)。この場合は `disableDvbDirect: true` を設定してください。
 
 #### decoder
 
@@ -372,9 +401,11 @@ flowchart TD
     - SKY: なし (`dvbConf` か `list` で指定します)
     - CATV: `1`~`12` (VHF)、`C13`~`C63`、`13`~`62`
     - FTTH: `13`~`62`、`BS01_0`~`BS23_3`、`CS2`~`CS24` (スカパー!プレミアムサービス光の SKY は `dvbConf` か `list` で指定します)
-- `dvbConf`: スキャンに使うチューナーの dvbv5-zap のチャンネル設定ファイル (`-c`) のすべてのチャンネル (DVB-C など、直接操作できないチャンネル設定ファイルも含む)
+- `dvbConf`: スキャンに使うチューナーの dvbv5-zap のチャンネル設定ファイル (`-c`) のすべてのチャンネル (DVB-S2 など、直接操作できないチャンネル設定ファイルも含む)
 - `list`: 指定したチャンネル (`channels`)
 - `format`: チャンネル名の書式 (`channelNameFormat`、例: `C{ch}`) と範囲
+
+既定は `preset` です。Web UI では、受信経路が `SAT` か `SKY` で、スキャンに使うチューナーがすべて dvbv5-zap の場合に、`dvbConf` を選んだ状態にします。dvbv5-zap のチューナーはチャンネル設定ファイルにないチャンネルを選局できず、`preset` より調べるチャンネルが少なく済むためです。
 
 #### 使うチューナー
 

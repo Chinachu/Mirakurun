@@ -288,19 +288,22 @@ export async function loadTuners(): Promise<Tuner[]> {
                     continue;
                 }
 
+                // the channel config file of the route (`routes` can be changed later for cable or optical)
                 const tuner: Writable<Tuner> = {
                     name: adapters[i],
                     types: undefined,
+                    routes: undefined,
+                    command: `dvbv5-zap -a ${i} -c ./config/dvbconf-for-isdb/conf/dvbv5_channels_<route>.conf -r -P <channel>`,
                     dvbDevicePath: `/dev/dvb/adapter${i}/dvr0`,
                     decoder: "arib-b25-stream-test"
                 };
 
                 if (isISDBT) {
                     tuner.types = ["GR"];
-                    tuner.command = `dvbv5-zap -a ${i} -c ./config/dvbconf-for-isdb/conf/dvbv5_channels_isdbt.conf -r -P <channel>`;
+                    tuner.routes = ["TER"];
                 } else if (isISDBS) {
                     tuner.types = ["BS", "CS"];
-                    tuner.command = `dvbv5-zap -a ${i} -c ./config/dvbconf-for-isdb/conf/dvbv5_channels_isdbs.conf -r -P <channel>`;
+                    tuner.routes = ["SAT"];
                 }
 
                 tuners.push(tuner);

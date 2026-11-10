@@ -125,6 +125,34 @@ flowchart LR
 
 In this example, the channels of the route `CATV` are tuned only by tuner 2, and the channels of `TER` and `SAT` only by tuner 1.
 
+#### Channel config files of dvbv5-zap
+
+The bundled [dvbconf-for-isdb](https://github.com/Chinachu/dvbconf-for-isdb) has a channel config file for each route, `dvbv5_channels_<route>.conf`. With `<route>` in `-c`, the file of the route of the channel is used for tuning.
+
+```yaml
+- name: adapter0
+  types:
+    - GR
+  routes:
+    - TER
+  command: dvbv5-zap -a 0 -c ./config/dvbconf-for-isdb/conf/dvbv5_channels_<route>.conf -r -P <channel>
+  dvbDevicePath: /dev/dvb/adapter0/dvr0
+```
+
+| File | Route | Channels | Delivery system |
+|---|---|---|---|
+| `dvbv5_channels_ter.conf` | `TER` | `1`-`12`, `13`-`62`, `C13`-`C63` | ISDB-T |
+| `dvbv5_channels_sat.conf` | `SAT` | `BSxx_y`, `CSx` (including 4K / 8K) | ISDB-S |
+| `dvbv5_channels_sky.conf` | `SKY` | `JCSAT3A-TPxx`, `JCSAT4B-TPxx` | DVB-S2 |
+| `dvbv5_channels_catv.conf` | `CATV` | `1`-`12`, `C13`-`C63`, `13`-`62` | DVB-C (J.83 Annex C tuned as Annex A) |
+| `dvbv5_channels_ftth.conf` | `FTTH` | `13`-`62`, `BSxx_y`, `CSx`, `73750`-`769250` | ISDB-T, ISDB-S, DVB-C (J.83 Annex B) |
+
+- The channels with a shifted frequency are listed under separate names (such as `4-`-`7-`, `C22-`, `C24+`-`C27+` of `ter` and `catv`). `sat` also has `BS14_0` of the left-hand circular polarization. See the README of dvbconf-for-isdb for details.
+- The tuner detection (when tuners.yml does not exist) sets this command, with `routes` of `TER` for the tuners of ISDB-T and `SAT` for the tuners of ISDB-S. For another route, just change `routes` to use the file of that route.
+- `dvbv5_channels_catv.conf` is for receiving trans-modulation by the tuners of DVB-C. To receive the pass-through of cable television by the tuners of ISDB-T, specify `dvbv5_channels_ter.conf` instead of `<route>` (`routes` may be left as `CATV`).
+- `dvbv5_channels_sky.conf` does not work with stock `dvbv5-zap` (see the README of dvbconf-for-isdb).
+- `dvbv5_channels_isdbt.conf` and `dvbv5_channels_isdbs.conf` used until 4.3.0 are kept and work as before.
+
 #### DVB device direct access
 
 For a tuner whose `command` is `dvbv5-zap`, Mirakurun tunes by accessing the DVB device directly instead of running the command. Tuning is faster because Mirakurun does not wait for a process to start and exit. To run the command as before, set `disableDvbDirect: true`.
@@ -146,9 +174,9 @@ The output options (`-r`, `-o -`) and the display options (`-s`, `-v`, `-N`) are
 
 For satellite, the LNB power, 22kHz tone, DiSEqC and frequency conversion are handled in the same way as `dvbv5-zap`, and `LNB`, `POLARIZATION` and `SAT_NUMBER` in the channels file are used in the same way. If the LNBf is specified neither by `-l` nor by `LNB` in the channels file, the frequency is not converted and the LNB is not powered.
 
-Supported delivery systems are ISDB-T and ISDB-S.
+Supported delivery systems are ISDB-T, ISDB-S and DVB-C (J.83 Annex A / B / C). The command is run for the channels files of DVB-S2 and others.
 
-`<route>` can be used in `-c` (such as `-c ./conf/dvbv5_channels_<route>.conf`). In this case, the channels file of each of `routes` (all routes if omitted) is read, and the file of the route of the channel is used for tuning.
+`<route>` can be used in `-c` (such as `-c ./conf/dvbv5_channels_<route>.conf`). In this case, the channels file of each of `routes` (all routes if omitted) is read, and the file of the route of the channel is used for tuning. For a route whose file can not be read (an unsupported delivery system, a missing file, etc.), the command is run only when tuning the channels of that route.
 
 ##### When the command is run
 
@@ -159,7 +187,7 @@ In any of the following cases, the command is run as before instead of accessing
 - The arguments other than options are not just `<channel>`.
 - A number in the options has a leading zero (`dvbv5-zap` reads it as octal).
 - `dvbDevicePath` differs from `/dev/dvb/adapter<a>/dvr<d>` given by `-a` and `-d`.
-- The channels file has unsupported or duplicate properties, or a channel without `FREQUENCY`.
+- The channels file has an unsupported delivery system (such as DVB-S2), unsupported or duplicate properties, or a channel without `FREQUENCY`.
 - The channels file has lines that `dvbv5-zap` reads differently (no space before `=`, trailing spaces in a value, CRLF line endings).
 
 If the channels file is edited after startup and can no longer be read, the command is run for each tuning until the file is fixed.
@@ -172,6 +200,7 @@ While tuning directly, the following differ from running the command.
 - To speed up the next tuning, the frontend is kept open for 1 second after the tuner is released.
 - If tuning fails (e.g. the device cannot be opened or the channel is not found), the stream request fails without retrying.
 - If tuning fails 3 times in a row because the device does not exist, the tuner is treated as faulty and is not used until Mirakurun is restarted. A restart is also required after reconnecting a USB tuner.
+- Tuning fails for the channels of a delivery system that the frontend does not support. `dvbv5-zap` tunes them with a delivery system of the same kind that the frontend supports instead (such as when the channels file has `DVBC/ANNEX_A` and the frontend supports only `DVBC/ANNEX_C`). Set `disableDvbDirect: true` in this case.
 
 #### decoder
 
@@ -372,9 +401,11 @@ How the type is decided and which types are added on each route are shown in the
     - SKY: none (specify by `dvbConf` or `list`)
     - CATV: `1`-`12` (VHF), `C13`-`C63`, `13`-`62`
     - FTTH: `13`-`62`, `BS01_0`-`BS23_3`, `CS2`-`CS24` (specify SKY of SKY PerfecTV! Premium Service Hikari by `dvbConf` or `list`)
-- `dvbConf`: all the channels of the channel config files of dvbv5-zap (`-c`) of the tuners used for the scan (including channel config files that DVB direct access cannot handle, such as DVB-C)
+- `dvbConf`: all the channels of the channel config files of dvbv5-zap (`-c`) of the tuners used for the scan (including channel config files that DVB direct access cannot handle, such as DVB-S2)
 - `list`: the channels specified (`channels`)
 - `format`: the format of the channel names (`channelNameFormat`, e.g. `C{ch}`) and the range
+
+The default is `preset`. The Web UI selects `dvbConf` when the route is `SAT` or `SKY` and all the tuners used for the scan are of dvbv5-zap, because the tuners of dvbv5-zap can not tune the channels not in the channel config file, and fewer channels are scanned than by `preset`.
 
 #### Tuners used
 

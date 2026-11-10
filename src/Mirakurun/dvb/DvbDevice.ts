@@ -61,6 +61,15 @@ const ISDBT_AUTO_LAYER = (fec: number, modulation: number, segmentCount: number,
     [timeInterleaving, INTERLEAVING_AUTO]
 ] as const;
 
+// J.83 Annex A と Annex C は同じ項目
+const DVBC_ANNEX_AC = [
+    [DTV.FREQUENCY, 0xFFFFFFFF],
+    [DTV.MODULATION, QAM_AUTO],
+    [DTV.INVERSION, INVERSION_AUTO],
+    [DTV.SYMBOL_RATE, 0xFFFFFFFF],
+    [DTV.INNER_FEC, FEC_AUTO]
+] as const;
+
 /**
  * libdvbv5 (dvbv5-zap) が選局で送る項目と、チャンネル設定にない場合の値
  * (`dvb-v5-std.c` の項目の順と、`dvb-file.c` の `dvbv5_default_value()` の値。
@@ -86,6 +95,13 @@ const TUNING_PROPERTIES = new Map<number, readonly (readonly [number, number])[]
     [SYS.ISDBS, [
         [DTV.FREQUENCY, 0xFFFFFFFF],
         [DTV.STREAM_ID, 0]
+    ]],
+    [SYS.DVBC_ANNEX_A, DVBC_ANNEX_AC],
+    [SYS.DVBC_ANNEX_C, DVBC_ANNEX_AC],
+    // MODULATION は必ずチャンネル設定にある (DvbChannelConf.ts で確かめている)
+    [SYS.DVBC_ANNEX_B, [
+        [DTV.FREQUENCY, 0xFFFFFFFF],
+        [DTV.MODULATION, QAM_AUTO]
     ]]
 ]);
 

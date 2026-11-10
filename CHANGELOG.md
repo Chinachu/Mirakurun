@@ -2,6 +2,32 @@
 
 see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check all.
 
+## 4.4.0+dev
+
+### dvbv5-zap のチューナーの設定
+
+同梱の dvbconf-for-isdb に、受信経路ごとのチャンネル設定ファイル (`dvbv5_channels_<経路>.conf`) を追加しました。チューナーの自動認識は、`-c ./config/dvbconf-for-isdb/conf/dvbv5_channels_<route>.conf` と `routes` を設定するようになります。
+
+- **既存の tuners.yml はそのまま使えます。** 4.3.0 までの `dvbv5_channels_isdbt.conf` と `dvbv5_channels_isdbs.conf` は残してあり、自動で書き換えることもありません。
+- 新しい設定に変える場合は、Web UI のチューナー設定で `command` の `-c` を `./config/dvbconf-for-isdb/conf/dvbv5_channels_<route>.conf` にし、`routes` に受信経路 (地上波のアンテナは `TER`、BS / CS のアンテナは `SAT`) を指定してください。
+- 登録済みのチャンネルの名前は、新しいファイルでも同じです。ただし、放送されていない `BS05_2`, `BS09_1`, `BS23_2` と、ストリーム ID を確認できていない `BS11_1` は `dvbv5_channels_sat.conf` にないため、新しい設定に変えると、これらのチャンネルは選局できなくなります。
+- BS の 4K (`BS07_*`, `BS11_*`, `BS17_*`) は、対応するドライバーで選局するための設定になりました (dvbconf-for-isdb の README を参照)。
+- 詳細は [doc/Configuration.ja.md](doc/Configuration.ja.md) の「dvbv5-zap のチャンネル設定ファイル」を参照してください。
+
+### Server
+
+- ✨ チューナー設定に `routes` (チューナーの入力に届いている受信経路) を追加。`command` の `<route>` は、選局するチャンネルの受信経路 (`ter`, `sat`, `sky`, `catv`, `ftth`) に置き換え
+- ✨ config: チューナーの自動認識で、受信経路ごとのチャンネル設定ファイル (`dvbv5_channels_<route>.conf`) と `routes` を設定
+- ⚡ TunerDevice: DVB デバイスの直接操作が DVB-C (J.83 Annex A / B / C) に対応
+  - `dvbv5_channels_catv.conf` と `dvbv5_channels_ftth.conf` のチューナーも、コマンドを実行せずに選局します。問題がある場合は、チューナー設定に `disableDvbDirect: true` を追加してください。
+  - `-c` に `<route>` を使うチューナーは、受信経路ごとのチャンネル設定ファイルを読みます。読めないファイル (DVB-S2 など) がある経路は、その経路のチャンネルを選局するときだけコマンドを実行します。
+- ⚡ チャンネルスキャン: 受信経路 `SAT` と `FTTH` で、NIT にない (放送されていない) BS のチャンネルをスキップ
+
+### UI
+
+- ✨ TunersConfigView: 追加するチューナーの `command` を、受信経路ごとのチャンネル設定ファイル (`dvbv5_channels_<route>.conf`) に変更
+- ✨ ChannelsConfigView: チャンネルスキャンで、受信経路が `SAT` か `SKY` で、使うチューナーがすべて dvbv5-zap の場合は、チャンネル設定ファイルのチャンネルを既定で選択
+
 ## 4.3.0 (2026-11-06)
 
 `dvbv5-zap` を使うチューナーでは、コマンドを実行せずに Mirakurun が DVB デバイスを直接操作して選局するようにしました。チャンネルの切り替えにかかる時間は 4.2.1 の 1/3〜1/5 になります。設定の変更は不要です。従来どおりコマンドを実行するには、チューナー設定に `disableDvbDirect: true` を追加してください。

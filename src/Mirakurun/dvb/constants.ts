@@ -20,9 +20,11 @@
 export const DTV = {
     TUNE: 1,
     FREQUENCY: 3,
+    MODULATION: 4,
     BANDWIDTH_HZ: 5,
     INVERSION: 6,
     SYMBOL_RATE: 8,
+    INNER_FEC: 9,
     DELIVERY_SYSTEM: 17,
     ISDBT_PARTIAL_RECEPTION: 18,
     ISDBT_SOUND_BROADCASTING: 19,
@@ -58,11 +60,14 @@ export const INTERLEAVING_AUTO = 1;
 
 /** `enum fe_delivery_system` */
 export const SYS = {
+    DVBC_ANNEX_A: 1,
+    DVBC_ANNEX_B: 2,
     DVBS: 5,
     DVBS2: 6,
     ISDBT: 8,
     ISDBS: 9,
-    TURBO: 17
+    TURBO: 17,
+    DVBC_ANNEX_C: 18
 } as const;
 
 /** 衛星の伝送方式 (libdvbv5 の `dvb_fe_is_satellite()` と同じ) */

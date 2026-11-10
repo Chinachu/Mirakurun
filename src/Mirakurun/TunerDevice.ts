@@ -118,6 +118,8 @@ export default class TunerDevice extends EventEmitter {
     private _dvbChannelsConfPath: string = null;
     /** when the command has `<route>` (e.g. `-c dvbv5_channels_<route>.conf`) */
     private _dvbChannelsConfPathByRoute: Partial<Record<apid.ChannelRoute, string>> = null;
+    /** the routes whose channel config file could not be loaded at startup (tuned by the command) */
+    private _dvbCommandRoutes = new Set<apid.ChannelRoute>();
     private _dvbChannelByFrequency = false;
     // DVB デバイスで選局してから止めるまでの間 (コマンドのプロセスがある間に相当)
     private _dvbActive = false;
@@ -531,6 +533,8 @@ export default class TunerDevice extends EventEmitter {
             if (this._config.command && this._config.command.includes("<route>")) {
                 // 経路ごとのコマンドを解釈する (チャンネル設定ファイル以外は同じでなければならない)
                 confPathByRoute = {};
+                let loaded = false;
+                const loadErrors: [apid.ChannelRoute, Error][] = [];
                 for (const route of this._config.routes || common.channelRoutes) {
                     const routeOptions = parseDvbv5ZapCommand(
                         this._config.command.replace(/<route>/g, route.toLowerCase()),
@@ -543,9 +547,25 @@ export default class TunerDevice extends EventEmitter {
                         throw new Error("`<route>` is only allowed in `-c`");
                     }
                     // 読めないチャンネル設定ファイルでは選局のたびに失敗するため、先に読んで確かめる
-                    loadChannelsConf(routeOptions.channelsConfPath);
+                    // (読めない経路があっても、ほかの経路は直接操作する。読めない経路は選局のたびにコマンドを実行する)
+                    try {
+                        loadChannelsConf(routeOptions.channelsConfPath);
+                        loaded = true;
+                    } catch (err) {
+                        loadErrors.push([route, err]);
+                    }
                     options = routeOptions;
                     confPathByRoute[route] = routeOptions.channelsConfPath;
+                }
+                if (loaded === false) {
+                    throw loadErrors[0]?.[1] ?? new Error("`routes` is empty");
+                }
+                for (const [route, err] of loadErrors) {
+                    this._dvbCommandRoutes.add(route);
+                    // 経路 (routes) を指定していない場合は、使わない経路かもしれないため警告にしない
+                    (this._config.routes ? log.warn : log.info)(
+                        "TunerDevice#%d uses the command instead of DVB device direct access for the route %s (%s)", this._index, route, err.message
+                    );
                 }
             } else {
                 options = parseDvbv5ZapCommand(this._config.command, this._config.dvbDevicePath);
@@ -745,15 +765,15 @@ export default class TunerDevice extends EventEmitter {
         this._updated();
 
         const generation = ++this._dvbGeneration;
-        const channelsConfPath = this._dvbChannelsConfPathByRoute
-            ? this._dvbChannelsConfPathByRoute[ch.route || common.getDefaultChannelRoute(ch.type)]
-            : this._dvbChannelsConfPath;
+        const route = ch.route || common.getDefaultChannelRoute(ch.type);
+        const channelsConfPath = this._dvbChannelsConfPathByRoute ? this._dvbChannelsConfPathByRoute[route] : this._dvbChannelsConfPath;
         let channels: DvbChannels;
         try {
             channels = await readChannelsConf(channelsConfPath);
         } catch (err) {
             // 起動後にチャンネル設定ファイルを読めなくなった場合は、その選局だけコマンドを実行する (次の選局で読み直す)
-            return this._spawnCommandInsteadOfDvb(ch, generation, err);
+            // 起動時から読めない経路は、起動時に知らせているため警告にしない
+            return this._spawnCommandInsteadOfDvb(ch, generation, err, this._dvbCommandRoutes.has(route));
         }
 
         try {
@@ -794,12 +814,12 @@ export default class TunerDevice extends EventEmitter {
         }
     }
 
-    private async _spawnCommandInsteadOfDvb(ch: ChannelItem, generation: number, err: Error): Promise<void> {
+    private async _spawnCommandInsteadOfDvb(ch: ChannelItem, generation: number, err: Error, expected = false): Promise<void> {
         // 設定を読む間に止めた場合は、止めた側で後処理している (後から始めた選局の frontend を閉じないよう、閉じる前に確かめる)
         if (generation !== this._dvbGeneration) {
             return;
         }
-        log.warn("TunerDevice#%d uses the command for this tuning because the channels file can not be used (%s)", this._index, err.message);
+        (expected ? log.debug : log.warn)("TunerDevice#%d uses the command for this tuning because the channels file can not be used (%s)", this._index, err.message);
         // コマンドが DVB デバイスを開けるよう、frontend を閉じる
         await this._dvb.close().catch(log.error);
         // 閉じる間に止めた場合は、止めた側で後処理している

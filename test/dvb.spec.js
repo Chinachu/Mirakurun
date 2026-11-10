@@ -56,6 +56,39 @@ describe("[dvb.spec] DvbChannelConf.ts: parseDvbv5ChannelsConf()", () => {
     assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = constructor\n"), /unsupported DELIVERY_SYSTEM/);
     assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = ISDBS\n LNB = UNKNOWN\n"), /unsupported property LNB/);
     assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = ISDBS\n POLARIZATION = X\n"), /unsupported property POLARIZATION/);
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = ISDBS\n FREQUENCY = 1\n constructor = 5\n"), /unsupported property constructor/);
+  });
+
+  it("parses the channels of DVB-C", () => {
+    const channels = conf.parseDvbv5ChannelsConf([
+      "[C13]", "\tDELIVERY_SYSTEM = DVBC/ANNEX_A", "\tFREQUENCY = 111000000", "\tSYMBOL_RATE = 5274000", "\tMODULATION = QAM/AUTO",
+      "[73750]", "\tDELIVERY_SYSTEM = DVBC/ANNEX_B", "\tFREQUENCY = 73750000", "\tSYMBOL_RATE = 5600000", "\tMODULATION = QAM/256",
+      // libdvbv5 と同じく、値の名前の大文字と小文字は区別しない
+      "[C]", "\tDELIVERY_SYSTEM = DVBC/ANNEX_C", "\tFREQUENCY = 117000000", "\tMODULATION = qam/64", "\tINVERSION = off", "\tINNER_FEC = 3/5",
+      // ISDB-S では使わない項目 (libdvbv5 は送らない)
+      "[BS01_0]", "\tDELIVERY_SYSTEM = ISDBS", "\tFREQUENCY = 1049480", "\tINVERSION = AUTO"
+    ].join("\n"));
+    assert.deepStrictEqual(channels.get("C13"), {
+      deliverySystem: SYS.DVBC_ANNEX_A,
+      properties: [[DTV.FREQUENCY, 111000000], [DTV.SYMBOL_RATE, 5274000], [DTV.MODULATION, 6]]
+    });
+    assert.deepStrictEqual(channels.get("73750"), {
+      deliverySystem: SYS.DVBC_ANNEX_B,
+      properties: [[DTV.FREQUENCY, 73750000], [DTV.SYMBOL_RATE, 5600000], [DTV.MODULATION, 5]]
+    });
+    assert.deepStrictEqual(channels.get("C"), {
+      deliverySystem: SYS.DVBC_ANNEX_C,
+      properties: [[DTV.FREQUENCY, 117000000], [DTV.MODULATION, 3], [DTV.INVERSION, 0], [DTV.INNER_FEC, 10]]
+    });
+    assert.deepStrictEqual(channels.get("BS01_0").properties, [[DTV.FREQUENCY, 1049480], [DTV.INVERSION, 2]]);
+
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = DVBC/ANNEX_A\n FREQUENCY = 1\n MODULATION = QAM/8\n"), /unsupported property MODULATION/);
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = DVBC/ANNEX_A\n FREQUENCY = 1\n INVERSION = constructor\n"), /unsupported property INVERSION/);
+    // libdvbv5 は、DVBC/ANNEX_B に MODULATION がないか VSB の場合に ATSC として選局する
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = DVBC/ANNEX_B\n FREQUENCY = 1\n"), /MODULATION of QAM is required/);
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n DELIVERY_SYSTEM = DVBC/ANNEX_B\n FREQUENCY = 1\n MODULATION = VSB/8\n"), /MODULATION of QAM is required/);
+    // dvbv5-zap は ISDB-T の MODULATION を各階層の変調方式にする (MODULATION が DELIVERY_SYSTEM より先でも同じ)
+    assert.throws(() => conf.parseDvbv5ChannelsConf("[1]\n MODULATION = QAM/64\n DELIVERY_SYSTEM = ISDBT\n FREQUENCY = 1\n"), /unsupported property MODULATION/);
   });
 
   it("rejects channels that libdvbv5 would tune differently", () => {
@@ -254,6 +287,22 @@ describe("[dvb.spec] DvbChannelConf.ts: parseDvbv5ChannelsConf()", () => {
     assert.strictEqual(conf.findChannelParams(conf.loadChannelsConf(isdbs), "BS01_0", isdbs).deliverySystem, SYS.ISDBS);
     assert.throws(() => conf.findChannelParams(conf.loadChannelsConf(isdbt), "99", isdbt), /not found/);
   });
+
+  // チューナーの自動認識で使う、経路ごとのチャンネル設定ファイル (dvbv5_channels_<route>.conf)
+  const byRoute = route => path.join(confDir, `dvbv5_channels_${route}.conf`);
+  it("loads dvbconf-for-isdb of each route", { skip: !fs.existsSync(byRoute("ter")) && "config/dvbconf-for-isdb is not checked out" }, () => {
+    const system = (route, channel) => conf.findChannelParams(conf.loadChannelsConf(byRoute(route)), channel, byRoute(route)).deliverySystem;
+    assert.deepStrictEqual(
+      [system("ter", "27"), system("ter", "C13"), system("sat", "BS01_0"), system("sat", "CS2"), system("catv", "C13")],
+      [SYS.ISDBT, SYS.ISDBT, SYS.ISDBS, SYS.ISDBS, SYS.DVBC_ANNEX_A]
+    );
+    assert.deepStrictEqual(
+      [system("ftth", "27"), system("ftth", "BS01_0"), system("ftth", "73750")],
+      [SYS.ISDBT, SYS.ISDBS, SYS.DVBC_ANNEX_B]
+    );
+    // DVB-S2 は直接操作できない (この経路だけコマンドを実行する)
+    assert.throws(() => conf.loadChannelsConf(byRoute("sky")), /unsupported DELIVERY_SYSTEM DVBS2/);
+  });
 });
 
 describe("[dvb.spec] linux-dvb.ts", { skip: !isVerifiedArch && "x64 / arm64 only" }, () => {
@@ -448,6 +497,10 @@ describe("[dvb.spec] DvbDevice.ts: LNB", { skip: !isSupportedArch && `${process.
     await device._tune({ deliverySystem: SYS.ISDBT, properties: [[DTV.FREQUENCY, 557142857], [DTV.BANDWIDTH_HZ, 6000000], [DTV.STREAM_ID, 1]] });
     // ISDB-S で STREAM_ID がない場合は、NO_STREAM_ID_FILTER ではなく libdvbv5 と同じく 0 を送る
     await device._tune({ deliverySystem: SYS.ISDBS, properties: [[DTV.FREQUENCY, 1049480]] });
+    // DVB-C (J.83 Annex A / C) はチャンネル設定にない項目を libdvbv5 の値にし、Annex B では使わない SYMBOL_RATE は送らない
+    await device._tune({ deliverySystem: SYS.DVBC_ANNEX_A, properties: [[DTV.FREQUENCY, 111000000], [DTV.SYMBOL_RATE, 5274000], [DTV.MODULATION, 6]] });
+    await device._tune({ deliverySystem: SYS.DVBC_ANNEX_B, properties: [[DTV.FREQUENCY, 73750000], [DTV.SYMBOL_RATE, 5600000], [DTV.MODULATION, 5]] });
+    await device._tune({ deliverySystem: SYS.DVBC_ANNEX_C, properties: [[DTV.FREQUENCY, 117000000], [DTV.INVERSION, 0], [DTV.INNER_FEC, 10]] });
     // 送る項目がわからない伝送方式では、何も設定せずに失敗する
     await assert.rejects(device._tune({ deliverySystem: SYS.DVBS, properties: [[DTV.FREQUENCY, 12000000]] }), /not supported/);
     await device.close();
@@ -457,7 +510,20 @@ describe("[dvb.spec] DvbDevice.ts: LNB", { skip: !isSupportedArch && `${process.
       ["setProperties", isdbtProperties(557142857, 6000000)],
       ["setProperties", [[DTV.DELIVERY_SYSTEM, SYS.ISDBS]]],
       ["setProperties", [[DTV.FREQUENCY, 1049480], [DTV.STREAM_ID, 0], [DTV.DELIVERY_SYSTEM, SYS.ISDBS], [DTV.TUNE, 0]]],
-      ["setVoltage", SEC_VOLTAGE.OFF]
+      // 衛星からケーブルに切り替える場合は給電を止める
+      ["setVoltage", SEC_VOLTAGE.OFF],
+      ["setProperties", [[DTV.DELIVERY_SYSTEM, SYS.DVBC_ANNEX_A]]],
+      ["setProperties", [
+        [DTV.FREQUENCY, 111000000], [DTV.MODULATION, 6], [DTV.INVERSION, 2], [DTV.SYMBOL_RATE, 5274000], [DTV.INNER_FEC, 9],
+        [DTV.DELIVERY_SYSTEM, SYS.DVBC_ANNEX_A], [DTV.TUNE, 0]
+      ]],
+      ["setProperties", [[DTV.DELIVERY_SYSTEM, SYS.DVBC_ANNEX_B]]],
+      ["setProperties", [[DTV.FREQUENCY, 73750000], [DTV.MODULATION, 5], [DTV.DELIVERY_SYSTEM, SYS.DVBC_ANNEX_B], [DTV.TUNE, 0]]],
+      ["setProperties", [[DTV.DELIVERY_SYSTEM, SYS.DVBC_ANNEX_C]]],
+      ["setProperties", [
+        [DTV.FREQUENCY, 117000000], [DTV.MODULATION, 6], [DTV.INVERSION, 0], [DTV.SYMBOL_RATE, 0xFFFFFFFF], [DTV.INNER_FEC, 10],
+        [DTV.DELIVERY_SYSTEM, SYS.DVBC_ANNEX_C], [DTV.TUNE, 0]
+      ]]
     ]);
   });
 
@@ -554,6 +620,17 @@ describe("[dvb.spec] dvbv5-zap.ts: parseDvbv5ZapCommand()", () => {
   });
 
   it("parses the command generated by the tuner detection", () => {
+    // `<route>` は、選局するチャンネルの経路に置き換えてから解釈する
+    const command = "dvbv5-zap -a 2 -c ./config/dvbconf-for-isdb/conf/dvbv5_channels_<route>.conf -r -P <channel>";
+    assert.deepStrictEqual(
+      parseDvbv5ZapCommand(command.replace(/<route>/g, "sat"), "/dev/dvb/adapter2/dvr0"),
+      {
+        adapter: 2, frontend: 0, demux: 0, dvr: 0,
+        channelsConfPath: path.resolve("./config/dvbconf-for-isdb/conf/dvbv5_channels_sat.conf"), channelByFrequency: false, ...noSat
+      }
+    );
+    assert.throws(() => parseDvbv5ZapCommand(command), /template variable/);
+    // 4.3.0 までの自動認識のコマンド
     assert.deepStrictEqual(
       parseDvbv5ZapCommand("dvbv5-zap -a 2 -c ./config/dvbconf-for-isdb/conf/dvbv5_channels_isdbs.conf -r -P <channel>", "/dev/dvb/adapter2/dvr0"),
       { adapter: 2, frontend: 0, demux: 0, dvr: 0, channelsConfPath: conf, channelByFrequency: false, ...noSat }

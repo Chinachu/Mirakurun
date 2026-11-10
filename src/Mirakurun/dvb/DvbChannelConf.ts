@@ -30,7 +30,10 @@ export interface DvbChannelParams {
 
 const DELIVERY_SYSTEMS = new Map<string, number>([
     ["ISDBT", SYS.ISDBT],
-    ["ISDBS", SYS.ISDBS]
+    ["ISDBS", SYS.ISDBS],
+    ["DVBC/ANNEX_A", SYS.DVBC_ANNEX_A],
+    ["DVBC/ANNEX_B", SYS.DVBC_ANNEX_B],
+    ["DVBC/ANNEX_C", SYS.DVBC_ANNEX_C]
 ]);
 
 // libdvbv5 がチャンネルの情報として読み、frontend には設定しない項目 (PID_* も同じ)
@@ -42,6 +45,17 @@ const NUMERIC_KEYS: { [key: string]: number } = {
     SYMBOL_RATE: DTV.SYMBOL_RATE,
     STREAM_ID: DTV.STREAM_ID
 };
+
+// 値を名前で書く項目 (libdvbv5 の `dvb-v5.c` の名前。順は uapi の enum の値)
+const MODULATION_NAMES = [
+    "QPSK", "QAM/16", "QAM/32", "QAM/64", "QAM/128", "QAM/256", "QAM/AUTO", "VSB/8", "VSB/16", "PSK/8", "APSK/16", "APSK/32", "DQPSK", "QAM/4_NR"
+];
+const VSB_MODULATIONS: readonly number[] = [MODULATION_NAMES.indexOf("VSB/8"), MODULATION_NAMES.indexOf("VSB/16")];
+const NAMED_KEYS = new Map<string, { readonly cmd: number; readonly names: readonly string[] }>([
+    ["MODULATION", { cmd: DTV.MODULATION, names: MODULATION_NAMES }],
+    ["INVERSION", { cmd: DTV.INVERSION, names: ["OFF", "ON", "AUTO"] }],
+    ["INNER_FEC", { cmd: DTV.INNER_FEC, names: ["NONE", "1/2", "2/3", "3/4", "4/5", "5/6", "6/7", "7/8", "8/9", "AUTO", "3/5", "9/10", "2/5"] }]
+]);
 
 // 設定ファイルを編集した場合に読み直すため、ファイルの状態と一緒に保持する
 const cache = new Map<string, { version: string; channels: DvbChannels }>();
@@ -117,6 +131,17 @@ export function parseDvbv5ChannelsConf(text: string): DvbChannels {
         if (deliverySystem === null) {
             throw new Error(`DELIVERY_SYSTEM is missing in [${label()}]`);
         }
+        if (deliverySystem === SYS.ISDBT && keys.has("MODULATION")) {
+            // dvbv5-zap は ISDB-T の MODULATION を各階層の変調方式にする
+            throw new Error(`unsupported property MODULATION in [${label()}]`);
+        }
+        if (deliverySystem === SYS.DVBC_ANNEX_B) {
+            // libdvbv5 は、MODULATION がないか VSB の場合に ATSC として選局する
+            const modulation = properties.find(([cmd]) => cmd === DTV.MODULATION)?.[1];
+            if (modulation === undefined || VSB_MODULATIONS.includes(modulation)) {
+                throw new Error(`MODULATION of QAM is required for DVBC/ANNEX_B in [${label()}]`);
+            }
+        }
         if (keys.has("FREQUENCY") === false) {
             throw new Error(`FREQUENCY is missing in [${label()}]`);
         }
@@ -165,6 +190,8 @@ export function parseDvbv5ChannelsConf(text: string): DvbChannels {
         }
         keys.add(key);
 
+        // libdvbv5 と同じく、名前の大文字と小文字は区別しない
+        const named = NAMED_KEYS.get(key)?.names.indexOf(toAsciiUpperCase(value)) ?? -1;
         const lnb = key === "LNB" ? findLnb(value) : null;
         const polarization = key === "POLARIZATION" ? POLARIZATION_NAMES[toAsciiUpperCase(value)] : undefined;
 
@@ -173,9 +200,11 @@ export function parseDvbv5ChannelsConf(text: string): DvbChannels {
                 throw new Error(`unsupported DELIVERY_SYSTEM ${value} in [${label()}]`);
             }
             deliverySystem = DELIVERY_SYSTEMS.get(value);
-        } else if (NUMERIC_KEYS[key] !== undefined && /^\d+$/.test(value) && parseInt(value, 10) <= 0xFFFFFFFF) {
+        } else if (Object.prototype.hasOwnProperty.call(NUMERIC_KEYS, key) && /^\d+$/.test(value) && parseInt(value, 10) <= 0xFFFFFFFF) {
             // libdvbv5 は 32 ビットに収まらない値を切り詰めるため、収まる値に限る
             properties.push([NUMERIC_KEYS[key], parseInt(value, 10)]);
+        } else if (named !== -1) {
+            properties.push([NAMED_KEYS.get(key).cmd, named]);
         } else if (lnb !== null) {
             sat.lnb = lnb;
         } else if (polarization !== undefined) {
@@ -211,7 +240,7 @@ export function loadChannelsConf(confPath: string): DvbChannels {
 /** `loadChannelsConf()` と同じく読む (選局のたびに読むため、イベントループを止めない) */
 /**
  * チャンネル設定ファイルのチャンネルの名前 (ファイルの順、重複を除く。チャンネルスキャン用)
- * 直接操作できない DELIVERY_SYSTEM (DVB-C など) のチャンネルも含むため、名前のほかは確かめない
+ * 直接操作できない DELIVERY_SYSTEM (DVB-S2 など) のチャンネルも含むため、名前のほかは確かめない
  */
 export async function readChannelNames(confPath: string): Promise<string[]> {
     const names = new Set<string>();

@@ -14,7 +14,7 @@
    limitations under the License.
 */
 import * as React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     Alignment,
     Breadcrumbs,
@@ -36,7 +36,7 @@ import {
 import equal from "fast-deep-equal";
 import { state } from "../modules/state";
 import * as ui from "../modules/ui";
-import { ConfigChannels, ConfigChannelsItem, ChannelType, ChannelRoute, ChannelScanStatus, ChannelScanMode, ChannelScanSource } from "../../../api.d";
+import { ConfigChannels, ConfigChannelsItem, ConfigTuners, ChannelType, ChannelRoute, ChannelScanStatus, ChannelScanMode, ChannelScanSource } from "../../../api.d";
 import { channelRoutes, getChannelRouteLabel, getDefaultChannelRoute } from "../modules/constants";
 
 import "./ChannelsConfigView.sass";
@@ -94,6 +94,27 @@ const migrateChannels = (channels: ConfigChannels): ConfigChannels => {
     });
 };
 
+// dvbv5-zap のチューナーは、チャンネル設定ファイルにないチャンネルを選局できない。
+// 衛星はプリセットに放送されていないチャンネルが多く (SKY はプリセットがない)、チャンネル設定ファイルのほうが速いため、既定にする
+const dvbConfDefaultTypes: Partial<Record<ChannelRoute, ChannelType[]>> = {
+    SAT: ["BS", "CS", "BS4K"],
+    SKY: ["SKY"]
+};
+
+/** スキャンに使うチューナーがすべて dvbv5-zap の場合は、チャンネル設定ファイルを既定にする */
+function getDefaultScanSource(route: ChannelRoute, tuners: ConfigTuners): ChannelScanSource {
+    const types = dvbConfDefaultTypes[route];
+    if (!types) {
+        return "preset";
+    }
+    const used = tuners.filter(tuner => (
+        tuner.isDisabled !== true &&
+        (tuner.types || []).some(type => types.includes(type)) &&
+        (!tuner.routes || tuner.routes.includes(route))
+    ));
+    return used.length > 0 && used.every(tuner => /^(\S*\/)?dvbv5-zap\s/.test(tuner.command || "")) ? "dvbConf" : "preset";
+}
+
 export const ChannelsConfigView: React.FC = () => {
     console.debug("routes", "ChannelsConfigView");
 
@@ -107,6 +128,9 @@ export const ChannelsConfigView: React.FC = () => {
     const [showScanDialog, setShowScanDialog] = useState(false);
     const [scanRoute, setScanRoute] = useState<ChannelRoute>("TER");
     const [scanSource, setScanSource] = useState<ChannelScanSource>("preset");
+    const [scanTuners, setScanTuners] = useState<ConfigTuners>([]);
+    // 経路を選んだ後に、ソースを手動で選んだか
+    const scanSourceChosen = useRef(false);
     const [scanChannels, setScanChannels] = useState("");
     const [scanChannelNameFormat, setScanChannelNameFormat] = useState("C{ch}");
     const [scanMinCh, setScanMinCh] = useState("13");
@@ -141,6 +165,30 @@ export const ChannelsConfigView: React.FC = () => {
             console.error("Failed to fetch scan status:", e);
         }
     };
+
+    const openScanDialog = async () => {
+        setShowScanDialog(true);
+        try {
+            const res = await fetch("/api/config/tuners");
+            const tuners: ConfigTuners = await res.json();
+            console.log("ChannelsConfigView", "GET", "/api/config/tuners", "->", tuners);
+            if (res.ok && Array.isArray(tuners)) {
+                // 変わっていなければ、選んだソースをそのままにする
+                setScanTuners(prev => equal(prev, tuners) ? prev : tuners);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    // プリセットとチャンネル設定ファイルは、経路かチューナーが変わったら選び直す
+    // (手動で選んだ後は、経路を変えるまでそのままにする。一覧と書式は入力した内容があるため、そのままにする)
+    useEffect(() => {
+        if (scanSourceChosen.current) {
+            return;
+        }
+        setScanSource(source => source === "preset" || source === "dvbConf" ? getDefaultScanSource(scanRoute, scanTuners) : source);
+    }, [scanRoute, scanTuners]);
 
     // スキャンを開始する
     const startScan = async () => {
@@ -442,7 +490,7 @@ export const ChannelsConfigView: React.FC = () => {
                     intent="warning"
                     icon="search"
                     text="Channel Scan"
-                    onClick={() => setShowScanDialog(true)}
+                    onClick={openScanDialog}
                     disabled={scanInProgress}
                 />
 
@@ -769,7 +817,10 @@ export const ChannelsConfigView: React.FC = () => {
                         >
                             <HTMLSelect
                                 value={scanRoute}
-                                onChange={(e) => setScanRoute(e.target.value as ChannelRoute)}
+                                onChange={(e) => {
+                                    scanSourceChosen.current = false;
+                                    setScanRoute(e.target.value as ChannelRoute);
+                                }}
                                 options={channelRoutes.map(route => ({ value: route, label: getChannelRouteLabel(route) }))}
                             />
                         </FormGroup>
@@ -777,7 +828,10 @@ export const ChannelsConfigView: React.FC = () => {
                         <FormGroup label="Channels">
                             <HTMLSelect
                                 value={scanSource}
-                                onChange={(e) => setScanSource(e.target.value as ChannelScanSource)}
+                                onChange={(e) => {
+                                    scanSourceChosen.current = true;
+                                    setScanSource(e.target.value as ChannelScanSource);
+                                }}
                                 options={[
                                     { value: "preset", label: "Preset of the route" },
                                     { value: "dvbConf", label: "Channel config files of dvbv5 (DVB tuners)" },

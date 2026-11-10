@@ -1822,6 +1822,44 @@ describe("[route.spec] route / streamId", () => {
       assert.deepStrictEqual(device._dvb.started, [confs.catv]);
     });
 
+    it("runs the command only for the routes whose channels file can not be read", async () => {
+      // DVB-S2 など、直接操作できない伝送方式のチャンネル設定ファイル
+      fs.writeFileSync(path.join(dir, "dvbv5_channels_sky.conf"), ["[TP01]", "\tDELIVERY_SYSTEM = DVBS2", "\tFREQUENCY = 12268000"].join("\n"));
+      const command = `dvbv5-zap -a 0 -c ${path.join(dir, "dvbv5_channels_<route>.conf")} -r -P <channel>`;
+      // 起動時に、読めない経路を知らせる (経路を指定していない場合は、使わない経路かもしれないため警告にしない)
+      const logs = { warn: mock.method(log, "warn", () => {}), info: mock.method(log, "info", () => {}) };
+      const byRoute = method => logs[method].mock.calls.filter(call => /for the route/.test(call.arguments[0])).map(call => call.arguments[2]);
+      let device;
+      try {
+        device = new TunerDevice(0, { name: "dvb", types: ["GR", "SKY"], routes: ["TER", "SKY"], command });
+        assert.deepStrictEqual([byRoute("warn"), byRoute("info")], [["SKY"], []]);
+        assert.ok(new TunerDevice(2, { name: "dvb", types: ["GR"], command })._dvb instanceof FakeDvb);
+        assert.deepStrictEqual([byRoute("warn"), byRoute("info")], [["SKY"], ["SAT", "SKY", "FTTH"]]);
+      } finally {
+        logs.warn.mock.restore();
+        logs.info.mock.restore();
+      }
+      assert.ok(device._dvb instanceof FakeDvb);
+
+      const proc = Object.assign(new EventEmitter(), { pid: 1, stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} });
+      const spawn = mock.method(child_process, "spawn", () => proc);
+      const warn = mock.method(log, "warn", () => {});
+      try {
+        const stream = Object.assign(new EventEmitter(), { closed: false, write() {}, flush() {}, end() {} });
+        await device.startStream({ id: "a", priority: 0 }, stream, new ChannelItem({ name: "TP01", type: "SKY", channel: "TP01", route: "SKY" }));
+        assert.deepStrictEqual(device._dvb.started, []);
+        assert.deepStrictEqual(spawn.mock.calls[0].arguments, ["dvbv5-zap", ["-a", "0", "-c", path.join(dir, "dvbv5_channels_sky.conf"), "-r", "-P", "TP01"]]);
+        // 起動時に知らせているため、選局のたびには警告しない
+        assert.strictEqual(warn.mock.callCount(), 0);
+      } finally {
+        warn.mock.restore();
+        spawn.mock.restore();
+      }
+
+      // 読めるチャンネル設定ファイルが 1 つもない場合は、すべてコマンドを実行する
+      assert.strictEqual(new TunerDevice(1, { name: "dvb", types: ["SKY"], routes: ["SKY"], command })._dvb, null);
+    });
+
     it("runs the command when <route> is used other than in -c", () => {
       const device = new TunerDevice(0, {
         name: "dvb",
