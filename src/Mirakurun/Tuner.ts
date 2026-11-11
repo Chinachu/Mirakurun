@@ -841,7 +841,8 @@ export class Tuner {
         const tlvScanned = scanStreams.some((stream, index) => stream.format === "tlv" && results[index].status === "fulfilled" &&
             (results[index] as PromiseFulfilledResult<apid.Service[]>).value.length > 0);
         if (carriersCompleted && !tlvScanned) {
-            for (const carrier of channel.getBondedChannels()) {
+            // (the streams may be changed while scanning)
+            for (const carrier of channel.getBondedChannels() || []) {
                 if (carrier !== channel) {
                     _.service.queueDiscoveredTsmfScan(carrier);
                 }
