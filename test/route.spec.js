@@ -1718,12 +1718,32 @@ describe("[route.spec] route / streamId", () => {
       const channel = _.channel.items[0];
       const device = new TunerDevice(0, { name: "remote", types: ["BS"], remoteMirakurunHost: "remote" });
       let supported = false;
-      device._getRemoteClient = () => ({ supportsChannelStreamTsmfRelTs: async () => supported });
+      let failing = false;
+      device._getRemoteClient = () => ({
+        supportsChannelStreamTsmfRelTs: async () => {
+          if (failing) throw new Error("ECONNREFUSED");
+          return supported;
+        }
+      });
+      const info = mock.method(log, "info", () => {});
       assert.strictEqual(await device.checkRemoteRelTs(), false);
+      // the same result is not logged by each check again
+      mock.timers.tick(1000 * 60 * 10);
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepStrictEqual([device.supportsRemoteRelTs, info.mock.callCount()], [false, 1]);
+      // logged again after the failure
+      failing = true;
+      mock.timers.tick(1000 * 60 * 10);
+      await new Promise(resolve => setImmediate(resolve));
+      failing = false;
+      mock.timers.tick(1000 * 10);
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepStrictEqual([device.supportsRemoteRelTs, info.mock.callCount()], [false, 2]);
       supported = true;
       mock.timers.tick(1000 * 60 * 10);
       await new Promise(resolve => setImmediate(resolve));
-      assert.strictEqual(device.supportsRemoteRelTs, true);
+      assert.deepStrictEqual([device.supportsRemoteRelTs, info.mock.callCount()], [true, 3]);
+      info.mock.restore();
 
       // TSMF is detected by the remote Mirakurun (the relative stream without the services registered may be detected)
       device.getRemoteChannel = async () => ({ type: "BS", channel: "C46", services: [{ id: 1, serviceId: 265, networkId: 4, streamId: 18801, tsmfRelTs: 2 }] });

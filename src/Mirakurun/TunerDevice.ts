@@ -138,6 +138,7 @@ export default class TunerDevice extends EventEmitter {
     private _remoteRelTsChecking: Promise<boolean> = null;
     private _remoteRelTsRetryTimer: NodeJS.Timeout = null;
     private _remoteRelTsCheckFailed = false;
+    private _remoteRelTsLogged: boolean;
     /** the relative streams refused by the remote Mirakurun (`type/channel/relTs`: the time) */
     private _remoteRelTsRefused = new Map<string, number>();
     /** the relative streams of the channels checked whether detected by the remote Mirakurun (`type/channel/relTs`: the time) */
@@ -476,7 +477,11 @@ export default class TunerDevice extends EventEmitter {
                     // not overwritten by the result of lib/remote
                     this._remoteRelTsSupported ??= supported;
                     this._remoteRelTsCheckFailed = false;
-                    log.info("TunerDevice#%d the remote Mirakurun %s the relative stream of TSMF detected", this._index, supported ? "supports" : "does not support");
+                    // not logged by each check again
+                    if (this._remoteRelTsLogged !== supported) {
+                        this._remoteRelTsLogged = supported;
+                        log.info("TunerDevice#%d the remote Mirakurun %s the relative stream of TSMF detected", this._index, supported ? "supports" : "does not support");
+                    }
                     if (this._remoteRelTsSupported === false) {
                         // checked again (the remote Mirakurun may be updated)
                         this._scheduleRemoteRelTsCheck(REMOTE_RELTS_RECHECK_INTERVAL);
@@ -487,6 +492,8 @@ export default class TunerDevice extends EventEmitter {
                     // logged once until checked
                     log[this._remoteRelTsCheckFailed ? "debug" : "warn"]("TunerDevice#%d failed to check the remote Mirakurun [%s]", this._index, err.message);
                     this._remoteRelTsCheckFailed = true;
+                    // the result is logged again after the failure
+                    this._remoteRelTsLogged = undefined;
                     this._scheduleRemoteRelTsCheck(REMOTE_RELTS_CHECK_INTERVAL);
                     return false;
                 })
