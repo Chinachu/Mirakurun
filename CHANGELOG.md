@@ -14,6 +14,16 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
 - BS の 4K (`BS07_*`, `BS11_*`, `BS17_*`) は、対応するドライバーで選局するための設定になりました (dvbconf-for-isdb の README を参照)。
 - 詳細は [doc/Configuration.ja.md](doc/Configuration.ja.md) の「dvbv5-zap のチャンネル設定ファイル」を参照してください。
 
+### 4.3.0 からの動作の変更
+
+チャンネルスキャン API (`PUT /config/channels/scan`) は、受信経路 (`route`) とチャンネルの指定方法 (`source`) でスキャンするようになりました。4.3.0 の `type` も使えますが (非推奨)、次の動作が変わります。
+
+- `type` の既定値 (`GR`) はなくなりました。`type` を指定しない場合は `route` (既定値 `TER`) と `source` (既定値 `preset`) でスキャンし、`minCh`, `maxCh`, `minSubCh`, `maxSubCh`, `useSubCh`, `channelNameFormat` は使いません。これらを使う場合は `type` を指定してください。
+- 置き換えるのは、スキャンしたチャンネルの設定だけです。スキャンの範囲にないチャンネルと `skipCh` のチャンネルの設定は残ります (4.3.0 は、同じ `type` の設定をすべて置き換えていました)。不要になった設定は、チャンネル設定で削除してください。
+- チャンネルの `type` は、受信したネットワークで決まります。`type=GR` のスキャンで受信した、地上波ではないネットワーク (BS, CS, CATV など) のストリームは追加しません (4.3.0 は `GR` として追加していました)。ケーブルテレビなどは、`route` に `CATV` か `FTTH` を指定してスキャンしてください。
+
+また、エンジニアリングサービス (サービスタイプ `0xA4`) は、サービスとして登録しなくなりました。
+
 ### Server
 
 - ✨ チューナー設定に `routes` (チューナーの入力に届いている受信経路) を追加。`command` の `<route>` は、選局するチャンネルの受信経路 (`ter`, `sat`, `sky`, `catv`, `ftth`) に置き換え
