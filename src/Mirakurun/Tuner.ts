@@ -892,7 +892,8 @@ export class Tuner {
 
             if (
                 tuner.routes !== undefined &&
-                (Array.isArray(tuner.routes) === false || tuner.routes.some(route => common.channelRoutes.includes(route) === false))
+                // (the tuner of no routes would never be used without any notice)
+                (Array.isArray(tuner.routes) === false || tuner.routes.length === 0 || tuner.routes.some(route => common.channelRoutes.includes(route) === false))
             ) {
                 log.error("invalid type of property `routes` in tuner#%s configuration", i);
                 return;

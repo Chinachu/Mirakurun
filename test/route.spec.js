@@ -1419,6 +1419,17 @@ describe("[route.spec] route / streamId", () => {
   });
 
   describe("Tuner: route", () => {
+    // routes が空のチューナーは、どのチャンネルにも使われないため、読み込まずにエラーを出す
+    it("does not load the tuner of invalid `routes`", () => {
+      const tuners = [undefined, ["TER", "CATV"], [], null, ["X"], "TER"].map((routes, i) => ({ name: `t${i}`, types: ["GR"], command: "cat", routes }));
+      _.config = { server: {}, tuners };
+      const error = mock.method(log, "error", () => {});
+      const t = new Tuner();
+      assert.deepStrictEqual(t._devices.map(d => d.index), [0, 1]);
+      assert.strictEqual(error.mock.callCount(), 4);
+      error.mock.restore();
+    });
+
     it("picks only the tuners of the route", () => {
       setupChannels([]);
       const t = tuner([fakeDevice(0, ["BS"], ["SAT"]), fakeDevice(1, ["BS"], ["CATV"]), fakeDevice(2, ["GR"])]);
