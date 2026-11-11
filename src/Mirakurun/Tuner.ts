@@ -465,7 +465,7 @@ export class Tuner {
     /**
      * the tuners to try a channel of the route by the channel scan, covering all the tuners of the route (in the order of `types`):
      * the local tuners of the same types are tried once by the first of the types (they receive the same),
-     * a remote tuner by each of the types (the remote Mirakurun receives only the channel of the type configured)
+     * the remote tuners of the same remote Mirakurun by each of the types (the remote Mirakurun receives only the channel of the type configured)
      */
     getScanAttempts(route: apid.ChannelRoute, types: apid.ChannelType[] = common.channelTypes): ScanAttempt[] {
         const attempts: ScanAttempt[] = [];
@@ -475,18 +475,19 @@ export class Tuner {
             if (deviceTypes.length === 0 || (device.config.routes && device.config.routes.includes(route) === false)) {
                 continue;
             }
-            if (device.isRemote) {
-                attempts.push(...deviceTypes.map(type => ({ type, devices: [device] })));
-                continue;
-            }
-            const key = deviceTypes.join(",");
-            const group = groups.get(key);
-            if (group) {
-                group.devices.push(device);
-            } else {
-                const attempt = { type: deviceTypes[0], devices: [device] };
-                groups.set(key, attempt);
-                attempts.push(attempt);
+            // the remote tuners of the same remote Mirakurun and the type receive the same too
+            const keys = device.isRemote ?
+                deviceTypes.map(type => `${device.config.remoteMirakurunHost}:${device.config.remoteMirakurunPort || 40772}/${type}`) :
+                [deviceTypes.join(",")];
+            for (let i = 0; i < keys.length; i++) {
+                const group = groups.get(keys[i]);
+                if (group) {
+                    group.devices.push(device);
+                } else {
+                    const attempt = { type: deviceTypes[i], devices: [device] };
+                    groups.set(keys[i], attempt);
+                    attempts.push(attempt);
+                }
             }
         }
         // the types in the order (stable)

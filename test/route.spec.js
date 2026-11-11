@@ -1396,6 +1396,10 @@ describe("[route.spec] route / streamId", () => {
       t = tuner([fakeDevice(0, ["GR", "BS"], ["CATV"], { isRemote: true }), fakeDevice(1, ["GR", "BS", "CS", "BS4K"], ["CATV"])]);
       assert.deepStrictEqual(attempts(t, "CATV"), [["GR", [0]], ["GR", [1]], ["BS", [0]]]);
       assert.deepStrictEqual(attempts(t, "SAT"), []);
+      // the remote tuners of the same remote Mirakurun are tried once by each of the types
+      const remote = (host, port) => ({ isRemote: true, config: { types: ["GR", "BS"], remoteMirakurunHost: host, remoteMirakurunPort: port } });
+      t = tuner([fakeDevice(0, null, null, remote("a")), fakeDevice(1, null, null, remote("a", 40772)), fakeDevice(2, null, null, remote("b")), fakeDevice(3, null, null, remote("a", 40773))]);
+      assert.deepStrictEqual(attempts(t, "CATV"), [["GR", [0, 1]], ["GR", [2]], ["GR", [3]], ["BS", [0, 1]], ["BS", [2]], ["BS", [3]]]);
     });
 
     it("lists the channels of the channel config files of the tuners used for the scan (the type and the route)", async () => {
