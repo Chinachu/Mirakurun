@@ -1518,7 +1518,7 @@ only the entries of the type are replaced):
             }
         },
         400: {
-            description: "Invalid scan configuration, no tuners for the route, or \`type\` specified (no longer supported)",
+            description: "Invalid scan configuration, no tuners for the route (or the type), or \`type\` (deprecated) specified with \`route\` or \`source\`",
             schema: {
                 $ref: "#/definitions/Error"
             }
