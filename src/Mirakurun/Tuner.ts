@@ -954,7 +954,7 @@ export class Tuner {
      * (`tsmf`: whether the relative streams of TSMF are detected)
      * @param anyTuner `true` to detect the format on any local tuner (only by the channel scan)
      * @param format the format received (the tuners only for TS detect only the relative streams of TSMF by the service scan,
-     * not to add any work to the environments only for TS: the stream without TSMF is of this format)
+     * reading the head of the stream once by each scan: the stream without TSMF is of this format)
      */
     private _startFormatProbe(
         user: common.User,
