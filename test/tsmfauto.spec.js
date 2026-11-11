@@ -431,6 +431,19 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
     t._readyForJobPickedDeviceSet.clear();
   });
 
+  // リモートの Mirakurun が判別した複数搬送波の TLV は、リモートが結合するため、搬送波の数だけのチューナーを求めない
+  it("is ready for the job of the TLV of the carriers bonded by the remote Mirakurun with a remote tuner", async () => {
+    const remote = { index: 0, config: { name: "remote", types: ["BS4K"] }, isRemote: true, supportsRemoteRelTs: true, canReceiveRemoteRelTs: () => true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
+    const t = Object.create(Tuner.prototype);
+    t._devices = [remote];
+    t._readyForJobPickedDeviceSet = new Set();
+    _.channel = { getStreams: () => [{ relTs: 5, format: "tlv", remote: true }] };
+    const channels = [1, 2].map(i => new ChannelItem({ name: `C${i}`, type: "BS4K", channel: `C${i}`, route: "CATV" }));
+    channels[0].getBondedChannels = () => channels;
+    assert.strictEqual(await t.readyForJob([{ channel: channels[0], relTs: 5 }]), channels[0]);
+    assert.deepStrictEqual([...t._readyForJobPickedDeviceSet], [remote]);
+  });
+
   it("shows tsmfRelTs of the stream setting only for the relative stream detected (as before for tsmfRelTs of channels.yml)", async () => {
     _.channel = { getStreams: () => [] };
     _.config = { server: {} };

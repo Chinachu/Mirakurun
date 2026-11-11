@@ -1494,6 +1494,53 @@ describe("[route.spec] route / streamId", () => {
 
       assert.strictEqual(await t.readyForJob(catv), null);
     });
+
+    // channels.yml で設定した複数搬送波の TLV は、チャンネルだけを指定しても、すべての搬送波のチューナーを待つ
+    it("waits for the tuners of all the carriers configured of the channel", async () => {
+      setupChannels([1, 2].map(i => ({ name: `C${i}`, type: "BS4K", route: "CATV", channel: `C${i}`, format: "tlv", tsmfRelTs: 1, tsmfGroupId: 5 })));
+      const [c1] = _.channel.items;
+      const busy = fakeDevice(1, ["BS4K"], undefined, { isAvailable: false, isFree: false, isUsing: true, users: [{}], getPriority: () => 5 });
+      const t = tuner([fakeDevice(0, ["BS4K"]), busy]);
+
+      let result;
+      t.readyForJob(c1).then(ch => result = ch);
+      await flush();
+      assert.strictEqual(result, undefined);
+
+      Object.assign(busy, { isAvailable: true, isFree: true, isUsing: false, users: [], getPriority: () => -2 });
+      mock.timers.tick(1000 * 10);
+      await flush();
+      assert.strictEqual(result, c1);
+      assert.strictEqual(t._readyForJobPickedDeviceSet.size, 2);
+      mock.timers.tick(1000 * 5);
+    });
+
+    // 搬送波の数よりチューナーが少ない場合は、待ち続けない
+    it("returns null when the tuners are less than the carriers configured", async () => {
+      setupChannels([1, 2].map(i => ({ name: `C${i}`, type: "BS4K", route: "CATV", channel: `C${i}`, format: "tlv", tsmfRelTs: 1, tsmfGroupId: 5 })));
+      const [c1] = _.channel.items;
+      const ts = new ChannelItem({ name: "C3", type: "BS4K", channel: "C3", route: "CATV" });
+      const t = tuner([fakeDevice(0, ["BS4K"])]);
+
+      const error = mock.method(log, "error", () => {});
+      assert.strictEqual(await t.readyForJob(c1), null);
+      assert.strictEqual(error.mock.calls[0].arguments[1], "BS4K/C1");
+      error.mock.restore();
+      assert.strictEqual(await t.readyForJob([{ channel: c1, relTs: 1 }]), null);
+      // the other candidate is received
+      assert.strictEqual(await t.readyForJob([c1, ts]), ts);
+      mock.timers.tick(1000 * 5);
+    });
+
+    // チューナーの数が足りていても、搬送波のチャンネルを受信できるチューナーがなければ待ち続けない
+    it("returns null when no tuners can receive a carrier configured", async () => {
+      setupChannels([["C1", "CATV"], ["C2", "FTTH"]].map(([channel, route]) => ({ name: channel, type: "BS4K", route, channel, format: "tlv", tsmfRelTs: 1, tsmfGroupId: 5 })));
+      const t = tuner([fakeDevice(0, ["BS4K"], ["CATV"]), fakeDevice(1, ["BS4K"], ["CATV"])]);
+      const [c1, c2] = _.channel.items;
+      assert.deepStrictEqual([t._getCandidate(c1, 1).devices.length, t._getCandidate(c2, 1).devices.length, c1.getBondedChannels().length], [2, 0, 2]);
+
+      assert.strictEqual(await t.readyForJob(c1), null);
+    });
   });
 
   describe("Channel: EPG gathering", () => {

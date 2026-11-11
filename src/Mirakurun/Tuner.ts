@@ -210,11 +210,12 @@ export class Tuner {
      * @returns the channel a tuner is available for, `null` if no tuners for the channels
      */
     async readyForJob(channels: ChannelItem | (ChannelItem | StreamTarget)[]): Promise<ChannelItem> {
-        const candidates = this._getCandidates(
-            (Array.isArray(channels) ? channels : [channels]).map(target => target instanceof ChannelItem ? { channel: target } : target)
-        );
-        if (candidates.every(candidate => candidate.devices.length === 0)) {
-            log.error("readyForJob: no tuners for channel %s", candidates.map(({ channel }) => `${channel.type}/${channel.channel}`).join(", "));
+        // the channel is received as the stream of the channel (`tsmfRelTs`, the carriers of it are bonded),
+        // the candidates never received (such as the carriers more than the tuners) are not waited for
+        const targets = (Array.isArray(channels) ? channels : [channels]).map(target => target instanceof ChannelItem ? { channel: target, relTs: target.tsmfRelTs } : target);
+        const candidates = this._getCandidates(targets).filter(candidate => candidate.devices.length > 0 && this._hasCarrierDevices(candidate));
+        if (candidates.length === 0) {
+            log.error("readyForJob: no tuners for channel %s", targets.map(({ channel }) => `${channel.type}/${channel.channel}`).join(", "));
             return null;
         }
 
@@ -1158,6 +1159,24 @@ export class Tuner {
             devices: candidate.devices.filter(device => isDetectedByRemote(candidate, device))
         })), priority);
         return remote === null ? { picked, carriers: null } : { picked: remote, carriers: this._pickCarrierDevices(remote, priority, excluded) };
+    }
+
+    /** whether the tuners exist for all the bonded carriers of the candidate (in use or not) */
+    private _hasCarrierDevices(candidate: TunerCandidate): boolean {
+        const channels = candidate.relTs && candidate.format === "tlv" ? candidate.channel.getBondedChannels() : null;
+        // the remote Mirakurun bonds the carriers of the relative stream detected by itself
+        if (channels === null || channels.length < 2 || candidate.devices.some(device => this._isDetectedByRemote(candidate, device))) {
+            return true;
+        }
+        const devices = new Set<TunerDevice>();
+        for (const channel of channels) {
+            const carrierDevices = channel === candidate.channel ? candidate.devices : this._getCandidate(channel, candidate.relTs, candidate.format).devices;
+            if (carrierDevices.length === 0) {
+                return false;
+            }
+            carrierDevices.forEach(device => devices.add(device));
+        }
+        return devices.size >= channels.length;
     }
 
     /**
