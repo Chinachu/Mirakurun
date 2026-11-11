@@ -1,4 +1,4 @@
-const { describe, it, before, beforeEach, afterEach } = require("node:test");
+const { describe, it, before, beforeEach, afterEach, mock } = require("node:test");
 const assert = require("assert");
 
 const log = require("../lib/Mirakurun/log");
@@ -278,6 +278,83 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
     // 失った後も組み立て直して、最後の近くまで出力する
     assert.ok(last > tlv.length * 0.9, `the last TLV packet assembled: ${last} of ${tlv.length}`);
     assert.ok(matched > tlv.length * 0.7, `assembled ${matched} of ${tlv.length} TLV packets`);
+  });
+
+  // ヘッダーのカウンターが一周する数 (16) のフレームを失うと、損失として検出できない。組み立てた TLV が壊れ続けることで検出し、組み立て直す
+  it("aligns the carriers again when the TLV assembled is broken by the super frames lost without being detected", () => {
+    const tlv = tlvPackets(30000);
+    const streams = carriers(splitTLV(tlv), 2, 1);
+    streams[1].splice(300, 16);
+    const errors = [];
+    const out = feed(new TSMFBonding(1, 2, reason => errors.push(reason)), streams, [0, 0]);
+
+    assert.deepStrictEqual(errors, []);
+    // the TLV packets differ by the length and the byte filled
+    const key = packet => packet.length * 256 + packet[5];
+    const index = new Map(tlv.map((packet, i) => [key(packet), i]));
+    let broken = 0;
+    let matched = 0;
+    let last = -1;
+    for (let pos = 0; pos + 4 <= out.length;) {
+      const packet = out.subarray(pos, pos + 4 + out.readUInt16BE(pos + 2));
+      const i = index.get(key(packet));
+      if (i !== undefined && i > last && tlv[i].equals(packet)) {
+        matched++;
+        last = i;
+      } else {
+        broken++;
+      }
+      pos += packet.length;
+    }
+    // 壊れた TLV は検出するまで (30 スーパーフレーム) の分だけで、その後は最後の近くまで出力する
+    assert.ok(broken > 0 && broken < 1500, `${broken} TLV packets are broken`);
+    assert.ok(last > tlv.length * 0.99, `the last TLV packet assembled: ${last} of ${tlv.length}`);
+    assert.ok(matched > tlv.length * 0.9, `assembled ${matched} of ${tlv.length} TLV packets`);
+  });
+
+  // 送出された TLV が壊れていても (長さの誤り)、ずれてはいないので組み立て直さない (組み立て直すと、壊れた TLV でずれを見つけられずに閉じる)
+  for (const [numberOfCarriers, numberOfFrames] of [[2, 1], [3, 4]]) it(`keeps the alignment when the TLV is broken as sent (${numberOfCarriers} carriers of ${numberOfFrames} frames)`, () => {
+    const tlv = tlvPackets(60000);
+    // 1 of 20 TLV packets (after the carriers are aligned: finding the alignment needs the valid TLV)
+    const sent = tlv.map((packet, i) => {
+      if (i < 20000 || i % 20 !== 10) {
+        return packet;
+      }
+      const broken = Buffer.from(packet);
+      broken.writeUInt16BE(broken.length - 4 + 7, 2);
+      return broken;
+    });
+    const streams = carriers(splitTLV(sent), numberOfCarriers, numberOfFrames);
+    const errors = [];
+    const warn = mock.method(log, "warn", () => {});
+    const out = feed(new TSMFBonding(1, numberOfCarriers, reason => errors.push(reason)), streams, new Array(numberOfCarriers).fill(0));
+    const warned = warn.mock.calls.map(call => call.arguments[1]);
+    warn.mock.restore();
+
+    assert.deepStrictEqual([errors, warned], [[], []]);
+    assert.ok(out.length > Buffer.concat(tlv).length * 0.8, `assembled ${out.length} of ${Buffer.concat(tlv).length} bytes`);
+  });
+
+  // パケットを失っても (エラーのあるパケット)、ずれてはいないので組み立て直さない
+  it("keeps the alignment when the packets of a carrier are lost", () => {
+    const tlv = tlvPackets(30000);
+    const streams = carriers(splitTLV(tlv), 2, 1);
+    // 1 of 5 slots of the carrier 1 with transport_error_indicator (after the carriers are aligned)
+    for (let sf = 100; sf < streams[0].length; sf++) {
+      for (let slot = 1 + sf % 5; slot < streams[0][sf].length; slot += 5) {
+        const packet = Buffer.from(streams[0][sf][slot]);
+        packet[1] |= 0x80;
+        streams[0][sf][slot] = packet;
+      }
+    }
+    const errors = [];
+    const warn = mock.method(log, "warn", () => {});
+    const out = feed(new TSMFBonding(1, 2, reason => errors.push(reason)), streams, [0, 0]);
+    const warned = warn.mock.calls.map(call => call.arguments[1]);
+    warn.mock.restore();
+
+    assert.deepStrictEqual([errors, warned], [[], []]);
+    assertTLV(out, tlv);
   });
 
   it("keeps the alignment after a broken header (CRC) of a carrier, losing the frame after it", () => {

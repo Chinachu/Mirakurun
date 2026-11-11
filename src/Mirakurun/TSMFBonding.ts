@@ -59,6 +59,15 @@ const ALIGN_EARLY_CANDIDATES = 20000;
 const KEEP_SUPERFRAMES = 2;
 /** the alignment is found again if the other carriers are ahead of a carrier by this super frames */
 const MAX_AHEAD_SUPERFRAMES = 60;
+/**
+ * the alignment is found again if the TLV assembled is broken this times or more, and at this ratio to the TLV packets assembled or more,
+ * while assembling `BROKEN_TLV_SUPERFRAMES` super frames
+ * (the TLV of the carriers aligned is not broken even if the packets are lost. The ratio of the carriers misaligned is 0.27 or more,
+ * and 0.12 of the TLV sent with 1 of 10 packets broken, with 2 to 4 carriers of 1 or 4 frames)
+ */
+const BROKEN_TLV_MIN = 16;
+const BROKEN_TLV_RATIO = 0.2;
+const BROKEN_TLV_SUPERFRAMES = ALIGN_CHECK_SUPERFRAMES;
 /** a carrier is stalled if the others deliver this super frames each without it (about 10 seconds, including starting the tuner) */
 const STALL_SUPERFRAMES = 1200;
 /**
@@ -236,7 +245,11 @@ export default class TSMFBonding {
     static alignSliceMs = 2;
 
     private _inputs: CarrierInput[] = [];
-    private _framer = new TLVFramer();
+    private _framer = new TLVFramer(undefined, () => ++this._broken);
+    /** the TLV broken, the TLV packets and the super frames assembled since counted */
+    private _broken = 0;
+    private _brokenPackets = 0;
+    private _brokenSuperframes = 0;
     private _offsets: number[] = null;
     private _failures = 0;
     private _nextAlignAt = ALIGN_SUPERFRAMES;
@@ -339,6 +352,9 @@ export default class TSMFBonding {
             this._failures = 0;
             carriers.forEach((carrier, i) => carrier.drop(offsets[i]));
             this._framer.lost();
+            this._broken = 0;
+            this._brokenPackets = 0;
+            this._brokenSuperframes = 0;
         }
 
         const count = Math.min(...carriers.map(carrier => carrier.superframes.length)) - KEEP_SUPERFRAMES;
@@ -348,6 +364,18 @@ export default class TSMFBonding {
         if (count > 0) {
             for (const carrier of carriers) {
                 carrier.drop(count);
+            }
+            this._brokenPackets += outputs.length;
+            this._brokenSuperframes += count;
+            if (this._brokenSuperframes >= BROKEN_TLV_SUPERFRAMES) {
+                // the alignment has slipped without the loss detected (such as the super frames lost by the cycle of the counter of the header)
+                const slipped = this._broken >= BROKEN_TLV_MIN && this._broken >= this._brokenPackets * BROKEN_TLV_RATIO;
+                this._broken = 0;
+                this._brokenPackets = 0;
+                this._brokenSuperframes = 0;
+                if (slipped) {
+                    this._fail("the TLV assembled is broken");
+                }
             }
         }
     }

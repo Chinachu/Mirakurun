@@ -157,7 +157,8 @@ export class TLVFramer {
     private _tlvLength = 0;
     private _started = false;
 
-    constructor(private _onLost?: () => void) {
+    /** @param _onBroken called when the data does not continue to a TLV packet (not by a lost packet) */
+    constructor(private _onLost?: () => void, private _onBroken?: () => void) {
     }
 
     /** @param packet a TS packet of TLV, `null` if lost */
@@ -211,6 +212,7 @@ export class TLVFramer {
             if (header[0] !== TLV_SYNC_BYTE) {
                 // broken, wait for the next start
                 this.lost();
+                this._onBroken?.();
                 return;
             }
             const size = TLV_HEADER_SIZE + header.readUInt16BE(2);
