@@ -15,14 +15,22 @@
 */
 /** Retain only newly queued chunks and discard the oldest bytes above the limit.
  * Returns the retained byte count. Input chunks may be shared with other consumers.
+ * @param whole `true` to discard the oldest chunks as a whole (the chunks queued at a time are not divided, the newest one is retained even over the limit)
  */
-export function retainOutput(buffer: Buffer[], retainedCount: number, bytes: number, limit: number): number {
+export function retainOutput(buffer: Buffer[], retainedCount: number, bytes: number, limit: number, whole = false): number {
     if (retainedCount < buffer.length) {
         buffer.push(Buffer.concat(buffer.splice(retainedCount)));
     }
     let excess = bytes - limit;
     if (excess > 0) {
         let head = 0;
+        if (whole) {
+            while (head < buffer.length - 1 && excess > 0) {
+                excess -= buffer[head++].length;
+            }
+            buffer.splice(0, head);
+            return limit + excess;
+        }
         while (head < buffer.length && buffer[head].length <= excess) {
             excess -= buffer[head++].length;
         }

@@ -223,11 +223,95 @@ describe("[tlv.spec] TLV (MMT)", () => {
       await tick();
       filter.close();
 
-      // 上限 (1000 バイト) を超えた古い分は破棄して、新しい分だけを書き出す
+      // 上限 (1000 バイト) を超えた古い分はチャンクの単位で破棄して、新しい分だけを TLV パケットの先頭から書き出す
       const rest = Buffer.concat(written.slice(2));
-      assert.strictEqual(rest.length, 1000);
-      assert.strictEqual(rest[rest.length - 1], 10);
+      assert.ok(rest.equals(Buffer.concat([chunk(8), chunk(9), chunk(10)])));
       _.config = { server: {} };
+    });
+
+    // 受信したままのチャンクは TLV パケットの単位ではないため、破棄した後は次の TLV パケットの先頭から書き出す
+    for (const size of [100, 150, 400]) it(`restarts the output from the head of a TLV packet after dropping the oldest (chunks of ${size} bytes)`, async () => {
+      _.config = { server: { maxBufferBytesBeforeReady: 1000 } };
+      const written = [];
+      let release;
+      const output = new Writable({
+        highWaterMark: 100,
+        write(chunk, encoding, callback) {
+          written.push(Buffer.from(chunk));
+          if (written.length === 1) {
+            callback();
+          } else {
+            release = callback;
+          }
+        }
+      });
+      const filter = new TLVFilter({ output });
+      const packets = Array.from({ length: 40 }, (unused, i) => tlvPacket(i + 1, 146));
+      const stream = Buffer.concat(packets);
+      // TLV パケットは 150 バイト (TLV パケットより小さいチャンクは、つなげて先頭を探す)
+      for (let pos = 0; pos < stream.length; pos += size) {
+        filter.write(stream.subarray(pos, pos + size));
+      }
+      assert.ok(status.errorCount.bufferOverflow > 0);
+
+      release();
+      await tick();
+      filter.close();
+
+      const rest = Buffer.concat(written.slice(2));
+      const first = packets.findIndex(packet => packet.equals(rest.subarray(0, 150)));
+      // 上限の近くまで残す (すべてを破棄しない)
+      assert.ok(first > 2 && rest.length <= 1000 && rest.length >= 600, `${rest.length} bytes from the TLV packet ${first}`);
+      assert.ok(rest.equals(Buffer.concat(packets.slice(first))));
+      // 破棄する前に書き出した分も TLV パケットの途中で終わらない (長さを信じて読むクライアントがずれない)
+      const out = Buffer.concat(written);
+      let last = 0;
+      for (let pos = 0; pos < out.length; pos += 150) {
+        assert.ok(out[pos] === 0x7F && out[pos + 4] > last, `the output at ${pos} is not the head of a TLV packet in the order`);
+        last = out[pos + 4];
+      }
+      _.config = { server: {} };
+    });
+
+    // TSMF から取り出した TLV は TLV パケットの単位で届くため、最初から出力し、破棄も TLV パケットの単位で行う
+    it("outputs the TLV packets extracted from TSMF from the first one, dropping the oldest without dividing them", async () => {
+      _.config = { server: { maxBufferBytesBeforeReady: 1000 } };
+      const written = [];
+      let release;
+      const output = new Writable({
+        highWaterMark: 100,
+        write(chunk, encoding, callback) {
+          written.push(Buffer.from(chunk));
+          if (written.length === 1) {
+            callback();
+          } else {
+            release = callback;
+          }
+        }
+      });
+      const filter = new TLVFilter({ output, tsmfRelTs: 1 });
+      filter._tsmf = { push: chunk => chunk };
+      const chunk = n => Buffer.concat([tlvPacket(n, 146), tlvPacket(n, 146), tlvPacket(n, 146)]);
+
+      // 次の TLV パケットを待たずに出力する
+      filter.write(tlvPacket(1, 146));
+      assert.ok(written[0].equals(tlvPacket(1, 146)));
+      for (let n = 2; n <= 12; n++) {
+        filter.write(chunk(n));
+      }
+
+      release();
+      await tick();
+      filter.close();
+
+      assert.ok(Buffer.concat(written.slice(2)).equals(Buffer.concat([chunk(11), chunk(12)])));
+      _.config = { server: {} };
+    });
+
+    it("ignores the input of the other carriers if the carriers are not bonded", () => {
+      const filter = new TLVFilter({ output: new PassThrough() });
+      filter.writeCarrier(1, Buffer.alloc(188));
+      filter.close();
     });
 
     it("starts the output from the head of a TLV packet", () => {
@@ -236,6 +320,85 @@ describe("[tlv.spec] TLV (MMT)", () => {
       const filter = new TLVFilter({ output });
       const packets = Buffer.concat([tlvPacket(1, 10), tlvPacket(2, 10)]);
       filter.write(Buffer.concat([Buffer.from([0x00, 0x7F, 0x00]), packets]));
+      filter.close();
+      assert.ok(Buffer.concat(written).equals(packets));
+    });
+
+    // 先頭の TLV パケットと次の先頭が 1 つのチャンクに入らない場合も、出力を始める
+    it("starts the output even if the chunks are smaller than a TLV packet", () => {
+      for (const size of [1, 7, 150, 1000]) {
+        const written = [];
+        const output = new Writable({ write: (chunk, encoding, callback) => { written.push(Buffer.from(chunk)); callback(); } });
+        const filter = new TLVFilter({ output });
+        const packets = Buffer.concat(Array.from({ length: 20 }, (unused, i) => tlvPacket(i + 1, 146)));
+        const stream = Buffer.concat([Buffer.from([0x00, 0x7F, 0x00]), packets]);
+        for (let pos = 0; pos < stream.length; pos += size) {
+          filter.write(stream.subarray(pos, pos + size));
+        }
+        filter.close();
+        assert.ok(Buffer.concat(written).equals(packets), `chunks of ${size} bytes`);
+      }
+    });
+
+    // 0x7F で始まり次も 0x7F でも、パケット種別が定義されたものでなければ先頭としない
+    it("does not start the output from the bytes of the undefined packet type", () => {
+      const written = [];
+      const output = new Writable({ write: (chunk, encoding, callback) => { written.push(Buffer.from(chunk)); callback(); } });
+      const filter = new TLVFilter({ output });
+      const packets = Buffer.concat([tlvPacket(1, 10), tlvPacket(2, 10), tlvPacket(3, 10)]);
+      filter.write(Buffer.concat([Buffer.from([0x7F, 0x40, 0x00, 0x01, 0x00]), packets]));
+      // counted from the first TLV packet
+      assert.deepStrictEqual(filter.streamInfo, { [0xFE]: { packet: 3, drop: 0 } });
+      filter.close();
+      assert.ok(Buffer.concat(written).equals(packets));
+    });
+
+    // 0x7F で始まりパケット種別が正しくても、次が TLV パケットの先頭でなければ先頭としない
+    it("does not start the output from the bytes not followed by a TLV packet", () => {
+      const written = [];
+      const output = new Writable({ write: (chunk, encoding, callback) => { written.push(Buffer.from(chunk)); callback(); } });
+      const filter = new TLVFilter({ output });
+      const packets = Buffer.concat([tlvPacket(1, 10), tlvPacket(2, 10), tlvPacket(3, 10)]);
+      filter.write(Buffer.concat([Buffer.from([0x7F, 0x02, 0x00, 0x01, 0x00, 0x00]), packets]));
+      filter.close();
+      assert.ok(Buffer.concat(written).equals(packets));
+    });
+
+    // 途中で TLV パケットが続かなくなったら (欠落や破損)、次の TLV パケットの先頭が見つかるまで出力しない
+    for (const size of [7, 400, 100000]) it(`outputs only the TLV packets when the input does not continue to a TLV packet (chunks of ${size} bytes)`, () => {
+      const written = [];
+      const output = new Writable({ write: (chunk, encoding, callback) => { written.push(Buffer.from(chunk)); callback(); } });
+      const filter = new TLVFilter({ output });
+      const packets = Array.from({ length: 40 }, (unused, i) => tlvPacket(i + 1, 146));
+      const stream = Buffer.concat([
+        ...packets.slice(0, 10),
+        // the bytes of the other data
+        Buffer.alloc(1000, 0x11),
+        ...packets.slice(10, 20),
+        // a TLV packet without the last 50 bytes
+        packets[20].subarray(0, 100),
+        ...packets.slice(21)
+      ]);
+      for (let pos = 0; pos < stream.length; pos += size) {
+        filter.write(stream.subarray(pos, pos + size));
+      }
+      const counted = filter.streamInfo[0xFE].packet;
+      filter.close();
+      // the TLV packet broken is output by its length (not known to be broken), followed by the next TLV packet found
+      const broken = Buffer.concat([packets[20].subarray(0, 100), packets[21].subarray(0, 50)]);
+      assert.ok(Buffer.concat(written).equals(Buffer.concat([...packets.slice(0, 20), broken, ...packets.slice(22)])));
+      assert.strictEqual(counted, 39);
+    });
+
+    it("starts the output of the large TLV packets in the small chunks", () => {
+      const written = [];
+      const output = new Writable({ write: (chunk, encoding, callback) => { written.push(Buffer.from(chunk)); callback(); } });
+      const filter = new TLVFilter({ output });
+      const packets = Buffer.concat([tlvPacket(1, 0xFFFF), tlvPacket(2, 60000), tlvPacket(3, 100)]);
+      const stream = Buffer.concat([Buffer.alloc(70000), packets]);
+      for (let pos = 0; pos < stream.length; pos += 4096) {
+        filter.write(stream.subarray(pos, pos + 4096));
+      }
       filter.close();
       assert.ok(Buffer.concat(written).equals(packets));
     });

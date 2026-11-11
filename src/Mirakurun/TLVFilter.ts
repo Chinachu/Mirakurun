@@ -60,19 +60,7 @@ export interface TLVFilterOptions {
     readonly tsmfCarriers?: number;
 }
 
-/** the start of the TLV packet followed by another one, `-1` if not found */
-function findTlvPacketStart(chunk: Buffer): number {
-    for (let i = 0; i + 4 <= chunk.length; i++) {
-        if (chunk[i] !== 0x7F) {
-            continue;
-        }
-        const next = i + 4 + chunk.readUInt16BE(i + 2);
-        if (next < chunk.length && chunk[next] === 0x7F) {
-            return i;
-        }
-    }
-    return -1;
-}
+const EMPTY = Buffer.alloc(0);
 
 const textDecoder = new TextDecoder();
 function decodeUTF8(buffer: Uint8Array): string {
@@ -99,8 +87,6 @@ export default class TLVFilter extends EventEmitter {
     private _buffer: Buffer[] = [];
     private _bufferBytes = 0;
     private _bufferRetainedCount = 0;
-    // 最初の出力は TLV パケットの先頭から始める
-    private _outputStarted = false;
     private _maxBufferBytes: number = _.config.server.maxBufferBytesBeforeReady || 1024 * 1024 * 8;
 
     // options
@@ -130,6 +116,8 @@ export default class TLVFilter extends EventEmitter {
 
     // the remainder of the last chunk to count the TLV packets
     private _countBuffer: Buffer = null;
+    // the input continues from a TLV packet found (the output starts at the head of a TLV packet)
+    private _packetSynced = false;
 
     private _remoteControlKeyIdMap: Map<number, number> = null;
     private _logoTransmissions: Map<number, {
@@ -187,6 +175,8 @@ export default class TLVFilter extends EventEmitter {
         if (this._provideServiceId !== null) {
             this._selector = new TLVServiceSelector(this._provideServiceId);
         }
+        // TSMF から取り出した TLV は、TLV パケットの単位で届く
+        this._packetSynced = this._tsmf !== null || this._bonding !== null;
         if (options.parseNIT === true) {
             this._parseNIT = true;
         }
@@ -244,7 +234,8 @@ export default class TLVFilter extends EventEmitter {
      * @param carrier 1..tsmfCarriers - 1
      */
     writeCarrier(carrier: number, chunk: Buffer, defer = false): void {
-        if (this._closed) {
+        // (the carriers are not bonded without `tsmfRelTs`)
+        if (this._closed || this._bonding === null) {
             return;
         }
         this._writeTLV(this._bonding.push(carrier, chunk), defer);
@@ -268,8 +259,9 @@ export default class TLVFilter extends EventEmitter {
         if (this._bufferBytes > this._maxBufferBytes) {
             ++status.errorCount.bufferOverflow;
         }
+        // 出力するチャンクは TLV パケットの単位のため、TLV パケットの途中で途切れないようチャンクの単位で破棄する
         this._bufferBytes = retainOutput(this._buffer, this._bufferRetainedCount,
-            this._bufferBytes, this._maxBufferBytes);
+            this._bufferBytes, this._maxBufferBytes, true);
         this._bufferRetainedCount = this._buffer.length;
     }
 
@@ -286,9 +278,8 @@ export default class TLVFilter extends EventEmitter {
             return;
         }
 
-        if (this._output) {
-            this._countPackets(chunk);
-        }
+        // 出力は TLV パケットの単位 (書き出せずに破棄しても、TLV パケットの途中で途切れない)
+        const packets = this._output ? this._countPackets(chunk) : EMPTY;
         this._reader.push(chunk);
 
         if (this._ready && this._output) {
@@ -297,13 +288,11 @@ export default class TLVFilter extends EventEmitter {
                 if (chunk.length === 0) {
                     return;
                 }
-            } else if (this._outputStarted === false) {
-                const start = findTlvPacketStart(chunk);
-                if (start === -1) {
+            } else {
+                chunk = packets;
+                if (chunk.length === 0) {
                     return;
                 }
-                this._outputStarted = true;
-                chunk = chunk.subarray(start);
             }
             this._buffer.push(chunk);
             this._bufferBytes += chunk.length;
@@ -313,27 +302,69 @@ export default class TLVFilter extends EventEmitter {
         }
     }
 
-    private _countPackets(chunk: Buffer): void {
+    /**
+     * counts the TLV packets
+     * @returns the complete TLV packets of the input from the first one found (the rest is kept for the next input,
+     * the bytes not continuing to a TLV packet are not output until the next one is found)
+     */
+    private _countPackets(chunk: Buffer): Buffer {
         const buf = this._countBuffer ? Buffer.concat([this._countBuffer, chunk]) : chunk;
         this._countBuffer = null;
 
+        let synced = this._packetSynced;
+        // the bytes before the first TLV packet are not output
+        let start = synced ? 0 : -1;
+        // the first TLV packet which may start, not known until the next input
+        let pending = -1;
+        // the TLV packets before the bytes not output
+        let head: Buffer = null;
         let pos = 0;
         while (pos + 4 <= buf.length) {
             if (buf[pos] !== 0x7F) {
+                if (synced) {
+                    synced = false;
+                    if (pos > start) {
+                        head = head === null ? buf.subarray(start, pos) : Buffer.concat([head, buf.subarray(start, pos)]);
+                    }
+                    start = -1;
+                }
                 ++pos;
                 continue;
             }
             const end = pos + 4 + buf.readUInt16BE(pos + 2);
-            if (end > buf.length) {
+            if (synced === false) {
+                // starts at the TLV packet (of the packet type defined: IPv4, IPv6, compressed IP, signalling, null) followed by another one
+                const type = buf[pos + 1];
+                if (type === 0x00 || (type > 0x03 && type < 0xFE)) {
+                    ++pos;
+                    continue;
+                }
+                if (end >= buf.length || buf[end] !== 0x7F) {
+                    if (end >= buf.length && pending === -1) {
+                        pending = pos;
+                    }
+                    ++pos;
+                    continue;
+                }
+                synced = true;
+                pending = -1;
+                if (start === -1) {
+                    start = pos;
+                }
+            } else if (end > buf.length) {
                 break;
             }
             const info = this.streamInfo[buf[pos + 1]] || (this.streamInfo[buf[pos + 1]] = { packet: 0, drop: 0 });
             ++info.packet;
             pos = end;
         }
-        if (pos < buf.length) {
-            this._countBuffer = Buffer.from(buf.subarray(pos));
+        this._packetSynced = synced;
+        const rest = pending === -1 ? pos : pending;
+        if (rest < buf.length) {
+            this._countBuffer = Buffer.from(buf.subarray(rest));
         }
+        const packets = start === -1 ? EMPTY : buf.subarray(start, rest);
+        return head === null ? packets : Buffer.concat([head, packets]);
     }
 
     private _onPLT(plt: PackageListTable): void {

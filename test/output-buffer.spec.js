@@ -28,6 +28,16 @@ it("retains shared input independently and copies only newly queued bytes", () =
   assert.deepEqual(Buffer.concat(queue), Buffer.concat(Array.from({ length: 8 }, (_, i) => Buffer.alloc(128, i + 12))));
 });
 
+it("discards the oldest chunks as a whole", () => {
+  const queue = [Buffer.alloc(300, 1), Buffer.alloc(300, 2), Buffer.alloc(300, 3), Buffer.alloc(300, 4)];
+  assert.equal(retainOutput(queue, 4, 1200, 1000, true), 900);
+  assert.deepEqual(queue.map(chunk => chunk[0]), [2, 3, 4]);
+  assert.equal(retainOutput(queue, 3, 900, 900, true), 900);
+  // the newest chunk is retained even over the limit
+  assert.equal(retainOutput(queue, 3, 900, 0, true), 300);
+  assert.deepEqual(queue.map(chunk => chunk[0]), [4]);
+});
+
 it("handles an exact limit and complete eviction", () => {
   const queue = [Buffer.from("abcd")];
   assert.equal(retainOutput(queue, 0, 4, 4), 4);
