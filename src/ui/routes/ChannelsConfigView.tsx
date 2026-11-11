@@ -129,6 +129,7 @@ export const ChannelsConfigView: React.FC = () => {
     const [scanRoute, setScanRoute] = useState<ChannelRoute>("TER");
     const [scanSource, setScanSource] = useState<ChannelScanSource>("preset");
     const [scanTuners, setScanTuners] = useState<ConfigTuners>([]);
+    const [scanError, setScanError] = useState<string | null>(null);
     // 経路を選んだ後に、ソースを手動で選んだか
     const scanSourceChosen = useRef(false);
     const [scanChannels, setScanChannels] = useState("");
@@ -167,6 +168,7 @@ export const ChannelsConfigView: React.FC = () => {
     };
 
     const openScanDialog = async () => {
+        setScanError(null);
         setShowScanDialog(true);
         try {
             const res = await fetch("/api/config/tuners");
@@ -192,6 +194,7 @@ export const ChannelsConfigView: React.FC = () => {
 
     // スキャンを開始する
     const startScan = async () => {
+        setScanError(null);
         try {
             const params = new URLSearchParams();
             params.append("route", scanRoute);
@@ -246,9 +249,11 @@ export const ChannelsConfigView: React.FC = () => {
                 await fetchScanStatus();
             } else {
                 console.error("Failed to start scan:", result);
+                setScanError(result?.reason || `${response.status} ${response.statusText}`);
             }
         } catch (e) {
             console.error("Error starting scan:", e);
+            setScanError(String(e));
         }
     };
 
@@ -944,6 +949,10 @@ export const ChannelsConfigView: React.FC = () => {
                             checked={scanRefresh}
                             onChange={(e) => setScanRefresh(e.currentTarget.checked)}
                         />
+
+                        {scanError !== null && (
+                            <Callout intent="danger" title="Failed to start the scan">{scanError}</Callout>
+                        )}
                     </div>
                 </DialogBody>
                 <DialogFooter
