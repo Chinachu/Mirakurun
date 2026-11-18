@@ -212,6 +212,25 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
   beforeEach(() => TSMFBonding.alignSliceMs = Infinity);
   afterEach(() => TSMFBonding.alignSliceMs = 2);
 
+  it("releases retained alignment samples when closed during a search", () => {
+    TSMFBonding.alignSliceMs = 0;
+    const streams = carriers(splitTLV(tlvPackets(2000)), 2, 1, 24);
+    const bonding = new TSMFBonding(1, 2, () => assert.fail("the search must still be in progress"));
+    try {
+      for (let sf = 0; sf < 24 && !bonding._search; sf++) {
+        for (let input = 0; input < 2; input++) {
+          const output = bonding.push(input, Buffer.concat(streams[input][sf]));
+          assert.equal(output.length, 0);
+        }
+      }
+      assert.ok(bonding._search, "alignment search should start before closing");
+      assert.ok(bonding._search.samples.every(sample => sample.length > 0));
+      bonding.close();
+      assert.ok(bonding._search === null, "closing releases the samples retained by the search");
+      assert.equal(bonding.push(0, Buffer.concat(streams[0][0])).length, 0);
+    } finally { bonding.close(); }
+  });
+
   for (const slots of [8, 12]) {
     for (const seed of [1, 2, 3, 4, 5]) {
       it(`aligns sparse slots with large TLV without rejecting short-probe tails (slots=${slots}, seed=${seed})`, () => {
