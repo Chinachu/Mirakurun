@@ -6,7 +6,7 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
 
 チャンネルに受信経路 (`route`) を追加し、同じ放送をアンテナとケーブルテレビなどの複数の経路で受信できるようになりました。TLV (MMT) のストリーム (BS の 4K / 8K など) と、ケーブルテレビの TSMF (相対 TS の自動判別、複数搬送波の結合) にも対応しました。
 
-既存の tuners.yml と channels.yml は、そのまま使えます。`route` と `routes` を省略した設定は、「4.3.0 からの動作の変更」に挙げた点を除いて、4.3.0 と同じように動作します。
+既存の tuners.yml と channels.yml は、そのまま使えます。`route` と `routes` を省略した設定は、「4.3.0 からの動作の変更」に挙げた点を除いて、4.3.0 と同じように動作します。 チャンネルの `route` を省略するとタイプごとの既定経路を使い、チューナーの `routes` を省略するとすべての受信経路を利用できるものとして扱います。
 
 ### dvbv5-zap のチューナーの設定
 
@@ -25,19 +25,13 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
 チャンネルスキャン API (`PUT /api/config/channels/scan`) は、受信経路 (`route`) とチャンネルの指定方法 (`source`) でスキャンするようになりました。4.3.0 の `type` も使えますが (非推奨)、次の動作が変わります。
 
 - `type` の既定値 (`GR`) はなくなりました。`type` も `source` も指定しない場合は、`route` (既定値 `TER`) の `preset` をスキャンします。
-  - この場合、`minCh`, `maxCh`, `minSubCh`, `maxSubCh`, `channelNameFormat` は使いません。これらを使う場合は、`source=format` か `type` を指定してください。
-  - `source=format` には、`channelNameFormat`, `minCh`, `maxCh` がすべて必要です。不足すると 400 を返します。
+  - 旧形式の範囲指定だけを送ってもスキャンできません。範囲を使う場合は `source=format` か `type` を指定し、クライアントを更新してください。指定方法と検証条件は [API Docs](https://mirakurun.github.io/Mirakurun/) を参照してください。
   - `type` は非推奨です。省略した値には、タイプの既定を使います。
   - `useSubCh` は、`type` を指定した場合だけ使います。
-- 置き換えるのは、スキャンしたチャンネルの設定だけです。スキャンの範囲にないチャンネルと `skipCh` のチャンネルの設定は残ります (4.3.0 は、同じ `type` の設定をすべて置き換えていました)。不要になった設定は、チャンネル設定で削除してください。
+- `route` と従来の `type` のどちらで指定したスキャンも、スキャンしたチャンネルの設定だけを置き換えます。4.3.0 の `type` 指定とは異なり、範囲外の同種別の設定は残ります。取得に失敗したチャンネルや `skipCh` で省略したチャンネルの設定も保持します。
 - チャンネルの `type` は、受信したネットワークで決まります。
   - `type=GR` のスキャンで受信した、地上波ではないネットワーク (BS, CS, CATV など) のストリームは追加しません (4.3.0 は `GR` として追加していました)。ケーブルテレビなどは、`route` に `CATV` か `FTTH` を指定してスキャンしてください。
   - リモートの Mirakurun のチューナーだけで受信した場合は、ネットワークでは決めません。`type` を指定したスキャンはそのタイプで、`route` のスキャンはチューナーの `types` のうち受信を試したタイプで追加します。
-- 次の場合は、スキャンを開始せずに 400 を返します。
-  - スキャンに使えるチューナーがない場合
-  - 調べるチャンネルがない場合
-  - `type` を、`TER` でもそのタイプの既定でもない `route` と一緒に指定した場合
-  - `type` を、`preset` ではない `source` と一緒に指定した場合
 - `skipCh` は、チャンネル名で指定します。チャンネル名に含まれる数字での一致は、`type` を指定した場合だけです。
 - `refresh` を指定しない場合、有効な設定があるチャンネルは、無効な設定も含めてそのまま残します (4.3.0 は、有効な設定だけを残していました)。
 - スキャンの状態 (`GET /api/config/channels/scan`) に `route` を追加しました。`type` は、`type` を指定したスキャンの場合だけ返します。
@@ -57,21 +51,26 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
 
 ### Server
 
+- 🐛 スキャンに失敗した相対ストリームや、まだ確認できない種別のチャンネル設定を保持し、スキャン中に編集した設定も保存時に反映します。
+- 🐛 DVBデバイスの終了処理に失敗した場合も開いたデバイスを解放し、利用者がいなくなった選局でコマンドを起動しないようにしました。
 - ✨ チャンネル設定に受信経路 `route` (`TER`, `SAT`, `SKY`, `CATV`, `FTTH`) を追加。省略した場合はタイプの既定 (GR は `TER`、BS / CS / BS4K は `SAT`、SKY は `SKY`、CATV は `CATV`)
   - 同じ放送を複数の経路で受信する場合は、経路ごとに別のチャンネルとして設定できます。ただし、タイプとチャンネル名が同じ設定を複数の経路に書いた場合は、有効で、その経路にそのタイプのチューナーがある最初の設定だけを使います。`serviceId` だけが異なる設定は、従来どおり使えます。
   - サービスと経路は、受信したストリーム (`networkId` と `transport_stream_id`) で結び付けます。
 - ✨ チャンネルのタイプに `BS4K` (TLV の放送) と `CATV` (ケーブルテレビの自主放送など) を追加
 - ✨ TLV (MMT) のストリームに対応
+  - 不正な制御パケットやストリーム形式の切り替わりの後も、後続パケットを解析します。
   - チャンネル、サービス、番組のストリームを出力し、サービス、番組情報 (MH-EIT)、ロゴを取得します。
   - チューナー設定に `tlvDecoder` (TLV の CAS 処理) と `tlvToTsDecoder` (TLV から MPEG-2 TS への変換) を追加しました。
   - ストリームの API に `format` (`ts` / `tlv`) を追加しました。省略した場合は、サーバー設定の `defaultTlvStreamFormat` (既定 `tlv`) に従います。TLV を出力する場合の `Content-Type` は `application/octet-stream` です。
-  - 出力できない形式になる場合は 406 を返します。TS のチャンネルに `format=tlv` を指定した場合と、`tlvToTsDecoder` を設定したチューナーで受信できない TLV のチャンネルを TS で出力する場合です。後者には、`format` を省略して `defaultTlvStreamFormat` が `ts` の場合を含みます。
+  - 出力形式の指定方法と変換できない場合の応答は、API Docsを参照してください。
   - チャンネル設定に `format` (`ts` / `tlv`) を追加しました。省略した場合は、TLV 用のチューナーでのサービスのスキャンで判別します。
 - ✨ TSMF (ケーブルテレビ) の相対 TS を自動で判別
+  - リモート受信では接続先の展開状態に合わせて相対TSを選び、複数搬送波の転送ではNULLパケットを保持します。リモートチューナーを未展開の搬送波として使う場合は、接続先にも対応版が必要です。
   - チャンネル設定の `tsmfRelTs` を省略した場合は、サービスのスキャンで TSMF のヘッダーから相対 TS と形式を判別し、サービスごとの相対 TS を受信します。
   - TSMF の相対 TS から TLV を取り出します。
   - チャンネルのストリームの API に `tsmfRelTs` を追加しました。チャンネルにない相対 TS を指定した場合は 404 を返します。
-  - リモートの Mirakurun のチューナーでも、判別した相対 TS を受信します。リモートの Mirakurun が 4.3.0 以前の場合、判別した相対 TS はリモートのチューナーでは受信しません (リモートのチューナーだけで受信するチャンネルは、従来どおりチャンネルのストリームを受信します)。
+  - 対応版の Mirakurun のチューナーでも、判別した相対 TS を受信できます。4.3.0 以前の接続先では、相対 TS を指定しないチャンネル配信は接続先の既定出力を使います。保存済みの相対 TS が必要なサービス・番組は、対応チューナーがなければ配信・録画できません。
+- ✨ チャンネル配信に `rawTsmf` 指定を追加しました。生の搬送波TSを、NULLパケットを含めて展開・結合・復号せずに転送できます。ローカルで相対TSを分離する場合は、単一搬送波でも接続先の生TSMF転送への対応が必要です。接続先が同じ相対TSを展開して返す構成では、この転送機能は不要です。条件はAPI Docsを参照してください。
 - ✨ 複数の搬送波で伝送する TLV (CATV のチャネルボンディング) を結合して出力
   - チャンネル設定に `tsmfGroupId` を追加しました。省略した場合は、サービスのスキャンでグループと搬送波を判別します。
   - 搬送波の数だけ、選局できるチューナーが必要です。
@@ -86,9 +85,10 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
   - チャンネルの `services`: `streamId`, `tsmfRelTs`, `format`
   - チューナー: `routes`
   - 番組: `mmtVideo` (MH-EIT の映像情報)
-- ✨ API: IPTV のプレイリストとラインアップ (`/api/iptv/playlist`, `/api/iptv/lineup.json`) は、TS で出力できないサービスを除き、TLV のサービスの URL に `?format=ts` を付加
+- ✨ API: IPTV のプレイリストとラインアップ (`/api/iptv/playlist`, `/api/iptv/lineup.json`) は、TS で出力できないサービスを除き、掲載するすべてのサービスの URL に `?format=ts` を付加
 - ✨ TSFilter: ケーブルテレビのエンジニアリングサービス (ESS) からロゴを取得
-- ✨ client: ストリームの取得に `format` と `tsmfRelTs` を、チャンネルスキャンに `route`, `source`, `channels` を追加。ストリームのエラーに `statusCode` と `statusMessage` を追加
+- ✨ client: `getChannelStream` に `format`・`tsmfRelTs`・`rawTsmf`、`getServiceStream`・`getServiceStreamByChannel`・`getProgramStream` に `format` を追加。チャンネルスキャンに `route`・`source`・`channels`、ストリームのエラーに `statusCode`・`statusMessage` を追加
+  - `supportsChannelStreamTsmfRelTs()` と `supportsChannelStreamRawTsmf()` で、接続先の対応状況を確認できます。接続先の `capabilities` を使用し、接続情報APIのない旧版ではAPI Docsで確認します。この版のサーバー自体に認証接続情報APIは追加していません。
 - ✨ チューナー設定に `routes` (チューナーの入力に届いている受信経路) を追加。`command` の `<route>` は、選局するチャンネルの受信経路 (`ter`, `sat`, `sky`, `catv`, `ftth`) に置き換え
 - ✨ config: チューナーの自動認識で、受信経路ごとのチャンネル設定ファイル (`dvbv5_channels_<route>.conf`) と `routes` を設定
 - ⚡ TunerDevice: DVB デバイスの直接操作が DVB-C (J.83 Annex A / B / C) に対応
@@ -100,10 +100,13 @@ see [Commit Logs](https://github.com/Chinachu/Mirakurun/commits/master) to check
 - 🐛 TSFilter: データカルーセルのロゴを複数のサービスが共有する場合に、最初のサービスにしかロゴを設定しない問題を修正
 - 🐛 TSDecoder: デコーダーが異常終了した後に、捕捉されない書き込みのエラー (`EPIPE`) が発生する問題を修正
 - 🐛 TSDecoder: 入力をそのまま出力する動作に切り替えた後も、デコーダーを起動し直す問題を修正
-- 🐛 remote: リモートの Mirakurun が断った要求 (400 / 404) を繰り返す問題を修正。今回追加した 406 の要求も繰り返しません
+- 🐛 remote: 408・429を除くHTTP 4xx（認証の401・403、形式不一致の406を含む）は繰り返しません。生TSMFや相対TS指定への非対応を確認した場合も受信を開始せず終了し、照会失敗とは区別します。
 
 ### UI
 
+- ✨ ホーム画面からの4Kテレビサービスの視聴に対応
+- ⚠️ Web UIの外部再生用コピーURLとM3Uは、TS向けプレイヤーに合わせてMPEG-TSを指定します。`defaultTlvStreamFormat` では切り替わりません。TLV入力をMPEG-TSで再生するには `tlvToTsDecoder` が必要です。TLVを直接扱うクライアントはAPI Docsを参照してください。
+- ⚠️ チャンネルスキャン画面の「Set Disabled on Add」の既定は「Auto」です。従来の画面と異なり、取得したサービスから追加する新規行はGRでは有効、それ以外では無効になります。新規サービス行を有効で追加する場合は「No」を選択してください。
 - ✨ チャンネルとチューナーの設定に、受信経路と TLV 用の項目を追加
 - ✨ ChannelsConfigView: チャンネルスキャンを、受信経路とチャンネルの指定方法 (プリセット、dvbv5 のチャンネル設定ファイル、一覧、書式) で実行するように変更。スキャンを開始できない場合は、理由を表示
 - ✨ サービスの受信経路と StreamID、受信できるすべてのチャンネルを表示

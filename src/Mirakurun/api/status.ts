@@ -105,11 +105,19 @@ export function getStatus(): apid.Status {
         }
     };
 
+    const gatheringNetworks = new Set<number>();
     for (const nid in status.epg) {
         if (status.epg[nid] === true) {
-            ret.epg.gatheringNetworks.push(parseInt(nid, 10));
+            gatheringNetworks.add(parseInt(nid, 10));
         }
     }
+    // TLVの取得はnetworkId/streamId単位で管理するが、公開状態ではネットワーク単位へまとめる。
+    for (const stream in status.epgByStream) {
+        if (status.epgByStream[stream] === true) {
+            gatheringNetworks.add(parseInt(stream, 10));
+        }
+    }
+    ret.epg.gatheringNetworks = [...gatheringNetworks];
 
     return ret;
 }

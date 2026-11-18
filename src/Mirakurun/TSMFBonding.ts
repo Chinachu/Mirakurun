@@ -43,7 +43,10 @@ const ALIGN_VALID_RATIO = 0.9;
 const ALIGN_VALID_RATIO_MARGIN = 0.02;
 /** compressed IP packets needed in the check */
 const ALIGN_MIN_COMPRESSED_IP = 16;
-/** the stream is closed after failing to find the alignment this times in a row */
+/**
+ * 位置合わせ失敗・受信差・TLV破損による再確認の上限。
+ * 再整列だけでは回数を戻さず、正常なTLVを30スーパーフレーム分確認した後に戻す。
+ */
 const ALIGN_MAX_FAILURES = 3;
 /** the maximum skew to check, including data buffered before the other tuners lock */
 const MAX_SKEW = 60;
@@ -75,6 +78,16 @@ const STALL_SUPERFRAMES = 1200;
  * and the losses have interrupted finding the alignment `ALIGN_MAX_FAILURES` times in a row
  */
 const ALIGN_TIMEOUT_SUPERFRAMES = 3600;
+
+const BONDING_FAILURE_MESSAGES = {
+    "carrier-timeout": "一部の搬送波を一定期間受信できませんでした",
+    "carrier-gap": "搬送波間の受信差が上限を超えました",
+    "carrier-count": "搬送波数がグループのチャンネル数と一致しません",
+    "duplicate-carrier": "複数のチャンネルで同じ搬送波を受信しました",
+    "alignment-failed": "搬送波の位置を確定できませんでした",
+    "broken-tlv": "結合したTLVの破損を検出しました"
+} as const;
+type BondingFailureReason = keyof typeof BONDING_FAILURE_MESSAGES;
 
 /** receives the frames of a relative stream from a carrier (one tuner) */
 class CarrierInput {
@@ -167,7 +180,11 @@ class CarrierInput {
             this.commit();
         }
 
+        // 相対TSと搬送波数はスキャン・明示設定で確定する。別サービスへ切り替えず、不一致フレームは採用しない。
+        // 一時的な不一致なら同じ相対TSの有効ヘッダーを待ち、配信の終了・中断は呼出元が管理する。
         if (isTLVStream(header, this._relTs) === false) {
+            // このフレームの欠落で搬送波間の対応も失うため、位置合わせと組立中のTLVを破棄する。
+            this._lost();
             this._warn(`the relative stream ${this._relTs} is not TLV`);
             return;
         }
@@ -180,10 +197,12 @@ class CarrierInput {
         this._numberOfFrames = header.numberOfFrames;
 
         if (header.framePosition === 0) {
+            // 未完了のスーパーフレームを新しい先頭で置き換える場合も、片方だけの欠落として扱う。
+            if (this._superframe !== null) { this._lost(); }
             this._superframe = { numberOfFrames: header.numberOfFrames, frames: [] };
         } else if (this._superframe === null || this._superframe.frames.length !== header.framePosition) {
-            // wait for the next super frame
-            this._superframe = null;
+            // 初回の途中フレームは待つだけとし、組立中・位置合わせ済みの欠落は全搬送波で再確認する。
+            if (this._superframe !== null || this._isAligned()) { this._lost(); }
             this._frame = null;
             return;
         }
@@ -285,7 +304,8 @@ export default class TSMFBonding {
             return Buffer.alloc(0);
         }
         const carrier = this._inputs[input];
-        const received = carrier.superframes.length;
+        // 損失処理で同じpush中に古いキューが減っても、新たに届いたスーパーフレームを数える。
+        const received = carrier.removed + carrier.superframes.length;
         carrier.push(chunk);
         if (this._closed) {
             return Buffer.alloc(0);
@@ -295,8 +315,9 @@ export default class TSMFBonding {
         if (this._closed) {
             return Buffer.alloc(0);
         }
-        if (carrier.superframes.length > received) {
-            this._received += carrier.superframes.length - received;
+        const added = carrier.removed + carrier.superframes.length - received;
+        if (added > 0) {
+            this._received += added;
             this._lastReceived[input] = this._received;
         }
 
@@ -308,13 +329,16 @@ export default class TSMFBonding {
     close(): void {
         this._closed = true;
         this._inputs = [];
+        // 探索サンプルと組み立て途中のTLVが参照する入力も終了時に解放する。
+        this._search = null;
+        this._offsets = null;
+        this._framer.lost();
     }
 
     private _assemble(outputs: Buffer[]): void {
-        // the tuner of the carrier has not started, or has stopped
+        // ほかの搬送波が進んだ間、この搬送波のスーパーフレームを受信できていない。
         if (this._lastReceived.some(last => this._received - last > STALL_SUPERFRAMES * (this._inputs.length - 1))) {
-            this._closed = true;
-            this._onError("a carrier has stalled");
+            this._stop("carrier-timeout");
             return;
         }
 
@@ -322,8 +346,8 @@ export default class TSMFBonding {
         if (this._offsets === null) {
             this._trim(Math.min(...counts));
         } else if (Math.max(...counts) - Math.min(...counts) > MAX_AHEAD_SUPERFRAMES) {
-            // a carrier has lagged or lost the super frames
-            this._fail("a carrier has stalled");
+            // 受信差は遅延や欠落でも生じるため、搬送波の停止とは断定しない。
+            this._fail("carrier-gap");
             return;
         }
 
@@ -332,14 +356,13 @@ export default class TSMFBonding {
         if (carriers.length < this._inputs.length) {
             return;
         }
-        if (carriers.some(carrier => carrier.numberOfCarriers !== this._inputs.length)) {
-            this._closed = true;
-            this._onError(`the number of carriers (${carriers[0].numberOfCarriers}) differs from the channels of the group (${this._inputs.length})`);
+        const mismatch = carriers.find(carrier => carrier.numberOfCarriers !== this._inputs.length);
+        if (mismatch) {
+            this._stop("carrier-count", `受信=${mismatch.numberOfCarriers}、設定=${this._inputs.length}`);
             return;
         }
         if (new Set(carriers.map(carrier => carrier.carrierSequence)).size !== carriers.length) {
-            this._closed = true;
-            this._onError(`the channels of the group receive the same carrier (carrier_sequence: ${carriers.map(carrier => carrier.carrierSequence).join(", ")})`);
+            this._stop("duplicate-carrier", `carrier_sequence: ${carriers.map(carrier => carrier.carrierSequence).join(", ")}`);
             return;
         }
 
@@ -349,7 +372,6 @@ export default class TSMFBonding {
                 return;
             }
             this._offsets = offsets;
-            this._failures = 0;
             carriers.forEach((carrier, i) => carrier.drop(offsets[i]));
             this._framer.lost();
             this._broken = 0;
@@ -370,11 +392,13 @@ export default class TSMFBonding {
             if (this._brokenSuperframes >= BROKEN_TLV_SUPERFRAMES) {
                 // the alignment has slipped without the loss detected (such as the super frames lost by the cycle of the counter of the header)
                 const slipped = this._broken >= BROKEN_TLV_MIN && this._broken >= this._brokenPackets * BROKEN_TLV_RATIO;
+                // 再整列しただけでは回復を確定しない。30スーパーフレームの検査を通り、TLVを出力できてから失敗回数を戻す。
+                if (!slipped && this._brokenPackets > 0) { this._failures = 0; }
                 this._broken = 0;
                 this._brokenPackets = 0;
                 this._brokenSuperframes = 0;
                 if (slipped) {
-                    this._fail("the TLV assembled is broken");
+                    this._fail("broken-tlv");
                 }
             }
         }
@@ -418,7 +442,7 @@ export default class TSMFBonding {
         if (found === null) {
             // all the skews have been checked
             if (Math.min(...samples.map(sample => sample.length)) >= MAX_SKEW + ALIGN_SUPERFRAMES) {
-                this._fail("can not align the carriers");
+                this._fail("alignment-failed");
             }
             return null;
         }
@@ -510,10 +534,14 @@ export default class TSMFBonding {
     private *_alignIn(samples: Superframe[][], from: number[], to: number[]): Generator<void, number[] | null> {
         const results: { offsets: number[], ratio: number }[] = [];
         for (const offsets of normalizedOffsets(from, to)) {
-            if (this._checkAlignment(samples, offsets, ALIGN_PROBE_SUPERFRAMES, 0) !== null) {
+            // 短い検査では開始・末尾のTLV端数の割合が大きい。連結・種別・CIDだけを確認し、有効率は本検査で判定する。
+            if (this._checkAlignment(samples, offsets, ALIGN_PROBE_SUPERFRAMES, 0, 0) !== null) {
                 const ratio = this._checkAlignment(samples, offsets, ALIGN_CHECK_SUPERFRAMES);
                 if (ratio !== null) {
                     results.push({ offsets: offsets.slice(), ratio });
+                    // 位置の決定と曖昧さの判定に必要なのは上位2件だけ。探索中に全候補を保持しない。
+                    results.sort((a, b) => b.ratio - a.ratio);
+                    if (results.length > 2) { results.pop(); }
                 }
             }
             yield;
@@ -522,7 +550,6 @@ export default class TSMFBonding {
         if (results.length === 0) {
             return null;
         }
-        results.sort((a, b) => b.ratio - a.ratio);
         if (results.length > 1 && results[0].ratio - results[1].ratio < ALIGN_VALID_RATIO_MARGIN) {
             // ambiguous, check with more super frames
             return null;
@@ -531,13 +558,15 @@ export default class TSMFBonding {
         return results[0].offsets;
     }
 
-    private _checkAlignment(samples: Superframe[][], offsets: number[], maxSuperframes: number, minCompressedIP = ALIGN_MIN_COMPRESSED_IP): number | null {
+    private _checkAlignment(samples: Superframe[][], offsets: number[], maxSuperframes: number,
+        minCompressedIP = ALIGN_MIN_COMPRESSED_IP, minValidRatio = ALIGN_VALID_RATIO): number | null {
         const count = Math.min(maxSuperframes, ...samples.map((sample, i) => sample.length - offsets[i]));
         if (count <= 0) {
             return null;
         }
         let intact = true;
-        const framer = new TLVFramer(() => intact = false);
+        // TEIや欠落はそのTLVだけを捨てて再同期する。位置ずれの棄却は、欠落以外で連結が壊れたときだけにする。
+        const framer = new TLVFramer(undefined, () => intact = false);
         const outputs: Buffer[] = [];
         let total = 0;
         for (let sf = 0; sf < count; sf++) {
@@ -553,7 +582,7 @@ export default class TSMFBonding {
                 return null;
             }
         }
-        return checkTLV(Buffer.concat(outputs), total, minCompressedIP);
+        return checkTLV(Buffer.concat(outputs), total, minCompressedIP, minValidRatio);
     }
 
     private _lost(carrier: CarrierInput): void {
@@ -579,8 +608,7 @@ export default class TSMFBonding {
                 ++this._interruptions;
             }
             if (this._interruptions >= ALIGN_MAX_FAILURES && this._received - this._unalignedAt > ALIGN_TIMEOUT_SUPERFRAMES * this._inputs.length) {
-                this._closed = true;
-                this._onError("can not align the carriers");
+                this._stop("alignment-failed");
                 return;
             }
             // the super frames before the loss do not continue to the later ones (aligned by them, the later ones are misaligned)
@@ -590,7 +618,13 @@ export default class TSMFBonding {
         this._framer.lost();
     }
 
-    private _fail(reason: string): void {
+    /** callbackは従来どおり文字列とし、終了理由は再確認時の警告と同じ日本語へ変換する。 */
+    private _stop(reason: BondingFailureReason, detail?: string): void {
+        this._closed = true;
+        this._onError(`${BONDING_FAILURE_MESSAGES[reason]}${detail ? ` (${detail})` : ""}`);
+    }
+
+    private _fail(reason: BondingFailureReason): void {
         if (this._offsets !== null) {
             this._unalignedAt = this._received;
         }
@@ -598,11 +632,10 @@ export default class TSMFBonding {
         this._search = null;
         ++this._failures;
         if (this._failures >= ALIGN_MAX_FAILURES) {
-            this._closed = true;
-            this._onError(reason);
+            this._stop(reason);
             return;
         }
-        log.warn("TSMFBonding: %s, aligning the carriers again (%d/%d)", reason, this._failures, ALIGN_MAX_FAILURES);
+        log.warn("TSMFBonding: ⚠️ %s。搬送波の位置を再確認します (%d/%d)", BONDING_FAILURE_MESSAGES[reason], this._failures, ALIGN_MAX_FAILURES);
         for (const input of this._inputs) {
             input.drop(input.superframes.length);
         }
@@ -610,6 +643,8 @@ export default class TSMFBonding {
     }
 
     private _warn(message: string): void {
+        // readerは実行中のchunkを同期的に走査し終えるため、停止後の診断は追加しない。
+        if (this._closed) { return; }
         if (this._warned.has(message) === false) {
             this._warned.add(message);
             log.warn("TSMFBonding: %s", message);
@@ -667,7 +702,7 @@ function normalizedRanges(from: number[], to: number[]): { lower: number[], uppe
  * @param total the bytes of the TLV data assembled
  * @returns the ratio of the valid TLV packets, `null` if not valid
  */
-function checkTLV(tlv: Buffer, total: number, minCompressedIP: number): number | null {
+function checkTLV(tlv: Buffer, total: number, minCompressedIP: number, minValidRatio: number): number | null {
     let pos = 0;
     let compressedIP = 0;
     while (pos + 4 <= tlv.length) {
@@ -688,5 +723,5 @@ function checkTLV(tlv: Buffer, total: number, minCompressedIP: number): number |
         return null;
     }
     const ratio = tlv.length / Math.max(total, 1);
-    return ratio >= ALIGN_VALID_RATIO ? ratio : null;
+    return ratio >= minValidRatio ? ratio : null;
 }

@@ -35,7 +35,7 @@ import {
 } from "@blueprintjs/core";
 import { state } from "../modules/state";
 import * as ui from "../modules/ui";
-import { ChannelRoute, Service, Status, StreamInfo, TunerDevice } from "../../../api.d";
+import { ChannelRoute, ChannelType, Service, Status, StreamInfo, TunerDevice } from "../../../api.d";
 import { getChannelRouteLabel, getDefaultChannelRoute } from "../modules/constants";
 
 import "./HomeView.sass";
@@ -106,7 +106,7 @@ const ServiceTooltip: React.FC<{ service: Service }> = ({ service }) => (
         <div>Type: 0x{service.type.toString(16).toUpperCase()} ({service.type})</div>
         {(() => {
             const channels = service.channels?.length ? service.channels : [service.channel];
-            const groups = new Map<string, { route: ChannelRoute; type: string; channels: string[] }>();
+            const groups = new Map<string, { route: ChannelRoute; type: ChannelType; channels: string[] }>();
             for (const channel of channels) {
                 if (!channel) { continue; }
                 const route: ChannelRoute = channel.route || getDefaultChannelRoute(channel.type);
@@ -119,7 +119,7 @@ const ServiceTooltip: React.FC<{ service: Service }> = ({ service }) => (
                 }
             }
             return Array.from(groups.values()).map((group, index) => (
-                <div key={index}>Channel{groups.size > 1 ? ` (${getChannelRouteLabel(group.route)})` : ""}: {group.type} / {group.channels.join(",")}</div>
+                <div key={index}>Channel{groups.size > 1 || group.route !== getDefaultChannelRoute(group.type) ? ` (${getChannelRouteLabel(group.route)})` : ""}: {group.type} / {group.channels.join(",")}</div>
             ));
         })()}
     </div>
@@ -194,13 +194,13 @@ const ServicesSection: React.FC<{
                                     }
                                 </span>
                             </Link>
-                            {service.type === 0x01 && allowPNA && tsplayEndpoint && (
+                            {(service.type === 0x01 || service.type === 0xAD) && allowPNA && tsplayEndpoint && (
                                 <span
                                     className="service-play"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         window.open(
-                                            `${tsplayEndpoint}#${location.protocol}//${location.host}/api/services/${service.id}/stream?decode=1`,
+                                            `${tsplayEndpoint}#${location.protocol}//${location.host}/api/services/${service.id}/stream?decode=1&format=ts`,
                                             "_blank",
                                             "popup"
                                         );

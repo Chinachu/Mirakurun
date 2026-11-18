@@ -1,3 +1,18 @@
+/*
+   Copyright 2026 Mirakurun contributors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 const { describe, it, before } = require("node:test");
 const assert = require("assert");
 const path = require("path");
@@ -234,6 +249,43 @@ describe("[tsmftlv.spec] TSMFTLV.ts", () => {
     headerCC = 0;
     const out = new TSMFTLV(1).push(Buffer.concat([...stale, ...frames(slotMap, splitTLV(tlv))]));
     assert.ok(out.equals(Buffer.concat(tlv)));
+  });
+
+  it("drops an incomplete TLV when consecutive headers switch away from a single-carrier TLV stream", () => {
+    const complete = tlvPacket(0x11, 180);
+    const resumed = tlvPacket(0x22, 500);
+    resumed[1] = 0x02;
+    const modes = [
+      { tlvRelTs: [] },
+      { numberOfCarriers: 2 },
+      { frameType: 0x01, numberOfCarriers: 2 }
+    ];
+    for (const interrupted of modes) {
+      for (const length of [500, 65535]) {
+        // 確定済みの1パケットは残し、その後に途中まで受信したTLVだけを捨てる。
+        const partial = splitTLV([tlvPacket(0x33, length)])[0];
+        const before = [splitTLV([complete])[0], partial];
+        const after = splitTLV([resumed]);
+        const fill = packets => [...packets, ...Array.from({ length: 52 - packets.length }, () => tsPacket(0x1FFF))];
+        const map = Array(52).fill(1);
+        const input = Buffer.concat([
+          header({ slotMap: map, cc: 0 }), ...fill([]),
+          header({ slotMap: map, cc: 1 }), ...fill(before),
+          header({ slotMap: map, cc: 2, ...interrupted }), ...fill([]),
+          header({ slotMap: map, cc: 3 }), ...fill(after),
+          header({ slotMap: map, cc: 4 })
+        ]);
+        for (const size of [input.length, 188, 61]) {
+          const filter = new TSMFTLV(1);
+          const out = [];
+          for (let offset = 0; offset < input.length; offset += size) {
+            out.push(filter.push(input.subarray(offset, offset + size)));
+          }
+          assert.deepStrictEqual(Buffer.concat(out), Buffer.concat([complete, resumed]),
+            `${JSON.stringify(interrupted)}, TLV length=${length}, chunk size=${size}`);
+        }
+      }
+    }
   });
 
   it("outputs nothing for the relative stream of TS and for multiple carriers", () => {

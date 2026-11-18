@@ -1,3 +1,18 @@
+/*
+   Copyright 2026 Mirakurun contributors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 const { describe, it, before, beforeEach, afterEach, mock } = require("node:test");
 const assert = require("assert");
 
@@ -197,6 +212,306 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
   beforeEach(() => TSMFBonding.alignSliceMs = Infinity);
   afterEach(() => TSMFBonding.alignSliceMs = 2);
 
+  for (const slots of [8, 12]) {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      it(`aligns sparse slots with large TLV without rejecting short-probe tails (slots=${slots}, seed=${seed})`, () => {
+        let random = seed;
+        const tlv = Array.from({ length: 1200 }, (_, index) => {
+          random = (random * 1103515245 + 12345) & 0x7FFFFFFF;
+          const length = 1200 + random % 301;
+          const packet = Buffer.alloc(4 + length, index & 0xFF);
+          packet[0] = 0x7F; packet[1] = 0x03;
+          packet.writeUInt16BE(length, 2);
+          packet[6] = 0x61;
+          return packet;
+        });
+        const streams = carriers(splitTLV(tlv), 2, 1, 0, 1, [52 - slots, 52 - slots]);
+        const errors = [], output = [];
+        const bonding = new TSMFBonding(1, 2, reason => errors.push(reason));
+        const starts = [0, 5];
+        let firstOutputAt = -1;
+        try {
+          const count = Math.min(...streams.map((stream, carrier) => stream.length - starts[carrier]));
+          for (let sf = 0; sf < count; ++sf) {
+            for (let carrier = 0; carrier < 2; ++carrier) {
+              const data = bonding.push(carrier, Buffer.concat(streams[carrier][starts[carrier] + sf]));
+              if (data.length > 0 && firstOutputAt === -1) { firstOutputAt = sf; }
+              output.push(data);
+            }
+          }
+          assert.deepStrictEqual(errors, []);
+          assert.ok(firstOutputAt >= 0 && firstOutputAt <= 30, `first output at superframe ${firstOutputAt}`);
+          const { matched } = assertTLV(Buffer.concat(output), tlv);
+          assert.ok(matched > tlv.length * 0.7, `assembled ${matched} of ${tlv.length} TLV packets`);
+        } finally { bonding.close(); }
+      });
+    }
+  }
+
+  it("waits for the configured TLV stream after temporarily receiving non-TLV headers", t => {
+    const warning = mock.method(log, "warn", () => {});
+    t.after(() => warning.mock.restore());
+    const tlv = tlvPackets(2400);
+    const streams = carriers(splitTLV(tlv), 2, 1);
+    for (const stream of streams) {
+      for (const frame of stream.slice(0, 4)) {
+        const packet = frame[0] = Buffer.from(frame[0]);
+        const payload = packet.subarray(4);
+        payload[121] = 0x7FFF >> 7;
+        payload[122] = (0x7FFF << 1) & 0xFF;
+        payload.writeUInt32BE(crc32(payload.subarray(0, 180)), 180);
+      }
+    }
+    const errors = [];
+    const bonding = new TSMFBonding(1, 2, reason => errors.push(reason));
+    try {
+      const out = feed(bonding, streams, [0, 0]);
+      assert.deepStrictEqual(errors, []);
+      assertTLV(out, tlv);
+      const notices = warning.mock.calls.filter(call => call.arguments.some(value => typeof value === "string" && /相対ストリームはTLVではありません|the relative stream \d+ is not TLV/.test(value)));
+      assert.strictEqual(notices.length, 1);
+    } finally { bonding.close(); }
+  });
+
+  for (const [fault, numberOfFrames, frame] of [
+    ["non-TLV", 1, 0], ["non-TLV", 4, 0],
+    ["frame-position-middle", 4, 2], ["frame-position-start", 4, 0], ["frame-position-restart", 4, 3]
+  ]) {
+    for (const changedCarrier of [0, 1]) {
+      it(`realigns after a valid-CRC ${fault} header on aligned carrier ${changedCarrier} (${numberOfFrames} frames)`, t => {
+        const warnings = mock.method(log, "warn", () => {});
+        t.after(() => warnings.mock.restore());
+        const tlv = tlvPackets(30000);
+        const streams = carriers(splitTLV(tlv), 2, numberOfFrames);
+        const faultAt = numberOfFrames === 1 ? 150 : 60;
+        const packet = streams[changedCarrier][faultAt][frame * 53] = Buffer.from(streams[changedCarrier][faultAt][frame * 53]);
+        const payload = packet.subarray(4);
+        if (fault === "non-TLV") {
+          payload[121] = 0x7FFF >> 7;
+          payload[122] = (0x7FFF << 1) & 0xFF;
+        } else {
+          const position = fault === "frame-position-middle" ? 3 : fault === "frame-position-start" ? 1 : 0;
+          payload[126] = (numberOfFrames << 4) | position;
+        }
+        payload.writeUInt32BE(crc32(payload.subarray(0, 180)), 180);
+        const errors = [], output = [];
+        const bonding = new TSMFBonding(1, 2, reason => errors.push(reason));
+        let lostAlignment = false, writtenBefore = 0, writtenAfter = 0;
+        try {
+          for (let sf = 0; sf < streams[0].length; ++sf) {
+            if (sf === faultAt) {
+              assert.ok(bonding._offsets, "fault must arrive after actual packets have aligned the carriers");
+              assert.ok(writtenBefore > 0, "TLV must already be reaching the user");
+            }
+            for (let carrier = 0; carrier < 2; ++carrier) {
+              const chunk = bonding.push(carrier, Buffer.concat(streams[carrier][sf]));
+              output.push(chunk);
+              if (sf < faultAt) { writtenBefore += chunk.length; }
+              if (sf > faultAt) { writtenAfter += chunk.length; }
+              if (sf === faultAt && carrier === changedCarrier) { lostAlignment = bonding._offsets === null; }
+            }
+          }
+          assert.deepStrictEqual(errors, []);
+          const { matched, last } = assertTLV(Buffer.concat(output), tlv);
+          assert.ok(lostAlignment, "dropping a superframe must release the old carrier alignment");
+          assert.ok(writtenAfter > 0, "the same configured TLV must resume after alignment is found again");
+          assert.ok(last > tlv.length * 0.95, `last original packet: ${last} of ${tlv.length}`);
+          assert.ok(matched > tlv.length * 0.7, `assembled ${matched} of ${tlv.length}`);
+          assert.strictEqual(bonding._closed, false);
+          assert.strictEqual(bonding._failures, 0, "known header loss must not be counted later as corrupted TLV");
+          assert.ok(warnings.mock.calls.every(call => !call.arguments.some(value => typeof value === "string" && /結合したTLVの破損|broken TLV/.test(value))));
+        } finally { bonding.close(); }
+      });
+    }
+  }
+
+  for (const failure of ["carrier-gap", "broken-tlv"]) {
+    it(`counts ${failure} retries across real alignment searches`, t => {
+      const warnings = mock.method(log, "warn", () => {});
+      t.after(() => warnings.mock.restore());
+      const errors = [];
+      const bonding = new TSMFBonding(1, 2, reason => errors.push(reason));
+      const streams = carriers(splitTLV(tlvPackets(14000)), 2, 1, 500);
+      const positions = [0, 0];
+      let written = 0;
+      function push(c, corrupt = false) {
+        assert.ok(positions[c] < streams[c].length, "fixture must contain the next superframe");
+        const packets = streams[c][positions[c]++];
+        const chunk = Buffer.concat(packets);
+        if (corrupt) {
+          let starts = 0;
+          for (let offset = 0; offset < chunk.length; offset += 188) {
+            if (chunk[offset + 2] === 0x2D && (chunk[offset + 1] & 0x40) !== 0 && ++starts % 2 === 0) {
+              chunk[offset + 4 + chunk[offset + 3]] = 0;
+            }
+          }
+        }
+        written += bonding.push(c, chunk).length;
+      }
+      function align() {
+        for (let count = 0; count < 100 && bonding._offsets === null && !bonding._closed; ++count) {
+          push(0); push(1);
+        }
+        assert.ok(bonding._offsets, "real TSMF packets must complete the alignment search");
+      }
+      try {
+        align();
+        assert.ok(written > 0);
+        for (let attempt = 0; attempt < 3; ++attempt) {
+          if (failure === "carrier-gap") {
+            for (let count = 0; count < 60; ++count) { push(0); }
+            assert.equal(bonding._failures, attempt, "受信差60では再試行しません");
+            assert.equal(bonding._closed, false);
+            push(0);
+          } else {
+            for (let count = 0; count < 60 && bonding._offsets !== null && !bonding._closed; ++count) {
+              push(0, true); push(1, true);
+            }
+          }
+          assert.equal(bonding._failures, attempt + 1);
+          assert.equal(bonding._closed, attempt === 2);
+          if (attempt < 2) {
+            while (positions[1] < positions[0]) { push(1); }
+            align();
+            assert.equal(bonding._failures, attempt + 1, "位置が合っただけでは失敗回数を戻しません");
+          }
+        }
+        const reason = failure === "carrier-gap" ? "搬送波間の受信差が上限を超えました" : "結合したTLVの破損を検出しました";
+        assert.deepEqual(errors, [reason]);
+        assert.equal(warnings.mock.callCount(), 2);
+        warnings.mock.calls.forEach((call, index) => {
+          const text = require("node:util").format(...call.arguments.slice(0));
+          assert.ok(text.includes(reason));
+          assert.match(text, new RegExp(`\\(${index + 1}/3\\)`));
+          assert.doesNotMatch(text, /受信が停止|stalled/);
+        });
+      } finally { bonding.close(); }
+    });
+  }
+
+  it("resets alignment failures only after 30 superframes produce valid TLV", () => {
+    const errors = [];
+    const bonding = new TSMFBonding(1, 2, reason => errors.push(reason));
+    const streams = carriers(splitTLV(tlvPackets(10000)), 2, 1, 350);
+    const positions = [0, 0];
+    let written = 0;
+    function push(c) { written += bonding.push(c, Buffer.concat(streams[c][positions[c]++])).length; }
+    function align() {
+      for (let count = 0; count < 100 && bonding._offsets === null; ++count) { push(0); push(1); }
+      assert.ok(bonding._offsets);
+    }
+    function gap() { for (let count = 0; count < 61; ++count) { push(0); } }
+    try {
+      align(); gap();
+      assert.equal(bonding._failures, 1);
+      while (positions[1] < positions[0]) { push(1); }
+      align();
+      assert.equal(bonding._failures, 1);
+      const before = written;
+      while (bonding._brokenSuperframes < 29) { push(0); push(1); }
+      assert.equal(bonding._failures, 1, "29スーパーフレームでは失敗回数を保持します");
+      push(0); push(1);
+      assert.equal(bonding._failures, 0);
+      assert.ok(written > before, "回復期間に実際のTLV出力が必要です");
+      gap();
+      assert.equal(bonding._failures, 1, "正常な回復後の障害は新たな1回として数えます");
+      assert.equal(bonding._closed, false);
+      assert.deepEqual(errors, []);
+    } finally { bonding.close(); }
+  });
+
+  for (const frames of [1, 4]) {
+    it(`aligns carriers while transport errors recur before alignment (${frames} frames)`, () => {
+      const tlv = tlvPackets(frames === 1 ? 9000 : 30000);
+      const streams = carriers(splitTLV(tlv), 2, frames);
+      // 最初の判定に使う区間を含め、10スーパーフレームごとに搬送波1の1パケットだけ失う。
+      for (let sf = 3; sf < streams[0].length; sf += 10) {
+        const packet = Buffer.from(streams[0][sf][20]);
+        packet[1] |= 0x80;
+        streams[0][sf][20] = packet;
+      }
+      const errors = [];
+      const bonding = new TSMFBonding(1, 2, reason => errors.push(reason));
+      try {
+        const out = feed(bonding, streams, [0, 7]);
+        assert.deepStrictEqual(errors, []);
+        assert.strictEqual(bonding._closed, false);
+        assert.strictEqual(bonding._failures, 0);
+        const { last } = assertTLV(out, tlv);
+        assert.ok(last > tlv.length * 0.95, `the last TLV packet assembled: ${last} of ${tlv.length}`);
+      } finally { bonding.close(); }
+    });
+    it(`rejects a broken candidate even when later packets resynchronize (${frames} frames)`, () => {
+      const streams = carriers(splitTLV(tlvPackets(6000)), 2, frames, 34);
+      const bonding = new TSMFBonding(1, 2, () => assert.fail("sampling must not close the stream"));
+      try {
+        for (let c = 0; c < streams.length; c++) {
+          bonding._inputs[c].push(Buffer.concat(streams[c].slice(0, 34).flat()));
+          bonding._inputs[c].commit();
+        }
+        const samples = bonding._inputs.map(input => input.superframes);
+        const packet = samples[0][5].frames[0].slots.find(item => (item[1] & 0x40) !== 0 && item[4 + item[3]] === 0x7F);
+        assert.ok(packet);
+        // 欠落のない連結が壊れた場合は、後続PUSIで再同期しても位置合わせ成功にしない。
+        packet[4 + packet[3]] = 0;
+        assert.strictEqual(bonding._checkAlignment(samples, [0, 0], 30), null);
+      } finally { bonding.close(); }
+    });
+    for (const loss of ["TEI", "missing"]) {
+      it(`accepts a correct alignment with ${loss} slots but rejects wrong skews (${frames} frames)`, () => {
+        const streams = carriers(splitTLV(tlvPackets(6000)), 2, frames, 34);
+        const bonding = new TSMFBonding(1, 2, () => assert.fail("sampling must not close the stream"));
+        try {
+          for (let c = 0; c < streams.length; c++) {
+            bonding._inputs[c].push(Buffer.concat(streams[c].slice(0, 34).flat()));
+            bonding._inputs[c].commit();
+          }
+          const samples = bonding._inputs.map(input => input.superframes);
+          for (let sf = 3; sf < 30; sf += 10) {
+            const slots = samples[0][sf].frames[0].slots;
+            const packet = slots[19];
+            assert.strictEqual(packet[2], 0x2D);
+            slots[19] = loss === "missing" ? null : Buffer.from(packet);
+            if (slots[19]) { slots[19][1] |= 0x80; }
+          }
+          assert.ok(bonding._checkAlignment(samples, [0, 0], 30) >= 0.9);
+          assert.strictEqual(bonding._checkAlignment(samples, [0, 1], 30), null);
+          assert.strictEqual(bonding._checkAlignment(samples, [1, 0], 30), null);
+        } finally { bonding.close(); }
+      });
+    }
+  }
+
+  it("counts received superframes even when loss drops an older queue in the same push", () => {
+    const errors = [];
+    const bonding = new TSMFBonding(1, 2, reason => errors.push(reason));
+    try {
+      const stream = carriers([], 2, 1, 8)[0];
+      bonding.push(0, Buffer.concat(stream.flat()));
+      assert.ok(bonding._inputs[0].superframes.length > 1);
+      const received = bonding._received;
+      // 他の搬送波は1201スーパーフレーム進んだ直後。このpushで実際に届く1本を無視すると停止と誤判定する。
+      bonding._received = received + 1201;
+      bonding._lastReceived[1] = bonding._received;
+      const resumed = [
+        header({ numberOfCarriers: 2, carrierSequence: 1, numberOfFrames: 1, framePosition: 0, cc: 10 }),
+        ...new Array(52).fill(nullPacket),
+        header({ numberOfCarriers: 2, carrierSequence: 1, numberOfFrames: 1, framePosition: 0, cc: 11 }),
+        ...new Array(52).fill(nullPacket)
+      ];
+      bonding.push(0, Buffer.concat(resumed));
+      assert.deepStrictEqual(errors, []);
+      assert.strictEqual(bonding._closed, false);
+      assert.strictEqual(bonding._received, received + 1202);
+      assert.strictEqual(bonding._lastReceived[0], bonding._received);
+      // 誤った停止判定を避けても、本当に止まった搬送波の検出は維持する。
+      bonding._received += 1201;
+      bonding._lastReceived[1] = bonding._received;
+      bonding._assemble([]);
+      assert.deepStrictEqual(errors, ["一部の搬送波を一定期間受信できませんでした"]);
+    } finally { bonding.close(); }
+  });
+
   it("assembles TLV of 3 carriers started at different super frames", () => {
     const tlv = tlvPackets(6000);
     const streams = carriers(splitTLV(tlv), 3, 2);
@@ -262,7 +577,7 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
     const errors = [];
     feed(new TSMFBonding(1, 3, reason => errors.push(reason)), [streams[0], streams[1], streams[1]], [0, 0, 0]);
 
-    assert.deepStrictEqual(errors, ["the channels of the group receive the same carrier (carrier_sequence: 1, 2, 2)"]);
+    assert.deepStrictEqual(errors, ["複数のチャンネルで同じ搬送波を受信しました (carrier_sequence: 1, 2, 2)"]);
   });
 
   it("aligns the carriers again after a super frame of a carrier is lost", () => {
@@ -476,7 +791,7 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
         }
       }
 
-      assert.deepStrictEqual(errors, losses === "periodic" ? ["can not align the carriers"] : []);
+      assert.deepStrictEqual(errors, losses === "periodic" ? ["搬送波の位置を確定できませんでした"] : []);
     });
   }
 
@@ -489,7 +804,7 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
     const errors = [];
     feed(new TSMFBonding(1, 3, reason => errors.push(reason)), streams, [0, 0, 0]);
 
-    assert.deepStrictEqual(errors, ["a carrier has stalled"]);
+    assert.deepStrictEqual(errors, ["一部の搬送波を一定期間受信できませんでした"]);
   });
 
   it("reports an error when a carrier never delivers its first header", () => {
@@ -498,7 +813,7 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
     const errors = [];
     const bonding = new TSMFBonding(1, 3, reason => errors.push(reason));
     const out = feed(bonding, streams, [0, 0, 0]);
-    assert.deepStrictEqual(errors, ["a carrier has stalled"]);
+    assert.deepStrictEqual(errors, ["一部の搬送波を一定期間受信できませんでした"]);
     assert.strictEqual(out.length, 0);
     assert.strictEqual(bonding.push(0, Buffer.alloc(188)).length, 0);
   });
@@ -534,8 +849,21 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
     assert.ok(matched > tlv.length / 3);
   });
 
-  it("finds the skews of 4 carriers in slices, not blocking the other streams", () => {
-    // 4 搬送波のずれをすべて調べる (区切らない場合は、1 回で 1 秒ほどかかる)
+  it("finds the skews of 4 carriers in slices, not blocking the other streams", t => {
+    // 実処理を呼びつつ検査1回を0.0001msに進め、OSの停止やGCを探索予算の判定へ混ぜない。
+    let checks = 0;
+    const clock = Object.getOwnPropertyDescriptor(performance, "now");
+    const checkAlignment = TSMFBonding.prototype._checkAlignment;
+    // mockの全呼出履歴に巨大なsample配列を残さず、件数だけを観測する。
+    Object.defineProperty(performance, "now", { configurable: true, value: () => checks / 10000 });
+    TSMFBonding.prototype._checkAlignment = function (...args) {
+      ++checks;
+      return checkAlignment.apply(this, args);
+    };
+    t.after(() => {
+      TSMFBonding.prototype._checkAlignment = checkAlignment;
+      if (clock) { Object.defineProperty(performance, "now", clock); } else { delete performance.now; }
+    });
     TSMFBonding.alignSliceMs = 10;
     const tlv = tlvPackets(60000);
     const streams = carriers(splitTLV(tlv), 4, 1);
@@ -543,17 +871,21 @@ describe("[tsmfbonding.spec] TSMFBonding.ts", () => {
     const bonding = new TSMFBonding(1, 4, reason => errors.push(reason));
     const starts = [0, 50, 30, 10];
     const out = [];
-    let maxMs = 0;
+    let maxChecks = 0;
+    let workingPushes = 0;
     for (let sf = 0; sf < streams[0].length - 50; sf++) {
       for (let c = 0; c < 4; c++) {
-        const startedAt = performance.now();
+        const before = checks;
         out.push(bonding.push(c, Buffer.concat(streams[c][starts[c] + sf])));
-        maxMs = Math.max(maxMs, performance.now() - startedAt);
+        const count = checks - before;
+        maxChecks = Math.max(maxChecks, count);
+        if (count > 0) { ++workingPushes; }
       }
     }
     assert.deepStrictEqual(errors, []);
-    // 区切らない場合の 1 秒ほどと区別する (テスト全体を並行して実行する場合の遅れを見込む)
-    assert.ok(maxMs < 300, `a push took ${maxMs}ms`);
+    // 1候補のprobeと本検査は分割しないため、10msの予算を最大2検査分だけ超えられる。
+    assert.ok(maxChecks <= 100002, `a push performed ${maxChecks} alignment checks`);
+    assert.ok(workingPushes > 1, "the real alignment search must return between bounded slices");
     const { matched } = assertTLV(Buffer.concat(out), tlv);
     assert.ok(matched > tlv.length / 3, `assembled ${matched} of ${tlv.length} TLV packets`);
   });

@@ -45,7 +45,9 @@ export const WatchButton: React.FC<WatchButtonProps> = ({ globalServiceId, popov
     }, []);
 
     const tsplayDisabled = !state.serverConfig?.tsplayEndpoint || !state.serverConfig?.allowPNA;
-    const streamEndpoint = `${location.protocol}//${location.host}/api/services/${globalServiceId}/stream`;
+    // TS用プレイヤーとIPTVプレイリストの互換性を優先し、外部向けのコピーURLとM3Uも明示的にMPEG-TSを要求する。
+    // defaultTlvStreamFormatには従わない。TLVを直接受ける用途はAPIで形式を指定し、TS再生にはtlvToTsDecoderを設定する。
+    const streamEndpoint = `${location.protocol}//${location.host}/api/services/${globalServiceId}/stream?format=ts`;
 
     return (<>
         <ButtonGroup className={loading ? "bp5-skeleton" : ""}>

@@ -1,3 +1,18 @@
+/*
+   Copyright 2026 Mirakurun contributors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 const { describe, it, before } = require("node:test");
 const assert = require("assert");
 const path = require("path");
@@ -142,12 +157,13 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
       { relTs: 2, slots: 26, format: "ts", streamId: 45168, networkId: 11 });
   });
 
-  it("treats tsmfRelTs of 0 or empty as not specified (outputs it as configured)", () => {
+  it("treats legacy tsmfRelTs of 0, null or empty as not specified in runtime and JSON", () => {
     _.channel = { getStreams: () => [] };
-    for (const tsmfRelTs of [0, null]) {
+    for (const tsmfRelTs of [0, null, ""]) {
       const channel = new ChannelItem({ name: "C", type: "BS4K", channel: "C46", route: "CATV", tsmfRelTs });
       assert.strictEqual(channel.tsmfRelTs, undefined);
-      assert.strictEqual(channel.toJSON().tsmfRelTs, tsmfRelTs);
+      assert.strictEqual(channel.toJSON().tsmfRelTs, undefined);
+      assert.strictEqual(Object.hasOwn(JSON.parse(JSON.stringify(channel)), "tsmfRelTs"), false);
     }
   });
 
@@ -409,7 +425,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
   });
 
   it("is ready for the job of the relative stream detected by the local tuners first", async () => {
-    const remote = { index: 0, config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true, canReceiveRemoteRelTs: () => true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
+    const remote = { index: 0, config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true, canReceiveRemoteRelTs: () => true, isRemoteChannelRelTsChecked: () => true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
     const local = { index: 1, config: { name: "local", types: ["BS"] }, isRemote: false, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
     const t = Object.create(Tuner.prototype);
     t._devices = [remote, local];
@@ -433,7 +449,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
 
   // リモートの Mirakurun が判別した複数搬送波の TLV は、リモートが結合するため、搬送波の数だけのチューナーを求めない
   it("is ready for the job of the TLV of the carriers bonded by the remote Mirakurun with a remote tuner", async () => {
-    const remote = { index: 0, config: { name: "remote", types: ["BS4K"] }, isRemote: true, supportsRemoteRelTs: true, canReceiveRemoteRelTs: () => true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
+    const remote = { index: 0, config: { name: "remote", types: ["BS4K"] }, isRemote: true, supportsRemoteRelTs: true, canReceiveRemoteRelTs: () => true, isRemoteChannelRelTsChecked: () => true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
     const t = Object.create(Tuner.prototype);
     t._devices = [remote];
     t._readyForJobPickedDeviceSet = new Set();
@@ -485,7 +501,7 @@ describe("[tsmfauto.spec] the relative streams of TSMF", () => {
   });
 
   it("requests the relative stream detected from the remote tuners if only they are left", async () => {
-    const remote = { index: 0, config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true, canReceiveRemoteRelTs: () => true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
+    const remote = { index: 0, config: { name: "remote", types: ["BS"] }, isRemote: true, supportsRemoteRelTs: true, canReceiveRemoteRelTs: () => true, isRemoteChannelRelTsChecked: () => true, isAvailable: true, isFree: true, users: [], getPriority: () => -2 };
     const t = Object.create(Tuner.prototype);
     t._devices = [remote];
     t._readyForJobPickedDeviceSet = new Set();

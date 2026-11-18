@@ -68,6 +68,8 @@
 | `tsplayEndpoint` | `TSPLAY_ENDPOINT` | String | `https://mirakurun-secure-contexts-api.pages.dev/tsplay/` | 🧪TSPlay endpoint (experimental) |
 | `defaultTlvStreamFormat` | `DEFAULT_TLV_STREAM_FORMAT` | String | `tlv` | Output format of the TLV (MMT) channels for the stream requests without `format` (`ts` or `tlv`)<br>If `ts` is selected and no tuner for the channel has `tlvToTsDecoder` configured, HTTP 406 is returned |
 
+Web UIからコピーする外部再生URLとM3U、旧TSPlay向けの再生URLはMPEG-TSを要求します。TLV入力を使う場合は `tlvToTsDecoder` が必要です。これらの出力は `defaultTlvStreamFormat` では変更されません。TLVをそのまま扱う外部クライアントでは、API Docsを参照してTLVのストリームを取得してください。
+
 ## 🗒️tuners.yml
 
 💯 Fully supported in Web UI
@@ -315,7 +317,7 @@ flowchart LR
 - New services are registered only when the channel has no services, as before (the services of a TLV of multiple carriers and of a TLV detected by the remote Mirakurun are added if no service of the TLV is registered).
 - The channel scan adds `tsmfRelTs` if the channel has only one relative TS of the type ([TSMF channels](#tsmf-channels)).
 - When the relative TS of a service is unknown, the relative TS with the most slots is received, chosen from those of the network of the service (or from all relative TSs if there are none); ties go to the lower number.
-- The stream of the channel (`/api/channels/{type}/{channel}/stream`) accepts the query `tsmfRelTs` to specify the relative TS. Without it, the relative TS of `tsmfRelTs` of channels.yml is output, or the stream as received if not specified either. For a channel where TSMF is detected, the stream as received is TS, even for `BS4K` (unless `format` is specified).
+- チャンネル全体や搬送波を取得する場合の指定方法は、Web UI の「API Docs」を参照してください。
 
 <details>
 <summary>Receiving by the tuners of a remote Mirakurun</summary>
@@ -326,8 +328,9 @@ flowchart LR
     - The remote Mirakurun has also detected the relative TS of the channel (`tsmfRelTs` of `services` of `/api/channels/{type}/{channel}`. Omit `tsmfRelTs` in channels.yml of the remote, or set the same value)
     - The remote has not refused the relative TS in the last 10 minutes
 - The service scan of a channel received only by the remote tuners receives the relative TSs detected by the remote Mirakurun (`tsmfRelTs` and `format` of `services`).
+- If the only available tuners are connected to Mirakurun 4.3.0 or earlier, channel playback without a relative TS uses the remote server’s default output. If a saved reception path specifies a relative TS, service playback and recording require a compatible tuner even when `tsmfRelTs` is omitted from the local channel configuration. If the remote server’s default output carries the service, rescanning can update the reception path.
 - The stream as received by the remote tuners is treated as the format the remote Mirakurun outputs (`format` of channels.yml, TS for the channel whose relative TSs are detected by the remote Mirakurun, otherwise the format saved by the service scan or the default of the type).
-- The streams refused by the remote Mirakurun (400 / 404 / 406) end without respawning. For the other errors (such as 503 for the tuners in use), they respawn as before.
+- リモートの認証・認可や配信対象の不在などで要求を継続できない場合は、その要求の再起動を止めます。認証・認可の失敗は、相対TSの非対応として保持しません。一時的な障害では、従来どおり待機後に再接続します。
 
 </details>
 
@@ -341,7 +344,7 @@ The format of the data received on the channel (`ts` / `tlv`): of the relative T
 
 #### tsmfGroupId
 
-The group of a TLV transmitted over multiple carriers (channel bonding of CATV). The channels of the same `type` and `tsmfGroupId` are tuned at the same time by separate tuners, and the TLV is assembled. Any channel of the group outputs the same TLV.
+The group of a TLV transmitted over multiple carriers (channel bonding of CATV). The channels of the same `type`, route and `tsmfGroupId` are tuned at the same time by separate tuners, and the TLV is assembled. Any channel of the group outputs the same TLV.
 
 ```mermaid
 flowchart LR

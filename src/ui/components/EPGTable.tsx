@@ -362,7 +362,8 @@ export const EPGTable: React.FC<EPGTableProps> = ({ date, channelType, globalSer
                     _serviceItems.push(
                         <button className="epg-table-header-item date" key={`${service.id}-${i}`}
                             onClick={() => {
-                                state.navigate(`/epg?type=${service.channel?.type}&date=${cur.toISODate()}`);
+                                // 経路が一時的に欠ける場合は種別を推測せず、同日の番組表を最後に選んだ種別（既定はGR）で開く。
+                                state.navigate(`/epg?${service.channel ? `type=${service.channel.type}&` : ""}date=${cur.toISODate()}`);
                             }}
                         >
                             <span>{cur.toFormat("M月d日（ccc）")}</span>

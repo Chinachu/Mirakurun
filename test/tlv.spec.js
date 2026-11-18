@@ -1,3 +1,18 @@
+/*
+   Copyright 2026 Mirakurun contributors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 const { describe, it, before, beforeEach, after, mock } = require("node:test");
 const assert = require("assert");
 const http = require("http");
@@ -195,12 +210,13 @@ describe("[tlv.spec] TLV (MMT)", () => {
       _.config = { server: { maxBufferBytesBeforeReady: 1000 } };
       const written = [];
       let release;
+      let paused = true;
       const output = new Writable({
         highWaterMark: 100,
         write(chunk, encoding, callback) {
           written.push(Buffer.from(chunk));
           // 最初の書き込みの後は、受信が止まったクライアントと同じく完了しない
-          if (written.length === 1) {
+          if (written.length === 1 || !paused) {
             callback();
           } else {
             release = callback;
@@ -219,6 +235,8 @@ describe("[tlv.spec] TLV (MMT)", () => {
       assert.deepStrictEqual(written.map(c => c[c.length - 1]), [1, 2]);
       assert.ok(status.errorCount.bufferOverflow > 0);
 
+      // 受信を継続再開する。複数のwriteへ分かれても、後続のcallbackを止め直さない。
+      paused = false;
       release();
       await tick();
       filter.close();
@@ -234,11 +252,12 @@ describe("[tlv.spec] TLV (MMT)", () => {
       _.config = { server: { maxBufferBytesBeforeReady: 1000 } };
       const written = [];
       let release;
+      let paused = true;
       const output = new Writable({
         highWaterMark: 100,
         write(chunk, encoding, callback) {
           written.push(Buffer.from(chunk));
-          if (written.length === 1) {
+          if (written.length === 1 || !paused) {
             callback();
           } else {
             release = callback;
@@ -253,12 +272,16 @@ describe("[tlv.spec] TLV (MMT)", () => {
         filter.write(stream.subarray(pos, pos + size));
       }
       assert.ok(status.errorCount.bufferOverflow > 0);
+      // vectorの後半を含め、Writableが既に受け付けた分はfilterの保持上限とは分ける。
+      const queuedBeforeResume = output.writableLength - written[1].length;
 
+      // 受信を継続再開する。複数のwriteへ分かれても、後続のcallbackを止め直さない。
+      paused = false;
       release();
       await tick();
       filter.close();
 
-      const rest = Buffer.concat(written.slice(2));
+      const rest = Buffer.concat(written.slice(2)).subarray(queuedBeforeResume);
       const first = packets.findIndex(packet => packet.equals(rest.subarray(0, 150)));
       // 上限の近くまで残す (すべてを破棄しない)
       assert.ok(first > 2 && rest.length <= 1000 && rest.length >= 600, `${rest.length} bytes from the TLV packet ${first}`);
@@ -278,11 +301,12 @@ describe("[tlv.spec] TLV (MMT)", () => {
       _.config = { server: { maxBufferBytesBeforeReady: 1000 } };
       const written = [];
       let release;
+      let paused = true;
       const output = new Writable({
         highWaterMark: 100,
         write(chunk, encoding, callback) {
           written.push(Buffer.from(chunk));
-          if (written.length === 1) {
+          if (written.length === 1 || !paused) {
             callback();
           } else {
             release = callback;
@@ -300,6 +324,8 @@ describe("[tlv.spec] TLV (MMT)", () => {
         filter.write(chunk(n));
       }
 
+      // 受信を継続再開する。複数のwriteへ分かれても、後続のcallbackを止め直さない。
+      paused = false;
       release();
       await tick();
       filter.close();
@@ -309,9 +335,17 @@ describe("[tlv.spec] TLV (MMT)", () => {
     });
 
     it("ignores the input of the other carriers if the carriers are not bonded", () => {
-      const filter = new TLVFilter({ output: new PassThrough() });
+      const written = [];
+      const output = new Writable({ write: (chunk, encoding, callback) => { written.push(Buffer.from(chunk)); callback(); } });
+      const filter = new TLVFilter({ output });
+      const packets = Buffer.concat([tlvPacket(1, 10), tlvPacket(2, 10)]);
       filter.writeCarrier(1, Buffer.alloc(188));
+      filter.writeCarrier(1, packets);
+      filter.flush();
+      assert.deepStrictEqual(written, [], "有効なTLVでも副搬送波の入力は出力しません");
+      filter.write(packets);
       filter.close();
+      assert.deepStrictEqual(written, [packets], "同じTLVを主入力に渡した場合は出力します");
     });
 
     it("starts the output from the head of a TLV packet", () => {
@@ -449,7 +483,7 @@ describe("[tlv.spec] TLV (MMT)", () => {
       }
     });
 
-    // 4.3.0 と同じく、出力しないまま強制終了したプロセスは 2 回分の失敗として数える (2 回目のタイムアウトでパススルー)
+    // 35669ceと同じく、素通し可能なデコーダーは2回のタイムアウトでパススルーへ移る。
     it("passes through the input after the process does not respond twice", { timeout: 20000 }, async () => {
       const chunks = [];
       const output = new Writable({ write: (chunk, encoding, callback) => { chunks.push(chunk); callback(); } });
@@ -652,14 +686,14 @@ describe("[tlv.spec] TLV (MMT)", () => {
       return Buffer.concat(chunks).toString();
     }
 
-    it("requests TS for the services of TLV", async () => {
+    it("requests TS for every IPTV service, including remote inputs", async () => {
       _.tuner = tuner([fakeDevice(0, { types: ["GR", "BS4K"], tlvToTsDecoder: "mmt2ts" })]);
       const m3u = await get(playlist);
-      assert.ok(m3u.includes("http://mirakurun/api/services/1/stream\n"), m3u);
+      assert.ok(m3u.includes("http://mirakurun/api/services/1/stream?format=ts\n"), m3u);
       assert.ok(m3u.includes("http://mirakurun/api/services/2/stream?format=ts\n"), m3u);
       const channels = JSON.parse(await get(lineup));
       assert.deepStrictEqual(channels.map(c => c.URL), [
-        "http://mirakurun/api/services/1/stream",
+        "http://mirakurun/api/services/1/stream?format=ts",
         "http://mirakurun/api/services/2/stream?format=ts"
       ]);
     });
@@ -670,7 +704,7 @@ describe("[tlv.spec] TLV (MMT)", () => {
       assert.ok(m3u.includes("/services/1/stream"), m3u);
       assert.ok(!m3u.includes("/services/2/"), m3u);
       const channels = JSON.parse(await get(lineup));
-      assert.deepStrictEqual(channels.map(c => c.URL), ["http://mirakurun/api/services/1/stream"]);
+      assert.deepStrictEqual(channels.map(c => c.URL), ["http://mirakurun/api/services/1/stream?format=ts"]);
     });
   });
 });

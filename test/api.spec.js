@@ -279,3 +279,13 @@ describe("[api.spec] api.ts: responseJSON()", () => {
     assert.ok(counter.count < body.length, `stringified ${counter.count} of ${body.length}`);
   });
 });
+
+for (const [code, expected] of [["ERR_STREAM_FORMAT_UNAVAILABLE", 406], ["ERR_DECODER_START_FAILED", 503], ["ERR_TUNER_UNAVAILABLE", 503]]) {
+  it(`[api.spec] acquisition ${code} maps to HTTP ${expected}`, () => {
+    const api = require("../lib/Mirakurun/api");
+    let status;
+    const response = { writeHead(code) { status = code; }, end() {} };
+    api.responseStreamErrorHandler(response, Object.assign(new Error("acquisition failed"), { code }));
+    assert.strictEqual(status, expected);
+  });
+}

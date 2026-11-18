@@ -176,20 +176,30 @@ export default class DvbDevice extends EventEmitter {
 
     close(): Promise<void> {
         return this._serial(async () => {
-            await this._stopStream();
-
-            if (this._frontendFd !== null) {
-                const fd = this._frontendFd;
-                this._frontendFd = null;
-                // libdvbv5 と同じく、衛星の場合は LNB への給電を止める
-                if (this._isSatellite()) {
-                    await linuxDvb.setVoltage(fd, SEC_VOLTAGE.OFF).catch(err => {
-                        log.debug("DvbDevice: %s failed to turn off LNB power (%s)", this.path, err.code);
-                    });
+            const errors: unknown[] = [];
+            try {
+                await this._stopStream();
+            } catch (err) {
+                errors.push(err);
+            } finally {
+                if (this._frontendFd !== null) {
+                    const fd = this._frontendFd;
+                    this._frontendFd = null;
+                    try {
+                        // libdvbv5 と同じく、衛星の場合は LNB への給電を止める
+                        if (this._isSatellite()) {
+                            await linuxDvb.setVoltage(fd, SEC_VOLTAGE.OFF).catch(err => {
+                                log.debug("DvbDevice: %s failed to turn off LNB power (%s)", this.path, err.code);
+                            });
+                        }
+                    } finally {
+                        this._deliverySystem = null;
+                        try { await close(fd); } catch (err) { errors.push(err); }
+                    }
                 }
-                this._deliverySystem = null;
-                await close(fd);
             }
+            if (errors.length === 1) { throw errors[0]; }
+            if (errors.length > 1) { throw new AggregateError(errors, "DVBデバイスの解放に失敗しました", { cause: errors[0] }); }
         });
     }
 
@@ -285,7 +295,7 @@ export default class DvbDevice extends EventEmitter {
 
         // dvr を開く前の出力は捨てられるため、dvr を先に開く
         const dvrFd = await open(`${this.path}/dvr${this._options.dvr || 0}`, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);
-        let demuxFd: number = null;
+        let demuxFd: number | null = null;
         try {
             await linuxDvb.setBufferSize(dvrFd, DVR_BUFFER_SIZE).catch(err => {
                 log.warn("DvbDevice: %s failed to set dvr buffer size (%s)", this.path, err.code);
@@ -300,10 +310,18 @@ export default class DvbDevice extends EventEmitter {
                 flags: DMX_IMMEDIATE_START
             });
         } catch (err) {
-            await close(dvrFd);
-            if (demuxFd !== null) {
-                await close(demuxFd);
+            const errors: unknown[] = [err];
+            // Linux の close は失敗しても fd を解放するため、各 fd は一度だけ閉じる。
+            try {
+                await close(dvrFd);
+            } catch (error) {
+                errors.push(error);
+            } finally {
+                if (demuxFd !== null) {
+                    try { await close(demuxFd); } catch (error) { errors.push(error); }
+                }
             }
+            if (errors.length > 1) { throw new AggregateError(errors, "DVB配信の開始と後始末に失敗しました", { cause: err }); }
             throw err;
         }
 
@@ -312,16 +330,21 @@ export default class DvbDevice extends EventEmitter {
     }
 
     private async _stopStream(): Promise<void> {
-        if (this._dvrFd === null) {
-            return;
+        const errors: unknown[] = [];
+        try {
+            await this._stopReading();
+        } catch (err) {
+            errors.push(err);
+        } finally {
+            // demux を閉じるとフィルターも止まる。DVR の close 失敗でも必ず解放する。
+            const demuxFd = this._demuxFd;
+            this._demuxFd = null;
+            if (demuxFd !== null) {
+                try { await close(demuxFd); } catch (err) { errors.push(err); }
+            }
         }
-
-        await this._stopReading();
-
-        // demux を閉じるとフィルターも止まる
-        const demuxFd = this._demuxFd;
-        this._demuxFd = null;
-        await close(demuxFd);
+        if (errors.length === 1) { throw errors[0]; }
+        if (errors.length > 1) { throw new AggregateError(errors, "DVB配信の停止に失敗しました", { cause: errors[0] }); }
     }
 
     private _startReading(fd: number): void {
@@ -335,13 +358,13 @@ export default class DvbDevice extends EventEmitter {
     private async _stopReading(): Promise<void> {
         const fd = this._dvrFd;
         this._dvrFd = null;
-        clearTimeout(this._readTimer);
+        if (this._readTimer) { clearTimeout(this._readTimer); }
         this._readTimer = null;
 
         if (this._readDone !== null) {
             await this._readDone;
         }
-        await close(fd);
+        if (fd !== null) { await close(fd); }
     }
 
     private _read(): void {

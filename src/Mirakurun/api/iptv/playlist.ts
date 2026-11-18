@@ -33,7 +33,7 @@ export const get: Operation = async (req, res) => {
         if (_.tuner.getOutputFormat(targets, "ts") === null) {
             continue;
         }
-        const query = targets.some(({ channel, relTs }) => channel.getFormat(relTs) === "tlv") ? "?format=ts" : "";
+        // リモートの出力はローカルの検出形式と異なる場合もあるため、IPTV向けには常にTSを要求する。
 
         m += `#KODIPROP:mimetype=video/mp2t\n`;
         m += `#EXTINF:-1 tvg-id="${service.id}"`;
@@ -41,7 +41,7 @@ export const get: Operation = async (req, res) => {
             m += ` tvg-logo="${apiRoot}/services/${service.id}/logo"`;
         }
         m += ` group-title="${service.channel.type}",${service.name}\n`;
-        m += `${apiRoot}/services/${service.id}/stream${query}\n`;
+        m += `${apiRoot}/services/${service.id}/stream?format=ts\n`;
     }
 
     res.setHeader("Content-Type", "application/x-mpegURL; charset=utf-8");

@@ -42,8 +42,10 @@ const DVB_CLOSE_DELAY = 1000;
 const DVB_RESPAWN_DELAY = 1000;
 /** DVB デバイスを開けない場合のうち、デバイスがないことを示すエラー */
 const DVB_MISSING_DEVICE_ERRORS = ["ENOENT", "ENODEV", "ENXIO"];
-/** リモートの Mirakurun が要求を断った場合 (400 / 404 / 406。起動し直しても同じく断られる) の `lib/remote` の終了コード */
+/** HTTP 404/406または生TSMF非対応による `lib/remote` の終了コード */
 const REMOTE_REFUSED_EXIT_CODE = 2;
+/** 認可エラーなど、相対TSの拒否とは区別する恒久的な要求失敗。 */
+const REMOTE_REQUEST_FAILED_EXIT_CODE = 4;
 /** リモートの Mirakurun が判別した相対 TS の指定 (`tsmfRelTs`) に対応しない場合 (4.3.0 以前) の `lib/remote` の終了コード */
 const REMOTE_RELTS_UNSUPPORTED_EXIT_CODE = 3;
 /** リモートの Mirakurun に断られた相対 TS (リモートで判別されていないなど) を、そのチューナーで要求しない時間 (ミリ秒) */
@@ -54,6 +56,8 @@ const REMOTE_RELTS_CHECK_INTERVAL = 1000 * 10;
 const REMOTE_RELTS_RECHECK_INTERVAL = 1000 * 60 * 10;
 /** リモートの Mirakurun でチャンネルの相対 TS が判別されているかを、確認し直すまでの時間 (ミリ秒) */
 const REMOTE_CHANNEL_RELTS_CHECK_INTERVAL = 1000 * 60;
+/** 一時的な照会失敗で保持するチャンネル数の上限。 */
+const REMOTE_CHANNEL_RELTS_FAILURE_LIMIT = 64;
 
 // koffi (FFI) は DVB デバイスを直接操作するチューナーがある場合だけ読み込む
 let dvbDeviceClass: typeof DvbDevice | null;
@@ -133,6 +137,10 @@ export default class TunerDevice extends EventEmitter {
     private _remoteRelTs: number;
     /** the format the remote Mirakurun outputs */
     private _remoteFormat: apid.StreamFormat;
+    private _remoteRawTsmf = false;
+    private _remoteRawTsmfSupport?: { supported: boolean; expiresAt: number; error?: unknown };
+    private _remoteRawTsmfChecking: Promise<{ supported: boolean; stale?: boolean; failure?: { error: unknown; reported: boolean } }> | null = null;
+    private _remoteRawTsmfGeneration = 0;
     /** the remote Mirakurun supports `tsmfRelTs` of the channel stream (`undefined`: not known yet) */
     private _remoteRelTsSupported: boolean;
     private _remoteRelTsChecking: Promise<boolean> = null;
@@ -141,6 +149,7 @@ export default class TunerDevice extends EventEmitter {
     private _remoteRelTsLogged: boolean;
     /** the relative streams refused by the remote Mirakurun (`type/channel/relTs`: the time) */
     private _remoteRelTsRefused = new Map<string, number>();
+    private _remoteChannelRelTsFailures = new Map<string, { until: number; error: unknown }>();
     /** the relative streams of the channels checked whether detected by the remote Mirakurun (`type/channel/relTs`: the time) */
     private _remoteChannelRelTsCheckedAt = new Map<string, number>();
     private _isFault = false;
@@ -213,8 +222,21 @@ export default class TunerDevice extends EventEmitter {
     }
 
     /** the format the remote Mirakurun outputs */
+    get remoteRawTsmf(): boolean { return this._remoteRawTsmf; }
+
     get remoteFormat(): apid.StreamFormat {
         return this._remoteFormat;
+    }
+
+    /** 未確認は候補に残し、確保前に checkRemoteRawTsmf() で確認する。 */
+    get supportsRemoteRawTsmf(): boolean | undefined {
+        return this._remoteRawTsmfSupport && Date.now() < this._remoteRawTsmfSupport.expiresAt
+            ? this._remoteRawTsmfSupport.supported : undefined;
+    }
+
+    /** 未対応と照会失敗を分け、原因不明のまま未対応と案内しない。 */
+    get remoteRawTsmfCheckError(): unknown {
+        return this.supportsRemoteRawTsmf === false ? this._remoteRawTsmfSupport?.error : undefined;
     }
 
     /**
@@ -260,11 +282,15 @@ export default class TunerDevice extends EventEmitter {
      * `undefined` if the command is not dvbv5-zap (with or without DVB device direct access), `null` if the channel is not in the file
      */
     async getDvbChannelStream(route: apid.ChannelRoute, channel: string): Promise<DvbChannelStream | null | undefined> {
-        const confPath = this._config.command ? findDvbv5ZapChannelsConf(this._config.command.replace(/<route>/g, route.toLowerCase())) : null;
+        const command = this._config.command?.replace(/<route>/g, route.toLowerCase()) ?? "";
+        const confPath = command ? findDvbv5ZapChannelsConf(command) : null;
         if (!confPath) {
             return undefined;
         }
-        const params = (await readChannelsConf(confPath)).find(channel, this._dvbChannelByFrequency);
+        // スキャンの周波数判定は直接操作の有効化やkoffiの読込成否から切り離す。
+        let byFrequency = this._dvbChannelByFrequency;
+        try { byFrequency = parseDvbv5ZapCommand(command)?.channelByFrequency ?? false; } catch { /* 直接操作に未対応のオプションでは、従来どおり名前で設定を探す。 */ }
+        const params = (await readChannelsConf(confPath, true)).find(channel, byFrequency);
         if (!params) {
             return null;
         }
@@ -325,19 +351,20 @@ export default class TunerDevice extends EventEmitter {
             // the remote Mirakurun outputs a relative stream of TSMF for each request
             const relTs = this._isRemote ? user.streamSetting?.tsmfRelTs : undefined;
             // the format to receive (the remote Mirakurun outputs it)
-            const format = this._isRemote ? user.streamSetting?.format : undefined;
+            const rawTsmf = this._isRemote && user._rawTsmf === true;
+            const format = this._isRemote ? (rawTsmf ? "ts" : user.streamSetting?.format) : undefined;
             if (this._isRunning) {
-                if (channel.channel !== this._channel.channel || relTs !== this._remoteRelTs || (format !== undefined && format !== this._remoteFormat)) {
+                if (channel.channel !== this._channel.channel || relTs !== this._remoteRelTs || (this._isRemote && rawTsmf !== this._remoteRawTsmf) || (format !== undefined && format !== this._remoteFormat)) {
                     if (user.priority <= this.getPriority()) {
                         throw new Error(util.format("TunerDevice#%d has higher priority user", this._index));
                     }
 
                     this._clearEndStreamTimer();
                     await this._kill(true);
-                    spawning = this._spawn(channel, relTs, format);
+                    spawning = this._spawn(channel, relTs, format, rawTsmf);
                 }
             } else {
-                spawning = this._spawn(channel, relTs, format);
+                spawning = this._spawn(channel, relTs, format, rawTsmf);
             }
         }
 
@@ -394,10 +421,7 @@ export default class TunerDevice extends EventEmitter {
             throw new Error(util.format("TunerDevice#%d is not remote device", this._index));
         }
 
-        const client = new Client();
-        client.host = this.config.remoteMirakurunHost;
-        client.port = this.config.remoteMirakurunPort || 40772;
-        client.userAgent = "Mirakurun (Remote)";
+        const client = this._getRemoteClient();
 
         log.debug("TunerDevice#%d fetching remote programs from %s:%d...", this._index, client.host, client.port);
 
@@ -408,18 +432,89 @@ export default class TunerDevice extends EventEmitter {
         return programs;
     }
 
-    async getRemoteChannel(type: apid.ChannelType, channel: string): Promise<apid.Channel> {
+    async getRemoteChannel(type: apid.ChannelType, channel: string, signal?: AbortSignal): Promise<apid.Channel> {
         if (!this._isRemote) {
             throw new Error(util.format("TunerDevice#%d is not remote device", this._index));
         }
+        const signals = [AbortSignal.timeout(5000)];
+        if (signal) { signals.push(signal); }
+        const lookupSignal = AbortSignal.any(signals);
+        lookupSignal.throwIfAborted();
+        try {
+            const remote = await this._getRemoteClient().getChannel(type, channel, { signal: lookupSignal });
+            lookupSignal.throwIfAborted();
+            return remote;
+        } catch (error) { lookupSignal.throwIfAborted(); throw error; }
+    }
 
-        return this._getRemoteClient().getChannel(type, channel);
+    async checkRemoteRawTsmf(signal?: AbortSignal, reportFailure?: (error: unknown) => boolean): Promise<boolean> {
+        signal?.throwIfAborted();
+        if (signal) {
+            // 能力照会はデバイスが所有し、各要求の中断ではその待機と失敗通知だけを止める。
+            return new Promise<boolean>((resolve, reject) => {
+                const aborted = () => { signal.removeEventListener("abort", aborted); reject(signal.reason); };
+                signal.addEventListener("abort", aborted, { once: true });
+                void this.checkRemoteRawTsmf(undefined, reportFailure && (error => !signal.aborted && reportFailure(error))).then(value => {
+                    signal.removeEventListener("abort", aborted);
+                    if (signal.aborted) { reject(signal.reason); } else { resolve(value); }
+                }, error => { signal.removeEventListener("abort", aborted); reject(error); });
+                if (signal.aborted) { aborted(); }
+            });
+        }
+        if (!this._isRemote) { return false; }
+        const cached = this.supportsRemoteRawTsmf;
+        if (cached !== undefined) { return cached; }
+        const generation = this._remoteRawTsmfGeneration;
+        if (this._remoteRawTsmfChecking === null) {
+            this._remoteRawTsmfChecking = (async () => {
+                const signals = [AbortSignal.timeout(5000)];
+                const lookupSignal = AbortSignal.any(signals);
+                try {
+                    const supported = await this._getRemoteClient().supportsChannelStreamRawTsmf({ signal: lookupSignal });
+                    lookupSignal.throwIfAborted();
+                    if (generation !== this._remoteRawTsmfGeneration) { return { supported: false, stale: true }; }
+                    this._remoteRawTsmfSupport = { supported, expiresAt: Date.now() + REMOTE_RELTS_RECHECK_INTERVAL };
+                    if (!supported) { log.warn(`⚠️ チューナー#${this._index} のリモートは生TSMFの取得に対応していません。`); }
+                    return { supported };
+                } catch (error) {
+                    if (generation !== this._remoteRawTsmfGeneration) { return { supported: false, stale: true }; }
+                    // 障害は短時間だけ候補から外す。未対応のpeerも更新後には再確認できる。
+                    this._remoteRawTsmfSupport = { supported: false, expiresAt: Date.now() + REMOTE_RELTS_CHECK_INTERVAL, error };
+                    return { supported: false, failure: { error, reported: false } };
+                }
+            })().finally(() => { this._remoteRawTsmfChecking = null; });
+        }
+        const result = await this._remoteRawTsmfChecking;
+        // 拒否後の要求が旧世代の照会に合流した場合は、完了後に現世代を再照会する。
+        if (result.stale && generation === this._remoteRawTsmfGeneration) {
+            return this.checkRemoteRawTsmf(undefined, reportFailure);
+        }
+        if (result.failure && generation === this._remoteRawTsmfGeneration) {
+            const { error } = result.failure;
+            // 合流した要求にも障害を記録する。警告済みの共有結果でも各要求のcallbackは一度呼ぶ。
+            const report = reportFailure?.(error) !== false;
+            if (report && !result.failure.reported) {
+                result.failure.reported = true;
+                log.warn(`⚠️ チューナー#${this._index} のリモートの生TSMF対応を確認できませんでした (${error instanceof Error ? error.message : String(error)})`);
+            }
+        }
+        return result.supported;
+    }
+
+    getRemoteChannelRelTsCheckError(channel: ChannelItem, relTs: number): unknown {
+        const failure = this._remoteChannelRelTsFailures.get(`${channel.type}/${channel.channel}/${relTs}`);
+        return failure && Date.now() < failure.until ? failure.error : undefined;
     }
 
     /** the remote Mirakurun outputs the relative stream of TSMF detected of the channel (not refused for a while) */
     canReceiveRemoteRelTs(channel: ChannelItem, relTs: number): boolean {
-        const refusedAt = this._remoteRelTsRefused.get(`${channel.type}/${channel.channel}/${relTs}`);
-        return this.supportsRemoteRelTs && (refusedAt === undefined || Date.now() - refusedAt >= REMOTE_REFUSED_RELTS_PERIOD);
+        const key = `${channel.type}/${channel.channel}/${relTs}`;
+        const refusedAt = this._remoteRelTsRefused.get(key);
+        const now = Date.now();
+        if (refusedAt !== undefined && now - refusedAt >= REMOTE_REFUSED_RELTS_PERIOD) { this._remoteRelTsRefused.delete(key); }
+        const failedUntil = this._remoteChannelRelTsFailures.get(key)?.until;
+        return this.supportsRemoteRelTs && (failedUntil === undefined || now >= failedUntil)
+            && (refusedAt === undefined || now - refusedAt >= REMOTE_REFUSED_RELTS_PERIOD);
     }
 
     /** the relative stream of the channel reported by the remote Mirakurun is requested again */
@@ -429,29 +524,48 @@ export default class TunerDevice extends EventEmitter {
 
     /** checked by `checkRemoteChannelRelTs()` for a while */
     isRemoteChannelRelTsChecked(channel: ChannelItem, relTs: number): boolean {
-        const checkedAt = this._remoteChannelRelTsCheckedAt.get(`${channel.type}/${channel.channel}/${relTs}`);
-        return checkedAt !== undefined && Date.now() - checkedAt < REMOTE_CHANNEL_RELTS_CHECK_INTERVAL;
+        const key = `${channel.type}/${channel.channel}/${relTs}`;
+        const checkedAt = this._remoteChannelRelTsCheckedAt.get(key);
+        if (checkedAt === undefined) { return false; }
+        if (Date.now() - checkedAt < REMOTE_CHANNEL_RELTS_CHECK_INTERVAL) { return true; }
+        this._remoteChannelRelTsCheckedAt.delete(key);
+        return false;
     }
 
     /**
-     * checks whether the remote Mirakurun has detected the relative streams of the channel
-     * (`tsmfRelTs` of the services of the channel, or `tsmfRelTs` of its channels.yml),
-     * not requested for a while if not detected (refused: an empty stream), requested if not known (such as failed to get, or no services yet).
-     * The relative stream without the services registered may be detected (refused by the remote Mirakurun if not, not requested for a while)
+     * リモート側の相対TS情報から、そのチャンネルを要求候補にできるか確認する。
+     * 設定の対象番号、サービスの相対TS情報、またはサービス未登録の応答がある場合は試行する。
+     * 照会失敗時はfalseを返し、対象のチャンネル・相対TSを10秒間候補から外す。
+     * 未検出や取得拒否による除外とは別に保持し、期限後の要求で再照会する。
      */
-    async checkRemoteChannelRelTs(channel: ChannelItem, relTs: number): Promise<boolean> {
+    async checkRemoteChannelRelTs(channel: ChannelItem, relTs: number, signal?: AbortSignal,
+        readChannel?: () => Promise<apid.Channel>, reportFailure?: (error: unknown) => boolean): Promise<boolean> {
         const key = `${channel.type}/${channel.channel}/${relTs}`;
         let detected: boolean;
         try {
-            const remoteChannel = await this.getRemoteChannel(channel.type, channel.channel);
+            const remoteChannel = await (readChannel ? readChannel() : this.getRemoteChannel(channel.type, channel.channel, signal));
+            signal?.throwIfAborted();
+            this._pruneRemoteChannelRelTsCache();
             const services = remoteChannel.services || [];
-            detected = remoteChannel.tsmfRelTs === relTs || services.length === 0 || services.some(service => service.tsmfRelTs !== undefined);
-        } catch (err) {
-            log.debug("TunerDevice#%d failed to get the channel %s/%s of the remote Mirakurun [%s]", this._index, channel.type, channel.channel, err.message);
-            detected = true;
-        } finally {
-            // checked when finished (not to check again while checking)
+            detected = remoteChannel.tsmfRelTs === relTs || services.length === 0 || services.some(service => Number.isInteger(service.tsmfRelTs) && service.tsmfRelTs! >= 1 && service.tsmfRelTs! <= 15);
+            this._remoteChannelRelTsFailures.delete(key);
             this._remoteChannelRelTsCheckedAt.set(key, Date.now());
+        } catch (err) {
+            signal?.throwIfAborted();
+            if (reportFailure?.(err) !== false) { log.warn(`⚠️ リモートのチャンネル ${channel.type}/${channel.channel} の相対TSを確認できないため、チューナー#${this._index} を一時的に候補から外します (${err instanceof Error ? err.message : String(err)})`); }
+            // 応答を確認できないpeerへ空のストリームを要求せず、別候補へ進む。
+            this._remoteChannelRelTsCheckedAt.delete(key);
+            this._pruneRemoteChannelRelTsCache();
+            const now = Date.now();
+            for (const [failedKey, failure] of this._remoteChannelRelTsFailures) {
+                if (failure.until <= now) { this._remoteChannelRelTsFailures.delete(failedKey); }
+            }
+            this._remoteChannelRelTsFailures.delete(key);
+            if (this._remoteChannelRelTsFailures.size >= REMOTE_CHANNEL_RELTS_FAILURE_LIMIT) {
+                this._remoteChannelRelTsFailures.delete(this._remoteChannelRelTsFailures.keys().next().value!);
+            }
+            this._remoteChannelRelTsFailures.set(key, { until: now + REMOTE_RELTS_CHECK_INTERVAL, error: err });
+            return false;
         }
         if (!detected) {
             log.info("TunerDevice#%d the relative stream %d on %s/%s is not detected by the remote Mirakurun", this._index, relTs, channel.type, channel.channel);
@@ -472,7 +586,7 @@ export default class TunerDevice extends EventEmitter {
             return this._remoteRelTsSupported;
         }
         if (this._remoteRelTsChecking === null) {
-            this._remoteRelTsChecking = this._getRemoteClient().supportsChannelStreamTsmfRelTs()
+            this._remoteRelTsChecking = this._getRemoteClient().supportsChannelStreamTsmfRelTs({ signal: AbortSignal.timeout(5000) })
                 .then(supported => {
                     // not overwritten by the result of lib/remote
                     this._remoteRelTsSupported ??= supported;
@@ -504,7 +618,21 @@ export default class TunerDevice extends EventEmitter {
         return this._remoteRelTsChecking;
     }
 
+    // 未接続で起動したpeerの復帰・更新を検出するため、失敗後も背景の能力確認を継続する。
+    // 同時照会は1件・各5秒までとし、Jobの準備枠を使う取得要求の有限再試行とは分ける。
     /** checks again after `delay` (not supported is checked again too) */
+    // キーは候補チャンネル×相対TS(1〜15)の有限集合で再利用する。
+    // 有効な拒否を件数の都合で捨てず、参照・更新時に期限切れを解放する。
+    private _pruneRemoteChannelRelTsCache(): void {
+        const now = Date.now();
+        for (const [key, refusedAt] of this._remoteRelTsRefused) {
+            if (now - refusedAt >= REMOTE_REFUSED_RELTS_PERIOD) { this._remoteRelTsRefused.delete(key); }
+        }
+        for (const [key, checkedAt] of this._remoteChannelRelTsCheckedAt) {
+            if (now - checkedAt >= REMOTE_CHANNEL_RELTS_CHECK_INTERVAL) { this._remoteChannelRelTsCheckedAt.delete(key); }
+        }
+    }
+
     private _scheduleRemoteRelTsCheck(delay: number): void {
         if (this._remoteRelTsRetryTimer !== null) {
             return;
@@ -571,7 +699,7 @@ export default class TunerDevice extends EventEmitter {
                     this._dvbCommandRoutes.add(route);
                     // 経路 (routes) を指定していない場合は、使わない経路かもしれないため警告にしない
                     (this._config.routes ? log.warn : log.info)(
-                        "TunerDevice#%d uses the command instead of DVB device direct access for the route %s (%s)", this._index, route, err.message
+                        `${this._config.routes ? "⚠️" : "📡"} チューナー#%d の経路 %s はコマンドを使用します (%s)`, this._index, route, err.message
                     );
                 }
             } else {
@@ -607,18 +735,18 @@ export default class TunerDevice extends EventEmitter {
     }
 
     /** respawned with the relative stream and the format of the remote Mirakurun as before */
-    private async _spawn(ch: ChannelItem, relTs = this._remoteRelTs, format = this._remoteFormat): Promise<void> {
+    private async _spawn(ch: ChannelItem, relTs = this._remoteRelTs, format = this._remoteFormat, rawTsmf = this._remoteRawTsmf): Promise<void> {
         if (this._dvb !== null) {
             return this._spawnDvb(ch);
         }
-        return this._spawnCommand(ch, relTs, format);
+        return this._spawnCommand(ch, relTs, format, rawTsmf);
     }
 
     /**
      * @param relTs the relative stream of TSMF the remote Mirakurun outputs
      * @param format the format the remote Mirakurun outputs (the format of the stream filter)
      */
-    private async _spawnCommand(ch: ChannelItem, relTs?: number, format?: apid.StreamFormat): Promise<void> {
+    private async _spawnCommand(ch: ChannelItem, relTs?: number, format?: apid.StreamFormat, rawTsmf = false): Promise<void> {
         log.debug("TunerDevice#%d spawn...", this._index);
 
         if (this._process) {
@@ -633,13 +761,12 @@ export default class TunerDevice extends EventEmitter {
             cmd += " " + (this._config.remoteMirakurunPort || 40772);
             cmd += " " + ch.type;
             cmd += " " + ch.channel;
-            if (this._config.remoteMirakurunDecoder === true) {
+            if (this._config.remoteMirakurunDecoder === true && !rawTsmf) {
                 cmd += " decode";
             }
             format = format || (relTs !== undefined ? ch.getFormat(relTs) : ch.remoteFormat);
-            if (format === "tlv") {
-                cmd += " tlv";
-            }
+            cmd += format === "tlv" ? " tlv" : " ts";
+            if (rawTsmf) { cmd += " rawTsmf=true"; }
             if (relTs !== undefined) {
                 cmd += " relTs=" + relTs;
             }
@@ -664,6 +791,7 @@ export default class TunerDevice extends EventEmitter {
         this._channel = ch;
         this._remoteRelTs = this._isRemote ? relTs : undefined;
         this._remoteFormat = this._isRemote ? format : undefined;
+        this._remoteRawTsmf = this._isRemote && rawTsmf;
 
         if (this._config.dvbDevicePath) {
             const cat = child_process.spawn("cat", [this._config.dvbDevicePath]);
@@ -724,12 +852,19 @@ export default class TunerDevice extends EventEmitter {
                 this._index, code, signal, this._process.pid
             );
 
-            // the request refused by the remote Mirakurun is not respawned (refused again)
-            if (this._isRemote === true && code === REMOTE_REFUSED_EXIT_CODE && this._closing === false) {
-                log.warn("TunerDevice#%d the remote Mirakurun has refused the request, closing the streams", this._index);
+            // 恒久的なHTTPエラーや能力不足では、同じ配信要求を自動で起動し直さない。
+            if (this._isRemote === true && (code === REMOTE_REFUSED_EXIT_CODE || code === REMOTE_REQUEST_FAILED_EXIT_CODE) && this._closing === false) {
+                log.warn("⚠️ チューナー#%d のリモート配信を継続できないため、ストリームを閉じます。", this._index);
                 this._closing = true;
-                // the relative stream detected (such as not detected by the remote Mirakurun) is not requested for a while
-                if (this._remoteRelTs !== undefined && this._channel) {
+                if (code === REMOTE_REFUSED_EXIT_CODE && this._remoteRawTsmf) {
+                    // チャンネル固有の拒否もあるため能力不足とは断定せず、次の要求で再確認する。
+                    // 拒否より前の照会も無効にし、遅い応答で古い能力情報を復活させない。
+                    ++this._remoteRawTsmfGeneration;
+                    this._remoteRawTsmfSupport = undefined;
+                }
+                // 404/406の拒否だけを保持し、認可エラーなどで相対TSを長期除外しない。
+                if (code === REMOTE_REFUSED_EXIT_CODE && this._remoteRelTs !== undefined && this._channel) {
+                    this._pruneRemoteChannelRelTsCache();
                     this._remoteRelTsRefused.set(`${this._channel.type}/${this._channel.channel}/${this._remoteRelTs}`, Date.now());
                 }
             }
@@ -834,6 +969,8 @@ export default class TunerDevice extends EventEmitter {
             return;
         }
 
+        // frontendは閉じたため、利用者がいなければ世代も解放し、後続の要求を停止済みの選局へ合流させません。
+        if (this._users.size === 0) { return this._kill(true); }
         this._dvbActive = false;
         try {
             await this._spawnCommand(ch);
@@ -1012,6 +1149,7 @@ export default class TunerDevice extends EventEmitter {
         this._channel = null;
         this._remoteRelTs = undefined;
         this._remoteFormat = undefined;
+        this._remoteRawTsmf = false;
         this._users.clear();
 
         if (this._isFault === false) {

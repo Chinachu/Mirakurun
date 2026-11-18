@@ -334,15 +334,21 @@ export default class TSMFTLV {
 
         // the frames of the carriers are interleaved, assembled by TSMFBonding
         // (the interleaving of the frames of a single carrier is the same order as the frames)
+        // 相対TSと搬送波数はスキャン・明示設定で確定した入力を受け、形式不一致で別サービスへ切り替えない。
+        // 一時的な不一致では未完了TLVを破棄して同じ相対TSの再同期を待ち、配信の終了・中断は呼出元が管理する。
         if (isBondedStream(header, this._relTs) || isTLVStream(header, this._relTs) === false) {
             if (this._warned === false) {
                 this._warned = true;
+                // 非TLVの相対TSに、搬送波結合では解消しない設定変更を案内しない。
+                const hint = isTLVStream(header, this._relTs) ? ", `tsmfGroupId` may be needed" : "";
                 log.warn(
-                    "TSMFTLV: the relative stream %d is not TLV of a single carrier (numberOfCarriers=%d), `tsmfGroupId` may be needed",
-                    this._relTs, header.numberOfCarriers
+                    "TSMFTLV: the relative stream %d is not TLV of a single carrier (numberOfCarriers=%d)%s",
+                    this._relTs, header.numberOfCarriers, hint
                 );
             }
             this._slotCounter = -1;
+            // 収集を停止した区間をまたいで、未完了のTLVへ次のストリームを継ぎ足さない。
+            this._framer.lost();
             return;
         }
 

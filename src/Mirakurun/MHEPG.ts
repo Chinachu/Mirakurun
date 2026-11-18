@@ -82,6 +82,8 @@ export default class MHEPG {
 
     write(eit: MHEventInformationTable) {
 
+        // 独立した取り込みでも、未適用の表を番組や版管理へ反映しない。
+        if (!eit.currentNextIndicator) { return; }
         if (!this._epg) {
             return;
         }

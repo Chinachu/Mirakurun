@@ -1,3 +1,18 @@
+/*
+   Copyright 2026 Mirakurun contributors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 const { describe, it, before } = require("node:test");
 const assert = require("assert");
 
@@ -22,6 +37,26 @@ function mmtpPacket(packetId, payloadType, payload, headerType = 0x61) {
   const header = Buffer.from([0x7F, 0x03, 0, 0]);
   header.writeUInt16BE(body.length, 2);
   return Buffer.concat([header, body]);
+}
+
+function udpPacket(ipVersion, payload) {
+  const ipHeaderSize = ipVersion === 6 ? 40 : 20;
+  const header = Buffer.alloc(4 + ipHeaderSize + 8);
+  header.set([0x7F, ipVersion === 6 ? 0x02 : 0x01]);
+  header.writeUInt16BE(ipHeaderSize + 8 + payload.length, 2);
+  if (ipVersion === 6) {
+    header[4] = 0x60;
+    header.writeUInt16BE(8 + payload.length, 8);
+    header[10] = 17;
+  } else {
+    header[4] = 0x45;
+    header.writeUInt16BE(ipHeaderSize + 8 + payload.length, 6);
+    header[13] = 17;
+  }
+  const udp = 4 + ipHeaderSize;
+  header.writeUInt16BE(5000, udp + 2);
+  header.writeUInt16BE(8 + payload.length, udp + 4);
+  return Buffer.concat([header, payload]);
 }
 
 function plt(packages) {
@@ -82,9 +117,9 @@ describe("[tlvserviceselector.spec] TLVServiceSelector", () => {
     return s;
   }
 
-  it("drops the MPT and the assets of the other services, keeping the shared ones and the others", () => {
+  it("drops the MPT and media of the other services, keeping shared assets and unknown signalling", () => {
     const data = Buffer.concat([0x9000, 0x0100, 0x0110, 0x9001, 0x0101, 0x0111, 0x0200, 0x8000, 0x0300]
-      .map(id => mmtpPacket(id, 0x00, Buffer.alloc(10))));
+      .map(id => mmtpPacket(id, id === 0x8000 || id === 0x0300 ? 0x02 : 0x00, Buffer.alloc(10))));
 
     const out = selector().push(data);
 
@@ -135,4 +170,108 @@ describe("[tlvserviceselector.spec] TLVServiceSelector", () => {
 
     assert.deepStrictEqual(out, Buffer.concat([control, nullPacket]));
   });
+  for (const ipVersion of [4, 6]) {
+    it(`keeps unclassified IPv${ipVersion} UDP while dropping unknown compressed MPU`, () => {
+      const s = selector();
+      assert.strictEqual(s.ready, true);
+      const unclassified = [0x00, 0x12, 0x40].map(flags => {
+        const payload = Buffer.alloc(12);
+        payload[0] = flags;
+        payload.writeUInt16BE(0x0999, 2);
+        return udpPacket(ipVersion, payload);
+      });
+      const unknownMedia = mmtpPacket(0x0999, 0, Buffer.alloc(10));
+      const unknownData = mmtpPacket(0x0999, 1, Buffer.alloc(10));
+      const unknownSI = mmtpPacket(0x8000, 2, Buffer.from([0, 0]));
+      const selectedMedia = mmtpPacket(0x0101, 0, Buffer.alloc(10));
+      const out = s.push(Buffer.concat([...unclassified, unknownMedia, unknownData, unknownSI, selectedMedia]));
+      assert.deepStrictEqual(out, Buffer.concat([...unclassified, unknownData, unknownSI, selectedMedia]));
+    });
+
+    it(`selects known MMTP assets carried in IPv${ipVersion} UDP`, () => {
+      const selected = udpPacket(ipVersion, mmtpPacket(0x0101, 0, Buffer.alloc(10)).subarray(7));
+      const excluded = udpPacket(ipVersion, mmtpPacket(0x0100, 0, Buffer.alloc(10)).subarray(7));
+      assert.deepStrictEqual(selector().push(Buffer.concat([excluded, selected])), selected);
+    });
+  }
+
+  for (const carrier of ["compressed", "ipv6"]) {
+    it(`[tlvserviceselector.spec] 選択MPTの別IPv6フローにある資産も保持する (carrier=${carrier})`, () => {
+      const s = selector();
+      const external = { locationType: "ipv6Dataflow", ipv6SourceAddress: new Uint8Array(16),
+        ipv6DestAddress: new Uint8Array(16), destPort: 5000, packetId: 0x0100 };
+      const table = mpt(0x0102, [0x0101]);
+      table.assets.push({ locations: [external] });
+      s.onMPT(table);
+      const media = mmtpPacket(0x0100, 0, Buffer.alloc(20));
+      let selected = media;
+      if (carrier === "ipv6") {
+        const header = Buffer.alloc(4 + 40 + 8);
+        header.set([0x7F, 0x02]);
+        header.writeUInt16BE(40 + 8 + media.length - 7, 2);
+        header[4] = 0x60;
+        header.writeUInt16BE(8 + media.length - 7, 8);
+        header[10] = 17;
+        header.writeUInt16BE(5000, 46);
+        header.writeUInt16BE(8 + media.length - 7, 48);
+        selected = Buffer.concat([header, media.subarray(7)]);
+      }
+      const kept = mmtpPacket(0x0101, 0, Buffer.alloc(20));
+      const unrelated = mmtpPacket(0x0999, 0, Buffer.alloc(20));
+      assert.deepStrictEqual(s.push(Buffer.concat([selected, unrelated, kept])), Buffer.concat([selected, kept]));
+      // 選択MPTから別フローの参照が消えた後は、その旧資産を保持し続けない。
+      s.onMPT(mpt(0x0102, [0x0101]));
+      assert.deepStrictEqual(s.push(Buffer.concat([media, kept])), kept);
+    });
+  }
+  it("[tlvserviceselector.spec] 他サービスの別フロー参照だけを根拠に同じpacket_idの制御情報を除外しない", () => {
+    const s = selector();
+    const table = mpt(0x0101, [0x0100]);
+    table.assets.push({ locations: [{ locationType: "ipv6Dataflow", ipv6SourceAddress: new Uint8Array(16),
+      ipv6DestAddress: new Uint8Array(16), destPort: 5000, packetId: 0x8000 }] });
+    s.onMPT(table);
+    const signalling = mmtpPacket(0x8000, 2, Buffer.from([0, 0]));
+    assert.deepStrictEqual(s.push(signalling), signalling);
+  });
+  it("[tlvserviceselector.spec] 依存readerが解析したIPv6別フローのMPTで資産を保持する", () => {
+    const s = selector();
+    const location = Buffer.alloc(37);
+    location[0] = 2;
+    location.writeUInt16BE(5000, 33);
+    location.writeUInt16BE(0x0300, 35);
+    const body = Buffer.concat([Buffer.from([0xFF, 2, 1, 2, 0, 0, 1,
+      0, 0, 0, 0, 0, 2, 0, 0, 0x68, 0x65, 0x76, 0x31, 0xFE, 1]), location, Buffer.from([0, 0])]);
+    const table = Buffer.from([0x20, 0, 0, 0]);
+    table.writeUInt16BE(body.length, 2);
+    const reader = createMMTTLVReader();
+    let notified = 0;
+    reader.addEventListener("mpt", event => {
+      ++notified;
+      assert.strictEqual(event.table.assets[0].locations[0].locationType, "ipv6Dataflow");
+      s.onMPT(event.table);
+    });
+    reader.push(paPacket(Buffer.concat([table, body])));
+    assert.strictEqual(notified, 1);
+    const media = mmtpPacket(0x0300, 0, Buffer.alloc(20));
+    const other = mmtpPacket(0x0400, 0, Buffer.alloc(20));
+    assert.deepStrictEqual(s.push(Buffer.concat([other, media])), media);
+    reader.close();
+  });
+
+});
+
+it("[tlvserviceselector.spec] 他サービスのMPT到着前も、選択済みMPTにない映像・音声は流さない", () => {
+  const TLVServiceSelector = require("../lib/Mirakurun/TLVServiceSelector").default;
+  const s = new TLVServiceSelector(0x0102);
+  s.onPLT({ packages: [
+    { mmtPackageId: Uint8Array.from([0x01, 0x01]), locationInfo: { locationType: "sameDataflow", packetId: 0x9000 } },
+    { mmtPackageId: Uint8Array.from([0x01, 0x02]), locationInfo: { locationType: "sameDataflow", packetId: 0x9001 } }
+  ] });
+  s.onMPT(mpt(0x0102, [0x0101, 0x0111, 0x0200]));
+  const media = [0x0100, 0x0101, 0x0110, 0x0111, 0x0200].map(id => mmtpPacket(id, 0, Buffer.alloc(10)));
+  const signalling = [0x8000, 0x8004, 0x9001].map(id => mmtpPacket(id, 2, Buffer.from([0, 0])));
+  assert.deepStrictEqual(packetIds(s.push(Buffer.concat([...media, ...signalling]))), [0x0101, 0x0111, 0x0200, 0x8000, 0x8004, 0x9001]);
+  // 選択MPTの新版で追加された資産と共有資産を直ちに通します。
+  s.onMPT(mpt(0x0102, [0x0101, 0x0111, 0x0200, 0x0100]));
+  assert.deepStrictEqual(packetIds(s.push(Buffer.concat(media))), [0x0100, 0x0101, 0x0111, 0x0200]);
 });

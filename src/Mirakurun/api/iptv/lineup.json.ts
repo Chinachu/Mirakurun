@@ -42,7 +42,7 @@ export const get: Operation = (req, res) => {
         if (_.tuner.getOutputFormat(targets, "ts") === null) {
             continue;
         }
-        const query = targets.some(({ channel, relTs }) => channel.getFormat(relTs) === "tlv") ? "?format=ts" : "";
+        // リモートの出力はローカルの検出形式と異なる場合もあるため、IPTV向けには常にTSを要求する。
 
         const mainNum = service.remoteControlKeyId || service.serviceId;
         if (countMap.has(mainNum)) {
@@ -56,7 +56,7 @@ export const get: Operation = (req, res) => {
             GuideNumber: `${mainNum}.${subNum}`,
             GuideName: service.name,
             HD: 1,
-            URL: `${apiRoot}/services/${service.id}/stream${query}`
+            URL: `${apiRoot}/services/${service.id}/stream?format=ts`
         });
     }
 

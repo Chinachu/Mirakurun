@@ -68,6 +68,8 @@
 | `tsplayEndpoint` | `TSPLAY_ENDPOINT` | String | `https://mirakurun-secure-contexts-api.pages.dev/tsplay/` | 🧪TSPlay エンドポイント (実験中) |
 | `defaultTlvStreamFormat` | `DEFAULT_TLV_STREAM_FORMAT` | String | `tlv` | `format` を付けないストリームの要求に対する、TLV (MMT) のチャンネルの出力形式 (`ts` または `tlv`)<br>`ts` を指定した場合、対象チャンネルを受信できるチューナーに `tlvToTsDecoder` が設定されていなければ HTTP 406 を返す |
 
+Web UIからコピーする外部再生URLとM3U、旧TSPlay向けの再生URLはMPEG-TSを要求します。TLV入力を使う場合は `tlvToTsDecoder` が必要です。これらの出力は `defaultTlvStreamFormat` では変更されません。IPTV 向けのプレイリストとチャンネル一覧も MPEG-TS を使用するため、MPEG-TS で出力できないサービスは表示されません。TLVをそのまま扱う外部クライアントでは、API Docsを参照してTLVのストリームを取得してください。
+
 ## 🗒️tuners.yml
 
 💯 Web UI 設定完全対応
@@ -315,7 +317,7 @@ flowchart LR
 - サービスを新しく登録するのは、従来どおりチャンネルにサービスがないときだけです (複数の搬送波の TLV と、リモートの Mirakurun が判別した TLV は、その TLV のサービスが 1 つも登録されていなければ追加します)。
 - チャンネルスキャンでは、チャンネルにそのタイプの相対 TS が 1 つだけなら `tsmfRelTs` を追加します ([TSMF のチャンネル](#tsmf-のチャンネル))。
 - サービスの相対 TS がわからない場合は、サービスのネットワークの相対 TS (なければすべての相対 TS) のうち、スロットがいちばん多いもの (同じ数なら番号の小さいほう) を受信します。
-- チャンネルのストリーム (`/api/channels/{type}/{channel}/stream`) は、`tsmfRelTs` のクエリで相対 TS を指定できます。指定しない場合は channels.yml の `tsmfRelTs` を、それもなければ受信したままのストリームを出力します。TSMF を判別したチャンネルの受信したままのストリームは、`BS4K` でも TS です (`format` を指定した場合を除く)。
+- チャンネル全体や搬送波を取得する場合の指定方法は、Web UI の「API Docs」を参照してください。
 
 <details>
 <summary>リモートの Mirakurun のチューナーで受信する場合</summary>
@@ -326,6 +328,7 @@ flowchart LR
     - リモートの Mirakurun でも、そのチャンネルの相対 TS を判別している (`/api/channels/{type}/{channel}` の `services` の `tsmfRelTs`。リモートの channels.yml の `tsmfRelTs` は省略するか、同じ値にします)
     - 10 分以内に、その相対 TS をリモートに断られていない
 - リモートのチューナーでしか受信できないチャンネルは、サービスのスキャンで、リモートの Mirakurun が判別した相対 TS (`services` の `tsmfRelTs` と `format`) を受信します。
+- 4.3.0 以前のリモートチューナーしか使えない場合、相対 TS を指定しないチャンネル配信は接続先の既定出力を使います。チャンネル設定で `tsmfRelTs` を省略していても、保存済みの受信経路が相対 TS を指定していれば、対応チューナーなしではサービスの視聴や録画はできません。接続先の既定出力で対象サービスを受信できる場合は、再スキャンで受信経路を更新できます。
 - リモートのチューナーで受信したままのストリームは、リモートの Mirakurun が出力する形式 (channels.yml の `format`、リモートの Mirakurun が相対 TS を判別したチャンネルは TS、ほかはサービスのスキャンで保存した形式かタイプの既定) として扱います。
 - リモートの Mirakurun に断られた場合 (400 / 404 / 406) は、起動し直さずにストリームを終了します。ほかのエラー (チューナーが使用中の 503 など) では、これまでどおり起動し直します。
 
@@ -341,7 +344,7 @@ flowchart LR
 
 #### tsmfGroupId
 
-1 つの TLV を複数の搬送波に分けて伝送する場合 (CATV のチャネルボンディング) のグループです。同じ `type` と `tsmfGroupId` のチャンネルを、別々のチューナーで同時に選局し、TLV を組み立てます。グループのどのチャンネルを要求しても、同じ TLV を出力します。
+1 つの TLV を複数の搬送波に分けて伝送する場合 (CATV のチャネルボンディング) のグループです。同じ `type`・受信経路・`tsmfGroupId` のチャンネルを、別々のチューナーで同時に選局し、TLV を組み立てます。グループのどのチャンネルを要求しても、同じ TLV を出力します。
 
 ```mermaid
 flowchart LR
@@ -405,7 +408,7 @@ flowchart TD
 - `list`: 指定したチャンネル (`channels`)
 - `format`: チャンネル名の書式 (`channelNameFormat`、例: `C{ch}`) と範囲
 
-既定は `preset` です。Web UI では、受信経路が `SAT` か `SKY` で、スキャンに使うチューナーがすべて dvbv5-zap の場合に、`dvbConf` を選んだ状態にします。dvbv5-zap のチューナーはチャンネル設定ファイルにないチャンネルを選局できず、`preset` より調べるチャンネルが少なく済むためです。
+Web UI の初期値は `SKY` が `list`、ほかの経路は `preset` です。チューナー設定の取得後、受信経路が `SAT` か `SKY` で、対象となる有効なチューナーが1台以上あり、すべてローカルの dvbv5-zap の場合に、`dvbConf` を選んだ状態にします。dvbv5-zap のチューナーはチャンネル設定ファイルにないチャンネルを選局できず、`preset` より調べるチャンネルが少なく済むためです。
 
 #### 使うチューナー
 

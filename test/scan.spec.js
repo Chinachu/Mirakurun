@@ -9,14 +9,14 @@ const range = (start, end, f) => Array.from({ length: end - start + 1 }, (_, i) 
 describe("[scan.spec] /api/config/channel/scan : generateScanConfig", () => {
     it("type of 4.3.0: the channels of the type by the parameters of 4.3.0", () => {
         const bs = range(1, 23, ch => [0, 1, 2, 3].map(subCh => `BS${String(ch).padStart(2, "0")}_${subCh}`)).flat();
-        assert.deepStrictEqual(scan.generateLegacyScanConfig({ type: "GR" }), { channels: range(13, 62, ch => `${ch}`) });
-        assert.deepStrictEqual(scan.generateLegacyScanConfig({ type: "BS" }), { channels: bs });
-        assert.deepStrictEqual(scan.generateLegacyScanConfig({ type: "BS", useSubCh: false }), { channels: range(101, 256, ch => `${ch}`) });
-        assert.deepStrictEqual(scan.generateLegacyScanConfig({ type: "CS", startCh: 2, endCh: 3, scanMode: "Channel" }), { channels: ["CS2", "CS3"], scanMode: "Channel" });
-        assert.deepStrictEqual(scan.generateLegacyScanConfig({ type: "GR", channelNameFormat: "C{ch}", startCh: 13, endCh: 14 }), { channels: ["C13", "C14"] });
+        assert.deepStrictEqual(scan.generateScanConfig({ type: "GR" }), { channels: range(13, 62, ch => `${ch}`) });
+        assert.deepStrictEqual(scan.generateScanConfig({ type: "BS" }), { channels: bs });
+        assert.deepStrictEqual(scan.generateScanConfig({ type: "BS", useSubCh: false }), { channels: range(101, 256, ch => `${ch}`) });
+        assert.deepStrictEqual(scan.generateScanConfig({ type: "CS", startCh: 2, endCh: 3, scanMode: "Channel" }), { channels: ["CS2", "CS3"], scanMode: "Channel" });
+        assert.deepStrictEqual(scan.generateScanConfig({ type: "GR", channelNameFormat: "C{ch}", startCh: 13, endCh: 14 }), { channels: ["C13", "C14"] });
         // the subchannels only for BS of the subchannel style
-        assert.deepStrictEqual(scan.generateLegacyScanConfig({ type: "CS", channelNameFormat: "CS{ch}_{subch}", startCh: 2, endCh: 2, startSubCh: 1, endSubCh: 2 }), { channels: ["CS2_0"] });
-        assert.strictEqual(scan.generateLegacyScanConfig({ type: "SKY" }), undefined);
+        assert.deepStrictEqual(scan.generateScanConfig({ type: "CS", channelNameFormat: "CS{ch}_{subch}", startCh: 2, endCh: 2, startSubCh: 1, endSubCh: 2 }), { channels: ["CS2_0"] });
+        assert.strictEqual(scan.generateScanConfig({ type: "SKY" }), undefined);
 
         assert.deepStrictEqual(scan.getLegacySkipChannels(["13", "14", "BS01_0", "CS4", "C15"], ["14", "10", "C15"]), ["14", "BS01_0", "C15"]);
     });
@@ -31,7 +31,7 @@ describe("[scan.spec] /api/config/channel/scan : generateScanConfig", () => {
         assert.deepStrictEqual(scan.generateScanConfig({ route: "CATV" }), { channels: [...range(1, 12, ch => `${ch}`), ...range(13, 63, ch => `C${ch}`), ...terrestrial] });
         assert.deepStrictEqual(scan.generateScanConfig({ route: "FTTH" }), { channels: [...terrestrial, ...bs, ...cs] });
         // no preset of SKY (by the channel config files of dvbv5)
-        assert.strictEqual(scan.generateScanConfig({ route: "SKY" }), undefined);
+        assert.throws(() => scan.generateScanConfig({ route: "SKY" }), /SKYにはプリセット/);
     });
 
     it("dvbConf: the channels of the channel config files", () => {
@@ -41,7 +41,7 @@ describe("[scan.spec] /api/config/channel/scan : generateScanConfig", () => {
 
     it("list: the channels listed (trimmed, without the empty and the duplicated)", () => {
         assert.deepStrictEqual(scan.generateScanConfig({ route: "CATV", source: "list", channels: [" C13", "27", "", "C13"] }), { channels: ["C13", "27"] });
-        assert.strictEqual(scan.generateScanConfig({ route: "CATV", source: "list", channels: [] }), undefined);
+        assert.throws(() => scan.generateScanConfig({ route: "CATV", source: "list", channels: [] }), /1件以上/);
     });
 
     it("format: the channels of the format in the ranges", () => {
@@ -50,8 +50,8 @@ describe("[scan.spec] /api/config/channel/scan : generateScanConfig", () => {
             scan.generateScanConfig({ route: "SAT", source: "format", channelNameFormat: "BS{ch00}_{subch}", startCh: 1, endCh: 1, startSubCh: 1, endSubCh: 2 }),
             { channels: ["BS01_1", "BS01_2"] }
         );
-        assert.strictEqual(scan.generateScanConfig({ route: "CATV", source: "format", startCh: 13, endCh: 15 }), undefined);
-        assert.strictEqual(scan.generateScanConfig({ route: "CATV", source: "format", channelNameFormat: "C{ch}" }), undefined);
+        assert.throws(() => scan.generateScanConfig({ route: "CATV", source: "format", startCh: 13, endCh: 15 }), /書式を指定/);
+        assert.throws(() => scan.generateScanConfig({ route: "CATV", source: "format", channelNameFormat: "C{ch}" }), /開始番号と終了番号/);
     });
 
     it("scanMode and setDisabledOnAdd are by the type of each stream unless specified", () => {
@@ -146,7 +146,7 @@ describe("[scan.spec] /api/config/channel/scan : generateScannedChannelItems", (
             { relTs: 1, format: "tlv", services: [], numberOfCarriers: 3 }
         ], {});
 
-        assert.deepStrictEqual(items, [{ name: "BS4KC30", type: "BS4K", channel: "C30", isDisabled: true, route: "CATV" }]);
+        assert.deepStrictEqual(items, [{ name: "BS4KC30", type: "BS4K", channel: "C30", isDisabled: false, route: "CATV" }]);
     });
 
     it("does not add the route of the default of the type, nor the relative stream of a stream without TSMF", () => {
@@ -1445,5 +1445,18 @@ describe("[scan.spec] /api/config/channel/scan : NIT of BS", () => {
             assert.strictEqual(scan.isAbsentBsChannel(bsStreams, { transponder }, true, none), false);
             assert.strictEqual(scan.isAbsentBsChannel(bsStreams, { transponder, streamId: 0x4470 }, true, none), false);
         }
+    });
+});
+
+
+describe("[scan.spec] channelNameFormat互換性", () => {
+    for (const type of ["GR", "BS", "CS"]) {
+        it(`${type}の空の書式は従来の既定書式と同じ`, () => {
+            const options = { type, startCh: 13, endCh: 13 };
+            assert.deepStrictEqual(scan.generateScanConfig({ ...options, channelNameFormat: "" }), scan.generateScanConfig(options));
+        });
+    }
+    it("source=formatは空の書式を拒否する", () => {
+        assert.throws(() => scan.generateScanConfig({ route: "CATV", source: "format", startCh: 1, endCh: 1, channelNameFormat: "" }), /書式/);
     });
 });

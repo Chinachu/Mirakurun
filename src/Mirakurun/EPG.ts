@@ -62,6 +62,7 @@ const COMPONENT_TYPE = {
     0xF4: "180p"
 };
 
+/** TSと独立したMH-EITの取り込みで、同じ音声周波数の対応表を使う。 */
 export const SAMPLING_RATE = {
     0: -1,
     1: 16000,
@@ -95,6 +96,7 @@ export type VersionRecord<T = number> = Record<TableId, T>;
 /** the version of the table in EIT (MH-EIT of MMT gives `table_id` of EIT[p/f actual] (0x4E) for EIT[p/f]) */
 export type EITVersion = Pick<EIT, "table_id" | "version_number">;
 
+// 独立したMH-EIT取り込みも使うため、拡張イベント項目の型を受け取る共有型として保持する。
 export interface EventState<ExtendedItem = {
     item_description_length: number;
     item_description_char: Buffer;

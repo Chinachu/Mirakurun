@@ -203,7 +203,12 @@ export function getPresetChannels(route: apid.ChannelRoute): string[] {
  * @param option The scan options including the route and the source of the channels
  * @returns A scan configuration with channels to scan and associated settings, `undefined` if invalid
  */
-export function generateScanConfig(option: ChannelScanOption): ScanConfig | undefined {
+export function generateScanConfig(option: ChannelScanOption | LegacyChannelScanOption): ScanConfig | undefined {
+    // 旧type指定の空文字は既定書式。明示source=formatだけ空欄を拒否する。
+    if (!("type" in option) && option.source === "format" && option.channelNameFormat !== undefined && option.channelNameFormat.trim() === "") {
+        throw new Error("チャンネル名の書式を指定してください。");
+    }
+    if ("type" in option) { return generateLegacyCompatConfig(option); }
     if (common.channelRoutes.includes(option.route) === false) {
         return undefined;
     }
@@ -211,6 +216,9 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig | unde
     let channels: string[];
     switch (option.source || "preset") {
         case "preset":
+            if (option.route === "SKY") {
+                throw new Error("SKYにはプリセットがありません。チャンネル一覧、dvbv5設定ファイル、または書式を指定してください。");
+            }
             channels = getPresetChannels(option.route);
             break;
         case "dvbConf":
@@ -218,10 +226,15 @@ export function generateScanConfig(option: ChannelScanOption): ScanConfig | unde
             break;
         case "list":
             channels = (option.channels || []).map(channel => channel.trim()).filter(channel => channel !== "");
+            if (channels.length === 0) { throw new Error("スキャンするチャンネルを1件以上指定してください。"); }
             break;
         case "format":
-            if (!option.channelNameFormat || option.startCh === undefined || option.endCh === undefined) {
-                return undefined;
+            if (option.channelNameFormat === undefined) { throw new Error("チャンネル名の書式を指定してください。"); }
+            if (option.startCh === undefined || option.endCh === undefined) {
+                throw new Error("書式から取得する開始番号と終了番号を指定してください。");
+            }
+            if (!/{subch0*}/.test(option.channelNameFormat) && (option.startSubCh !== undefined || option.endSubCh !== undefined)) {
+                throw new Error("minSubCh・maxSubChは、channelNameFormatに{subch}を含む場合だけ指定できます。");
             }
             channels = formatChannels(option.channelNameFormat, option.startCh, option.endCh, option.startSubCh, option.endSubCh);
             break;
@@ -263,7 +276,7 @@ export const legacyScanTypes: apid.ChannelType[] = ["GR", "BS", "CS"];
  * - CS: `CS{ch}` 2-24
  * @returns `undefined` if invalid
  */
-export function generateLegacyScanConfig(option: LegacyChannelScanOption): ScanConfig | undefined {
+function generateLegacyCompatConfig(option: LegacyChannelScanOption): ScanConfig | undefined {
     let defaults: { format: string, startCh: number, endCh: number };
     if (option.type === "GR") {
         defaults = { format: "{ch}", startCh: 13, endCh: 62 };
@@ -276,14 +289,17 @@ export function generateLegacyScanConfig(option: LegacyChannelScanOption): ScanC
     }
     // the subchannels only for BS of the subchannel style
     const subCh = option.type === "BS" && option.useSubCh !== false;
+    const channelNameFormat = option.channelNameFormat || defaults.format;
+    const hasSubCh = /{subch0*}/.test(channelNameFormat);
     return generateScanConfig({
         route: common.getDefaultChannelRoute(option.type),
         source: "format",
-        channelNameFormat: option.channelNameFormat || defaults.format,
+        channelNameFormat,
         startCh: option.startCh ?? defaults.startCh,
         endCh: option.endCh ?? defaults.endCh,
-        startSubCh: subCh ? option.startSubCh : 0,
-        endSubCh: subCh ? option.endSubCh : 0,
+        // 旧形式で使用しないサブ番号は、経路形式の検証へ持ち込まない。
+        startSubCh: subCh ? option.startSubCh : hasSubCh ? 0 : undefined,
+        endSubCh: subCh ? option.endSubCh : hasSubCh ? 0 : undefined,
         scanMode: option.scanMode,
         setDisabledOnAdd: option.setDisabledOnAdd
     });
@@ -439,6 +455,11 @@ function getScanErrorRank(error: unknown): number {
     return /channel .+ is not found in /.test(text) ? 0 : 2;
 }
 
+interface ScannedChannelRetention {
+    incompleteTypes: Set<apid.ChannelType>;
+    carrierTypes: Set<apid.ChannelType>;
+}
+
 /**
  * the channel items of a channel scanned (by the type of each stream)
  * @param log writes the notes
@@ -452,25 +473,40 @@ export function generateScannedChannelItems(
     scanConfig: ScanConfig,
     log: (text: string) => void = () => undefined,
     remoteType?: apid.ChannelType,
-    relTsByRemote: apid.ChannelType[] = []
+    relTsByRemote: apid.ChannelType[] = [],
+    retention?: ScannedChannelRetention
 ): apid.ConfigChannels {
-    const types = new Map<apid.ChannelType, { relTs: Set<number | undefined>, services: apid.Service[], bonded: boolean }>();
+    const types = new Map<apid.ChannelType, { relTs: Set<number | undefined>, services: apid.Service[], bonded: boolean, incomplete: boolean }>();
+    let hasUnidentifiedStream = false;
+    const observedTypes = new Set<apid.ChannelType>();
     for (const stream of streams) {
         const services = stream.services.filter(service => serviceTypes.includes(service.type));
         const bonded = stream.format === "tlv" && stream.numberOfCarriers > 1;
-        // the carriers of a TLV of multiple carriers are added without the services (the services are scanned after all the carriers are known),
-        // the relative stream failed to scan is counted by the network of the TSMF header (not to specify the other relative stream of the type)
-        if (services.length === 0 && !bonded && !stream.failed) {
-            continue;
-        }
-        const networkId = services[0]?.networkId ?? stream.networkId;
+        // 対象外サービスだけのTSもネットワーク自体は確認できている。
+        const networkId = stream.services[0]?.networkId ?? stream.networkId;
         let type = getChannelTypeByNetwork(networkId, stream.format);
         if (remoteType !== undefined && type !== remoteType) {
             log(`-> received by the remote tuner as ${remoteType}${type === null ? "" : ` (the network is of ${type})`}, added as ${remoteType}.\n`);
             type = remoteType;
         }
+        // 未知の相対TSは未観測種別だけを保護する。正常に確認できた種別の移転・廃止は反映する。
+        if (type === null) {
+            hasUnidentifiedStream = true;
+        } else if (stream.failed && !routeTypes[route].includes(type)) {
+            // 経路と識別済み種別が矛盾する失敗は、既知種別を含め削除・相対TS変更の根拠にしない。
+            for (const existingType of common.channelTypes) { retention?.incompleteTypes.add(existingType); }
+        } else if (!routeTypes[route].includes(type)) {
+            // 経路外の受信結果では、このチャンネルの未観測種別が廃止されたとは確認できない。
+            hasUnidentifiedStream = true;
+        }
         if (type === null) {
             log(`-> unknown network (networkId: ${networkId}${stream.relTs ? `, relTs: ${stream.relTs}` : ""}), skipped.\n`);
+            continue;
+        }
+        if (routeTypes[route].includes(type)) { observedTypes.add(type); }
+        // the carriers of a TLV of multiple carriers are added without the services (the services are scanned after all the carriers are known),
+        // the relative stream failed to scan is counted by the network of the TSMF header (not to specify the other relative stream of the type)
+        if (services.length === 0 && !bonded && !stream.failed) {
             continue;
         }
         // such as SKY on SAT (the satellite of SKY is received on the route SKY)
@@ -483,15 +519,18 @@ export function generateScannedChannelItems(
             log(`-> the services of the relative stream ${stream.relTs} (${type}) are not received (it may have no services, such as for the engineering).` +
                 ` if it has services, scan the channel again with refresh to add them.\n`);
         }
-        const entry = types.get(type) || { relTs: new Set(), services: [], bonded: false };
+        const entry = types.get(type) || { relTs: new Set(), services: [], bonded: false, incomplete: false };
         entry.relTs.add(stream.relTs);
         entry.services.push(...services.filter(service => !entry.services.some(s => s.networkId === service.networkId && s.serviceId === service.serviceId)));
         entry.bonded = entry.bonded || bonded;
+        entry.incomplete = entry.incomplete || stream.failed === true || (bonded && services.length === 0);
         types.set(type, entry);
     }
 
     const items: apid.ConfigChannels = [];
-    for (const [type, { relTs, services, bonded }] of types) {
+    for (const [type, { relTs, services, bonded, incomplete }] of types) {
+        if (incomplete) { retention?.incompleteTypes.add(type); }
+        if (services.length === 0 && bonded) { retention?.carrierTypes.add(type); }
         // only the relative streams failed to scan
         if (services.length === 0 && !bonded) {
             continue;
@@ -509,9 +548,10 @@ export function generateScannedChannelItems(
             log(`-> no tuners of ${type} for the route ${route}, add ${type} to \`types\` of the tuners.\n`);
         }
 
+        // 未取得サービスの搬送波行は次の受信に必要なため有効にする。
         const typeItems = services.length > 0
             ? generateChannelItems(scanMode, type, channel, services, setDisabledOnAdd)
-            : [{ name: `${type}${channel}`, type, channel, isDisabled: setDisabledOnAdd }];
+            : [{ name: `${type}${channel}`, type, channel, isDisabled: false }];
         for (const item of typeItems) {
             if (route !== common.getDefaultChannelRoute(type)) {
                 item.route = route;
@@ -520,6 +560,12 @@ export function generateScannedChannelItems(
                 item.tsmfRelTs = tsmfRelTs;
             }
             items.push(item);
+        }
+    }
+    if (retention && (hasUnidentifiedStream || retention.incompleteTypes.size > 0)) {
+        // 一部の相対TSを取得できない場合、未観測の種別が消えたとは確認できない。
+        for (const type of common.channelTypes) {
+            if (!observedTypes.has(type)) { retention.incompleteTypes.add(type); }
         }
     }
     return items;
@@ -715,8 +761,46 @@ async function runChannelScan(
         const isOnRoute = (item: apid.ConfigChannelsItem): boolean => (item.route || common.getDefaultChannelRoute(item.type)) === route;
         const isReplaced = (item: apid.ConfigChannelsItem): boolean => isOnRoute(item) && (legacyType === undefined || item.type === legacyType);
         const isSkipped = (channel: string): boolean => skipCh.includes(channel);
-        const scannedChannels = new Set(scanConfig.channels.filter(channel => !isSkipped(channel)));
-        const result: apid.ConfigChannels = oldChannelItems.filter(item => !isReplaced(item) || !scannedChannels.has(item.channel));
+        const selectedChannels = new Set(scanConfig.channels);
+        const scannedChannels = new Set([...selectedChannels].filter(channel => !isSkipped(channel)));
+        // この版では旧type指定もスキャンしたチャンネルだけを置換し、範囲外の設定は残す。
+        const isInScope = (item: apid.ConfigChannelsItem): boolean => isReplaced(item) && scannedChannels.has(item.channel);
+        const result: apid.ConfigChannels = oldChannelItems.filter(item => !isInScope(item));
+        const acquiredItems: apid.ConfigChannels = [];
+        // 取得失敗やrefresh=falseで省略したチャンネルは、保存時の最新行を引き継ぐ。
+        const replacedChannels = new Set<string>();
+        const retainedChannelTypes = new Map<string, Set<apid.ChannelType>>();
+        const carrierShells = new WeakSet<apid.ConfigChannelsItem>();
+        const typeChannelKey = (item: apid.ConfigChannelsItem): string => `${item.type}/${item.channel}`;
+        const mergeIncompleteItems = (current: Readonly<apid.ConfigChannels>, acquired: apid.ConfigChannels) => {
+            const existing = new Map<string, apid.ConfigChannels>();
+            for (const item of current) {
+                if (!isInScope(item) || !retainedChannelTypes.get(item.channel)?.has(item.type)) { continue; }
+                const key = typeChannelKey(item);
+                const rows = existing.get(key);
+                if (rows) { rows.push(item); } else { existing.set(key, [item]); }
+            }
+            // 未完了の取得でサービス範囲を広げたり、指定された相対TSを変えたりしない。
+            const items = acquired.filter(item => {
+                const rows = existing.get(typeChannelKey(item));
+                // 旧設定の0・null・空文字は未指定として比較し、共有設定は変更しない。
+                return !rows || (!carrierShells.has(item) && item.serviceId !== undefined
+                    && rows.every(row => {
+                        const relTs: unknown = row.tsmfRelTs;
+                        return row.serviceId !== undefined &&
+                            (relTs === undefined || relTs === null || relTs === 0 || relTs === "" || relTs === item.tsmfRelTs);
+                    }));
+            });
+            const replacements = new Map<string, Set<number | undefined>>();
+            for (const item of items) {
+                const key = typeChannelKey(item);
+                if (!replacements.has(key)) { replacements.set(key, new Set()); }
+                replacements.get(key).add(item.serviceId);
+            }
+            const retained = new Set(current.filter(item => isInScope(item) && existing.has(typeChannelKey(item))
+                && !replacements.get(typeChannelKey(item))?.has(item.serviceId)));
+            return { items, retained };
+        };
         let newCount = 0;
         let takeoverCount = 0;
         // the streams of BS by NIT (`undefined` until a channel of BS is received, `null` if not known by it)
@@ -784,7 +868,7 @@ async function runChannelScan(
                 scanStatus.takeoverCount = update.takeoverCount;
             }
             if (update.result) {
-                scanStatus.result = update.result;
+                scanStatus.result = normalizePublicScanResult(update.result);
             }
 
             appendToLog(textOutput);
@@ -950,6 +1034,8 @@ async function runChannelScan(
             }
             // not tried by any tuners, or the other tuners (such as of the terrestrial) do not have the channel in the channel config files of dvbv5
             if (streams === null && absentInBs && (lastError === null || getScanErrorRank(lastError) === 0)) {
+                // NITで不在が確認できたチャンネルだけは、取得失敗と区別して旧行を置き換える。
+                replacedChannels.add(channel);
                 updateStepStatus(
                     {
                         status: "skipped" as const,
@@ -982,6 +1068,7 @@ async function runChannelScan(
                 continue; // Skip to next channel
             }
 
+            replacedChannels.add(channel);
             const serviceCount = streams.reduce((count, stream) => count + stream.services.filter(service => serviceTypes.includes(service.type)).length, 0);
             updateStepStatus(
                 {
@@ -1021,7 +1108,17 @@ async function runChannelScan(
                     }
                 }
             }
-            const scannedItems = generateScannedChannelItems(channel, route, streams, scanConfig, appendToLog, remoteType, relTsByRemote);
+            const retention: ScannedChannelRetention = { incompleteTypes: new Set(), carrierTypes: new Set() };
+            const generated = generateScannedChannelItems(channel, route, streams, scanConfig, appendToLog, remoteType, relTsByRemote, retention);
+            if (retention.incompleteTypes.size > 0) { retainedChannelTypes.set(channel, retention.incompleteTypes); }
+            for (const item of generated) { if (retention.carrierTypes.has(item.type)) { carrierShells.add(item); } }
+            const partial = mergeIncompleteItems(oldChannelItems as apid.ConfigChannels, generated);
+            const scannedItems = partial.items;
+            // 別経路との重複で開始時に候補を失わず、保存直前の最新設定で採否を決める。
+            for (const item of scannedItems) { acquiredItems.push(item); }
+            for (const item of partial.retained) { result.push(item); }
+            takeoverCount += partial.retained.size;
+            scanStatus.takeoverCount = takeoverCount;
             if (scannedItems.length === 0) {
                 appendToLog("\n");
                 continue;
@@ -1067,14 +1164,34 @@ async function runChannelScan(
             );
         }
 
-        // Sort results by type and channel number
-        result.sort((a, b) => {
-            if (a.type === b.type) {
-                return a.channel.localeCompare(b.channel, undefined, compareOptions);
+        const mergeResult = (current: Readonly<apid.ConfigChannels>): apid.ConfigChannels => {
+            const partial = mergeIncompleteItems(current, acquiredItems);
+            const retained = current.filter(item => !isInScope(item) || !replacedChannels.has(item.channel) || partial.retained.has(item));
+            // 別経路で新たに有効化された行も、保存時の最新設定で確認する。
+            const otherRoutes = new Set(retained.filter(other => !isOnRoute(other) && !other.isDisabled
+                && (other.route === undefined || common.channelRoutes.includes(other.route))
+                && _.tuner.typeExists(other.type, other.route || common.getDefaultChannelRoute(other.type))).map(typeChannelKey));
+            const configuredOtherTypes = new Set(legacyType === undefined ? [] : retained.filter(item => isOnRoute(item) && item.type !== legacyType).map(typeChannelKey));
+            const items = partial.items.filter(item => !otherRoutes.has(typeChannelKey(item)) && !configuredOtherTypes.has(typeChannelKey(item)));
+            result.length = 0;
+            for (const item of retained) { result.push(item); }
+            for (const item of items) { result.push(item); }
+            newCount = items.length;
+            // 0件の取得結果も確定する従来契約を維持する。引継ぎはskipChを含む今回の選択範囲だけを数える。
+            takeoverCount = retained.filter(item => isReplaced(item) && selectedChannels.has(item.channel)).length;
+            scanStatus.newCount = newCount;
+            scanStatus.takeoverCount = takeoverCount;
+            result.sort((a, b) => a.type === b.type ? a.channel.localeCompare(b.channel, undefined, compareOptions) : channelOrder[a.type] - channelOrder[b.type]);
+            return result;
+        };
+        if (!isCancellationRequested) {
+            if (dryRun) {
+                mergeResult(await config.loadChannels() as apid.ConfigChannels);
             } else {
-                return channelOrder[a.type] - channelOrder[b.type];
+                // 同じI/Oキュー内で最新設定の取得と保存を行い、並行PUTの更新を巻き戻さない。
+                await config.mergeAndSaveChannels(mergeResult);
             }
-        });
+        }
 
         // Generate and display summary
         const summaryData = {
@@ -1087,7 +1204,7 @@ async function runChannelScan(
 
         updateResultStatus(
             summaryData,
-            `-> total ${newCount + takeoverCount}/${result.length} (${route}/Any) channels configured.\n\n`
+            `-> total ${newCount + takeoverCount}/${result.length} (${legacyType ?? route}/Any) channels configured.\n\n`
         );
 
         updateResultStatus(
@@ -1104,7 +1221,6 @@ async function runChannelScan(
         if (!isCancellationRequested) {
             // Save results if not a dry run
             if (!dryRun) {
-                await config.saveChannels(result);
                 updatePhaseStatus(
                     { status: "completed" as const, saved: true },
                     "channel scan has been completed and saved successfully.\n"
@@ -1138,14 +1254,28 @@ async function runChannelScan(
     }
 }
 
+/** 旧設定の0・null・空文字は未指定として公開し、保存・統合に使う設定と候補を変更しない。 */
+function normalizePublicScanResult(channels: Readonly<apid.ConfigChannels>): apid.ConfigChannels {
+    return channels.map(channel => {
+        const relTs: unknown = channel.tsmfRelTs;
+        if (relTs !== 0 && relTs !== null && relTs !== "") { return channel; }
+        const normalized = { ...channel };
+        delete normalized.tsmfRelTs;
+        return normalized;
+    });
+}
+
 /**
  * Get channel scan status - API handler
  */
 export const get: Operation = async (req, res) => {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
 
-    // Return current scan status
-    api.responseJSON(res, scanStatus as apid.ChannelScanStatus);
+    // 旧設定を含む状態も複製して公開し、共有中の設定・結果を変更しない。
+    const snapshot: apid.ChannelScanStatus = { ...scanStatus, scanLog: scanStatus.scanLog?.slice(),
+        result: scanStatus.result && normalizePublicScanResult(scanStatus.result)
+    };
+    api.responseJSON(res, snapshot);
 };
 
 get.apiDoc = {
@@ -1170,6 +1300,19 @@ get.apiDoc = {
  * Initiate a channel scan - API handler
  */
 export const put: Operation = async (req, res) => {
+    // queryの型変換前に上限で切られた条件を、受理済みの指定として扱わない。
+    // URL上限はSDK・Web UIとそろえ、Nodeの既定ヘッダー上限にも余裕を残す。
+    const requestUrl = req.originalUrl || req.url || "";
+    if (Buffer.byteLength(requestUrl) > 8192) {
+        api.responseError(res, 400, "スキャン条件が長すぎます。符号化済みURLを8192バイト以下にしてください。チャンネル一覧やスキップの指定を分けてから、再度開始してください。");
+        return;
+    }
+    const queryStart = requestUrl.indexOf("?");
+    if (queryStart !== -1 && requestUrl.slice(queryStart + 1).split("&").length >= 1000) {
+        api.responseError(res, 400, "クエリーのパラメーター数は1000未満にしてください。channelsとskipChはそれぞれカンマ区切りの1キーで指定してください。");
+        return;
+    }
+
     // Check if a scan is already in progress
     if (scanStatus.isScanning === true) {
         api.responseError(res, 409, "Already Scanning");
@@ -1196,10 +1339,11 @@ export const put: Operation = async (req, res) => {
             reject(`\`type\` must be one of ${legacyScanTypes.join(", ")}`);
             return;
         }
+        // 明示した経路の不一致を既定値として無視せず、別経路の誤走査を受付前に防ぐ。
         const defaultRoute = common.getDefaultChannelRoute(legacyType);
-        if ((req.query.route !== undefined && req.query.route !== "TER" && req.query.route !== defaultRoute) ||
+        if ((req.query.route !== undefined && req.query.route !== defaultRoute) ||
             (req.query.source !== undefined && req.query.source !== "preset")) {
-            reject("`type` (deprecated) can not be used with `route` and `source`");
+            reject("typeのrouteには種別の既定経路、sourceにはpresetだけを指定できます。");
             return;
         }
     }
@@ -1207,21 +1351,52 @@ export const put: Operation = async (req, res) => {
     // Extract query parameters
     const asyncMode = Boolean(req.query.async);
     const dryRun = Boolean(req.query.dryRun);
+    // type省略は経路別presetへの意図した移行で、旧GRの範囲指定・同種別全体の置換へ推測で戻さない。
+    // 旧形式の範囲指定はtypeを明示するかsource=formatへ移行する。指定方法と置換範囲はAPI Docsを参照する。
     const route = legacyType !== undefined ? common.getDefaultChannelRoute(legacyType) : (req.query.route as apid.ChannelRoute) || "TER";
     const refresh = Boolean(req.query.refresh);
     const source = legacyType !== undefined ? "format" : (req.query.source as ChannelScanSource) || "preset";
+    const ignoredRangeParameters = ["minCh", "maxCh", "minSubCh", "maxSubCh", "channelNameFormat"]
+        .filter(name => req.query[name] !== undefined);
+    if (legacyType === undefined && source !== "format" && ignoredRangeParameters.length > 0) {
+        reject(`${ignoredRangeParameters.join("・")}はsource=${source}では使用できません。範囲を指定する場合はsource=formatと書式、または従来のtypeを指定してください。`);
+        return;
+    }
+    // useSubChは旧type指定だけの選択肢。経路形式は書式の{subch}で決め、指定を無視しない。
+    if (legacyType === undefined && req.query.useSubCh !== undefined) {
+        reject("useSubChは従来のtype指定でのみ使用できます。typeを省略する場合はuseSubChを外し、サブ番号が必要な場合はsource=formatの書式に{subch}を含めてください。");
+        return;
+    }
+    if (req.query.channels !== undefined && source !== "list") {
+        reject(legacyType !== undefined
+            ? "typeとchannelsは併用できません。チャンネル一覧を指定する場合はtypeを省略し、routeとsource=listを指定してください。"
+            : "channelsはsource=listでのみ指定できます。チャンネル一覧を指定する場合はsource=listを指定してください。");
+        return;
+    }
     const toList = (value: unknown): string[] => (Array.isArray(value) ? value : value === undefined ? [] : [value]).map(String);
     // the channels of BS not broadcast in TS are skipped by NIT of BS (not the channels specified by `list` / `format`)
     const byNetwork = legacyType === undefined && (source === "preset" || source === "dvbConf") && (route === "SAT" || route === "FTTH");
 
+    // この版の旧type指定は名前・名前中の数字も受け付ける互換契約を維持する。
+    // 5.0の主番号だけを使う制約は、識別子を渡す既存クライアントへ遡って適用しない。
     // Parse skipCh parameter (the names, or the numbers of 4.3.0 with `type`)
-    let skipCh = toList(req.query.skipCh);
+    let skipCh = toList(req.query.skipCh).map(name => name.trim()).filter(name => name.length > 0);
 
     const scanTypes = [...new Set(getScanAttempts(route, undefined, legacyType && [legacyType]).map(attempt => attempt.type))];
-    if (scanTypes.length === 0) {
+    if (scanTypes.length === 0 && source === "dvbConf") {
         reject(legacyType !== undefined ? `No tuners for the type ${legacyType}` : `No tuners for the route ${route}`);
         return;
     }
+    // 受付前のdvbConf読込もDELETEで取消し可能。読込の成否より取消しを優先する。
+    const cancelPreparation = (): boolean => {
+        if (!isCancellationRequested) { return false; }
+        scanStatus.isScanning = false;
+        isPreparing = false;
+        isCancellationRequested = false;
+        res.status(204);
+        res.end();
+        return true;
+    };
     const getDvbChannelNames = async (): Promise<string[]> => {
         const names = new Set<string>();
         for (const type of scanTypes) {
@@ -1248,14 +1423,21 @@ export const put: Operation = async (req, res) => {
         };
 
         // Generate scan configuration
-        scanConfig = legacyType !== undefined ? generateLegacyScanConfig({
+        scanConfig = legacyType !== undefined ? generateScanConfig({
             ...channelOptions,
             type: legacyType,
             useSubCh: req.query.useSubCh !== undefined ? Boolean(req.query.useSubCh) : undefined
         }) : generateScanConfig(channelOptions);
     } catch (error) {
+        if (cancelPreparation()) { return; }
         // such as a range too large (the scan is not started)
-        reject(`Invalid scan configuration (${error.message})`);
+        reject(error.message);
+        return;
+    }
+
+    if (cancelPreparation()) { return; }
+    if (scanTypes.length === 0) {
+        reject(legacyType !== undefined ? `No tuners for the type ${legacyType}` : `No tuners for the route ${route}`);
         return;
     }
 
@@ -1326,7 +1508,9 @@ export const put: Operation = async (req, res) => {
 put.apiDoc = {
     tags: ["config"],
     summary: "Channel Scan",
-    description: `Scans the channels of a receiving route, and decides the type of each stream by its network (original_network_id of the services):
+    description: `channels is accepted only with source=list; otherwise the request is rejected with 400. Without type, preset (the default) and dvbConf reject minCh, maxCh, minSubCh, maxSubCh and channelNameFormat with 400; use source=format and its required parameters instead.
+
+Scans the channels of a receiving route, and decides the type of each stream by its network (original_network_id of the services):
 - \`4\`: BS, \`6\` / \`7\`: CS, \`1\` / \`3\` / \`10\`: SKY, TLV (MMT): BS4K
 - \`0x7880\`-\`0x7FE8\` (terrestrial): GR
 - the networks of the cable television (\`0xFFF7\`, \`0xFFF9\`, \`0xFFFA\`, \`0xFFFD\`, \`0xFFFE\`, \`0xFFFF\`, such as the community channels): CATV
@@ -1349,6 +1533,7 @@ The relative streams of TSMF are detected on any local tuner.
 A tuner receiving multiple systems should have all the types to receive in \`types\` (such as \`[GR, BS, CS, BS4K, CATV]\` for CATV).
 
 Entry rewriting specifications:
+- SAT・FTTHのpresetまたはdvbConfでは、BSのNITからTSでの不在を確認できたチャンネルの取得を省略し、そのチャンネルの対象経路の既存行（無効な行を含む）を置換対象として、結果保存時に削除します。refresh=falseで有効設定を引き継ぐ場合、skipChで省略した場合、取得に失敗した場合は既存行を保持します。
 - The entries of the channels scanned on the route (of any type) are replaced with the result. The other entries remain.
 - If an enabled entry of the channel to be scanned is in the configuration file, the scan will not be performed for that channel and the entries of the channel remain intact. If you do not want to keep the entries, use the \`refresh\` option.
 - The entries added have the \`route\` if it is not the default of the type.
@@ -1381,22 +1566,22 @@ only the entries of the type are replaced):
             name: "route",
             type: "string",
             enum: ["TER", "SAT", "SKY", "CATV", "FTTH"] as apid.ChannelRoute[],
-            default: "TER",
-            description: "Specifies the receiving route to scan."
+            // handlerで補完し、type指定時の既定経路と明示TERを区別する。
+            description: "Specifies the receiving route to scan (default: TER, or the default route of type). With type, only its default route is accepted."
         },
         {
             in: "query",
             name: "type",
             type: "string",
             enum: legacyScanTypes,
-            description: "Deprecated (compatible with 4.3.0): scans the channels of the type by the tuners of the type, instead of `route` and `source`."
+            description: "Deprecated (compatible with 4.3.0): scans the channels of the type by the tuners of the type. route may be omitted or the default route of type; source may be omitted or preset."
         },
         {
             in: "query",
             name: "useSubCh",
             type: "boolean",
             allowEmptyValue: true,
-            description: "Deprecated (with `type`: BS): the subchannel style (e.g. BS01_0) if `true` (default), or `101`-`256`."
+            description: "従来のtype指定でのみ使用します。type=BSではtrue（省略時）でBS01_0などのサブチャンネル形式、falseで101〜256を使います。type省略時の指定は400です。source=formatでは書式に{subch}を含めてください。"
         },
         {
             in: "query",
@@ -1404,7 +1589,7 @@ only the entries of the type are replaced):
             type: "string",
             enum: ["preset", "dvbConf", "list", "format"] as ChannelScanSource[],
             default: "preset",
-            description: "Specifies the channels to scan."
+            description: "スキャン対象の指定方法です。typeを使わない場合、番号範囲・channelNameFormatはsource=formatでのみ指定できます。"
         },
         {
             in: "query",
@@ -1414,7 +1599,7 @@ only the entries of the type are replaced):
                 type: "string"
             },
             collectionFormat: "csv",
-            description: "Comma-separated list of the channels to scan (`source`: `list`)."
+            description: "source=listのチャンネル識別子をカンマ区切りの1キーで指定します。4096件以下、符号化済みURL全体は8192バイト以下、クエリーのキー数は1000未満にしてください。"
         },
         {
             in: "query",
@@ -1438,13 +1623,13 @@ only the entries of the type are replaced):
             in: "query",
             name: "minSubCh",
             type: "integer",
-            description: "The minimum number of `{subch}` (`source`: `format`, default: 0)."
+            description: "サブチャンネル番号の下限です（省略時0）。source=formatでは、書式に{subch}がない場合の指定は400です。"
         },
         {
             in: "query",
             name: "maxSubCh",
             type: "integer",
-            description: "The maximum number of `{subch}` (`source`: `format`, default: 3)."
+            description: "サブチャンネル番号の上限です（省略時3）。source=formatでは、書式に{subch}がない場合の指定は400です。"
         },
         {
             in: "query",
@@ -1454,7 +1639,7 @@ only the entries of the type are replaced):
                 type: "string"
             },
             collectionFormat: "csv",
-            description: "Comma-separated list of the channels to skip (the names, e.g. `C13,27`, also the numbers in the names with `type`)."
+            description: "取得を省くチャンネルをカンマ区切りの1キーで指定します。各識別子の前後の空白と空項目は除きます。4096件以下で、URL全体の8192バイト上限と1000未満のクエリーキー数にも従ってください。"
         },
         {
             in: "query",
@@ -1470,9 +1655,9 @@ only the entries of the type are replaced):
             name: "setDisabledOnAdd",
             type: "boolean",
             allowEmptyValue: true,
-            description: "If `true`, newly discovered channels will be added in disabled state.\n\n" +
-                "_Default value (GR)_: false\n" +
-                "_Default value (the others)_: true"
+            description: "`true` の場合、新たに取得したチャンネルを無効状態で追加します。ただし、サービスが未取得のTLV複数搬送波の行は、次回の受信に必要なため有効状態で追加します。\n\n" +
+                "_既定値（GR）_: false\n" +
+                "_既定値（GR以外）_: true"
         },
         {
             in: "query",
@@ -1516,6 +1701,9 @@ only the entries of the type are replaced):
                     }
                 }
             }
+        },
+        204: {
+            description: "Cancelled before the scan was accepted"
         },
         400: {
             description: "Invalid scan configuration, no tuners for the route (or the type), or \`type\` (deprecated) specified with \`route\` or \`source\`",

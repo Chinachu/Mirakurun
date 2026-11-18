@@ -1,3 +1,18 @@
+/*
+   Copyright 2026 Mirakurun contributors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 const { describe, it, before } = require("node:test");
 const assert = require("assert");
 const path = require("path");
@@ -46,7 +61,10 @@ function sectionPacket(pid, tableId, idExtension, body, { version = 0, current =
 }
 
 const TSID = 0x4010;
-const pat = () => sectionPacket(0, 0x00, TSID, [...u16(0), ...u16(0xE010), ...u16(151), ...u16(0xE1F0)]);
+const pat = (serviceIds = [151]) => sectionPacket(0, 0x00, TSID, [
+  ...u16(0), ...u16(0xE010),
+  ...serviceIds.flatMap((serviceId, index) => [...u16(serviceId), ...u16(0xE1F0 + index)])
+]);
 
 // transportStreams: [TSID, the frequency (8 digits of BCD, 10 kHz) of the satellite delivery system descriptor]
 function nit(networkId, transportStreams, options = {}, tableId = 0x40) {
@@ -55,6 +73,16 @@ function nit(networkId, transportStreams, options = {}, tableId = 0x40) {
     return [...u16(tsid), ...u16(networkId), ...u16(0xF000 | desc.length), ...desc];
   });
   return sectionPacket(0x10, tableId, networkId, [...u16(0xF000), ...u16(0xF000 | loop.length), ...loop], options);
+}
+
+function sdt(services) {
+  return sectionPacket(0x11, 0x42, TSID, [
+    ...u16(4), 0xFF,
+    ...services.flatMap(([serviceId, type, freeCaMode]) => {
+      const descriptor = [0x48, 5, type, 0, 2, 0x54, 0x56];
+      return [...u16(serviceId), 0xFC, ...u16(0x8000 | (freeCaMode << 12) | descriptor.length), ...descriptor];
+    })
+  ]);
 }
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -152,6 +180,57 @@ describe("[tsfilter-nit.spec] TSFilter.ts: the streams of the network by NIT", (
     f.close();
 
     assert.deepStrictEqual(events.networkStreams, [{ networkId: 0xFFFE, streams: [{ streamId: 0x0421 }, { streamId: 0x0420 }] }]);
+  });
+
+  it("ignores an out-of-range section before completing or resetting the network version", async () => {
+    const [f, events] = filter({ parseNetworkStreams: true });
+    try {
+      await write(f, [pat(), nit(4, [[0x4999]], { section: 1, last: 0 })]);
+      assert.deepStrictEqual(events.networkStreams, []);
+      await write(f, [
+        nit(4, [[TSID]], { version: 1, section: 0, last: 1 }),
+        nit(4, [[0x4999]], { version: 2, section: 2, last: 1 }),
+        nit(4, [[0x4011]], { version: 1, section: 1, last: 1 })
+      ]);
+      assert.deepStrictEqual(events.networkStreams, [{ networkId: 4, streams: [{ streamId: TSID }, { streamId: 0x4011 }] }]);
+    } finally { f.close(); }
+  });
+
+  it("notifies a repeated SDT serviceId once and keeps its first metadata", async () => {
+    const [f] = filter({ parseSDT: true });
+    const services = [];
+    f.on("services", rows => services.push(rows));
+    try {
+      await write(f, [pat([151, 152]), nit(4, [[TSID]]), sdt([
+        [151, 0x01, 0],
+        [151, 0xA5, 1],
+        [152, 0x02, 1],
+        [151, 0xA5, 1],
+        [153, 0x01, 0] // PATにないサービスは通知しない。
+      ])]);
+      assert.strictEqual(services.length, 1);
+      assert.deepStrictEqual(services[0].map(({ networkId, serviceId, streamId, type, isFree }) =>
+        ({ networkId, serviceId, streamId, type, isFree })), [
+        { networkId: 4, serviceId: 151, streamId: TSID, type: 0x01, isFree: true },
+        { networkId: 4, serviceId: 152, streamId: TSID, type: 0x02, isFree: false }
+      ]);
+    } finally { f.close(); }
+  });
+
+  it("keeps different SDT serviceIds even when their descriptors are identical", async () => {
+    const [f] = filter({ parseSDT: true });
+    const services = [];
+    f.on("services", rows => services.push(rows));
+    try {
+      await write(f, [pat([151, 152]), nit(4, [[TSID]]), sdt([
+        [151, 0x01, 0],
+        [152, 0x01, 0]
+      ])]);
+      assert.strictEqual(services.length, 1);
+      assert.deepStrictEqual(services[0].map(service => service.serviceId), [151, 152]);
+      assert.strictEqual(services[0][0].name, services[0][1].name);
+      assert.ok(services[0][0].name);
+    } finally { f.close(); }
   });
 
   it("does not collect the streams of the network by default", async () => {

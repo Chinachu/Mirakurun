@@ -16,6 +16,7 @@
 import { execSync } from "child_process";
 import { dirname } from "path";
 import { hostname } from "os";
+import { inspect } from "util";
 import { existsSync, readdirSync } from "fs";
 import { mkdir, copyFile, readFile, writeFile } from "fs/promises";
 import * as yaml from "js-yaml";
@@ -111,6 +112,7 @@ export async function loadServer(): Promise<Server> {
         config.tsplayEndpoint = "https://mirakurun-secure-contexts-api.pages.dev/tsplay/";
     }
     if (config.defaultTlvStreamFormat !== undefined && config.defaultTlvStreamFormat !== "ts" && config.defaultTlvStreamFormat !== "tlv") {
+        log.warn(`⚠️ defaultTlvStreamFormat の値 ${inspect(config.defaultTlvStreamFormat, { depth: 0, maxArrayLength: 4, maxStringLength: 128, breakLength: Infinity }).slice(0, 256)} は無効です。ts または tlv を指定してください。この値は適用しません。`);
         delete config.defaultTlvStreamFormat;
     }
 
@@ -180,6 +182,8 @@ export async function loadServer(): Promise<Server> {
         }
         if (DEFAULT_TLV_STREAM_FORMAT === "ts" || DEFAULT_TLV_STREAM_FORMAT === "tlv") {
             config.defaultTlvStreamFormat = DEFAULT_TLV_STREAM_FORMAT;
+        } else if (DEFAULT_TLV_STREAM_FORMAT) {
+            log.warn(`⚠️ 環境変数 DEFAULT_TLV_STREAM_FORMAT の値 ${JSON.stringify(DEFAULT_TLV_STREAM_FORMAT).slice(0, 256)} は無効です。ts または tlv を指定してください。この上書きは適用しません。`);
         }
 
         log.info("load server config (merged w/ env): %s", JSON.stringify(config));
@@ -387,6 +391,17 @@ export async function loadChannels(): Promise<Channel[]> {
 
 export function saveChannels(data: Channel[]): Promise<void> {
     return save("channels", CHANNELS_CONFIG_PATH, data);
+}
+
+/** 最新設定との統合と保存を同じI/Oキュー内で行う。 */
+export function mergeAndSaveChannels(merge: (current: Readonly<apid.ConfigChannels>) => apid.ConfigChannels): Promise<apid.ConfigChannels> {
+    return configIOQueue.add(async () => {
+        const current = yaml.load(await readFile(CHANNELS_CONFIG_PATH, "utf8"));
+        if (!Array.isArray(current)) { throw new Error("チャンネル設定の本文には配列を指定してください。"); }
+        const channels = merge(current);
+        await writeFile(CHANNELS_CONFIG_PATH, yaml.dump(channels));
+        return channels;
+    });
 }
 
 // use queue because async fs ops is not thread safe

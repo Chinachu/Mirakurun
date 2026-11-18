@@ -14,7 +14,7 @@
    limitations under the License.
 */
 import * as React from "react";
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import * as regexp from "../modules/regexp";
 import { ProgramAttributeMap, ProgramAttributeClassMap, ProgramAttributeNormalizationMap } from "../modules/constants";
 import { state } from "../modules/state";
@@ -24,6 +24,21 @@ import "./ProgramTitle.sass";
 
 type ProgramTitleProps = {
     program: Program;
+};
+// 多数のセルの登録・解除でStateのリスナー配列を繰り返し走査しないよう、通知元の購読を共有する。
+// サービス実体は保持せず、接続先・本人の変更時もStateの現在の索引だけを参照する。
+const serviceSubscribers = new Set<() => void>();
+const notifyServiceSubscribers = () => {
+    for (const notify of serviceSubscribers) { notify(); }
+};
+const subscribeServices = (onChange: () => void) => {
+    if (serviceSubscribers.size === 0) { state.on("services", notifyServiceSubscribers); }
+    serviceSubscribers.add(onChange);
+    return () => {
+        if (serviceSubscribers.delete(onChange) && serviceSubscribers.size === 0) {
+            state.off("services", notifyServiceSubscribers);
+        }
+    };
 };
 export const ProgramTitle: React.FC<ProgramTitleProps> = ({ program }) => {
     // console.debug("components", "ProgramTitle");
@@ -44,7 +59,9 @@ export const ProgramTitle: React.FC<ProgramTitleProps> = ({ program }) => {
     name = name.replace(regexp.squaredUnicode, "").replace(regexp.legacyAttributeFormat, "");
 
     // `false` if the service is normally scrambled, `undefined` if unknown
-    const serviceIsFree = program.isFree ? state.getService(program.networkId, program.serviceId)?.isFree : undefined;
+    // 共有済みのサービス索引だけを読み、該当値が変わる行だけを再描画する。
+    const getServiceIsFree = () => program.isFree ? state.getService(program.networkId, program.serviceId)?.isFree : undefined;
+    const serviceIsFree = useSyncExternalStore(subscribeServices, getServiceIsFree, getServiceIsFree);
 
     const attributes = useMemo(() => {
         const attrSet = new Set<keyof typeof ProgramAttributeMap>();
@@ -55,6 +72,8 @@ export const ProgramTitle: React.FC<ProgramTitleProps> = ({ program }) => {
                 ...attributeSource.match(regexp.legacyAttributeFormat) || [],
             ];
             // 通常有料のサービスで無料の番組 (サービスが分からない場合は従来どおり BS/CS の無料の番組)
+            // 無料フラグからの自動補完では通常無料のサービスの冗長表示を省く。明示された番組名の属性は保持する。
+            // 検索・ルール用に保存する無料属性は、この表示判断に依存させない。
             if (program.isFree && (serviceIsFree === false || (serviceIsFree === undefined && program.networkId >= 0x01 && program.networkId <= 0x0C))) {
                 items.push("無");
             }

@@ -39,6 +39,8 @@ interface TSFilterOptions {
     /** collects the streams of the network by all the sections of NIT (with `parseNIT`) */
     readonly parseNetworkStreams?: boolean;
     readonly tsmfRelTs?: number;
+    /** TSMF搬送波の全スロットを解析・書換えずに中継する内部モード。 */
+    readonly rawTsmf?: boolean;
 }
 
 const PACKET_SIZE = 188;
@@ -61,6 +63,8 @@ const PROVIDE_PIDS = [
 ];
 
 const DSMCC_BLOCK_SIZE = 4066; // ARIB TR-B15
+const MAX_LOGO_DATA_BYTES = 16 * 1024 * 1024;
+const MAX_LOGO_DOWNLOADS = 64;
 
 const LOGO_DATA_NAME_BS = Buffer.from("LOGO-05"); // ARIB STD-B21, ARIB TR-B15
 const LOGO_DATA_NAME_CS = Buffer.from("CS_LOGO-05"); // ARIB STD-B21, ARIB TR-B15
@@ -88,6 +92,7 @@ export default class TSFilter extends EventEmitter {
 
     // output
     private _output: Writable;
+    private readonly _handleOutputClose: () => void;
 
     // options
     private _provideServiceId: number;
@@ -95,6 +100,7 @@ export default class TSFilter extends EventEmitter {
     private _parseNIT = false;
     private _parseSDT = false;
     private _parseEIT = false;
+    private _rawTsmf = false;
     private _targetNetworkId: number;
     private _enableParseCDT = false;
     private _enableParseDSMCC = false;
@@ -102,6 +108,7 @@ export default class TSFilter extends EventEmitter {
     // tsmf
     private _tsmfEnableTsmfSplit = false;
     private _tsmfSlotCounter = -1;
+    private _tsmfFrame: Buffer | null = null;
     private _tsmfRelativeStreamNumber: number[] = [];
     private _tsmfTsNumber = 0;
 
@@ -148,13 +155,19 @@ export default class TSFilter extends EventEmitter {
     private _patMap: Map<number, number> = null; // <serviceId, pid>, for CATV ESS detection
     private _networkEmitted = false;
     private _networkMatched = false; // 自身の TS のセクションから通知したか
+    private _pendingSDT: { pid: number, data: any } = null; // CATVのESS判定前に届いた最新のSDTだけを保持する
+    private _catvNitSections = new Set<number>();
+    private _catvNitVersion = -1;
+    private _catvNitComplete = false; // 自TSを含まなくても、同じ版の全セクションを受信したらSDTを通知できる
     // the streams of each section of NIT (`null` if not collected, or already notified), of the network and the version
     private _nitSections: Map<number, NetworkStreams["streams"]> = null;
     private _nitVersion = -1;
     private _essMap = new Map<number, number>(); // <serviceId, pid>
     private _essEsPids = new Set<number>();
-    private _dlDataMap = new Map<number, DownloadData>();
+    // 1つのDIIに複数のロゴモジュールがあるため、downloadIdとmoduleIdで独立して保持する。
+    private _dlDataMap = new Map<string, DownloadData>();
     private _logoDataTimer: NodeJS.Timeout;
+    private _logoDataChecking = false;
     private _provideEventLastDetectedAt = -1;
     private _provideEventTimeout: NodeJS.Timeout = null;
     // 作成してから準備完了と最初の出力までの時間を計測するための作成時刻
@@ -175,6 +188,10 @@ export default class TSFilter extends EventEmitter {
 
     constructor(options: TSFilterOptions) {
         super();
+        this._handleOutputClose = () => this._close();
+
+        this._rawTsmf = options.rawTsmf === true;
+        if (this._rawTsmf) { options = { output: options.output }; }
 
         const enabletsmf = options.tsmfRelTs || 0;
         if (enabletsmf !== 0) {
@@ -190,7 +207,8 @@ export default class TSFilter extends EventEmitter {
             this._providePids = new Set(PROVIDE_PIDS);
             this._ready = false;
         }
-        if (this._provideEventId !== null) {
+        // 出力のない解析専用フィルターには、番組終了を監視するタイマーを作らない。
+        if (this._provideEventId !== null && options.output) {
             this._ready = false;
 
             const program = _.program.get(
@@ -213,8 +231,8 @@ export default class TSFilter extends EventEmitter {
         }
         if (options.output) {
             this._output = options.output;
-            this._output.once("finish", this._close.bind(this));
-            this._output.once("close", this._close.bind(this));
+            this._output.once("finish", this._handleOutputClose);
+            this._output.once("close", this._handleOutputClose);
         } else {
             this._provideServiceId = null;
             this._provideEventId = null;
@@ -303,6 +321,8 @@ export default class TSFilter extends EventEmitter {
         for (; offset < length; offset += PACKET_SIZE) {
             // sync byte (0x47) verifying
             if (chunk[offset] !== 71) {
+                // byte同期を失った区間のslot位置は推測しない。次の正常なTSMFヘッダーから再開する。
+                if (this._tsmfEnableTsmfSplit) { this._tsmfFrame = null; this._tsmfSlotCounter = -1; }
                 offset -= PACKET_SIZE - 1;
                 continue;
             }
@@ -325,7 +345,7 @@ export default class TSFilter extends EventEmitter {
             });
         }
 
-        if (defer === false || (this._ready && this._patWritten === false)) {
+        if (defer === false || (!this._rawTsmf && this._ready && this._patWritten === false)) {
             this.flush();
         }
     }
@@ -355,42 +375,58 @@ export default class TSFilter extends EventEmitter {
         this._close();
     }
 
-    close(): void {
-        this._close();
+    close(endOutput = true): void {
+        this._close(endOutput);
     }
 
     /** `source[offset..offset + PACKET_SIZE]` のパケットを処理する (必要な場合以外は切り出さない) */
-    private _processPacket(source: Buffer, offset: number, parsingBuffers: Buffer[]): void {
+    private _processPacket(source: Buffer, offset: number, parsingBuffers: Buffer[], relativePacket = false): void {
         const header1 = source[offset + 1];
         const pid = ((header1 & 0x1F) << 8) | source[offset + 2];
 
+        if (this._rawTsmf) {
+            // NULL・TEIも52スロットの位置を占めるため、解析・分離・書換えより先にそのまま通す。
+            const info = this.streamInfo[pid] ??= { packet: 0, drop: 0 };
+            ++info.packet;
+            this._pushRun(source, offset);
+            return;
+        }
+
         // tsmf
-        if (this._tsmfEnableTsmfSplit) {
+        if (this._tsmfEnableTsmfSplit && !relativePacket) {
             if (pid === 0x002F) {
-                const tsmfFlameSync = source.readUInt16BE(offset + 4) & 0x1FFF;
-                if (tsmfFlameSync !== 0x1A86 && tsmfFlameSync !== 0x0579) {
+                // 先行フレームが52slotに満たない場合や、ヘッダーが壊れている場合は位置情報ごと捨てる。
+                this._tsmfFrame = null;
+                this._tsmfSlotCounter = -1;
+                this._tsmfRelativeStreamNumber = [];
+                const payload = source.subarray(offset + 4, offset + PACKET_SIZE);
+                const frameSync = payload.readUInt16BE(0) & 0x1FFF;
+                if ((header1 & 0x80) !== 0 || (frameSync !== 0x1A86 && frameSync !== 0x0579) || TsCrc32.calc(payload) !== 0) {
                     return;
                 }
-
-                this._tsmfRelativeStreamNumber = [];
                 for (let i = 0; i < 26; i++) {
-                    this._tsmfRelativeStreamNumber.push((source[offset + 73 + i] & 0xf0) >> 4);
-                    this._tsmfRelativeStreamNumber.push(source[offset + 73 + i] & 0x0f);
+                    this._tsmfRelativeStreamNumber.push((payload[69 + i] & 0xf0) >> 4);
+                    this._tsmfRelativeStreamNumber.push(payload[69 + i] & 0x0f);
                 }
-
                 this._tsmfSlotCounter = 0;
                 return;
             }
+            if (this._tsmfSlotCounter < 0 || this._tsmfSlotCounter >= 52) { return; }
 
-            if (this._tsmfSlotCounter < 0 || this._tsmfSlotCounter > 51) {
-                return;
+            // 未確定の出力は最大52×188Bだけコピーして保持し、大きな入力chunkのviewを残さない。
+            // 単独の欠落を検出するまで他の相対TSを流さず、正常な52slot末尾は次ヘッダーを待たず確定する。
+            // データと次ヘッダーの複合欠落は個数だけで完全に識別できないため、推測によるslot補完は行わない。
+            const frame = this._tsmfFrame ??= Buffer.allocUnsafe(52 * PACKET_SIZE);
+            source.copy(frame, this._tsmfSlotCounter * PACKET_SIZE, offset, offset + PACKET_SIZE);
+            if (++this._tsmfSlotCounter < 52) { return; }
+            // 確定済みviewは既存の出力queueへ渡す。次のフレームでは別Bufferを使い、遅延出力を上書きしない。
+            this._tsmfFrame = null;
+            for (let slot = 0; slot < 52 && !this._closed; ++slot) {
+                if (this._tsmfRelativeStreamNumber[slot] === this._tsmfTsNumber) {
+                    this._processPacket(frame, slot * PACKET_SIZE, parsingBuffers, true);
+                }
             }
-
-            this._tsmfSlotCounter++;
-
-            if (this._tsmfRelativeStreamNumber[this._tsmfSlotCounter - 1] !== this._tsmfTsNumber) {
-                return;
-            }
+            return;
         }
 
         // NULL
@@ -537,7 +573,14 @@ export default class TSFilter extends EventEmitter {
         const tsidChanged = this._tsid !== data.transport_stream_id;
 
         this._tsid = data.transport_stream_id;
-        this._patMap = this._isCatv ? new Map() : null;
+        if (tsidChanged) {
+            this._pendingSDT = null;
+            this._catvNitSections.clear();
+            this._catvNitVersion = -1;
+            this._catvNitComplete = false;
+        }
+        // スキャンではnetworkIdがまだないため、後着のNIT/SDTによるCATV判定にも備える。
+        this._patMap = this._isCatv || (this._targetNetworkId === null && this._parseNIT) ? new Map() : null;
         this._serviceIds = new Set();
         this._parseServiceIds = new Set();
 
@@ -568,7 +611,12 @@ export default class TSFilter extends EventEmitter {
                 (this._targetNetworkId === 4 && serviceId === 929) // ARIB TR-B15 (BS/CS)
             ) {
                 const essPmtPid = program.program_map_PID;
+                const previousPid = this._essMap.get(serviceId);
                 this._essMap.set(serviceId, essPmtPid);
+                if (previousPid !== undefined && previousPid !== essPmtPid) {
+                    const parsing = this._parsePids.delete(previousPid);
+                    if (parsing || this._logoDataTimer) { this._parsePids.add(essPmtPid); }
+                }
 
                 log.debug("TSFilter#_onPAT: detected ESS PMT PID=%d as serviceId=%d", essPmtPid, serviceId);
                 continue;
@@ -652,7 +700,9 @@ export default class TSFilter extends EventEmitter {
 
                 if (newEssPmtPid !== essPmtPid) {
                     this._essMap.set(serviceId, newEssPmtPid);
-                    if (this._parsePids.delete(essPmtPid)) {
+                    const parsing = this._parsePids.delete(essPmtPid);
+                    // 解析済みPMTはparsePidsから外れる。ロゴ待機中なら更新先を改めて解析する。
+                    if (parsing || (this._enableParseDSMCC && this._logoDataTimer)) {
                         this._parsePids.add(newEssPmtPid);
                     }
 
@@ -715,6 +765,9 @@ export default class TSFilter extends EventEmitter {
             return;
         }
 
+        if (this._targetNetworkId === null && this._parseNIT && CATV_NETWORK_IDS.includes(data.network_id)) {
+            this._isCatv = true;
+        }
         if (this._nitSections !== null) {
             this._collectNetworkStreams(data);
         }
@@ -727,6 +780,20 @@ export default class TSFilter extends EventEmitter {
 
         // NIT of CATV lists many transport streams (in multiple sections)
         const matchedTs = data.transport_streams.find(ts => ts.transport_stream_id === this._tsid);
+        // SDTのONIDでCATVと分かった場合も、NITのnetwork_idに依存せず全セクションで保留を解除する。
+        // NITが先に非CATVとして確定した場合は_networkMatchedが立ち、後着のSDTを保留しない。
+        if (this._isCatv && !this._networkMatched && data.current_next_indicator !== 0) {
+            const version = (data.network_id << 5) | data.version_number;
+            if (this._catvNitVersion !== version) {
+                this._catvNitVersion = version;
+                this._catvNitSections.clear();
+                this._catvNitComplete = false;
+            }
+            if (data.section_number <= data.last_section_number) {
+                this._catvNitSections.add(data.section_number);
+                this._catvNitComplete = this._catvNitSections.size === data.last_section_number + 1;
+            }
+        }
         // CATV では、自身の TS が見つからなければ別の TS の記述子を読まない
         // (別の TS の remoteControlKeyId を通知しないため)
         const ts = matchedTs || (this._isCatv ? undefined : data.transport_streams[0]);
@@ -756,15 +823,21 @@ export default class TSFilter extends EventEmitter {
             this.emit("network", _network);
         }
 
-        // for CATV, wait for the section of this transport stream (and all the sections if the streams of the network are collected)
-        if (this._parsePids.has(pid) && (this._isCatv === false || matchedTs) && this._nitSections === null) {
+        if (!this._closed && (this._networkMatched || this._catvNitComplete) && this._pendingSDT !== null) {
+            const pending = this._pendingSDT;
+            this._pendingSDT = null;
+            this._onSDT(pending.pid, pending.data);
+        }
+
+        // CATVでは自TSのセクション、または自TSのない全セクションを受信するまで待つ。
+        if (this._parsePids.has(pid) && (this._isCatv === false || matchedTs || this._catvNitComplete) && this._nitSections === null) {
             this._parsePids.delete(pid);
         }
     }
 
     /** collects the streams of the network by all the sections of NIT, notified once */
     private _collectNetworkStreams(data: any): void {
-        if (data.current_next_indicator === 0) {
+        if (data.current_next_indicator === 0 || data.section_number > data.last_section_number) {
             return;
         }
         // the sections of the same network and the same version (the relative streams of TSMF mixed may carry the different networks)
@@ -804,6 +877,8 @@ export default class TSFilter extends EventEmitter {
                 continue;
             }
             this._essMap.set(service.service_id, essPmtPid);
+            // 待機開始後に追加されたESSも、既存の待機期間内にPMTを解析する。
+            if (this._enableParseDSMCC && this._logoDataTimer) { this._parsePids.add(essPmtPid); }
             this._serviceIds.delete(service.service_id);
             detected = true;
 
@@ -818,6 +893,16 @@ export default class TSFilter extends EventEmitter {
 
     private _onSDT(pid: number, data: any): void {
         if (this._tsid !== data.transport_stream_id) {
+            return;
+        }
+
+        if (this._targetNetworkId === null && this._parseNIT && CATV_NETWORK_IDS.includes(data.original_network_id)) {
+            this._isCatv = true;
+        }
+        // CATVのSDTはESSを通常のservice_typeで載せる場合がある。自TSのNIT、または全セクションを待つ。
+        // NITを確認できない場合はサービスを推測して通知せず、スキャン呼出元のタイムアウトとcloseに委ねる。
+        if (this._isCatv && !this._networkMatched && !this._catvNitComplete) {
+            this._pendingSDT = { pid, data };
             return;
         }
 
@@ -848,11 +933,12 @@ export default class TSFilter extends EventEmitter {
                 }
             }
 
+            // ESSはnetworkIdにかかわらず通常のservices通知から除く。BS/CS/CATVではロゴ受信にも使い、地上波のロゴはCDTで受信する。
             if (type === SERVICE_TYPE_ENGINEERING) {
                 continue;
             }
 
-            if (_services.some(_service => _service.id === service.service_id) === false) {
+            if (_services.some(_service => _service.serviceId === service.service_id) === false) {
                 _services.push({
                     networkId: data.original_network_id,
                     serviceId: service.service_id,
@@ -955,14 +1041,15 @@ export default class TSFilter extends EventEmitter {
             const downloadId: number = ddb.downloadId;
             const moduleId: number = ddb.moduleId;
 
-            const dl = this._dlDataMap.get(downloadId);
+            const downloadKey = `${downloadId}:${moduleId}`;
+            const dl = this._dlDataMap.get(downloadKey);
             if (!dl || dl.moduleId !== moduleId || !dl.data) {
                 return;
             }
 
             const moduleVersion: number = ddb.moduleVersion;
             if (dl.moduleVersion !== moduleVersion) {
-                this._dlDataMap.delete(downloadId);
+                this._dlDataMap.delete(downloadKey);
                 return;
             }
 
@@ -989,6 +1076,7 @@ export default class TSFilter extends EventEmitter {
 
             const dlData = dl.data;
             delete dl.data;
+            dl.loadedBlocks.clear();
 
             const dataModule = new tsDataModule.TsDataModuleLogo(dlData).decode();
             for (const logo of dataModule.logos) {
@@ -1017,11 +1105,12 @@ export default class TSFilter extends EventEmitter {
             // DII - Download Info Indication
             const dii = data.message;
 
-            if (this._dlDataMap.has(dii.downloadId)) {
-                return;
-            }
-
             for (const module of dii.modules) {
+                const downloadKey = `${dii.downloadId}:${module.moduleId}`;
+                const previous = this._dlDataMap.get(downloadKey);
+                if (previous && (previous.data || previous.moduleVersion === module.moduleVersion)) {
+                    continue;
+                }
                 for (const descriptor of module.moduleInfo) {
                     // name
                     if (descriptor.descriptor_tag !== 0x02) {
@@ -1037,7 +1126,19 @@ export default class TSFilter extends EventEmitter {
                         continue;
                     }
                     const blockSize: number = dii.blockSize || DSMCC_BLOCK_SIZE;
-                    this._dlDataMap.set(dii.downloadId, {
+                    const retainedBytes = [...this._dlDataMap.values()].reduce((bytes, download) => bytes + (download.data?.length || 0), 0);
+                    if (!Number.isInteger(module.moduleSize) || module.moduleSize <= 0 || retainedBytes + module.moduleSize > MAX_LOGO_DATA_BYTES
+                        || !Number.isInteger(blockSize) || blockSize <= 0) {
+                        continue;
+                    }
+                    if (previous) { this._dlDataMap.delete(downloadKey); }
+                    if (this._dlDataMap.size >= MAX_LOGO_DOWNLOADS) {
+                        // 完了済みは直近の重複抑止にだけ使い、新しい受信枠が必要なら解放する。未完了のデータは残す。
+                        const completed = [...this._dlDataMap].find(([, download]) => !download.data);
+                        if (!completed) { continue; }
+                        this._dlDataMap.delete(completed[0]);
+                    }
+                    this._dlDataMap.set(downloadKey, {
                         downloadId: dii.downloadId,
                         blockSize,
                         moduleId: module.moduleId,
@@ -1073,7 +1174,7 @@ export default class TSFilter extends EventEmitter {
         if (this._closed) {
             return;
         }
-        if (this._logoDataTimer) {
+        if (this._logoDataTimer || this._logoDataChecking) {
             return;
         }
         if (this._enableParseDSMCC && this._essMap.size === 0) {
@@ -1112,63 +1213,71 @@ export default class TSFilter extends EventEmitter {
         const now = Date.now();
         const logoDataInterval = _.config.server.logoDataInterval || 1000 * 60 * 60 * 24 * 7; // 7 days
 
-        for (const networkId in logoIdNetworkMap) {
-            for (const logoId of logoIdNetworkMap[networkId]) {
-                if (logoId === -1 && logoIdNetworkMap[networkId].size > 1) {
-                    continue;
-                }
+        // EIT開始と後発NITのESS検出が重なっても、照会中から待機開始まで1件だけ進める。
+        this._logoDataChecking = true;
+        try {
+            for (const networkId in logoIdNetworkMap) {
+                for (const logoId of logoIdNetworkMap[networkId]) {
+                    if (logoId === -1 && logoIdNetworkMap[networkId].size > 1) {
+                        continue;
+                    }
 
-                // check logoDataInterval
-                if (now - await Service.getLogoDataMTime(this._targetNetworkId, logoId) > logoDataInterval) {
-                    if (this._closed) {
+                    // check logoDataInterval
+                    if (now - await Service.getLogoDataMTime(this._targetNetworkId, logoId) > logoDataInterval) {
+                        if (this._closed) {
+                            return; // break all loops
+                        }
+
+                        if (this._enableParseCDT) {
+                            // for GR
+                            if (logoId >= 0) {
+                                this._parsePids.add(0x29); // CDT PID
+                            }
+
+                            // add listener
+                            this._parser.on("cdt", this._onCDT.bind(this));
+
+                            // add timer
+                            this._logoDataTimer = setTimeout(() => {
+                                this._parsePids.delete(0x29); // CDT
+                                this._parser.removeAllListeners("cdt");
+
+                                log.info("TSFilter#_standbyLogoData: stopped waiting for logo data (networkId=%d, logoId=%d)", this._targetNetworkId, logoId);
+                            }, 1000 * 60 * 30); // 30 mins
+
+                            log.info("TSFilter#_standbyLogoData: waiting for logo data for 30 minutes... (networkId=%d, logoId=%d)", this._targetNetworkId, logoId);
+                        } else if (this._enableParseDSMCC) {
+                            // for BS/CS/CATV
+                            for (const essPmtPid of this._essMap.values()) {
+                                this._parsePids.add(essPmtPid); // ESS PMT PID
+                            }
+
+                            // add listener
+                            this._parser.on("dsmcc", this._onDSMCC.bind(this));
+
+                            // add timer
+                            this._logoDataTimer = setTimeout(() => {
+                                delete this._logoDataTimer;
+
+                                for (const essEsPid of this._essEsPids.values()) {
+                                    this._parsePids.delete(essEsPid);
+                                }
+                                this._parser.removeAllListeners("dsmcc");
+                                // 購読終了後は完成できないため、未完了モジュールも解放する。
+                                this._dlDataMap.clear();
+
+                                log.info("TSFilter#_standbyLogoData: stopped waiting for logo data (networkId=[%s])", logNetworkIds);
+                            }, 1000 * 60 * 30); // 30 mins
+
+                            log.info("TSFilter#_standbyLogoData: waiting for logo data for 30 minutes... (networkId=[%s])", logNetworkIds);
+                        }
+
                         return; // break all loops
                     }
-
-                    if (this._enableParseCDT) {
-                        // for GR
-                        if (logoId >= 0) {
-                            this._parsePids.add(0x29); // CDT PID
-                        }
-
-                        // add listener
-                        this._parser.on("cdt", this._onCDT.bind(this));
-
-                        // add timer
-                        this._logoDataTimer = setTimeout(() => {
-                            this._parsePids.delete(0x29); // CDT
-                            this._parser.removeAllListeners("cdt");
-
-                            log.info("TSFilter#_standbyLogoData: stopped waiting for logo data (networkId=%d, logoId=%d)", this._targetNetworkId, logoId);
-                        }, 1000 * 60 * 30); // 30 mins
-
-                        log.info("TSFilter#_standbyLogoData: waiting for logo data for 30 minutes... (networkId=%d, logoId=%d)", this._targetNetworkId, logoId);
-                    } else if (this._enableParseDSMCC) {
-                        // for BS/CS/CATV
-                        for (const essPmtPid of this._essMap.values()) {
-                            this._parsePids.add(essPmtPid); // ESS PMT PID
-                        }
-
-                        // add listener
-                        this._parser.on("dsmcc", this._onDSMCC.bind(this));
-
-                        // add timer
-                        this._logoDataTimer = setTimeout(() => {
-                            delete this._logoDataTimer;
-
-                            for (const essEsPid of this._essEsPids.values()) {
-                                this._parsePids.delete(essEsPid);
-                            }
-                            this._parser.removeAllListeners("dsmcc");
-
-                            log.info("TSFilter#_standbyLogoData: stopped waiting for logo data (networkId=[%s])", logNetworkIds);
-                        }, 1000 * 60 * 30); // 30 mins
-
-                        log.info("TSFilter#_standbyLogoData: waiting for logo data for 30 minutes... (networkId=[%s])", logNetworkIds);
-                    }
-
-                    return; // break all loops
                 }
             }
+        } finally {
+            this._logoDataChecking = false;
         }
     }
 
@@ -1197,11 +1306,13 @@ export default class TSFilter extends EventEmitter {
         }
     }
 
-    private _close(): void {
+    private _close(endOutput = true): void {
         if (this._closed) {
             return;
         }
         this._closed = true;
+        // 未完の末尾は相対TSの位置を確定できないため出力せず解放する。
+        this._tsmfFrame = null;
 
         // clear timer
         clearTimeout(this._pmtTimer);
@@ -1220,6 +1331,10 @@ export default class TSFilter extends EventEmitter {
         this._parser.removeAllListeners();
         this._parser.end();
         delete this._parser;
+
+        this._dlDataMap.clear();
+        this._pendingSDT = null;
+        this._catvNitSections.clear();
 
         // clear EPG instance & state
         if (this._epg) {
@@ -1242,7 +1357,7 @@ export default class TSFilter extends EventEmitter {
         if (this._output) {
             // 保留していた出力は、書き出せる状態なら閉じる前に書き出す
             if (
-                this._buffer.length !== 0 &&
+                endOutput && this._buffer.length !== 0 &&
                 this._ready &&
                 this._output.writableEnded === false &&
                 this._output.destroyed === false &&
@@ -1250,10 +1365,11 @@ export default class TSFilter extends EventEmitter {
             ) {
                 this._writeBuffer();
             }
-            if (this._output.writableEnded === false) {
+            if (endOutput && this._output.writableEnded === false) {
                 this._output.end();
             }
-            this._output.removeAllListeners();
+            this._output.removeListener("finish", this._handleOutputClose);
+            this._output.removeListener("close", this._handleOutputClose);
             delete this._output;
         }
 

@@ -433,7 +433,8 @@ export const TunersConfigView: React.FC = () => {
                                         {/* hidden for the tuners only for GR, which does not carry TLV (MMT) */}
                                         {(tuner.types?.some(type => type !== "GR") || tuner.tlvDecoder || tuner.tlvToTsDecoder) && (
                                             <>
-                                                <FormGroup label="TLV Decoder">
+                                                {/* リモートでも、生TSMFをこのMirakurunで展開する場合の復号に使うため表示する。 */}
+                                                <FormGroup label="TLV Decoder" helperText={`TLV／MMTを復号するコマンドを指定してください。${tuner.remoteMirakurunHost ? "通常のリモート受信には適用されません。生TSMFを取得してこのMirakurunで展開する場合に使用します。通常の受信時の復号は「Decode (Remote Mirakurun Decoder)」で指定してください。" : ""}空欄の場合、このMirakurunではTLVを復号しません。コマンドはMirakurun を実行する環境で利用できる必要があります。`}>
                                                     <InputGroup
                                                         value={tuner.tlvDecoder || ""}
                                                         onChange={(e) => {
@@ -446,7 +447,7 @@ export const TunersConfigView: React.FC = () => {
                                                         }}
                                                     />
                                                 </FormGroup>
-                                                <FormGroup label="TLV to TS Decoder">
+                                                <FormGroup label="TLV to TS Decoder" helperText="TLV／MMTをMPEG-TSへ変換するコマンドを指定してください。TLVのチャンネルをMPEG-TSで視聴する場合に必要です。コマンドはMirakurunを実行する環境で利用できる必要があります。">
                                                     <InputGroup
                                                         value={tuner.tlvToTsDecoder || ""}
                                                         onChange={(e) => {

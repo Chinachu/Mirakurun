@@ -67,7 +67,7 @@ const VALUE_OPTIONS: { [name: string]: string } = {
 
 /**
  * dvbv5-zap のコマンドのチャンネル設定ファイル (`-c`)。dvbv5-zap でなければ null を返す
- * (チャンネルスキャン用。直接操作できないオプションがあってもよい)
+ * (チャンネルスキャン用。直接操作できないオプションがあってもよい。未解決のファイル名変数は非対応)
  */
 export function findDvbv5ZapChannelsConf(command: string): string | null {
     const { command: bin, args } = common.parseCommandForSpawn(command);
@@ -80,7 +80,8 @@ export function findDvbv5ZapChannelsConf(command: string): string | null {
             const [longName, inlineValue] = splitOnce(arg.slice(2), "=");
             const short = findShortName(longName);
             if (short === "c") {
-                return inlineValue ?? args[i + 1] ?? null;
+                const confPath = inlineValue ?? args[i + 1];
+                return confPath && !/<[^>]*>/.test(confPath) ? confPath : null;
             }
             if (short !== null && VALUE_OPTIONS[short] && inlineValue === undefined) {
                 i++;
@@ -90,7 +91,8 @@ export function findDvbv5ZapChannelsConf(command: string): string | null {
         if (arg.startsWith("-") && arg.length > 1) {
             for (let j = 1; j < arg.length; j++) {
                 if (arg[j] === "c") {
-                    return j + 1 < arg.length ? arg.slice(j + 1) : args[i + 1] ?? null;
+                    const confPath = j + 1 < arg.length ? arg.slice(j + 1) : args[i + 1];
+                    return confPath && !/<[^>]*>/.test(confPath) ? confPath : null;
                 }
                 if (VALUE_OPTIONS[arg[j]]) {
                     if (j + 1 === arg.length) {

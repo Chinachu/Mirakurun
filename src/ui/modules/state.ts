@@ -135,9 +135,8 @@ class State extends EventEmitter<StateEventTypes> {
 
     async fetchServices(): Promise<Service[]> {
         this.services = await this._rpc.call("getServices");
-        if (this.services.length > 0) {
-            this.emit("services", this.services);
-        }
+        // 空一覧も通知し、再接続・定期取得で消えたサービスを索引や表示へ残さない。
+        this.emit("services", this.services);
         return this.services;
     }
 

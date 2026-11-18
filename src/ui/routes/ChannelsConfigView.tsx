@@ -43,6 +43,17 @@ import "./ChannelsConfigView.sass";
 
 const configAPI = "/api/config/channels";
 const typesIndex = ["GR", "BS", "CS", "SKY", "BS4K", "CATV"];
+const satellitePresetRanges = [
+    ...Array.from({ length: 23 }, (_, i) => {
+        const channel = `BS${String(i + 1).padStart(2, "0")}`;
+        return `${channel}_0-${channel}_3`;
+    }),
+    "CS2-CS24"
+].join(", ");
+const relativeTsErrorMessage = "相対TSは1以上15以下の整数で指定してください。";
+const isValidRelativeTs = (value: number | undefined) => value === undefined || Number.isInteger(value) && value >= 1 && value <= 15;
+const tsmfGroupIdErrorMessage = "TSMFグループIDは1以上255以下の整数で指定してください。";
+const isValidTsmfGroupId = (value: number | undefined) => value === undefined || Number.isInteger(value) && value >= 1 && value <= 255;
 
 function sortTypes(types: ChannelType[]): ChannelType[] {
     return types.sort((a, b) => typesIndex.indexOf(a) - typesIndex.indexOf(b));
@@ -50,27 +61,55 @@ function sortTypes(types: ChannelType[]): ChannelType[] {
 
 // チャンネルの一覧を展開する関数 (同じ接頭辞の末尾の番号の範囲を展開し、チャンネル名はそのまま。例: "14-16,C18-C19,BS01_0-BS01_1" → ["14", "15", "16", "C18", "C19", "BS01_0", "BS01_1"])
 function expandChannelRanges(input: string): string[] {
-    const result: string[] = [];
-
-    for (const part of input.split(",").map(p => p.trim()).filter(p => p !== "")) {
+    if (!input.trim()) { return []; }
+    const result = new Set<string>();
+    let expandedCount = 0;
+    const invalid = () => new Error("数値のチャンネルは0以上の整数で指定してください。範囲の端点は0以上65535以下とし、開始番号以上の終了番号を指定してください。");
+    const addChannel = (channel: string) => {
+        // 単体の数字名は周波数などの識別子なので上限を設けず、長い値も数値へ変換しない。
+        // 4- や 13x は識別子として扱い、範囲の展開後も指数・小数・符号付き数値は拒否する。
+        // APIは任意の識別子を受けるが、この範囲入力では数値の誤記による意図しない走査を防ぐ。
+        if (!/^\d+$/.test(channel) && !Number.isNaN(Number(channel))) { throw invalid(); }
+        result.add(channel);
+    };
+    for (const raw of input.split(",")) {
+        const part = raw.trim();
+        if (!part || part.length > 1024) { throw invalid(); }
         // the prefix of the end may be omitted (e.g. C13-20)
-        const range = /^(.*?)(\d+)-(.*?)(\d+)$/.exec(part);
+        const range = /^(.*?)(\d+)\s*-\s*(.*?)(\d+)$/.exec(part);
+        // 終了側の接頭辞は省略できるが、開始側が数値のみでも終了側だけに名称の接頭辞は付けられない。
+        // 1-2-3など数値と区切りだけの単体識別子は従来どおり扱う。
+        if (range && range[3] !== "" && range[1] !== range[3]
+            && (range[1] !== "" || /[^\d+.\s-]/.test(range[3]))) {
+            throw new Error("範囲の開始と終了には同じ接頭辞を指定してください。異なる接頭辞のチャンネルは、同じ接頭辞の範囲に分けるか、カンマで区切って指定してください。");
+        }
         if (range && (range[1] === range[3] || range[3] === "")) {
             // the digits of the start (zero padded, e.g. BS01-BS03 -> BS01, BS02, BS03)
-            const [start, end] = [parseInt(range[2], 10), parseInt(range[4], 10)].sort((a, b) => a - b);
+            const start = Number(range[2]);
+            const end = Number(range[4]);
+            if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end > 65535 || start > end) { throw invalid(); }
+            expandedCount += end - start + 1;
+            if (expandedCount > 4096) { throw new Error("スキップまたは取得するチャンネルは、重複を含む展開後の件数を4096件以下にしてください。"); }
             for (let i = start; i <= end; i++) {
-                result.push(`${range[1]}${String(i).padStart(range[2].length, "0")}`);
+                addChannel(`${range[1]}${String(i).padStart(range[2].length, "0")}`);
             }
         } else {
-            result.push(part);
+            if (++expandedCount > 4096) { throw new Error("スキップまたは取得するチャンネルは、重複を含む展開後の件数を4096件以下にしてください。"); }
+            addChannel(part);
         }
     }
 
-    return [...new Set(result)];
+    return [...result];
 }
 
 const migrateChannels = (channels: ConfigChannels): ConfigChannels => {
     return channels.map(ch => {
+        // 旧サーバーが返す0・null・空文字は読込時だけ未指定へ移す。新しい入力は範囲検証で拒否する。
+        const relTs: unknown = ch.tsmfRelTs;
+        if (relTs === 0 || relTs === null || relTs === "") {
+            ch = { ...ch };
+            delete ch.tsmfRelTs;
+        }
         if ((ch.satellite || ch.space !== undefined || ch.freq !== undefined || ch.polarity) && (!ch.commandVars || Object.keys(ch.commandVars).length === 0)) {
             const commandVars: Record<string, string | number> = {};
             if (ch.satellite) {
@@ -103,16 +142,18 @@ const dvbConfDefaultTypes: Partial<Record<ChannelRoute, ChannelType[]>> = {
 
 /** スキャンに使うチューナーがすべて dvbv5-zap の場合は、チャンネル設定ファイルを既定にする */
 function getDefaultScanSource(route: ChannelRoute, tuners: ConfigTuners): ChannelScanSource {
+    // SKYにはプリセットがないため、対象名を入力できる一覧を初期値にする。
+    const fallback = route === "SKY" ? "list" : "preset";
     const types = dvbConfDefaultTypes[route];
     if (!types) {
-        return "preset";
+        return fallback;
     }
     const used = tuners.filter(tuner => (
         tuner.isDisabled !== true &&
         (tuner.types || []).some(type => types.includes(type)) &&
         (!tuner.routes || tuner.routes.includes(route))
     ));
-    return used.length > 0 && used.every(tuner => /^(\S*\/)?dvbv5-zap\s/.test(tuner.command || "")) ? "dvbConf" : "preset";
+    return used.length > 0 && used.every(tuner => tuner.remoteMirakurunHost === undefined && /^(\S*\/)?dvbv5-zap\s/.test(tuner.command || "")) ? "dvbConf" : fallback;
 }
 
 export const ChannelsConfigView: React.FC = () => {
@@ -129,9 +170,17 @@ export const ChannelsConfigView: React.FC = () => {
     const [scanRoute, setScanRoute] = useState<ChannelRoute>("TER");
     const [scanSource, setScanSource] = useState<ChannelScanSource>("preset");
     const [scanTuners, setScanTuners] = useState<ConfigTuners>([]);
+    const [scanTunersError, setScanTunersError] = useState<string>();
     const [scanError, setScanError] = useState<string | null>(null);
     // 経路を選んだ後に、ソースを手動で選んだか
     const scanSourceChosen = useRef(false);
+    const scanTunersRequest = useRef(0);
+    const scanTunersController = useRef<AbortController>(undefined);
+    useEffect(() => () => {
+        ++scanTunersRequest.current;
+        scanTunersController.current?.abort();
+        scanTunersController.current = undefined;
+    }, []);
     const [scanChannels, setScanChannels] = useState("");
     const [scanChannelNameFormat, setScanChannelNameFormat] = useState("C{ch}");
     const [scanMinCh, setScanMinCh] = useState("13");
@@ -140,11 +189,13 @@ export const ChannelsConfigView: React.FC = () => {
     const [scanMaxSubCh, setScanMaxSubCh] = useState("3");
     const [scanSkipCh, setScanSkipCh] = useState("");
     const [scanMode, setScanMode] = useState<ChannelScanMode | "">("");
+    // Autoでは値を送らず、新規サービス行をGRは有効・ほかは無効にするサーバー既定へ委ねる。
     const [scanSetDisabledOnAdd, setScanSetDisabledOnAdd] = useState<"" | "true" | "false">("");
     const [scanAutoApply, setScanAutoApply] = useState(false);
     const [scanRefresh, setScanRefresh] = useState(false);
     const [scanStatus, setScanStatus] = useState<ChannelScanStatus | null>(null);
     const [scanInProgress, setScanInProgress] = useState(false);
+    const [isStartingScan, setIsStartingScan] = useState(false);
     const [showScanResultDialog, setShowScanResultDialog] = useState(false);
 
     ui.setTitle("チャンネル設定", isLoading);
@@ -169,33 +220,58 @@ export const ChannelsConfigView: React.FC = () => {
 
     const openScanDialog = async () => {
         setScanError(null);
+        setScanTunersError(undefined);
         setShowScanDialog(true);
+        const generation = ++scanTunersRequest.current;
+        scanTunersController.current?.abort();
+        const controller = new AbortController();
+        scanTunersController.current = controller;
         try {
-            const res = await fetch("/api/config/tuners");
+            const res = await fetch("/api/config/tuners", { signal: controller.signal });
             const tuners: ConfigTuners = await res.json();
             console.log("ChannelsConfigView", "GET", "/api/config/tuners", "->", tuners);
-            if (res.ok && Array.isArray(tuners)) {
+            if (!res.ok) { throw new Error(`${res.status} ${res.statusText}`); }
+            if (generation === scanTunersRequest.current && Array.isArray(tuners)) {
                 // 変わっていなければ、選んだソースをそのままにする
                 setScanTuners(prev => equal(prev, tuners) ? prev : tuners);
             }
         } catch (e) {
-            console.error(e);
+            // 推奨スキャン元の取得失敗は、開始要求の受付結果を変更しない。
+            if (generation === scanTunersRequest.current) { setScanTunersError(e instanceof Error ? e.message : String(e)); }
+        } finally {
+            if (scanTunersController.current === controller) { scanTunersController.current = undefined; }
         }
+    };
+    const closeScanDialog = () => {
+        ++scanTunersRequest.current;
+        scanTunersController.current?.abort();
+        scanTunersController.current = undefined;
+        setScanTunersError(undefined);
+        setShowScanDialog(false);
     };
 
     // プリセットとチャンネル設定ファイルは、経路かチューナーが変わったら選び直す
     // (手動で選んだ後は、経路を変えるまでそのままにする。一覧と書式は入力した内容があるため、そのままにする)
     useEffect(() => {
-        if (scanSourceChosen.current) {
+        // 開始中は送信した条件を固定し、失敗の後に取得済みの推奨ソースを反映する。
+        if (scanSourceChosen.current || isStartingScan || scanInProgress) {
             return;
         }
-        setScanSource(source => source === "preset" || source === "dvbConf" ? getDefaultScanSource(scanRoute, scanTuners) : source);
-    }, [scanRoute, scanTuners]);
+        setScanSource(source => source === "preset" || source === "dvbConf" || source === "list" && !scanChannels.trim()
+            ? getDefaultScanSource(scanRoute, scanTuners) : source);
+    }, [scanRoute, scanTuners, isStartingScan, scanInProgress, scanChannels]);
 
     // スキャンを開始する
     const startScan = async () => {
+        setIsStartingScan(true);
+        setScanTunersError(undefined);
         setScanError(null);
         try {
+            if (scanRoute === "SKY" && scanSource === "preset") {
+                throw new Error("SKYにはプリセットがありません。チャンネル一覧、dvbv5設定ファイル、または書式を指定してください。");
+            }
+            if (scanSource === "list" && !scanChannels.trim()) { throw new Error("スキャンするチャンネルを1件以上指定してください。"); }
+            if (scanSource === "format" && !scanChannelNameFormat.trim()) { throw new Error("チャンネル名の書式を指定してください。"); }
             const params = new URLSearchParams();
             params.append("route", scanRoute);
             params.append("source", scanSource);
@@ -237,6 +313,10 @@ export const ChannelsConfigView: React.FC = () => {
             params.append("async", "true");
 
             const url = `/api/config/channels/scan?${params.toString()}`;
+            // URLSearchParamsの符号化済みURLはASCII。Nodeの既定16KiBにヘッダー用の余裕を残す。
+            if (url.length > 8192) {
+                throw new Error("スキャン条件が長すぎます。チャンネル一覧やスキップの指定を短くしてから、再度開始してください。");
+            }
             console.log("ChannelsConfigView", "PUT", url);
 
             const response = await fetch(url, { method: "PUT" });
@@ -245,7 +325,7 @@ export const ChannelsConfigView: React.FC = () => {
             if (response.status === 202) {
                 console.log("Scan started:", result);
                 setScanInProgress(true);
-                setShowScanDialog(false);
+                closeScanDialog();
                 await fetchScanStatus();
             } else {
                 console.error("Failed to start scan:", result);
@@ -254,6 +334,8 @@ export const ChannelsConfigView: React.FC = () => {
         } catch (e) {
             console.error("Error starting scan:", e);
             setScanError(String(e));
+        } finally {
+            setIsStartingScan(false);
         }
     };
 
@@ -271,7 +353,7 @@ export const ChannelsConfigView: React.FC = () => {
     // スキャン結果を適用する
     const applyScanResult = () => {
         if (scanStatus && scanStatus.result) {
-            setEditing(JSON.parse(JSON.stringify(scanStatus.result)));
+            setEditing(migrateChannels(JSON.parse(JSON.stringify(scanStatus.result))));
             setShowScanResultDialog(false);
         }
     };
@@ -321,6 +403,8 @@ export const ChannelsConfigView: React.FC = () => {
     }, [scanInProgress]);
 
     const hasChanges = editing !== null && current !== null && !equal(editing, current);
+    const hasInvalidRelativeTs = editing?.some(channel => !isValidRelativeTs(channel.tsmfRelTs));
+    const hasInvalidTsmfGroupId = editing?.some(channel => !isValidTsmfGroupId(channel.tsmfGroupId));
 
     const handleCancel = () => {
         if (current) {
@@ -329,7 +413,7 @@ export const ChannelsConfigView: React.FC = () => {
     };
 
     const handleSave = async () => {
-        if (!editing) return;
+        if (!editing || hasInvalidRelativeTs || hasInvalidTsmfGroupId) { return; }
         setShowSaveDialog(false);
         try {
             console.log("ChannelsConfigView", "PUT", configAPI, "<-", editing);
@@ -513,7 +597,7 @@ export const ChannelsConfigView: React.FC = () => {
                     intent="primary"
                     icon="saved"
                     text="Save"
-                    disabled={!hasChanges}
+                    disabled={!hasChanges || hasInvalidRelativeTs || hasInvalidTsmfGroupId}
                     onClick={() => setShowSaveDialog(true)}
                 />
             </Navbar.Group>
@@ -680,35 +764,43 @@ export const ChannelsConfigView: React.FC = () => {
                                             />
                                         </FormGroup>
 
-                                        <FormGroup label="TsmfRelTs" style={{ width: "90px", marginBottom: 0 }}>
+                                        <FormGroup label="TsmfRelTs" style={{ width: "90px", marginBottom: 0 }}
+                                            intent={isValidRelativeTs(ch.tsmfRelTs) ? undefined : "danger"}
+                                            helperText={isValidRelativeTs(ch.tsmfRelTs) ? undefined : `${i + 1}行目: ${relativeTsErrorMessage}`}>
                                             <InputGroup
                                                 placeholder="TsmfRelTs"
-                                                value={`${ch.tsmfRelTs || ""}`}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    if (val === "") {
+                                                type="number" min={1} max={15} step={1}
+                                                value={Number.isNaN(ch.tsmfRelTs) ? "" : `${ch.tsmfRelTs ?? ""}`}
+                                                onInput={(e) => {
+                                                    const val = e.currentTarget.value;
+                                                    // 不完全な数値は空valueでも未指定にしない。onInputで全削除による復旧も検出する。
+                                                    if (e.currentTarget.validity.badInput) {
+                                                        updateChannel(i, { tsmfRelTs: Number.NaN });
+                                                    } else if (val === "") {
                                                         deleteChannelProperty(i, "tsmfRelTs");
-                                                    } else if (/^[0-9]+$/.test(val)) {
-                                                        const tsmfRelTs = parseInt(val, 10);
-                                                        updateChannel(i, { tsmfRelTs });
+                                                    } else {
+                                                        updateChannel(i, { tsmfRelTs: Number(val) });
                                                     }
                                                 }}
                                             />
                                         </FormGroup>
 
-                                        <FormGroup label="TsmfGroupId" style={{ width: "100px", marginBottom: 0 }}>
+                                        <FormGroup label="TsmfGroupId" style={{ width: "100px", marginBottom: 0 }}
+                                            intent={isValidTsmfGroupId(ch.tsmfGroupId) ? undefined : "danger"}
+                                            helperText={isValidTsmfGroupId(ch.tsmfGroupId) ? undefined : `${i + 1}行目: ${tsmfGroupIdErrorMessage}`}>
                                             <InputGroup
                                                 placeholder="Group ID"
-                                                value={`${ch.tsmfGroupId ?? ""}`}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    if (val === "") {
+                                                type="number" min={1} max={255} step={1}
+                                                value={Number.isNaN(ch.tsmfGroupId) ? "" : `${ch.tsmfGroupId ?? ""}`}
+                                                onInput={(e) => {
+                                                    const val = e.currentTarget.value;
+                                                    // 不完全な数値は空valueでも未指定にしない。onInputで全削除による復旧も検出する。
+                                                    if (e.currentTarget.validity.badInput) {
+                                                        updateChannel(i, { tsmfGroupId: Number.NaN });
+                                                    } else if (val === "") {
                                                         deleteChannelProperty(i, "tsmfGroupId");
-                                                    } else if (/^[0-9]+$/.test(val)) {
-                                                        const tsmfGroupId = parseInt(val, 10);
-                                                        if (tsmfGroupId >= 1 && tsmfGroupId <= 255) {
-                                                            updateChannel(i, { tsmfGroupId });
-                                                        }
+                                                    } else {
+                                                        updateChannel(i, { tsmfGroupId: Number(val) });
                                                     }
                                                 }}
                                             />
@@ -797,7 +889,7 @@ export const ChannelsConfigView: React.FC = () => {
                             <Button onClick={() => setShowSaveDialog(false)}>キャンセル</Button>
                             <Button
                                 intent="primary"
-                                disabled={!hasChanges}
+                                disabled={!hasChanges || hasInvalidRelativeTs || hasInvalidTsmfGroupId}
                                 onClick={handleSave}
                             >
                                 保存
@@ -810,7 +902,7 @@ export const ChannelsConfigView: React.FC = () => {
             {/* スキャン設定ダイアログ */}
             <Dialog
                 isOpen={showScanDialog}
-                onClose={() => setShowScanDialog(false)}
+                onClose={closeScanDialog}
                 title="Channel Scan"
                 style={{ width: "520px" }}
             >
@@ -849,17 +941,17 @@ export const ChannelsConfigView: React.FC = () => {
                         {scanSource === "preset" && (
                             <Callout>
                                 {scanRoute === "TER" && "13-62"}
-                                {scanRoute === "SAT" && "BS01_0-BS23_3, CS2-CS24"}
+                                {scanRoute === "SAT" && satellitePresetRanges}
                                 {scanRoute === "SKY" && "なし (dvbv5 のチャンネル設定ファイルか一覧で指定してください)"}
                                 {scanRoute === "CATV" && "1-12, C13-C63, 13-62"}
-                                {scanRoute === "FTTH" && "13-62, BS01_0-BS23_3, CS2-CS24"}
+                                {scanRoute === "FTTH" && `13-62, ${satellitePresetRanges}`}
                             </Callout>
                         )}
 
                         {scanSource === "list" && (
                             <FormGroup
                                 label="Channel List (comma separated)"
-                                helperText="Range notation (e.g. 14-16, C13-C20, BS01_0-BS01_3) is supported."
+                                helperText="範囲指定（14-16、C13-C20、BS01_0-BS01_3）が使えます。重複を含む展開後の件数は4096件までです。指定全体が長い場合は、件数を減らしてください。"
                             >
                                 <InputGroup
                                     placeholder="Example: C13-C20,27,BS01_0"
@@ -904,7 +996,7 @@ export const ChannelsConfigView: React.FC = () => {
 
                         <FormGroup
                             label="Skip Channels (comma separated)"
-                            helperText="Channel names. Range notation (e.g. 14-16, C13-C20, BS01_0-BS01_3) is supported."
+                            helperText="取得を省くチャンネル識別子です。範囲指定（14-16、C13-C20、BS01_0-BS01_3）が使えます。重複を含む展開後の件数は4096件までです。指定全体が長い場合は、件数を減らしてください。"
                         >
                             <InputGroup
                                 placeholder="Example: 13,14-16,C18-C20"
@@ -950,6 +1042,7 @@ export const ChannelsConfigView: React.FC = () => {
                             onChange={(e) => setScanRefresh(e.currentTarget.checked)}
                         />
 
+                        {scanTunersError && !isStartingScan && !scanInProgress && <Callout intent="warning" title="チューナー設定を取得できませんでした">{scanTunersError}</Callout>}
                         {scanError !== null && (
                             <Callout intent="danger" title="Failed to start the scan">{scanError}</Callout>
                         )}
@@ -958,7 +1051,7 @@ export const ChannelsConfigView: React.FC = () => {
                 <DialogFooter
                     actions={
                         <>
-                            <Button onClick={() => setShowScanDialog(false)}>Cancel</Button>
+                            <Button onClick={closeScanDialog}>Cancel</Button>
                             <Button intent="primary" onClick={startScan}>Start Scan</Button>
                         </>
                     }

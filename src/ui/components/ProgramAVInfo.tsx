@@ -37,7 +37,9 @@ export const ProgramAVInfo: React.FC<ProgramAVInfoProps> = ({ video, mmtVideo, a
     }
 
     if (!video && mmtVideo) {
-        labels.push(<span key="video.resolution" className="video resolution">{mmtVideo.resolution}</span>);
+        if (mmtVideo.resolution) {
+            labels.push(<span key="video.resolution" className="video resolution">{mmtVideo.resolution}</span>);
+        }
         if (mmtVideo.frameRate) {
             labels.push(<span key="video.frameRate" className="video frame-rate">{mmtVideo.frameRate}fps</span>);
         }

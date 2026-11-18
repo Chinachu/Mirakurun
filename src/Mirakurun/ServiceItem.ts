@@ -166,6 +166,11 @@ export default class ServiceItem {
         }
     }
 
+    /** 保存時の入力照合には、派生した配信先ではなくスキャン元を使う。 */
+    get sourceChannel(): ChannelItem {
+        return this._channel;
+    }
+
     get channel(): ChannelItem {
         return this.channels[0];
     }
@@ -182,9 +187,11 @@ export default class ServiceItem {
     get locations(): StreamLocation[] {
         const locations: StreamLocation[] = [];
 
-        // until the stream is received on the channel, it is trusted as before
-        const streams = this._channel.streams;
-        if (this._streamId === undefined || streams.length === 0) {
+        // streamIdが判明した後は、そのストリームを検出済みの経路を優先する。
+        // 未検出のスキャン元を先頭にすると別の相対TSで開くため、ほかに経路がある間は候補に加えない。
+        // streamsが空でも相対TSの番号を推測せず、別経路が確認済みなら公開経路・配信・EPGにそちらだけを使う。
+        // 保存元はsourceChannelで別に保持し、起動時の元入力確認と再検出後の候補復帰に使う。
+        if (this._streamId === undefined) {
             locations.push({ channel: this._channel, stream: null });
         }
 
@@ -195,7 +202,7 @@ export default class ServiceItem {
             locations.push(...found.filter(location => location.channel !== this._channel));
         }
 
-        // the stream has moved from the channel but not found elsewhere yet
+        // 検出済みの経路がなければ、再スキャンまでの候補としてスキャン元を残す。
         if (locations.length === 0) {
             locations.push({ channel: this._channel, stream: null });
         }
@@ -218,8 +225,9 @@ export default class ServiceItem {
         return this.format === "tlv";
     }
 
-    export(): apid.Service {
-        const channels = this.channels;
+    /** 保存時はスキャン元を保持し、配信可能な経路の変化で復元先を付け替えない。 */
+    export(forStorage = false): apid.Service {
+        const channels = forStorage ? [this._channel] : this.channels;
         const channel = channels[0];
         const ret: apid.Service = {
             id: this._id,

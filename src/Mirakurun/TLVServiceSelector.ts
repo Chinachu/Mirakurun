@@ -43,8 +43,13 @@ export default class TLVServiceSelector {
     /** service ID → packet IDs of the assets */
     private _assets = new Map<number, number[]>();
     private _drop = new Set<number>();
+    private _keep = new Set<number>();
+    private _hasSelectedAssets = false;
 
     constructor(readonly serviceId: number) { }
+
+    /** 対象サービスのPLTとMPTが揃い、メディアを選択できる状態。 */
+    get ready(): boolean { return this._hasSelectedAssets; }
 
     onPLT(plt: PackageListTable): void {
         const packages = new Map<number, number>();
@@ -54,11 +59,17 @@ export default class TLVServiceSelector {
                 packages.set(serviceId, pkg.locationInfo.packetId);
             }
         }
+        // 同じPLTの再送では保持し、MPTの所在が変わった・削除されたサービスの旧資産だけを捨てる。
+        // 新しいMPTが届くまで、変更前の資産一覧で新しいMPUを除外しない。
+        for (const [serviceId, packetId] of this._packages) {
+            if (packages.get(serviceId) !== packetId) { this._assets.delete(serviceId); }
+        }
         this._packages = packages;
         this._decide();
     }
 
     onMPT(mpt: MMTPackageTable): void {
+        // 依存readerが未対応のlocation_type（0x01等）はMPT自体を通知しないため、位置情報を推測して補完しない。
         const serviceId = mmtPackageIdToServiceId(mpt.mmtPackageId);
         if (serviceId === undefined) {
             return;
@@ -66,7 +77,9 @@ export default class TLVServiceSelector {
         const packetIds: number[] = [];
         for (const asset of mpt.assets) {
             for (const location of asset.locations) {
-                if (location.locationType === "sameDataflow") {
+                // 選択サービスの別フロー資産も保持する。フローを照合しないpacket_id単独の判定では、
+                // 他サービスの別フロー参照を、入力中の同じIDを除外する根拠にはしない。
+                if (location.locationType === "sameDataflow" || serviceId === this.serviceId) {
                     packetIds.push(location.packetId);
                 }
             }
@@ -145,6 +158,8 @@ export default class TLVServiceSelector {
             drop.delete(packetId);
         }
         this._drop = drop;
+        this._keep = keep;
+        this._hasSelectedAssets = this._packages.has(this.serviceId) && this._assets.has(this.serviceId);
     }
 
     /** @returns the packet as is, a rewritten one, or `null` to drop */
@@ -155,6 +170,13 @@ export default class TLVServiceSelector {
         }
         const packetId = packet.readUInt16BE(mmtp + 2);
         if (this._drop.has(packetId)) {
+            return null;
+        }
+        // 選択MPTが揃った後は、他サービスのMPTを待たずに未参照の映像・音声MPUを除く。
+        // 非圧縮UDPはMMTPと確定できないため、既知のpacket_idだけで選別する。
+        // 未知のSI・データ等は消さず、MPT更新や共通の制御情報を引き続き受信できるようにする。
+        if (packet[1] === TLV_COMPRESSED_IP && this._hasSelectedAssets
+            && (packet[mmtp + 1] & 0x3F) === 0 && !this._keep.has(packetId)) {
             return null;
         }
         if (packetId !== PLT_PACKET_ID || (packet[mmtp + 1] & 0x3F) !== MMTP_SIGNALLING) {

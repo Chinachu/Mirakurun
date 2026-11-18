@@ -63,7 +63,7 @@ export default class ChannelItem {
         this.channel = config.channel;
         // `0` or empty is not specified
         this.tsmfRelTs = config.tsmfRelTs || undefined;
-        this._configuredTsmfRelTs = config.tsmfRelTs;
+        this._configuredTsmfRelTs = this.tsmfRelTs;
         this._configuredTsmfGroupId = config.tsmfGroupId;
         this.commandVars = config.commandVars;
         this._format = config.format;
@@ -184,6 +184,7 @@ export default class ChannelItem {
             type: this.type,
             channel: this.channel,
             route: this.route,
+            // 旧設定の0・null・空文字は実行時と同じく未指定として公開する。
             tsmfRelTs: this._configuredTsmfRelTs,
             format: this._format,
             tsmfGroupId: this._configuredTsmfGroupId,
@@ -196,9 +197,9 @@ export default class ChannelItem {
         if (this.tsmfGroupId === undefined) {
             return null;
         }
-        // configured: the channels configured with the same group (the groups discovered are not mixed)
+        // configured: the same type, route and group (the groups discovered are not mixed)
         if (this._configuredTsmfGroupId !== undefined) {
-            return _.channel.items.filter(item => item.type === this.type && item._configuredTsmfGroupId === this._configuredTsmfGroupId);
+            return _.channel.items.filter(item => item.type === this.type && item.route === this.route && item._configuredTsmfGroupId === this._configuredTsmfGroupId);
         }
         // discovered: the channels of the same route carrying the same TLV in the same group
         return _.channel.items.filter(item => item.type === this.type && item.route === this.route &&

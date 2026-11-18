@@ -16,7 +16,7 @@
 import { join, dirname } from "path";
 import { existsSync } from "fs";
 import { stat, mkdir, readFile, writeFile } from "fs/promises";
-import { sleep } from "./common";
+import { sleep, getDefaultChannelRoute } from "./common";
 import * as log from "./log";
 import * as db from "./db";
 import _ from "./_";
@@ -101,6 +101,7 @@ export class Service {
     }
 
     private _items: ServiceItem[] = [];
+    private _unloadedServices: db.Service[] = [];
     private _saveTimerId: NodeJS.Timeout;
     private _channelIndex: Map<ChannelItem, ServiceItem[]> = null;
 
@@ -207,21 +208,47 @@ export class Service {
         log.debug("loading services...");
 
         let updated = false;
+        let upgrade = false;
 
         const services = await db.loadServices(_.configIntegrity.channels, true);
+        const unloaded = new Map<string, db.Service>();
+        const currentConfigs = new Map<string, typeof _.config.channels>();
+        for (const config of _.config.channels) {
+            const key = `${config.type}/${config.channel}`;
+            const rows = currentConfigs.get(key);
+            if (rows) { rows.push(config); } else { currentConfigs.set(key, [config]); }
+        }
         for (const service of services) {
+            if (!service.channel || service.networkId === undefined || service.serviceId === undefined) {
+                updated = true;
+                continue;
+            }
+            const key = `${service.channel.type}/${service.channel.channel}`;
             const channelItem = _.channel.get(service.channel.type, service.channel.channel);
-
-            if (channelItem === null) {
+            if (channelItem === null && service.reception === undefined) {
+                const configs = currentConfigs.get(key) || [];
+                const first = configs[0];
+                if (first && configs.some(config => !db.channelStateMatches({ ...service.channel, reception: db.channelStateReception(first) }, config))) {
+                    // 未確定の旧サービスも、複数の受信入力から先頭行を選んで認定せずに保持する。
+                    unloaded.set(`${service.networkId}/${service.serviceId}`, service);
+                    updated = true;
+                    continue;
+                }
+            }
+            const input = { ...service.channel, reception: service.reception };
+            if (channelItem === null || !db.channelStateMatches(input, channelItem.toJSON())) {
+                const configured = currentConfigs.get(key)?.find(config => db.channelStateMatches(input, config));
+                if (configured) {
+                    // 無効・未接続の入力のサービスはAPIへ出さず、同じ入力の再有効化用にだけ保持する。
+                    unloaded.set(`${service.networkId}/${service.serviceId}`, { ...service, reception: db.channelStateReception(configured) });
+                    upgrade ||= service.reception === undefined;
+                }
+                // 予約が残っていても旧入力のサービスを新入力へ結び直さない。追加スキャンの完了まではサービスを利用できない。
                 updated = true;
                 continue;
             }
 
-            if (service.networkId === undefined || service.serviceId === undefined) {
-                updated = true;
-                continue;
-            }
-
+            upgrade ||= service.reception === undefined;
             // migrate logo data
             if (service.logoData) {
                 const logoDataPath = Service.getLogoDataPath(service.networkId, service.logoId);
@@ -252,7 +279,12 @@ export class Service {
             );
         }
 
-        if (updated) {
+        this._unloadedServices = [...unloaded.values()];
+        if (upgrade) {
+            // 旧形式を読み込めた回に受信設定を補完し、名前変更後も検証して復元できるようにする。
+            clearTimeout(this._saveTimerId);
+            await this._save();
+        } else if (updated) {
             this.save();
         }
 
@@ -287,7 +319,7 @@ export class Service {
                 continue;
             }
             const channel = _.channel.get(channelConfig.type, channelConfig.channel);
-            if (!channel) {
+            if (!channel || channel.route !== (channelConfig.route || getDefaultChannelRoute(channelConfig.type))) {
                 continue;
             }
             const serviceId = channelConfig.serviceId;
@@ -298,17 +330,28 @@ export class Service {
             this._queueCheckToAdd(channel, serviceId);
         }
 
+        // SID指定だけの入力は選別を守る。同じ入力に全サービス行があれば、その行が要求するサービスも補完する。
+        const specifiedChannels = new Set(_.config.channels.filter(config => !config.isDisabled && config.serviceId)
+            .map(config => `${config.type}/${config.channel}/${config.route || getDefaultChannelRoute(config.type)}`));
+        const mixedChannels = new Set(_.config.channels.filter(config => !config.isDisabled && !config.serviceId)
+            .map(config => `${config.type}/${config.channel}/${config.route || getDefaultChannelRoute(config.type)}`)
+            .filter(key => specifiedChannels.has(key)));
+        for (const key of mixedChannels) { specifiedChannels.delete(key); }
         // scan services (no service channel only)
         _.job.add({
             key: "Service.Add.Scan.Find-Channels",
             name: "Service Add Scan [Find Targets]",
             fn: async () => {
                 for (const channel of _.channel.items) {
-                    if (this.findByChannel(channel).length > 0) {
+                    const key = `${channel.type}/${channel.channel}/${channel.route}`;
+                    const hasServices = this.findByChannel(channel).length > 0;
+                    // 指定SIDの確認が先に成功しても、混在入力の全件探索を省略しない。
+                    if (specifiedChannels.has(key) || (hasServices && !mixedChannels.has(key))) {
                         continue;
                     }
 
-                    this._queueScanToAdd(channel);
+                    // サービスのある混在入力は補完を1回だけ試し、起動ごとの長期再試行を増やさない。
+                    this._queueScanToAdd(channel, !hasServices);
                 }
             },
             readyFn: async () => {
@@ -349,15 +392,19 @@ export class Service {
         });
     }
 
-    private _save(): void {
+    private _save(): Promise<void> {
         log.debug("saving services...");
 
-        db.saveServices(
-            this._items.map(service => {
-                // `channels` is resolved from the channels db
-                const { channels, ...ret } = service.export();
-                return ret;
-            }),
+        const activeIds = new Set(this._items.map(item => item.id));
+        return db.saveServices(
+            [
+                ...this._items.map(service => {
+                    // `channels` is resolved from the channels db; reception is private persistence data.
+                    const { channels, ...ret } = service.export(true);
+                    return { ...ret, reception: db.channelStateReception(service.sourceChannel.toJSON()) };
+                }),
+                ...this._unloadedServices.filter(service => !activeIds.has(ServiceItem.getId(service.networkId, service.serviceId)))
+            ],
             _.configIntegrity.channels
         );
     }
@@ -386,13 +433,13 @@ export class Service {
         return (await _.tuner.readyForJob(remote.length > 0 ? [{ channel }, ...remote] : channel)) !== null;
     }
 
-    private _queueScanToAdd(channel: ChannelItem): void {
+    private _queueScanToAdd(channel: ChannelItem, retryOnFail = true): void {
         _.job.add({
             key: `Service.Add.Scan.${channel.type}.${channel.channel}`,
             name: `Service Add Scan ${channel.type}/${channel.channel}`,
             fn: async () => this._scan(channel, true),
             readyFn: async () => this._readyForScan(channel),
-            retryOnFail: true,
+            retryOnFail,
             retryMax: (1000 * 60 * 60 * 12) / (1000 * 60 * 3), // (12時間 / retryDelay) = 12時間～
             retryDelay: 1000 * 60 * 3
         });
@@ -461,7 +508,11 @@ export class Service {
         // its services are added unless any service of the TLV has been added, even by the scan to update (not kept in memory to survive restarts)
         // (not for the channels of `serviceId`, only the services specified are added),
         // the same for the TLV detected by the remote Mirakurun (the remote Mirakurun scans the carriers by itself, later)
-        const serviceIdSpecified = _.config.channels.some(config => config.type === channel.type && config.channel === channel.channel && config.serviceId);
+        const channelConfigs = _.config.channels.filter(config => !config.isDisabled && config.type === channel.type && config.channel === channel.channel &&
+            (config.route || getDefaultChannelRoute(config.type)) === channel.route);
+        const specifiedServiceIds = new Set(channelConfigs.filter(config => config.serviceId).map(config => config.serviceId!));
+        // 全サービス行を含む同一入力では、SID指定行との和集合を登録する。
+        const serviceIdSpecified = specifiedServiceIds.size > 0 && channelConfigs.every(config => config.serviceId);
         const newTlvStreams = serviceIdSpecified ? [] : channel.streams.filter(stream => stream.format === "tlv" && (stream.numberOfCarriers > 1 || stream.remote === true) &&
             this._items.some(item => item.networkId === stream.networkId && item.streamId === stream.streamId) === false);
 
@@ -478,7 +529,7 @@ export class Service {
                     item.logoId = service.logoId;
                 }
                 item.remoteControlKeyId = service.remoteControlKeyId;
-            } else if (add === true || newTlvStreams.some(stream => stream.networkId === service.networkId && stream.streamId === service.streamId)) {
+            } else if (add === true && (!serviceIdSpecified || specifiedServiceIds.has(service.serviceId)) || newTlvStreams.some(stream => stream.networkId === service.networkId && stream.streamId === service.streamId)) {
                 this.add(
                     new ServiceItem(
                         channel,

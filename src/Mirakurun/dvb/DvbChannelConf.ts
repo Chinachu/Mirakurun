@@ -58,7 +58,7 @@ const NAMED_KEYS = new Map<string, { readonly cmd: number; readonly names: reado
 ]);
 
 // 設定ファイルを編集した場合に読み直すため、ファイルの状態と一緒に保持する
-const cache = new Map<string, { version: string; channels: DvbChannels }>();
+const cache = new Map<string, { version: string; channels: DvbChannels; metadataOnly: boolean }>();
 
 // 更新日時を保ったまま置き換えた場合 (`cp -p` など) も読み直すよう、ctime、大きさ、inode も比べる
 function fileVersion(stat: fs.Stats): string {
@@ -112,8 +112,11 @@ export class DvbChannels {
     }
 }
 
-/** dvbv5 形式のチャンネル設定 (dvbv5_channels_*.conf) を読む */
-export function parseDvbv5ChannelsConf(text: string): DvbChannels {
+/**
+ * dvbv5 形式のチャンネル設定 (dvbv5_channels_*.conf) を読む
+ * @param metadataOnly スキャン用にDVB-S2の識別情報も読む。直接選局には使用しない。
+ */
+export function parseDvbv5ChannelsConf(text: string, metadataOnly = false): DvbChannels {
     const entries: DvbChannelEntry[] = [];
     let started = false;
     let name: string | null = null;
@@ -122,6 +125,7 @@ export function parseDvbv5ChannelsConf(text: string): DvbChannels {
     let properties: [number, number][] = [];
     let sat: { lnb?: Lnb; polarization?: number; satNumber?: number } = {};
     let keys = new Set<string>();
+    let unsupportedProperty: Error | null = null;
 
     const label = () => name ?? "CHANNEL";
     const commit = () => {
@@ -130,6 +134,9 @@ export function parseDvbv5ChannelsConf(text: string): DvbChannels {
         }
         if (deliverySystem === null) {
             throw new Error(`DELIVERY_SYSTEM is missing in [${label()}]`);
+        }
+        if (unsupportedProperty && deliverySystem !== SYS.DVBS2) {
+            throw unsupportedProperty;
         }
         if (deliverySystem === SYS.ISDBT && keys.has("MODULATION")) {
             // dvbv5-zap は ISDB-T の MODULATION を各階層の変調方式にする
@@ -169,6 +176,7 @@ export function parseDvbv5ChannelsConf(text: string): DvbChannels {
             properties = [];
             sat = {};
             keys = new Set();
+            unsupportedProperty = null;
             continue;
         }
 
@@ -196,10 +204,14 @@ export function parseDvbv5ChannelsConf(text: string): DvbChannels {
         const polarization = key === "POLARIZATION" ? POLARIZATION_NAMES[toAsciiUpperCase(value)] : undefined;
 
         if (key === "DELIVERY_SYSTEM") {
-            if (DELIVERY_SYSTEMS.has(value) === false) {
-                throw new Error(`unsupported DELIVERY_SYSTEM ${value} in [${label()}]`);
+            if (metadataOnly && value === "DVBS2") {
+                deliverySystem = SYS.DVBS2;
+            } else {
+                if (DELIVERY_SYSTEMS.has(value) === false) {
+                    throw new Error(`unsupported DELIVERY_SYSTEM ${value} in [${label()}]`);
+                }
+                deliverySystem = DELIVERY_SYSTEMS.get(value);
             }
-            deliverySystem = DELIVERY_SYSTEMS.get(value);
         } else if (Object.prototype.hasOwnProperty.call(NUMERIC_KEYS, key) && /^\d+$/.test(value) && parseInt(value, 10) <= 0xFFFFFFFF) {
             // libdvbv5 は 32 ビットに収まらない値を切り詰めるため、収まる値に限る
             properties.push([NUMERIC_KEYS[key], parseInt(value, 10)]);
@@ -218,8 +230,13 @@ export function parseDvbv5ChannelsConf(text: string): DvbChannels {
         } else if (ENTRY_KEYS.has(key) || key.startsWith("PID_")) {
             // dvbv5-scan が出力するサービスの情報 (libdvbv5 は選局に使わない)
         } else {
-            // 未対応の項目を無視すると、意図と異なる設定で選局するため
-            throw new Error(`unsupported property ${key} = ${value} in [${label()}]`);
+            // DVB-S2のスキャンでは選局用の項目を使わない。伝送方式が後に現れる場合もあるため確定を待つ。
+            const error = new Error(`unsupported property ${key} = ${value} in [${label()}]`);
+            if (!metadataOnly || key === "FREQUENCY" || key === "STREAM_ID") {
+                // 未対応の項目を無視すると、意図と異なる設定で選局するため
+                throw error;
+            }
+            unsupportedProperty ??= error;
         }
     }
     commit();
@@ -231,13 +248,12 @@ export function parseDvbv5ChannelsConf(text: string): DvbChannels {
 export function loadChannelsConf(confPath: string): DvbChannels {
     const version = fileVersion(fs.statSync(confPath));
     const cached = cache.get(confPath);
-    if (cached && cached.version === version) {
+    if (cached && cached.version === version && !cached.metadataOnly) {
         return cached.channels;
     }
     return cacheChannels(confPath, version, fs.readFileSync(confPath, "utf8"));
 }
 
-/** `loadChannelsConf()` と同じく読む (選局のたびに読むため、イベントループを止めない) */
 /**
  * チャンネル設定ファイルのチャンネルの名前 (ファイルの順、重複を除く。チャンネルスキャン用)
  * 直接操作できない DELIVERY_SYSTEM (DVB-S2 など) のチャンネルも含むため、名前のほかは確かめない
@@ -255,18 +271,22 @@ export async function readChannelNames(confPath: string): Promise<string[]> {
     return [...names];
 }
 
-export async function readChannelsConf(confPath: string): Promise<DvbChannels> {
+/**
+ * `loadChannelsConf()` と同じく読む (選局のたびに読むため、イベントループを止めない)
+ * @param metadataOnly スキャン用にDVB-S2の識別情報も読む。直接選局用のキャッシュとは区別する。
+ */
+export async function readChannelsConf(confPath: string, metadataOnly = false): Promise<DvbChannels> {
     const version = fileVersion(await fs.promises.stat(confPath));
     const cached = cache.get(confPath);
-    if (cached && cached.version === version) {
+    if (cached && cached.version === version && (metadataOnly || !cached.metadataOnly)) {
         return cached.channels;
     }
-    return cacheChannels(confPath, version, await fs.promises.readFile(confPath, "utf8"));
+    return cacheChannels(confPath, version, await fs.promises.readFile(confPath, "utf8"), metadataOnly);
 }
 
-function cacheChannels(confPath: string, version: string, text: string): DvbChannels {
-    const channels = parseDvbv5ChannelsConf(text);
-    cache.set(confPath, { version, channels });
+function cacheChannels(confPath: string, version: string, text: string, metadataOnly = false): DvbChannels {
+    const channels = parseDvbv5ChannelsConf(text, metadataOnly);
+    cache.set(confPath, { version, channels, metadataOnly });
     return channels;
 }
 

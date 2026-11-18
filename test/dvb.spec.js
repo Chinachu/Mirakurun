@@ -566,6 +566,139 @@ describe("[dvb.spec] DvbDevice.ts: LNB", { skip: !isSupportedArch && `${process.
   });
 });
 
+describe("[dvb.spec] DvbDevice.ts: cleanup", () => {
+  function fixture({ pesError, closeErrors = {} } = {}) {
+    const Module = require("module");
+    const filename = require.resolve("../lib/Mirakurun/dvb/DvbDevice");
+    const loaded = new Module(filename, module);
+    const openFds = new Map();
+    const closed = [];
+    let nextFd = 100;
+    const mockFs = {
+      constants: fs.constants,
+      open(filename, flags, callback) {
+        const fd = nextFd++;
+        openFds.set(fd, path.basename(filename));
+        callback(null, fd);
+      },
+      close(fd, callback) {
+        const kind = openFds.get(fd);
+        assert.ok(kind, `fd ${fd} must be closed only once`);
+        openFds.delete(fd);
+        closed.push(kind);
+        callback(closeErrors[kind]);
+      },
+      read(fd, buffer, offset, length, position, callback) {
+        setImmediate(() => callback(Object.assign(new Error("no data"), { code: "EAGAIN" }), 0));
+      }
+    };
+    loaded.filename = filename;
+    loaded.paths = module.paths;
+    const originalRequire = loaded.require.bind(loaded);
+    loaded.require = id => {
+      if (id === "fs") { return mockFs; }
+      if (id === "../log") { return { debug() {}, warn() {} }; }
+      if (id === "./linux-dvb") {
+        return {
+          getDeliverySystem: async () => SYS.ISDBT,
+          setProperties: async () => {},
+          setBufferSize: async () => {},
+          setPesFilter: async () => { if (pesError) { throw pesError; } }
+        };
+      }
+      return originalRequire(id);
+    };
+    loaded._compile(fs.readFileSync(filename, "utf8"), filename);
+    const device = new loaded.exports.default({ adapter: 0 });
+    const start = () => device.start({ deliverySystem: SYS.ISDBT, properties: [[DTV.FREQUENCY, 557142857]] });
+    return { device, start, openFds, closed };
+  }
+
+  it("closes demux after a DVR close failure while unwinding a failed start", async () => {
+    const pesError = new Error("PES setup failed");
+    const closeError = Object.assign(new Error("DVR close failed"), { code: "EIO" });
+    const { device, start, openFds, closed } = fixture({ pesError, closeErrors: { dvr0: closeError } });
+    try {
+      await assert.rejects(start(), error => {
+        assert.ok(error instanceof AggregateError);
+        assert.deepStrictEqual(error.errors, [pesError, closeError]);
+        return true;
+      });
+    } finally { await device.close(); }
+    assert.deepStrictEqual(closed, ["dvr0", "demux0", "frontend0"]);
+    assert.strictEqual(openFds.size, 0);
+    await device.close();
+    assert.strictEqual(closed.length, 3);
+  });
+
+  it("keeps the start error and all cleanup errors while releasing every FD", async () => {
+    const pesError = new Error("PES setup failed");
+    const errors = ["DVR", "demux", "frontend"].map(name => Object.assign(new Error(`${name} close failed`), { code: "EIO" }));
+    const { device, start, openFds, closed } = fixture({ pesError, closeErrors: { dvr0: errors[0], demux0: errors[1], frontend0: errors[2] } });
+    await assert.rejects(start(), error => {
+      assert.ok(error instanceof AggregateError);
+      assert.deepStrictEqual(error.errors, [pesError, errors[0], errors[1]]);
+      assert.strictEqual(error.cause, pesError);
+      return true;
+    });
+    await assert.rejects(device.close(), error => error === errors[2]);
+    assert.deepStrictEqual(closed, ["dvr0", "demux0", "frontend0"]);
+    assert.strictEqual(openFds.size, 0);
+    await device.close();
+    assert.strictEqual(closed.length, 3);
+  });
+
+  it("closes demux and frontend even when stopping the DVR fails", async () => {
+    const failure = Object.assign(new Error("DVR close failed"), { code: "EIO" });
+    const { device, start, openFds, closed } = fixture({ closeErrors: { dvr0: failure } });
+    await start();
+    await assert.rejects(device.close(), error => error === failure);
+    assert.deepStrictEqual(closed, ["dvr0", "demux0", "frontend0"]);
+    assert.strictEqual(openFds.size, 0);
+    assert.strictEqual(device.isOpen, false);
+    assert.strictEqual(device.isStreaming, false);
+    await device.close();
+    assert.strictEqual(closed.length, 3);
+  });
+
+  it("releases frontend after stopStream fails without closing stream FDs again", async () => {
+    const failure = Object.assign(new Error("DVR close failed"), { code: "EIO" });
+    const { device, start, openFds, closed } = fixture({ closeErrors: { dvr0: failure } });
+    await start();
+    await assert.rejects(device.stopStream(), error => error === failure);
+    assert.deepStrictEqual(closed, ["dvr0", "demux0"]);
+    await device.close();
+    await device.close();
+    assert.deepStrictEqual(closed, ["dvr0", "demux0", "frontend0"]);
+    assert.strictEqual(openFds.size, 0);
+  });
+
+  it("closes demux even if DVR reading was already stopped", async () => {
+    const { device, start, openFds, closed } = fixture();
+    await start();
+    await device._stopReading();
+    await device.close();
+    assert.deepStrictEqual(closed, ["dvr0", "demux0", "frontend0"]);
+    assert.strictEqual(openFds.size, 0);
+  });
+
+  it("reports all close failures after releasing each FD once", async () => {
+    const errors = ["DVR", "demux", "frontend"].map(name => Object.assign(new Error(`${name} close failed`), { code: "EIO" }));
+    const { device, start, openFds, closed } = fixture({ closeErrors: { dvr0: errors[0], demux0: errors[1], frontend0: errors[2] } });
+    await start();
+    await assert.rejects(device.close(), error => {
+      assert.ok(error instanceof AggregateError);
+      const flatten = failure => failure instanceof AggregateError ? failure.errors.flatMap(flatten) : [failure];
+      assert.deepStrictEqual(flatten(error), errors);
+      return true;
+    });
+    assert.deepStrictEqual(closed, ["dvr0", "demux0", "frontend0"]);
+    assert.strictEqual(openFds.size, 0);
+    await device.close();
+    assert.strictEqual(closed.length, 3);
+  });
+});
+
 describe("[dvb.spec] DvbDevice.ts: reading", { skip: !isSupportedArch && `${process.arch} is not supported` }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mirakurun-dvb-"));
   after(() => fs.rmSync(dir, { recursive: true, force: true }));

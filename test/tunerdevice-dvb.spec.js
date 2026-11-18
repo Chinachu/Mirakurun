@@ -533,4 +533,83 @@ describe("[tunerdevice-dvb.spec] TunerDevice.ts: DVB device direct access", () =
       assert.strictEqual(device._dvb, null, conf);
     }
   });
+  it("設定読取り待ちで最後の利用者が離れた場合はコマンドとcatを起動しない", async () => {
+    const config = require("../lib/Mirakurun/dvb/DvbChannelConf"), gate = Promise.withResolvers();
+    const read = mock.method(config, "readChannelsConf", () => gate.promise);
+    const commands = [];
+    const spawn = mock.method(child_process, "spawn", (command, args) => {
+      commands.push([command, ...args]);
+      const p = new EventEmitter(); p.pid = 1000 + commands.length;
+      p.stdout = new EventEmitter(); p.stderr = new EventEmitter();
+      p.kill = () => { p.emit("exit", null, "SIGTERM"); p.emit("close", null, "SIGTERM"); return true; };
+      return p;
+    });
+    const [device, dvb] = createDevice(), stream = fakeStream();
+    device._config.dvbDevicePath = "/dev/dvb/adapter9/dvr0";
+    try {
+      const starting = device.startStream(user("left"), stream, channel("27"));
+      stream.closed = true; stream.emit("close");
+      gate.reject(new Error("readChannelsConf failed"));
+      await starting;
+      assert.deepStrictEqual(commands, []);
+      assert.strictEqual(device._dvbActive, false);
+      assert.deepStrictEqual(device.users, []);
+      assert.deepStrictEqual(dvb.calls, [["close"], ["stopStream"]]);
+      mock.timers.tick(3000); await flush();
+      assert.deepStrictEqual(dvb.calls, [["close"], ["stopStream"]]);
+      assert.strictEqual(device.isFree, true);
+      assert.strictEqual(device.isAvailable, true);
+      assert.strictEqual(device.channel, null);
+      assert.strictEqual(device._dvbActive, false);
+    } finally { gate.resolve(); read.mock.restore(); spawn.mock.restore(); }
+  });
+
+  it("fallbackのfrontend解放待ちで利用者が離れた場合もコマンドを起動しない", async () => {
+    const config = require("../lib/Mirakurun/dvb/DvbChannelConf"), entered = Promise.withResolvers(), gate = Promise.withResolvers();
+    const read = mock.method(config, "readChannelsConf", async () => { throw new Error("readChannelsConf failed"); });
+    const commands = [];
+    const spawn = mock.method(child_process, "spawn", command => { commands.push(command); throw new Error("unexpected spawn"); });
+    const [device, dvb] = createDevice(), stream = fakeStream();
+    dvb.close = async () => { dvb.calls.push(["close"]); entered.resolve(); await gate.promise; dvb.isOpen = false; };
+    try {
+      const starting = device.startStream(user("left-during-close"), stream, channel("27"));
+      await entered.promise;
+      stream.closed = true; stream.emit("close");
+      gate.resolve(); await starting;
+      assert.deepStrictEqual(commands, []);
+      assert.strictEqual(device._dvbActive, false);
+      mock.timers.tick(3000); await flush();
+      assert.deepStrictEqual(dvb.calls, [["close"], ["stopStream"]]);
+      assert.strictEqual(device.channel, null);
+      assert.strictEqual(device.isFree, true);
+    } finally { gate.resolve(); read.mock.restore(); spawn.mock.restore(); }
+  });
+
+  it("利用者なしのfallbackを見送った後の要求は閉じたfrontendへ合流せず選局し直す", async () => {
+    const config = require("../lib/Mirakurun/dvb/DvbChannelConf"), gate = Promise.withResolvers();
+    let reads = 0;
+    const read = mock.method(config, "readChannelsConf", () => ++reads === 1 ? gate.promise : Promise.resolve(config.loadChannelsConf(confPath)));
+    const commands = [];
+    const spawn = mock.method(child_process, "spawn", command => { commands.push(command); throw new Error("unexpected spawn"); });
+    const [device, dvb] = createDevice(), first = fakeStream(), second = fakeStream();
+    try {
+      const starting = device.startStream(user("left"), first, channel("27"));
+      first.closed = true; first.emit("close");
+      gate.reject(new Error("readChannelsConf failed"));
+      await starting;
+      const restarted = device.startStream(user("next"), second, channel("27"));
+      await flush();
+      assert.strictEqual(reads, 2);
+      assert.deepStrictEqual(dvb.calls, [["close"], ["stopStream"], ["start", 557142857]]);
+      await dvb.resolveStart(); await restarted;
+      mock.timers.tick(3000); await flush();
+      assert.deepStrictEqual(commands, []);
+      assert.deepStrictEqual(device.users.map(u => u.id), ["next"]);
+      assert.strictEqual(second.ended, false);
+      assert.strictEqual(device.isUsing, true);
+      assert.strictEqual(dvb.isOpen, true);
+      await device.kill();
+    } finally { gate.resolve(); read.mock.restore(); spawn.mock.restore(); }
+  });
+
 });

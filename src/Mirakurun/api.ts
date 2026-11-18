@@ -25,10 +25,10 @@ import _ from "./_";
 import type ChannelItem from "./ChannelItem";
 import type { StreamTarget } from "./Tuner";
 
-/** Service references on this carrier, including the relative TS needed to request each one. */
+/** この搬送波で受信できるサービスと、取得に必要な相対TSの検出情報を返す。 */
 export function getChannelServices(channel: ChannelItem): apid.Service[] {
     const streams = channel.streams;
-    // only the relative streams detected (`tsmfRelTs` of channels.yml is of the channel)
+    // 設定で相対TSを固定していないチャンネルだけ、検出済みの相対TS情報を付ける。
     const hasRelativeStreams = channel.tsmfRelTs === undefined && streams.some(stream => stream.relTs !== undefined);
     return channel.getServices().map(service => {
         const result: apid.Service = {
@@ -43,7 +43,7 @@ export function getChannelServices(channel: ChannelItem): apid.Service[] {
             const relative = streams.find(stream => stream.networkId === service.networkId && stream.streamId === service.streamId);
             if (relative?.relTs !== undefined) {
                 result.tsmfRelTs = relative.relTs;
-                // for the remote Mirakurun to receive the relative stream (`tsmfRelTs` and `format` of the channel stream)
+                // リモートで相対TSを取得するための検出形式を返す。チャンネル設定のformatは反映しない。
                 if (relative.format) {
                     result.format = relative.format;
                 }
@@ -60,7 +60,8 @@ export interface Error {
 }
 
 export function responseError(res: express.Response, code: number, reason?: string): express.Response {
-    if (reason) {
+    // 日本語の理由はJSON本文に保持し、HTTPのstatusMessageへは渡さない。
+    if (reason && /^[\x20-\x7E]+$/.test(reason)) {
         res.writeHead(code, reason, {
             "Content-Type": "application/json"
         });
@@ -82,7 +83,13 @@ export function responseError(res: express.Response, code: number, reason?: stri
 }
 
 export function responseStreamErrorHandler(res: express.Response, err: NodeJS.ErrnoException): express.Response {
-    if (err.message === "no available tuners") {
+    if (err.code === "ERR_STREAM_FORMAT_UNAVAILABLE") {
+        return responseError(res, 406, "Requested Stream Format Unavailable");
+    }
+    if (err.code === "ERR_DECODER_START_FAILED") {
+        return responseError(res, 503, "Decoder Unavailable");
+    }
+    if (err.message === "no available tuners" || err.code === "ERR_TUNER_UNAVAILABLE") {
         return responseError(res, 503, "Tuner Resource Unavailable");
     }
 
@@ -95,7 +102,7 @@ export const streamFormatParameter = {
     name: "format",
     type: "string",
     enum: ["ts", "tlv"],
-    description: "The output format. `tlv` is only for the channels of TLV (MMT), `ts` needs `tlvToTsDecoder` for them."
+    description: "配信するストリーム形式です。formatを省略すると、TS入力はts、TLV（MMT）入力はサーバー設定のdefaultTlvStreamFormat（未設定時はtlv）で配信します。formatを明示するとサーバーの既定値より優先します。tlvを指定できるのはTLV入力だけです。TLVをtsで取得するにはtlvToTsDecoderの設定が必要です。チャンネル配信のrawTsmf=trueでは、省略時もtsで配信します。"
 };
 
 /**
@@ -208,6 +215,8 @@ async function writeJSONArray(res: express.Response, items: any[]): Promise<void
     let chunk: string = chunks.next().value;
     // Keep small listings in one bounded write as their metadata grows.
     let coalesce = items.length <= 512;
+    // まとめる上限はUTF-8の送信量で数え、要素単体のJSONは途中で分割しない。
+    let chunkBytes = coalesce ? Buffer.byteLength(chunk) : 0;
 
     while (!res.destroyed) {
         const next = chunks.next();
@@ -217,8 +226,10 @@ async function writeJSONArray(res: express.Response, items: any[]): Promise<void
             return;
         }
 
-        if (coalesce && chunk.length + next.value.length <= 128 * 1024) {
+        const nextBytes = coalesce ? Buffer.byteLength(next.value) : 0;
+        if (coalesce && chunkBytes + nextBytes <= 128 * 1024) {
             chunk += next.value;
+            chunkBytes += nextBytes;
             continue;
         }
         coalesce = false;

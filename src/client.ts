@@ -125,20 +125,62 @@ export class Client {
     private _userAgent = `MirakurunClient/${pkg.version} Node/${process.version} (${process.platform})`;
     private _docs: OpenAPIV2.Document;
 
-    async getDocs() {
+    async getDocs(option: RequestOption = {}) {
         if (!this._docs) {
-            await this._getDocs();
+            await this._getDocs(option);
         }
         return this._docs;
     }
 
     /** the channel stream outputs the relative stream of TSMF specified by `tsmfRelTs` (not 4.3.0 or before, which ignores it) */
-    async supportsChannelStreamTsmfRelTs(): Promise<boolean> {
-        const docs = await this.getDocs();
+    async supportsChannelStreamTsmfRelTs(option: RequestOption = {}): Promise<boolean> {
+        let hasConnectionInfo = false;
+        try {
+            // 接続情報は参照用キーでも取得でき、管理用のAPI Docsを公開する必要はない。
+            const connection = (await this.request("GET", "/auth/connection", option)).body as { capabilities?: { channelStreamTsmfRelTs?: boolean } } | undefined;
+            hasConnectionInfo = true;
+            const supported = connection?.capabilities?.channelStreamTsmfRelTs;
+            if (typeof supported === "boolean") { return supported; }
+            if (supported !== undefined) { throw new Error("相対TSの対応情報が不正です。"); }
+        } catch (error) {
+            option.signal?.throwIfAborted();
+            const status = (error as Response | undefined)?.status;
+            // 接続情報を持たない旧サーバーだけは、従来のAPI Docsで確認する。
+            if (status !== 404 && status !== 405) { throw error; }
+        }
+        try {
+            const docs = await this.getDocs(option);
+            const path = docs.paths["/channels/{type}/{channel}/stream"];
+            // the parameters of the path (as Mirakurun), and of the operation
+            const parameters = [...(path?.parameters || []), ...(path?.get?.parameters || [])];
+            return parameters.some(param => "name" in param && param.name === "tsmfRelTs");
+        } catch (error) {
+            option.signal?.throwIfAborted();
+            // capabilityのない旧5.0等で管理docsだけ拒否された場合は、対応を確認できないため使わない。
+            // 接続情報自体の拒否や、旧サーバーのdocs認証失敗・通信障害は要求エラーのまま返す。
+            if (hasConnectionInfo && (error as Response | undefined)?.status === 403) { return false; }
+            throw error;
+        }
+    }
+
+    async supportsChannelStreamRawTsmf(option: RequestOption = {}): Promise<boolean> {
+        try {
+            const connection = (await this.request("GET", "/auth/connection", option)).body as { capabilities?: { channelStreamRawTsmf?: boolean } } | undefined;
+            const supported = connection?.capabilities?.channelStreamRawTsmf;
+            if (typeof supported === "boolean") { return supported; }
+            if (supported !== undefined) { throw new Error("生TSMFの対応情報が不正です。"); }
+            return false;
+        } catch (error) {
+            option.signal?.throwIfAborted();
+            const status = (error as Response | undefined)?.status;
+            if (status !== 404 && status !== 405) { throw error; }
+        }
+        // 接続情報のない4.x peerは、専用rawTsmf指定を公開したAPI Docsでのみ対応を確認する。
+        // format=tsの存在だけではNULLパケット保持を保証できないため、未対応とは区別する。
+        const docs = await this.getDocs(option);
         const path = docs.paths["/channels/{type}/{channel}/stream"];
-        // the parameters of the path (as Mirakurun), and of the operation
         const parameters = [...(path?.parameters || []), ...(path?.get?.parameters || [])];
-        return parameters.some(param => (param as OpenAPIV2.Parameter).name === "tsmfRelTs");
+        return parameters.some(param => "name" in param && param.name === "rawTsmf");
     }
 
     request(method: RequestMethod, path: string, option: RequestOption = {}): Promise<Response>|Promise<ErrorResponse> {
@@ -192,7 +234,7 @@ export class Client {
 
     async call(operationId: string, param: { [key: string]: any } = {}, option: RequestOption = {}): Promise<any|http.IncomingMessage> {
         if (!this._docs) {
-            await this._getDocs();
+            await this._getDocs({ signal: option.signal });
         }
 
         let path: string;
@@ -233,8 +275,8 @@ export class Client {
 
         option = {
             headers: {},
-            query: {},
-            ...option
+            ...option,
+            query: { ...option.query }
         };
 
         for (const p of parameters) {
@@ -255,6 +297,24 @@ export class Client {
             }
         }
 
+        // CSV配列は1キーにまとめ、クエリーパーサーのキー数上限で後続の条件が欠けるのを防ぐ。
+        for (const p of parameters) {
+            if (p.in === "query" && p.collectionFormat === "csv" && Array.isArray(option.query![p.name])) {
+                const values = option.query![p.name];
+                if (values.length === 0) {
+                    delete option.query![p.name];
+                } else {
+                    option.query![p.name] = values.join(",");
+                }
+            }
+        }
+        if (operationId === "channelScan") {
+            const query = querystring.stringify(option.query);
+            if (Buffer.byteLength(this.basePath + path + (query ? "?" + query : "")) > 8192) {
+                throw new Error("スキャン条件が長すぎます。符号化済みURLを8192バイト以下にしてください。チャンネル一覧やスキップの指定を分けてから、再度開始してください。");
+            }
+        }
+
         if (operation.tags.indexOf("stream") !== -1) {
             return this._requestStream(method, path, option);
         }
@@ -271,8 +331,8 @@ export class Client {
         return res.body as apid.Channel[];
     }
 
-    async getChannel(type: apid.ChannelType, channel: string): Promise<apid.Channel> {
-        const res = await this.call("getChannel", { type, channel });
+    async getChannel(type: apid.ChannelType, channel: string, option: RequestOption = {}): Promise<apid.Channel> {
+        const res = await this.call("getChannel", { type, channel }, option);
         return res.body as apid.Channel;
     }
 
@@ -317,13 +377,13 @@ export class Client {
         return this.call("getServiceStreamByChannel", {
             type,
             channel,
-            sid,
+            id: sid,
             decode: decode ? 1 : 0,
             ...(format ? { format } : {})
         }, { priority, signal });
     }
 
-    async getChannelStream(opt: { type: apid.ChannelType, channel: string, decode?: boolean, priority?: number, format?: apid.StreamFormat, tsmfRelTs?: number, signal?: AbortSignal }): Promise<http.IncomingMessage>;
+    async getChannelStream(opt: { type: apid.ChannelType, channel: string, decode?: boolean, priority?: number, format?: apid.StreamFormat, tsmfRelTs?: number, rawTsmf?: boolean, signal?: AbortSignal }): Promise<http.IncomingMessage>;
     async getChannelStream(type: apid.ChannelType, channel: string, decode?: boolean, priority?: number): Promise<http.IncomingMessage>;
     async getChannelStream(...args: any[]): Promise<http.IncomingMessage> {
         let type: apid.ChannelType;
@@ -333,6 +393,7 @@ export class Client {
         let signal: AbortSignal;
         let format: apid.StreamFormat;
         let tsmfRelTs: number;
+        let rawTsmf: boolean;
 
         if (typeof args[0] === "object") {
             const opt = args[0];
@@ -343,6 +404,7 @@ export class Client {
             signal = opt.signal;
             format = opt.format;
             tsmfRelTs = opt.tsmfRelTs;
+            rawTsmf = opt.rawTsmf;
         } else {
             type = args[0];
             channel = args[1];
@@ -355,7 +417,8 @@ export class Client {
             channel,
             decode: decode ? 1 : 0,
             ...(format ? { format } : {}),
-            ...(tsmfRelTs ? { tsmfRelTs } : {})
+            ...(tsmfRelTs ? { tsmfRelTs } : {}),
+            ...(rawTsmf ? { rawTsmf: true } : {})
         }, { priority, signal });
     }
 
@@ -637,10 +700,10 @@ export class Client {
         }
     }
 
-    private async _getDocs() {
-        const res = await this.request("GET", this.docsPath);
+    private async _getDocs(option: RequestOption = {}) {
+        const res = await this.request("GET", this.docsPath, option);
         if (res.isSuccess !== true) {
-            throw new Error(`Failed to get "${this.docsPath}".`);
+            throw Object.assign(new Error(`Failed to get "${this.docsPath}".`), { status: res.status });
         }
         this._docs = res.body;
     }

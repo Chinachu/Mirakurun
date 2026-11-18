@@ -353,6 +353,7 @@ export class Job {
         Event.emit("job", "update", jobToJSON("standby", job));
 
         let skip = false;
+        let readinessFailure: Error | undefined;
 
         if (job.readyFn) {
             try {
@@ -360,11 +361,12 @@ export class Job {
             } catch (err) {
                 const error = err instanceof Error ? err : new Error(String(err));
                 log.error(`Job#_checkReady() "${job.key}" readyFn error: ${error.message}`);
-                skip = true;
+                if ((err as { code?: string })?.code === "ERR_TUNER_UNAVAILABLE") { readinessFailure = error; }
+                skip = !readinessFailure;
             }
         }
 
-        if (!skip && this._runningJobItemSet.size >= this.maxRunning) {
+        if (!skip && !readinessFailure && this._runningJobItemSet.size >= this.maxRunning) {
             log.debug(`Job#_checkReady() running is full [wait]`);
             while (this._runningJobItemSet.size >= this.maxRunning) {
                 await sleep(1000);
@@ -376,7 +378,12 @@ export class Job {
             this._standbyJobItems.splice(waitingIndex, 1);
         }
 
-        if (skip || job.ac.signal.aborted) {
+        if (readinessFailure && !job.ac.signal.aborted) {
+            // 有限回のチューナー準備失敗は枠を解放し、本体の失敗と同じretryOnFailへ渡す。
+            const failedJob: RunningJobItem = { ...job, retryCount: job.retryCount || 0, startedAt: Date.now() };
+            this._finishJob(failedJob, false, readinessFailure);
+            setImmediate(() => this._retryJob(failedJob));
+        } else if (skip || job.ac.signal.aborted) {
             // skip, abort
             const skippedJob: RunningJobItem = {
                 ...job,

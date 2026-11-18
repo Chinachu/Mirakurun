@@ -1,3 +1,18 @@
+/*
+   Copyright 2026 Mirakurun contributors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 const { describe, it, before, after, beforeEach, afterEach, mock } = require("node:test");
 const assert = require("assert");
 const fs = require("fs");
@@ -74,6 +89,8 @@ function fakeDevice(index, types, routes, state = {}) {
     isUsing: false,
     users: [],
     channel: null,
+    remoteRawTsmf: false,
+    supportsRemoteRawTsmf: true,
     getPriority: () => -2,
     // the remote Mirakurun supports `tsmfRelTs` (not 4.3.0 or before)
     supportsRemoteRelTs: true,
@@ -117,6 +134,68 @@ describe("[route.spec] route / streamId", () => {
 
   beforeEach(() => mock.timers.enable({ apis: ["setTimeout"] }));
   afterEach(() => mock.timers.reset());
+
+  it("prefers a detected service location over the unobserved original channel", () => {
+    setupChannels([
+      { name: "original", type: "BS", route: "CATV", channel: "C21" },
+      { name: "relay", type: "BS", route: "CATV", channel: "C22" }
+    ]);
+    const [original, relay] = _.channel.items;
+    relay.setStreams([{ networkId: 4, streamId: 18801, relTs: 2, format: "ts", slots: 52 }]);
+    const ServiceItem = require("../lib/Mirakurun/ServiceItem").default;
+    const item = new ServiceItem(original, 4, 101, "BS", 1, -1);
+    assert.deepStrictEqual(item.locations, [{ channel: original, stream: null }]);
+    item.streamId = 18801;
+    assert.deepStrictEqual(item.channels, [relay]);
+    assert.deepStrictEqual(item.targets, [{ channel: relay, relTs: 2 }]);
+    relay.setStreams([]);
+    assert.deepStrictEqual(item.locations, [{ channel: original, stream: null }]);
+  });
+
+
+  for (const [type, networkId, format] of [["BS", 4, "ts"], ["BS4K", 11, "tlv"]]) {
+    it(`スキャン元が未検出なら検出経路だけを使い、再検出後は確認した相対TSを使う (${format})`, async () => {
+      setupChannels([
+        { name: "original", type, route: "CATV", channel: "C21", tsmfRelTs: 1 },
+        { name: "relay", type, route: "FTTH", channel: "C22" }
+      ]);
+      const [original, relay] = _.channel.items;
+      const streamId = 18801;
+      relay.setStreams([{ networkId, streamId, relTs: 2, format, slots: 52 }]);
+      const ServiceItem = require("../lib/Mirakurun/ServiceItem").default;
+      const item = new ServiceItem(original, networkId, 101, "service", 1, -1, undefined, false, 0, streamId);
+      _.service.add(item);
+      assert.deepStrictEqual(original.streams, []);
+      assert.deepStrictEqual(item.locations, [{ channel: relay, stream: relay.streams[0] }]);
+      assert.deepStrictEqual(item.channels, [relay]);
+      assert.deepStrictEqual(item.targets, [{ channel: relay, relTs: 2 }]);
+      assert.strictEqual(item.format, format);
+      assert.deepStrictEqual(_.service.findByChannel(original), [], "受信未確認の元入力を公開経路には加えません");
+      assert.deepStrictEqual(_.service.findByChannel(relay), [item]);
+      assert.strictEqual(item.sourceChannel, original);
+      assert.deepStrictEqual(item.export(true).channel, { type, channel: "C21", route: "CATV" });
+      assert.deepStrictEqual(item.export().channel, { type, channel: "C22", route: "FTTH" });
+
+      const previousJob = _.job;
+      const jobs = [];
+      _.job = { add: job => jobs.push(job), addSchedule: () => {}, jobs };
+      try {
+        await _.service._initJobs();
+        await jobs.find(job => job.key === "Service.Add.Scan.Find-Channels").fn();
+        assert.strictEqual(jobs.filter(job => job.key === `Service.Add.Scan.${type}.C21`).length, 1,
+          "経路の候補から外れていても、元入力の追加確認を1件だけ予約します");
+      } finally { _.job = previousJob; }
+
+      original.setStreams([{ networkId: networkId + 1, streamId: streamId + 1, relTs: 3, format }]);
+      assert.deepStrictEqual(item.targets, [{ channel: relay, relTs: 2 }], "別のストリームを検出しても元入力を加えません");
+      original.setStreams([{ networkId, streamId, relTs: 3, format, slots: 52 }]);
+      assert.deepStrictEqual(item.channels, [original, relay]);
+      assert.deepStrictEqual(item.targets, [{ channel: original, relTs: 3 }, { channel: relay, relTs: 2 }]);
+      assert.deepStrictEqual(_.service.findByChannel(original), [item], "再検出した元入力を一覧へ戻し、検出した相対TSを使います");
+      assert.strictEqual(item.sourceChannel, original);
+      assert.deepStrictEqual(item.export(true).channel, { type, channel: "C21", route: "CATV" });
+    });
+  }
 
   describe("TSMF two-stage discovery", () => {
     for (const order of [[0, 1, 2], [2, 0, 1]]) {
@@ -416,6 +495,22 @@ describe("[route.spec] route / streamId", () => {
   });
 
   describe("ChannelItem", () => {
+    it("手動tsmfGroupIdは同じ放送種別かつ同じ受信経路の搬送波だけを結合する", () => {
+      setupChannels([
+        { name: "Cable1", type: "BS4K", channel: "C21", route: "CATV", tsmfGroupId: 8 },
+        { name: "Cable2", type: "BS4K", channel: "C22", route: "CATV", tsmfGroupId: 8 },
+        { name: "Fiber1", type: "BS4K", channel: "T21", route: "FTTH", tsmfGroupId: 8 },
+        { name: "Fiber2", type: "BS4K", channel: "T22", route: "FTTH", tsmfGroupId: 8 },
+        { name: "Satellite1", type: "BS4K", channel: "BS01_0", tsmfGroupId: 8 },
+        { name: "Satellite2", type: "BS4K", channel: "BS03_0", route: "SAT", tsmfGroupId: 8 },
+        { name: "Other type", type: "BS", channel: "C23", route: "CATV", tsmfGroupId: 8 }
+      ]);
+      const channels = _.channel.items;
+      for (const [index, expected] of [[0, [0, 1]], [2, [2, 3]], [4, [4, 5]], [6, [6]]]) {
+        assert.deepStrictEqual(channels[index].getBondedChannels(), expected.map(i => channels[i]));
+      }
+    });
+
     it("defaults the route by the type and keeps the config properties in toJSON()", () => {
       setupChannels([]);
       const gr = new ChannelItem({ name: "GR27", type: "GR", channel: "27", commandVars: { freq: 1 } });
@@ -528,8 +623,8 @@ describe("[route.spec] route / streamId", () => {
         channels: undefined
       }]);
       assert.deepStrictEqual(savedChannels, [
-        { type: "BS", channel: "BS31_0", streams: [{ networkId: 4, streamId: 20225, format: "ts" }] },
-        { type: "BS", channel: "C45", streams: [{ networkId: 4, streamId: 20225, format: "ts" }] }
+        { type: "BS", channel: "BS31_0", reception: { route: "SAT", commandVars: {} }, streams: [{ networkId: 4, streamId: 20225, format: "ts" }] },
+        { type: "BS", channel: "C45", reception: { route: "CATV", commandVars: {} }, streams: [{ networkId: 4, streamId: 20225, format: "ts" }] }
       ]);
     });
 
@@ -899,16 +994,37 @@ describe("[route.spec] route / streamId", () => {
       assert.strictEqual(channel.remoteFormat, "ts");
     });
 
-    // channels.yml で結合する搬送波は、これまでどおりリモートのチューナーでも受信する (リモートが出力するのは 1 つの搬送波)
-    it("receives the carriers of the group of channels.yml by the remote tuners too, as before", () => {
+    // rawTsmfは既定の相対TS設定を適用しない。未確認の能力は候補に残し、開始前の照会で確定する。
+    it("selects raw remote carriers independently of the configured relative TS", () => {
       setupChannels([1, 2].map(i => ({ name: `C${i}`, type: "BS4K", route: "CATV", channel: `C${i}`, format: "tlv", tsmfRelTs: 1, tsmfGroupId: 5 })));
       const [c1] = _.channel.items;
       const local = fakeDevice(0, ["BS4K"], ["CATV"]);
       const remote = fakeDevice(1, ["BS4K"], ["CATV"], { isRemote: true });
       const t = tuner([local, remote]);
       const candidate = t._getCandidate(c1, 1);
-      assert.deepStrictEqual(t._pickCarrierDevices({ device: local, channel: c1, candidate }, 0).map(({ device }) => device), [remote]);
+      assert.deepStrictEqual(t._pickCarrierDevices({ device: local, channel: c1, candidate }, 0, undefined, () => undefined).map(({ device }) => device), [remote]);
+      assert.deepStrictEqual(t._pickCarrierDevices({ device: remote, channel: c1, candidate }, 0, undefined, () => undefined).map(({ device }) => device), [local]);
+      assert.deepStrictEqual(t._pickCarrierDevices({ device: remote, channel: c1, candidate }, 0, undefined, () => 1), []);
+      assert.deepStrictEqual(t._pickCarrierDevices({ device: local, channel: c1, candidate }, 0, undefined, () => 1).map(({ device }) => device), [remote]);
+      const localCandidate = { ...candidate, devices: [local] };
+      assert.strictEqual(t._hasCarrierDevices(localCandidate, () => 1), true);
+      assert.strictEqual(t._pickCarrierDevices({ device: local, channel: c1, candidate }, 0, undefined, () => null), null);
+      assert.strictEqual(t._hasCarrierDevices(localCandidate, () => null), false);
+      remote.supportsRemoteRawTsmf = false;
+      assert.strictEqual(t._pickCarrierDevices({ device: local, channel: c1, candidate }, 0, undefined, () => 1), null);
+      assert.strictEqual(t._hasCarrierDevices(localCandidate, () => 1), false);
+      remote.supportsRemoteRawTsmf = undefined;
+      const pendingCarriers = t._pickCarrierDevices({ device: local, channel: c1, candidate }, 0, undefined, () => 1);
+      assert.deepStrictEqual(pendingCarriers.map(({ device }) => device), [remote]);
+      assert.deepStrictEqual(t._uncheckedRawTsmfDevices({ device: local, candidate: localCandidate }, pendingCarriers, () => 1), [remote]);
+      // 能力照会中の開始停止はtuner-remote-tsmf.specの保留Promiseで検証する。
+      remote.supportsRemoteRawTsmf = true;
       assert.deepStrictEqual(t._pickCarrierDevices({ device: remote, channel: c1, candidate }, 0).map(({ device }) => device), [local]);
+      const remoteOnly = tuner([remote]);
+      const remoteCandidate = remoteOnly._getCandidate(c1, 1);
+      assert.strictEqual(remoteOnly._hasCarrierDevices(remoteCandidate), false);
+      assert.strictEqual(remoteOnly._hasCarrierDevices(remoteCandidate, () => 1), true);
+      assert.strictEqual(remoteOnly._hasCarrierDevices(remoteCandidate, () => undefined), false);
     });
 
     // ローカルのチューナーで搬送波を受信できない場合は、判別した相対 TS を結合して出力するリモートのチューナーで受信する
@@ -1543,14 +1659,16 @@ describe("[route.spec] route / streamId", () => {
       mock.timers.tick(1000 * 5);
     });
 
-    // チューナーの数が足りていても、搬送波のチャンネルを受信できるチューナーがなければ待ち続けない
-    it("returns null when no tuners can receive a carrier configured", async () => {
+    // 同じ手動グループ番号でも、別経路の搬送波を待機条件へ混ぜない。
+    it("does not wait for a configured carrier on another route", async () => {
       setupChannels([["C1", "CATV"], ["C2", "FTTH"]].map(([channel, route]) => ({ name: channel, type: "BS4K", route, channel, format: "tlv", tsmfRelTs: 1, tsmfGroupId: 5 })));
       const t = tuner([fakeDevice(0, ["BS4K"], ["CATV"]), fakeDevice(1, ["BS4K"], ["CATV"])]);
       const [c1, c2] = _.channel.items;
-      assert.deepStrictEqual([t._getCandidate(c1, 1).devices.length, t._getCandidate(c2, 1).devices.length, c1.getBondedChannels().length], [2, 0, 2]);
+      assert.deepStrictEqual([t._getCandidate(c1, 1).devices.length, t._getCandidate(c2, 1).devices.length, c1.getBondedChannels().length], [2, 0, 1]);
 
-      assert.strictEqual(await t.readyForJob(c1), null);
+      assert.strictEqual(await t.readyForJob(c1), c1);
+      assert.strictEqual(await t.readyForJob(c2), null);
+      mock.timers.tick(1000 * 5);
     });
   });
 
@@ -1640,7 +1758,7 @@ describe("[route.spec] route / streamId", () => {
         const device = new TunerDevice(0, { name: "remote", types: ["BS"], remoteMirakurunHost: "remote" });
         const stream = () => Object.assign(new EventEmitter(), { closed: false, write() {}, flush() {}, end() {} });
         await device.startStream({ id: "a", priority: 1, streamSetting: { channel, tsmfRelTs: 3 } }, stream(), channel);
-        assert.deepStrictEqual(spawn.mock.calls[0].arguments, ["node", ["lib/remote", "remote", "40772", "BS", "C46", "relTs=3"]]);
+        assert.deepStrictEqual(spawn.mock.calls[0].arguments, ["node", ["lib/remote", "remote", "40772", "BS", "C46", "ts", "relTs=3"]]);
         assert.strictEqual(device.remoteRelTs, 3);
 
         // another relative stream of the same channel is not shared
@@ -1649,7 +1767,7 @@ describe("[route.spec] route / streamId", () => {
           device._stream = null;
         };
         await device.startStream({ id: "b", priority: 2, streamSetting: { channel, tsmfRelTs: 2 } }, stream(), channel);
-        assert.deepStrictEqual(spawn.mock.calls[1].arguments, ["node", ["lib/remote", "remote", "40772", "BS", "C46", "relTs=2"]]);
+        assert.deepStrictEqual(spawn.mock.calls[1].arguments, ["node", ["lib/remote", "remote", "40772", "BS", "C46", "ts", "relTs=2"]]);
         assert.strictEqual(device.remoteRelTs, 2);
       } finally {
         spawn.mock.restore();
@@ -1724,13 +1842,13 @@ describe("[route.spec] route / streamId", () => {
         const device = new TunerDevice(0, { name: "remote", types: ["BS4K"], remoteMirakurunHost: "remote" });
         // the relative stream 2 of TS, not saved yet (the first scan)
         await device.startStream({ id: "scan", priority: -1, streamSetting: { channel, tsmfRelTs: 2, format: "ts" } }, stream(), channel);
-        assert.deepStrictEqual(spawn.mock.calls[0].arguments, ["node", ["lib/remote", "remote", "40772", "BS4K", "C19", "relTs=2"]]);
+        assert.deepStrictEqual(spawn.mock.calls[0].arguments, ["node", ["lib/remote", "remote", "40772", "BS4K", "C19", "ts", "relTs=2"]]);
         assert.deepStrictEqual([device.remoteRelTs, device.remoteFormat], [2, "ts"]);
 
         // respawned with the same request
         close(procs[0], 1);
         await wait();
-        assert.deepStrictEqual(spawn.mock.calls[1].arguments, ["node", ["lib/remote", "remote", "40772", "BS4K", "C19", "relTs=2"]]);
+        assert.deepStrictEqual(spawn.mock.calls[1].arguments, ["node", ["lib/remote", "remote", "40772", "BS4K", "C19", "ts", "relTs=2"]]);
 
         // another format is not shared
         const killed = [];
@@ -1811,9 +1929,12 @@ describe("[route.spec] route / streamId", () => {
       device.getRemoteChannel = async () => ({ type: "BS", channel: "C46", services: [{ id: 1, serviceId: 265, networkId: 4, streamId: 18801 }] });
       assert.strictEqual(await device.checkRemoteChannelRelTs(channel, 3), false);
       assert.deepStrictEqual([device.isRemoteChannelRelTsChecked(channel, 3), device.canReceiveRemoteRelTs(channel, 2), device.canReceiveRemoteRelTs(channel, 3)], [true, true, false]);
-      // not known (failed to get): requested
+      // 確認できないpeerは一時的に除外し、相対TSの未対応とは確定しない。
       device.getRemoteChannel = async () => { throw new Error("ECONNREFUSED"); };
-      assert.strictEqual(await device.checkRemoteChannelRelTs(channel, 4), true);
+      assert.strictEqual(await device.checkRemoteChannelRelTs(channel, 4), false);
+      assert.strictEqual(device.canReceiveRemoteRelTs(channel, 4), false);
+      assert.strictEqual(device.isRemoteChannelRelTsChecked(channel, 4), false);
+      assert.strictEqual(device.getRemoteChannelRelTsCheckError(channel, 4).message, "ECONNREFUSED");
       // tsmfRelTs of channels.yml of the remote Mirakurun (its services have no tsmfRelTs), and no services yet: requested
       device.getRemoteChannel = async () => ({ type: "BS", channel: "C46", tsmfRelTs: 5, services: [{ id: 1, serviceId: 265, networkId: 4, streamId: 18801 }] });
       assert.deepStrictEqual([await device.checkRemoteChannelRelTs(channel, 5), device.canReceiveRemoteRelTs(channel, 5)], [true, true]);
@@ -1910,13 +2031,16 @@ describe("[route.spec] route / streamId", () => {
       const command = `dvbv5-zap -a 0 -c ${path.join(dir, "dvbv5_channels_<route>.conf")} -r -P <channel>`;
       // 起動時に、読めない経路を知らせる (経路を指定していない場合は、使わない経路かもしれないため警告にしない)
       const logs = { warn: mock.method(log, "warn", () => {}), info: mock.method(log, "info", () => {}) };
-      const byRoute = method => logs[method].mock.calls.filter(call => /for the route/.test(call.arguments[0])).map(call => call.arguments[2]);
+      const byRoute = method => logs[method].mock.calls.filter(call => /の経路/.test(call.arguments[0])).map(call => call.arguments[2]);
       let device;
       try {
         device = new TunerDevice(0, { name: "dvb", types: ["GR", "SKY"], routes: ["TER", "SKY"], command });
         assert.deepStrictEqual([byRoute("warn"), byRoute("info")], [["SKY"], []]);
+        assert.ok(logs.warn.mock.calls.some(call => call.arguments[0].startsWith("⚠️ ")), "指定した経路の失敗は警告の印で表示します");
         assert.ok(new TunerDevice(2, { name: "dvb", types: ["GR"], command })._dvb instanceof FakeDvb);
         assert.deepStrictEqual([byRoute("warn"), byRoute("info")], [["SKY"], ["SAT", "SKY", "FTTH"]]);
+        const optionalRoutes = logs.info.mock.calls.filter(call => /の経路/.test(call.arguments[0]));
+        assert.ok(optionalRoutes.every(call => call.arguments[0].startsWith("📡 ")), "未指定の経路は通常の情報表示を維持します");
       } finally {
         logs.warn.mock.restore();
         logs.info.mock.restore();

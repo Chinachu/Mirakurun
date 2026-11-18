@@ -14,6 +14,7 @@
    limitations under the License.
 */
 import { Writable } from "stream";
+import { setTimeout as delay } from "timers/promises";
 import EventEmitter = require("eventemitter3");
 import * as common from "./common";
 import * as log from "./log";
@@ -31,6 +32,40 @@ import { DETECT_BYTES, DETECT_SKIP_BYTES, TSMFStream, detectStreamFormat, detect
 const TLV_DECODER_STARTUP_TIMEOUT = 10000;
 // milliseconds to receive the data to detect the format
 const DETECT_TIMEOUT = 10000;
+const REMOTE_READY_LOOKUP_FAILURE_LIMIT = 3;
+
+/** nullは出力確認の失敗、undefinedは未設定です。未照会の候補は確保前に確認します。 */
+type RemoteChannelRelTs = (device: TunerDevice, channel: ChannelItem) => number | undefined | null;
+type RemoteChannelStates = Map<TunerDevice, Map<ChannelItem, number | undefined | null>>;
+type RemoteChannelFailures = Map<TunerDevice, Set<ChannelItem>>;
+interface RemoteChannelQuery { promise: Promise<apid.Channel>; retryable: boolean; reported: Set<string>; checkedAt?: number; expired?: boolean; error?: unknown; }
+type RemoteChannelQueries = Map<string, RemoteChannelQuery>;
+
+/** 同じ要求の同じ障害だけを抑制し、接続先・チャンネルや障害の種類が変われば記録する。 */
+function reportRemoteChannelFailure(reported: Set<string> | undefined, error: unknown): boolean {
+    if (!reported) { return true; }
+    const detail = error as { code?: unknown; statusCode?: unknown; status?: unknown };
+    const signature = JSON.stringify([detail?.code ?? (error instanceof Error ? error.name : typeof error),
+        Number(detail?.statusCode ?? detail?.status)]);
+    if (reported.has(signature)) { return false; }
+    reported.add(signature);
+    return true;
+}
+
+/** 通信は要求が所有し、同じ接続先の照会結果だけをその要求の候補間で共有する。 */
+function remoteChannelQuery(device: TunerDevice, channel: ChannelItem, queries: RemoteChannelQueries, signal?: AbortSignal): RemoteChannelQuery {
+    const key = remoteChannelLookupKey(device, channel);
+    const previous = queries.get(key);
+    if (previous && !previous.expired) { return previous; }
+    const query: RemoteChannelQuery = { retryable: false, reported: previous?.reported ?? new Set(),
+        promise: device.getRemoteChannel(channel.type, channel.channel,
+            signal ? AbortSignal.any([signal, AbortSignal.timeout(5000)]) : AbortSignal.timeout(5000))
+            .then(remote => { query.checkedAt = Date.now(); return remote; })
+            .catch(error => { query.error = error; query.retryable = isRetryableRemoteLookupError(error); throw error; })
+    };
+    queries.set(key, query);
+    return query;
+}
 
 /** receives the data of a tuner to detect the format */
 class FormatProbe extends EventEmitter {
@@ -129,6 +164,24 @@ class CarrierSink extends EventEmitter {
     }
 }
 
+/** 確認不能と固定の不適合を分ける。タイムアウト・通信失敗・5xxは準備待ちで再確認する。 */
+function isRetryableRemoteLookupError(error: unknown): boolean {
+    if ((error as { code?: string })?.code === "ERR_REMOTE_CHANNEL_RELTS_INVALID") { return false; }
+    const status = Number((error as { statusCode?: unknown })?.statusCode ?? (error as { status?: unknown })?.status);
+    return !Number.isInteger(status) || status < 400 || status >= 500 || status === 408 || status === 429;
+}
+
+/** 同じGETでも、通信方式・接続先・認証・チャンネルが違えば結果を共有しない。キーはログへ出さない。 */
+function remoteChannelLookupKey(device: TunerDevice, channel: Pick<ChannelItem, "type" | "channel">): string {
+    // この版のremote clientはHTTP・認証なし。実際のクライアントが使用する接続情報だけで区別する。
+    const config = device.config;
+    const host = String(config.remoteMirakurunHost);
+    // DNS名以外は大文字小文字も含めてそのまま区別し、未知の接続表記を推測で統合しない。
+    const normalizedHost = /^[a-z\d.-]+$/i.test(host) ? host.toLowerCase() : host;
+    return JSON.stringify(["http:", normalizedHost,
+        config.remoteMirakurunPort || 40772, "", channel.type, String(channel.channel)]);
+}
+
 /** a channel and the relative stream of TSMF to receive */
 export interface StreamTarget {
     channel: ChannelItem;
@@ -137,6 +190,8 @@ export interface StreamTarget {
 }
 
 interface TunerCandidate extends StreamTarget {
+    /** 結合用の未展開TSMFを受け取る。 */
+    rawTsmf?: boolean;
     devices: TunerDevice[];
     /** the format to receive */
     format: apid.StreamFormat;
@@ -209,42 +264,136 @@ export class Tuner {
      * @param channels candidates (and the relative streams of TSMF), the former is preferred
      * @returns the channel a tuner is available for, `null` if no tuners for the channels
      */
-    async readyForJob(channels: ChannelItem | (ChannelItem | StreamTarget)[]): Promise<ChannelItem> {
-        // the channel is received as the stream of the channel (`tsmfRelTs`, the carriers of it are bonded),
-        // the candidates never received (such as the carriers more than the tuners) are not waited for
-        const targets = (Array.isArray(channels) ? channels : [channels]).map(target => target instanceof ChannelItem ? { channel: target, relTs: target.tsmfRelTs } : target);
-        const candidates = this._getCandidates(targets).filter(candidate => candidate.devices.length > 0 && this._hasCarrierDevices(candidate));
-        if (candidates.length === 0) {
-            log.error("readyForJob: no tuners for channel %s", targets.map(({ channel }) => `${channel.type}/${channel.channel}`).join(", "));
-            return null;
-        }
+    async readyForJob(channels: ChannelItem | (ChannelItem | StreamTarget)[], signal?: AbortSignal): Promise<ChannelItem | null> {
+        signal?.throwIfAborted();
 
+        // 未照会のリモートを展開済みと扱わず、確保時と同じ既定出力で搬送波数を判定する。
+        const targets = (Array.isArray(channels) ? channels : [channels]).map(target => target instanceof ChannelItem ? { channel: target, relTs: target.tsmfRelTs } : target);
+        const remoteChannels: RemoteChannelStates = new Map();
+        const remoteQueries: RemoteChannelQueries = new Map();
+        const rawFailureReports = new Map<TunerDevice, Set<string>>();
+        const retryableLookups: RemoteChannelFailures = new Map();
+        let reportedWaiting = false;
+        let transientFailures = 0;
+        const remoteChannelRelTs: RemoteChannelRelTs = (device, channel) => remoteChannels.get(device)?.get(channel);
         while (true) {
+            signal?.throwIfAborted();
+
+            // 直前に除外されたpeerも、10秒の失敗cacheが切れたら候補へ戻す。
+            const candidates = this._getCandidates(targets).filter(candidate => candidate.devices.length > 0);
+            const viable = candidates.filter(candidate => this._hasCarrierDevices(candidate, remoteChannelRelTs));
             // the bonded carriers need the tuners too
             const { picked, carriers } = this._pickTunerDeviceWithCarriers(
-                candidates.map(candidate => ({
+                viable.map(candidate => ({
                     ...candidate,
                     devices: candidate.devices.filter(device => !this._readyForJobPickedDeviceSet.has(device))
                 })),
                 -1,
-                this._readyForJobPickedDeviceSet
+                this._readyForJobPickedDeviceSet,
+                remoteChannelRelTs
             );
-            if (picked === null || carriers === null) {
-                // log.debug("readyForJob: no available tuners for channel type: %s", channel.type);
-                await common.sleep(1000 * 10);
+            if (picked !== null && this._isDetectedByRemote(picked.candidate, picked.device) && !picked.device.isRemoteChannelRelTsChecked(picked.channel, picked.candidate.relTs!)) {
+                await this._checkRemoteRelativeForRequest(picked.device, picked.channel, picked.candidate.relTs!, remoteQueries, signal);
+
+                continue;
+            }
+            // 全ローカルで確保できる場合は、未使用リモートの照会を待たない。
+            const unchecked = (picked === null || carriers === null
+                ? candidates.flatMap(candidate => candidate.relTs !== undefined && candidate.relTs === candidate.channel.tsmfRelTs
+                    ? candidate.devices.map(device => ({ device, channel: candidate.channel })) : [])
+                : [
+                    ...(picked.candidate.relTs !== undefined && picked.candidate.relTs === picked.channel.tsmfRelTs ? [picked] : []),
+                    ...carriers
+                ]).filter(({ device, channel }) => device.isRemote && !remoteChannels.get(device)?.has(channel) && !this._hasActiveRemoteRawInput(device, channel));
+            if (unchecked.length > 0 && await this._checkRemoteChannels(unchecked, remoteChannels, signal, retryableLookups, remoteQueries)) { continue; }
+            const uncheckedRaw = this._uncheckedRawTsmfDevices(picked, carriers, remoteChannelRelTs);
+            if (uncheckedRaw.length > 0) {
+                for (const device of uncheckedRaw) {
+                    let reported = rawFailureReports.get(device);
+                    if (!reported) { reported = new Set(); rawFailureReports.set(device, reported); }
+                    await device.checkRemoteRawTsmf(signal, error => reportRemoteChannelFailure(reported, error));
+                }
+                continue;
+            }
+            if (viable.length === 0) {
+                const lookupFailed = [...remoteChannels.values()].some(channels => [...channels.values()].includes(null));
+                const rawRejected = candidates.flatMap(candidate => candidate.devices.filter(device => device.isRemote
+                    && this._needsRemoteRawTsmf(candidate, device, remoteChannelRelTs) && device.supportsRemoteRawTsmf === false));
+                const rawCheckErrors = rawRejected.map(device => device.remoteRawTsmfCheckError).filter(error => error !== undefined);
+                const rawCheckError = rawCheckErrors.find(isRetryableRemoteLookupError) ?? rawCheckErrors[0];
+                // _getCandidateは一時失敗中の相対TS用peerも省くため、元のdevice集合で原因を確認する。
+                const relativeDevices = targets.flatMap(target => target.relTs !== undefined && target.relTs !== target.channel.tsmfRelTs
+                    ? this._getDevicesByType(target.channel.type, target.channel.route).filter(device => device.isRemote)
+                        .map(device => ({ device, channel: target.channel, relTs: target.relTs! })) : []);
+                const relTsCheckErrors = relativeDevices.map(({ device, channel, relTs }) => device.getRemoteChannelRelTsCheckError?.(channel, relTs))
+                    .filter(error => error !== undefined);
+                const relTsCheckError = relTsCheckErrors.find(isRetryableRemoteLookupError) ?? relTsCheckErrors[0];
+                const checkingSupport = relativeDevices.some(({ device }) => device.isRemoteRelTsChecked === false);
+                const transient = retryableLookups.size > 0 || checkingSupport
+                    || rawCheckError !== undefined && isRetryableRemoteLookupError(rawCheckError)
+                    || relTsCheckError !== undefined && isRetryableRemoteLookupError(relTsCheckError);
+                const reason = lookupFailed ? "リモートのチャンネル出力を確認できませんでした"
+                    : relTsCheckError !== undefined ? "リモートの相対TSを確認できませんでした"
+                        : rawCheckError !== undefined ? "リモートの生TSMF対応を確認できませんでした"
+                            : checkingSupport ? "リモートの相対TS対応を確認しています"
+                                : rawRejected.length > 0 ? "生TSMFの取得に対応するチューナーがありません" : "対応するチューナーがありません";
+                const label = targets.map(({ channel }) => `${channel.type}/${channel.channel}`).join(", ");
+                if (!transient) {
+                    log.error(`❌ ${reason}: %s`, label);
+                    return null;
+                }
+                // 通信障害で準備枠を占有し続けない。有限回の再確認後はJobの失敗・再試行へ戻す。
+                // false/nullは意図したskipに使うため、照会失敗を成功扱いにしない。
+                if (++transientFailures >= REMOTE_READY_LOOKUP_FAILURE_LIMIT) {
+                    const cause = relTsCheckError ?? rawCheckError ?? [...remoteQueries.values()].find(query => query.retryable)?.error;
+                    throw Object.assign(new Error(`${reason}。再確認の上限に達しました。`, cause !== undefined ? { cause } : undefined),
+                        { code: "ERR_TUNER_UNAVAILABLE" });
+                }
+                if (!reportedWaiting) { log.warn(`⚠️ ${reason}: ${label}。10秒後に再確認します。`); reportedWaiting = true; }
+            }
+            if (viable.length > 0) { transientFailures = 0; }
+            if (viable.length === 0 || picked === null || carriers === null) {
+                await delay(1000 * 10, undefined, { signal });
+                // 固定不適合は残し、準備待ちで再確認する失敗だけをこの要求内でも破棄する。
+                for (const [device, failures] of retryableLookups) {
+                    for (const channel of failures.keys()) { remoteChannels.get(device)?.delete(channel); }
+                }
+                retryableLookups.clear();
+                // 成功した照会もdevice側と同じ60秒で更新し、古いPromiseで確認時刻だけを延長しない。
+                const expired = new Set<string>();
+                for (const [key, query] of remoteQueries) {
+                    if (query.retryable || query.checkedAt !== undefined && Date.now() - query.checkedAt >= 60000) {
+                        // Promiseは更新しても、同じ要求の警告済み記録は引き継ぐ。
+                        query.expired = true;
+                        expired.add(key);
+                    }
+                }
+                for (const [device, channels] of remoteChannels) {
+                    for (const channel of channels.keys()) {
+                        if (expired.has(remoteChannelLookupKey(device, channel))) { channels.delete(channel); }
+                    }
+                }
                 continue;
             }
             const { channel } = picked;
-            // pick したチューナーを少し保持する
+            signal?.throwIfAborted();
+            // readyFn間の連続選択を短期間抑える。実使用の所有・競合はdeviceのchannel/usersとstartStreamが管理する。
             for (const { device } of [picked, ...carriers]) {
                 this._readyForJobPickedDeviceSet.add(device);
-                log.debug("readyForJob: picked device: #%d (%s) for %s/%s", device.index, device.config.name, channel.type, channel.channel);
-
-                setTimeout(() => {
-                    // 開放
+                log.debug(`📡 デバイス #${device.index} を選択しました (${channel.type}/${channel.channel})`);
+                let released = false;
+                const release = () => {
+                    // 同じ保持のtimerを一度だけ解放し、後から選択した別の呼出元の保持に触れない。
+                    if (released) { return; }
+                    released = true;
+                    clearTimeout(timeout);
+                    signal?.removeEventListener("abort", release);
                     this._readyForJobPickedDeviceSet.delete(device);
-                    log.debug("readyForJob: released device: #%d (%s)", device.index, device.config.name);
-                }, 1000 * 5);
+                    log.debug(`📡 デバイス #${device.index} を解放しました`);
+                };
+                const timeout = setTimeout(release, 1000 * 5);
+                signal?.addEventListener("abort", release, { once: true });
+                if (signal?.aborted) { release(); signal.throwIfAborted(); }
             }
 
             return channel;
@@ -271,15 +420,15 @@ export class Tuner {
         await Promise.all(devices.map(device => device.checkRemoteRelTs()));
         const hosts = new Map<string, TunerDevice[]>();
         for (const device of devices) {
-            const host = `${device.config.remoteMirakurunHost}:${device.config.remoteMirakurunPort || 40772}`;
+            const host = remoteChannelLookupKey(device, { type, channel });
             hosts.set(host, [...(hosts.get(host) || []), device]);
         }
         for (const hostDevices of hosts.values()) {
             try {
                 const remoteChannel = await hostDevices[0].getRemoteChannel(type, channel);
                 // detected by the remote Mirakurun, received by the tuners supporting it
-                const detected = hostDevices.every(device => device.supportsRemoteRelTs) && (remoteChannel.services || []).some(service => service.tsmfRelTs !== undefined);
-                if (remoteChannel.tsmfRelTs === undefined && !detected) {
+                const detected = hostDevices.every(device => device.supportsRemoteRelTs) && (remoteChannel.services || []).some(service => Number.isInteger(service.tsmfRelTs) && service.tsmfRelTs! >= 1 && service.tsmfRelTs! <= 15);
+                if (!remoteChannel.tsmfRelTs && !detected) {
                     return false;
                 }
             } catch (err) {
@@ -300,18 +449,28 @@ export class Tuner {
             return requested === "tlv" ? null : "ts";
         }
 
-        // the streams of TS can output TS without the conversion
-        const canConvert = tlvTargets.length < targets.length ||
-            this._getCandidates(tlvTargets).some(({ devices }) => devices.some(device => !!device.config.tlvToTsDecoder));
+        // 設定上のTS経路だけでは受信できるとは限らない。占有状態は見ず、対応デバイスと変換能力で判定する。
+        const candidates = this._getCandidates(targets);
+        const hasDevices = candidates.some(({ devices }) => devices.length > 0);
+        const canConvert = candidates.some(({ format, devices }) =>
+            devices.some(device => format === "ts" || !!device.config.tlvToTsDecoder));
         const format = requested || _.config.server.defaultTlvStreamFormat || "tlv";
-        if (format === "ts" && canConvert === false) {
+        // 入力候補がない場合は変換不能と断定せず、確保側のチューナー不足として扱う。
+        if (format === "ts" && hasDevices && canConvert === false) {
             return null;
         }
         return format;
     }
 
     /** @param relTs the relative stream of TSMF (default: `tsmfRelTs` of the channel, the stream as received if not specified) */
-    initChannelStream(channel: ChannelItem, userReq: common.UserRequest, output: Writable, relTs?: number): Promise<common.StreamFilter> {
+    initChannelStream(channel: ChannelItem, userReq: common.UserRequest, output: Writable, relTs?: number, rawTsmf = false): Promise<common.StreamFilter> {
+        if (rawTsmf) {
+            // formatは内側の論理形式であり、外側TSMFの未検出時にも使うためtlv設定だけで拒否しない。
+            // 入力機器が外側TSを出力する構成で使用し、物理入力がTLVかどうかは設定から推測しない。
+            // 搬送波は設定済みの相対TS・TLV形式・復号器を適用せず転送します。
+            return this._initTS({ ...userReq, disableDecoder: true, streamSetting: { channel } }, output,
+                [{ channel, devices: this._getDevicesByType(channel.type, channel.route), format: "ts", rawTsmf: true }]);
+        }
         let networkId: number;
 
         relTs = relTs || channel.tsmfRelTs;
@@ -476,7 +635,7 @@ export class Tuner {
             if (deviceTypes.length === 0 || (device.config.routes && device.config.routes.includes(route) === false)) {
                 continue;
             }
-            // the remote tuners of the same remote Mirakurun and the type receive the same too
+            // この版のremote clientはHTTP・認証なしのため、接続先host/portとタイプだけで試行をまとめる。
             const keys = device.isRemote ?
                 deviceTypes.map(type => `${device.config.remoteMirakurunHost}:${device.config.remoteMirakurunPort || 40772}/${type}`) :
                 [deviceTypes.join(",")];
@@ -535,7 +694,7 @@ export class Tuner {
         await Promise.all(devices.map(device => device.checkRemoteRelTs()));
         const hosts = new Map<string, TunerDevice>();
         for (const device of devices.filter(item => item.supportsRemoteRelTs)) {
-            const host = `${device.config.remoteMirakurunHost}:${device.config.remoteMirakurunPort || 40772}`;
+            const host = remoteChannelLookupKey(device, channel);
             if (!hosts.has(host)) {
                 hosts.set(host, device);
             }
@@ -564,7 +723,7 @@ export class Tuner {
 
             const streams = new Map<number, TSMFStream>();
             for (const service of services) {
-                if (!Number.isInteger(service.tsmfRelTs) || (service.format !== "ts" && service.format !== "tlv") || streams.has(service.tsmfRelTs)) {
+                if (!Number.isInteger(service.tsmfRelTs) || service.tsmfRelTs! < 1 || service.tsmfRelTs! > 15 || (service.format !== "ts" && service.format !== "tlv") || streams.has(service.tsmfRelTs)) {
                     continue;
                 }
                 streams.set(service.tsmfRelTs, {
@@ -578,8 +737,7 @@ export class Tuner {
             }
             if (streams.size > 0) {
                 // the relative streams reported are requested again (even if refused before, such as while scanning by the remote Mirakurun)
-                for (const item of devices.filter(other => other.config.remoteMirakurunHost === device.config.remoteMirakurunHost &&
-                    (other.config.remoteMirakurunPort || 40772) === (device.config.remoteMirakurunPort || 40772))) {
+                for (const item of devices.filter(other => remoteChannelLookupKey(other, channel) === remoteChannelLookupKey(device, channel))) {
                     for (const relTs of streams.keys()) {
                         item.clearRemoteRelTsRefused(channel, relTs);
                     }
@@ -742,131 +900,136 @@ export class Tuner {
         remote = false,
         devices?: TunerDevice[]
     ): Promise<apid.Service[]> {
-        log.info(
-            "Tuner: the relative streams of TSMF on %s/%s are detected: %s",
-            channel.type, channel.channel, streams.map(stream => `${stream.relTs}:${stream.format}(${stream.slots} slots)`).join(", ")
-        );
+        log.info(`📡 ${channel.type}/${channel.channel} の相対TSを検出しました: ${streams.map(stream => `${stream.relTs}:${stream.format}(${stream.slots} slots)`).join(", ")}`);
 
-        let scanStreams = streams;
-        let carriersCompleted = false;
-        // the stream of the services scanned (the same as without TSMF), the one of the TSMF header if no services
-        // the stream as received of the remote Mirakurun is TS (TSMF)
-        let channelStreams: ChannelStream[] = streams.map(stream => ({ ...stream, ...(remote && { remote: true }) }));
-        const discovery = streams.find(stream => stream.numberOfCarriers > 1 && stream.format === "tlv");
-        if (discovery) {
-            // the IDs of the header associate the carriers (`tsmfNetworkId` / `tsmfStreamId`, the IDs of the services may differ),
-            // `networkId` / `streamId` of the services scanned are kept until scanned again (as received before if the scan fails)
-            channelStreams = streams.map(stream => {
-                const saved = channel.getStreamByRelTs(stream.relTs);
-                const sameStream = saved?.tsmfNetworkId === stream.networkId && saved?.tsmfStreamId === stream.streamId;
-                return {
-                    ...stream,
-                    ...(sameStream && { networkId: saved.networkId, streamId: saved.streamId }),
-                    tsmfNetworkId: stream.networkId,
-                    tsmfStreamId: stream.streamId
-                };
-            });
-            const discoveryChanged = streams.some(stream => {
-                const saved = channel.getStreamByRelTs(stream.relTs);
-                return !saved || saved.groupId !== stream.groupId || saved.numberOfCarriers !== stream.numberOfCarriers ||
-                    saved.carrierSequence !== stream.carrierSequence || saved.tsmfNetworkId !== stream.networkId || saved.tsmfStreamId !== stream.streamId;
-            });
-            if (_.channel.get(channel.type, channel.channel) === channel) {
-                // to find the other carriers (copied, the streams are updated by the scan)
-                channel.setStreams([...channelStreams]);
+        const savedStreams = channel.streams;
+        let provisionalStreams: ChannelStream[] | undefined;
+        let streamsCommitted = false;
+        try {
+            let scanStreams = streams;
+            let carriersCompleted = false;
+            // the stream of the services scanned (the same as without TSMF), the one of the TSMF header if no services
+            // the stream as received of the remote Mirakurun is TS (TSMF)
+            let channelStreams: ChannelStream[] = streams.map(stream => ({ ...stream, ...(remote && { remote: true }) }));
+            const discovery = streams.find(stream => (stream.numberOfCarriers || 0) > 1 && stream.format === "tlv");
+            if (discovery) {
+                // the IDs of the header associate the carriers (`tsmfNetworkId` / `tsmfStreamId`, the IDs of the services may differ),
+                // `networkId` / `streamId` of the services scanned are kept until scanned again (as received before if the scan fails)
+                channelStreams = streams.map(stream => {
+                    const saved = channel.getStreamByRelTs(stream.relTs);
+                    const sameStream = saved?.tsmfNetworkId === stream.networkId && saved?.tsmfStreamId === stream.streamId;
+                    return {
+                        ...stream,
+                        ...(sameStream && { networkId: saved.networkId, streamId: saved.streamId }),
+                        tsmfNetworkId: stream.networkId,
+                        tsmfStreamId: stream.streamId
+                    };
+                });
+                const discoveryChanged = streams.some(stream => {
+                    const saved = channel.getStreamByRelTs(stream.relTs);
+                    return !saved || saved.groupId !== stream.groupId || saved.numberOfCarriers !== stream.numberOfCarriers ||
+                        saved.carrierSequence !== stream.carrierSequence || saved.tsmfNetworkId !== stream.networkId || saved.tsmfStreamId !== stream.streamId;
+                });
+                if (_.channel.get(channel.type, channel.channel) === channel) {
+                    // to find the other carriers (copied, the streams are updated by the scan)
+                    channel.setStreams(provisionalStreams = [...channelStreams]);
+                }
+                const canReceive = this.canReceiveTsmfCarriers(channel, discovery.numberOfCarriers!);
+                if (!canReceive || !channel.hasAllCarriers(discovery)) {
+                    log.info(`📡 ${channel.type}/${channel.channel} の相対TS ${discovery.relTs} は、グループ ${discovery.groupId} の全 ${discovery.numberOfCarriers} 搬送波が揃ってからTLVを取得します (${canReceive ? `検出済み搬送波: ${(channel.getBondedChannels() || []).length}、またはcarrier_sequenceが不正` : "ローカルチューナーが不足"})`);
+                    // TS services on a shared carrier do not require the other carriers.
+                    scanStreams = streams.filter(stream => stream.format === "ts");
+                } else {
+                    carriersCompleted = discoveryChanged;
+                }
+            } else if (!remote && channel.streams.some(stream => stream.remote === true) && _.channel.get(channel.type, channel.channel) === channel) {
+                // the relative streams detected by the local tuners are received by them (not as detected by the remote Mirakurun)
+                channel.setStreams(provisionalStreams = [...channelStreams]);
             }
-            const canReceive = this.canReceiveTsmfCarriers(channel, discovery.numberOfCarriers);
-            if (!canReceive || !channel.hasAllCarriers(discovery)) {
-                log.info(
-                    "Tuner: the TLV of the relative stream %d on %s/%s is not scanned until all the %d carriers of the group %d are found (%s)",
-                    discovery.relTs, channel.type, channel.channel, discovery.numberOfCarriers, discovery.groupId,
-                    canReceive ? `carriers found: ${(channel.getBondedChannels() || []).length}, or carrier_sequence is invalid` : "not enough local tuners"
-                );
-                // TS services on a shared carrier do not require the other carriers.
-                scanStreams = streams.filter(stream => stream.format === "ts");
-            } else {
-                carriersCompleted = discoveryChanged;
-            }
-        } else if (!remote && channel.streams.some(stream => stream.remote === true) && _.channel.get(channel.type, channel.channel) === channel) {
-            // the relative streams detected by the local tuners are received by them (not as detected by the remote Mirakurun)
-            channel.setStreams([...channelStreams]);
-        }
 
-        const scan = (stream: TSMFStream): Promise<apid.Service[]> => this._scanServices(
-            channel,
-            { ...userReq, streamSetting: { ...userReq.streamSetting } },
-            stream.format,
-            false,
-            stream.relTs,
-            false,
-            { devices }
-        );
-        // the remote tuners receive a relative stream each (not to wait for the tuners until the timeout)
-        const results: PromiseSettledResult<apid.Service[]>[] = [];
-        if (remote) {
-            for (const stream of scanStreams) {
-                results.push(...await Promise.allSettled([scan(stream)]));
-            }
-        } else {
-            results.push(...await Promise.allSettled(scanStreams.map(scan)));
-        }
+            const scan = (stream: TSMFStream): Promise<apid.Service[]> => this._scanServices(
+                channel,
+                { ...userReq, streamSetting: { ...userReq.streamSetting! } },
+                stream.format,
+                false,
+                stream.relTs,
+                false,
+                { devices }
+            );
+            // the remote tuners receive a relative stream each (not to wait for the tuners until the timeout)
+            const results: PromiseSettledResult<apid.Service[]>[] = [];
+            if (remote) {
+                for (const stream of scanStreams) {
 
-        const services: apid.Service[] = [];
-        const streamServices: apid.Service[][] = streams.map(() => []);
-        const failed: boolean[] = streams.map(() => false);
-        let lastError: Error = null;
-        results.forEach((result, index) => {
-            const i = scanStreams === streams ? index : streams.indexOf(scanStreams[index]);
-            if (result.status === "fulfilled") {
-                services.push(...result.value);
-                streamServices[i] = result.value;
-                if (result.value.length > 0) {
-                    channelStreams[i] = { ...channelStreams[i], networkId: result.value[0].networkId, streamId: result.value[0].streamId };
+                    results.push(...await Promise.allSettled([scan(stream)]));
                 }
             } else {
-                failed[i] = true;
-                lastError = result.reason;
-                log.warn(
-                    "Tuner: the services of the relative stream %d of TSMF on %s/%s are not received [%s]",
-                    streams[i].relTs, channel.type, channel.channel, lastError.message
-                );
-                // the stream received before is kept (the format detected may be wrong if the scan has failed)
-                const saved = channel.getStreamByRelTs(streams[i].relTs);
-                if (saved !== null) {
-                    channelStreams[i] = { ...channelStreams[i], networkId: saved.networkId, streamId: saved.streamId, format: saved.format };
+                results.push(...await Promise.allSettled(scanStreams.map(scan)));
+            }
+
+            const services: apid.Service[] = [];
+            const streamServices: apid.Service[][] = streams.map(() => []);
+            const failed: boolean[] = streams.map(() => false);
+            let lastError: unknown = null;
+            results.forEach((result, index) => {
+                const i = scanStreams === streams ? index : streams.indexOf(scanStreams[index]);
+                if (result.status === "fulfilled") {
+                    services.push(...result.value);
+                    streamServices[i] = result.value;
+                    if (result.value.length > 0) {
+                        channelStreams[i] = { ...channelStreams[i], networkId: result.value[0].networkId, streamId: result.value[0].streamId ?? channelStreams[i].streamId };
+                    }
+                } else {
+                    failed[i] = true;
+                    lastError = result.reason;
+                    log.warn(`⚠️ ${channel.type}/${channel.channel} の相対TS ${streams[i].relTs} のサービスを取得できませんでした (${lastError instanceof Error ? lastError.message : String(lastError)})`);
+                    // the stream received before is kept (the format detected may be wrong if the scan has failed)
+                    const saved = savedStreams.find(stream => stream.relTs === streams[i].relTs);
+                    if (saved !== undefined) {
+                        channelStreams[i] = { ...channelStreams[i], networkId: saved.networkId, streamId: saved.streamId, format: saved.format };
+                    }
+                }
+            });
+            // the other carriers scan the TLV only if it is not scanned by this (its services are added by any carrier)
+            const tlvScanned = scanStreams.some((stream, index) => stream.format === "tlv" && results[index].status === "fulfilled" &&
+                (results[index] as PromiseFulfilledResult<apid.Service[]>).value.length > 0);
+            if (carriersCompleted && !tlvScanned) {
+                // (the streams may be changed while scanning)
+                for (const carrier of channel.getBondedChannels() || []) {
+                    if (carrier !== channel) {
+                        _.service.queueDiscoveredTsmfScan(carrier);
+                    }
                 }
             }
-        });
-        // the other carriers scan the TLV only if it is not scanned by this (its services are added by any carrier)
-        const tlvScanned = scanStreams.some((stream, index) => stream.format === "tlv" && results[index].status === "fulfilled" &&
-            (results[index] as PromiseFulfilledResult<apid.Service[]>).value.length > 0);
-        if (carriersCompleted && !tlvScanned) {
-            // (the streams may be changed while scanning)
-            for (const carrier of channel.getBondedChannels() || []) {
-                if (carrier !== channel) {
-                    _.service.queueDiscoveredTsmfScan(carrier);
-                }
+
+            collect?.push(...streams.map((stream, i) => ({
+                relTs: stream.relTs,
+                format: stream.format,
+                services: streamServices[i],
+                networkId: stream.networkId,
+                ...((stream.numberOfCarriers || 0) > 1 && { numberOfCarriers: stream.numberOfCarriers }),
+                ...(failed[i] && { failed: true })
+            })));
+
+            // the channel scan adds the carriers bonded without the services (the TLV is scanned when all the carriers are found)
+            const allFailed = services.length === 0 && lastError !== null && !collect?.some(stream => stream.format === "tlv" && (stream.numberOfCarriers || 0) > 1);
+            if (_.channel.get(channel.type, channel.channel) === channel && (!allFailed || (provisionalStreams !== undefined && channel.streams === provisionalStreams))) {
+                // 全失敗の復旧は自分の仮経路だけを対象とし、別取得が確定した経路は上書きしない。
+                channel.setStreams(channelStreams);
+                streamsCommitted = true;
+            }
+            if (allFailed) {
+                throw lastError;
+            }
+            return services;
+        } finally {
+            // 搬送波の検出に使った仮経路は、確定前の中断時に保存しない。
+            // 待機中に別の取得が確定した経路は、そのsnapshotで巻き戻さない。
+            if (!streamsCommitted && provisionalStreams !== undefined && channel.streams === provisionalStreams &&
+                _.channel.get(channel.type, channel.channel) === channel) {
+                channel.setStreams(savedStreams);
             }
         }
-
-        collect?.push(...streams.map((stream, i) => ({
-            relTs: stream.relTs,
-            format: stream.format,
-            services: streamServices[i],
-            networkId: stream.networkId,
-            ...(stream.numberOfCarriers > 1 && { numberOfCarriers: stream.numberOfCarriers }),
-            ...(failed[i] && { failed: true })
-        })));
-
-        // the channel scan adds the carriers bonded without the services (the TLV is scanned when all the carriers are found)
-        if (services.length === 0 && lastError !== null && !collect?.some(stream => stream.format === "tlv" && stream.numberOfCarriers > 1)) {
-            throw lastError;
-        }
-
-        if (_.channel.get(channel.type, channel.channel) === channel) {
-            channel.setStreams(channelStreams);
-        }
-        return services;
     }
 
     private _load(): this {
@@ -1004,135 +1167,309 @@ export class Tuner {
      * @param candidates the channels (and the relative streams of TSMF) carrying the same stream (default: `streamSetting.channel`)
      */
     private async _initTS(user: common.User, dest?: Writable, candidates?: TunerCandidate[]): Promise<common.StreamFilter | null> {
+
         const setting = user.streamSetting;
-
-        if (_.config.server.disableEITParsing === true) {
-            setting.parseEIT = false;
-        }
-
+        if (!setting) { throw new Error("streamSetting is required"); }
+        if (_.config.server.disableEITParsing === true) { setting.parseEIT = false; }
         candidates = candidates || [this._getCandidate(setting.channel, setting.channel.defaultRelTs)];
         if (dest && user.outputFormat) {
-            candidates = candidates.map(candidate => {
-                const { devices } = candidate;
-                if (candidate.format === "tlv") {
-                    // only the tuners can convert TLV to TS
-                    return { ...candidate, devices: user.outputFormat === "ts" ? devices.filter(device => !!device.config.tlvToTsDecoder) : devices };
-                }
-                // the streams of TS cannot output TLV
-                return { ...candidate, devices: user.outputFormat === "tlv" ? [] : devices };
-            });
+            const hadDevices = candidates.some(candidate => candidate.devices.length > 0);
+            candidates = candidates.map(candidate => ({
+                ...candidate,
+                devices: candidate.format === "tlv"
+                    ? (user.outputFormat === "ts" ? candidate.devices.filter(device => !!device.config.tlvToTsDecoder) : candidate.devices)
+                    : (user.outputFormat === "tlv" ? [] : candidate.devices)
+            }));
+            if (hadDevices && !candidates.some(candidate => candidate.devices.length > 0)) {
+                throw Object.assign(new Error("stream format is unavailable"), { code: "ERR_STREAM_FORMAT_UNAVAILABLE" });
+            }
         }
         let tryCount = 50;
         const startedAt = Date.now();
-
         if (!dest) {
-            // the relative stream detected is received by the local tuners if any (the remote Mirakurun may not have detected it),
-            // the programs of the remote Mirakurun are used if only the remote tuners (as before, regardless of the relative stream)
+            // ローカルで検出した相対TSにはローカルを優先し、リモートのみなら従来どおり番組表を取得する。
             const remoteResult = await this._useRemoteData(user, candidates.flatMap(candidate => {
-                if (candidate.relTs === candidate.channel.tsmfRelTs) {
-                    return candidate.devices;
-                }
+                if (candidate.relTs === candidate.channel.tsmfRelTs) { return candidate.devices; }
                 const local = candidate.devices.filter(device => !device.isRemote);
                 return local.length > 0 ? local : this._getDevicesByType(candidate.channel.type, candidate.channel.route).filter(device => device.isRemote);
             }));
-            if (remoteResult) {
-                return null;
-            }
+            // remoteの取得・保存が完了した結果は、その後の中止要求で失敗へ戻さない。
+            if (remoteResult) { return null; }
+
         }
-
+        // リモートの既定出力を要求内で確認する。未確認・取得失敗を「生のTSMF」と推測しない。
+        const remoteChannels: RemoteChannelStates = new Map();
+        const remoteQueries: RemoteChannelQueries = new Map();
+        const rawFailureReports = new Map<TunerDevice, Set<string>>();
+        const remoteChannelRelTs: RemoteChannelRelTs = (device, channel) => remoteChannels.get(device)?.get(channel);
+        const pick = () => this._pickTunerDeviceWithCarriers(candidates!, user.priority, undefined, remoteChannelRelTs);
         while (tryCount > 0) {
-            // the tuners of the other bonded carriers (the remote tuners refused the relative stream detected are not used)
-            const { picked, carriers } = this._pickTunerDeviceWithCarriers(candidates.map(candidate => ({
-                ...candidate,
-                devices: candidate.devices.filter(device => !this._isDetectedByRemote(candidate, device) || device.canReceiveRemoteRelTs(candidate.channel, candidate.relTs))
-            })), user.priority);
 
-            // the remote Mirakurun may not have detected the relative stream (refused with an empty stream), picked again after checked
-            if (picked !== null && this._isDetectedByRemote(picked.candidate, picked.device) && !picked.device.isRemoteChannelRelTsChecked(picked.channel, picked.candidate.relTs)) {
-                await picked.device.checkRemoteChannelRelTs(picked.channel, picked.candidate.relTs);
+            const { picked, carriers: initialCarriers } = pick();
+            let carriers = initialCarriers;
+            if (picked !== null && this._isDetectedByRemote(picked.candidate, picked.device) && !picked.device.isRemoteChannelRelTsChecked(picked.channel, picked.candidate.relTs!)) {
+                await this._checkRemoteRelativeForRequest(picked.device, picked.channel, picked.candidate.relTs!, remoteQueries);
+
                 continue;
             }
-
+            const unchecked = (picked === null || carriers === null
+                ? candidates.flatMap(candidate => candidate.relTs !== undefined && candidate.relTs === candidate.channel.tsmfRelTs
+                    ? candidate.devices.map(device => ({ device, channel: candidate.channel })) : [])
+                : [
+                    ...(picked.candidate.relTs !== undefined && picked.candidate.relTs === picked.channel.tsmfRelTs ? [picked] : []),
+                    ...carriers
+                ]).filter(({ device, channel }) => device.isRemote && !remoteChannels.get(device)?.has(channel) && !this._hasActiveRemoteRawInput(device, channel));
+            if (unchecked.length > 0 && await this._checkRemoteChannels(unchecked, remoteChannels, undefined, undefined, remoteQueries)) { continue; }
+            const uncheckedRaw = this._uncheckedRawTsmfDevices(picked, carriers, remoteChannelRelTs);
+            if (uncheckedRaw.length > 0) {
+                for (const device of uncheckedRaw) {
+                    let reported = rawFailureReports.get(device);
+                    if (!reported) { reported = new Set(); rawFailureReports.set(device, reported); }
+                    await device.checkRemoteRawTsmf(undefined, error => reportRemoteChannelFailure(reported, error));
+                }
+                continue;
+            }
             if (picked === null || carriers === null) {
-                // retry
-                tryCount--;
-                if (tryCount <= 0) {
-                    throw new Error("no available tuners");
-                }
-                await new Promise(resolve => setTimeout(resolve, 250));
-            } else {
-                // found
-                const { device, channel, candidate } = picked;
-                const isTlv = candidate.format === "tlv";
-                const { relTs } = candidate;
-                setting.channel = channel;
-                // only the relative stream detected (`tsmfRelTs` of channels.yml is of the channel, as before)
-                setting.tsmfRelTs = relTs !== channel.tsmfRelTs ? relTs : undefined;
-                setting.format = candidate.format;
-                // the remote Mirakurun outputs the relative stream detected (extracted, and bonded)
-                const filterRelTs = device.isRemote && setting.tsmfRelTs !== undefined ? undefined : relTs;
-                log.debug("Tuner: picked TunerDevice#%d for user `%s` in %dms", device.index, user.id, Date.now() - startedAt);
-
-                let tsFilter: common.StreamFilter;
-                if (isTlv) {
-                    // Keep MMT parsing modules out of the existing TS-only path.
-                    const TLVFilter = (require("./TLVFilter") as typeof import("./TLVFilter")).default;
-                    tsFilter = new TLVFilter({
-                        output: this._getTlvOutput(device, user, dest),
-                        networkId: setting.networkId,
-                        serviceId: setting.serviceId,
-                        eventId: setting.eventId,
-                        parseNIT: setting.parseNIT,
-                        parseSDT: setting.parseSDT,
-                        parseEIT: setting.parseEIT,
-                        tsmfRelTs: filterRelTs,
-                        tsmfCarriers: carriers.length + 1
-                    });
-                } else {
-                    let output: Writable;
-                    if (user.disableDecoder === true || device.decoder === null) {
-                        output = dest;
-                    } else {
-                        output = new TSDecoder({
-                            output: dest,
-                            command: device.decoder
-                        });
+                if (!candidates.some(candidate => this._hasCarrierDevices(candidate, remoteChannelRelTs))) {
+                    const lookupFailed = [...remoteChannels.values()].some(channels => [...channels.values()].includes(null));
+                    const rawRejected = candidates.flatMap(candidate => candidate.devices.filter(device => device.isRemote
+                        && this._needsRemoteRawTsmf(candidate, device, remoteChannelRelTs) && device.supportsRemoteRawTsmf === false));
+                    const rawCheckError = rawRejected.map(device => device.remoteRawTsmfCheckError).find(error => error !== undefined);
+                    // 候補作成時に一時除外されたpeerも原因を確認し、空の候補を待ち続けない。
+                    // 同じ要求では照会結果を固定し、再試行する呼出元が次の要求で候補を作り直す。
+                    const relTsCheckError = candidates.flatMap(candidate => candidate.relTs === undefined ? []
+                        : this._getDevicesByType(candidate.channel.type, candidate.channel.route)
+                            .map(device => device.getRemoteChannelRelTsCheckError?.(candidate.channel, candidate.relTs!))).find(error => error !== undefined);
+                    if (lookupFailed || rawRejected.length > 0 || relTsCheckError !== undefined) {
+                        const message = lookupFailed ? "リモートのチャンネル出力を確認できませんでした。"
+                            : relTsCheckError !== undefined ? "リモートの相対TSを確認できませんでした。"
+                                : rawCheckError !== undefined ? "リモートの生TSMF対応を確認できませんでした。" : "生TSMFの取得に対応するチューナーがありません。";
+                        const cause = relTsCheckError ?? rawCheckError;
+                        throw Object.assign(new Error(message, cause !== undefined ? { cause } : undefined), { code: "ERR_TUNER_UNAVAILABLE" });
                     }
-
-                    tsFilter = new TSFilter({
-                        output,
-                        networkId: setting.networkId,
-                        serviceId: setting.serviceId,
-                        eventId: setting.eventId,
-                        parseNIT: setting.parseNIT,
-                        parseSDT: setting.parseSDT,
-                        parseEIT: setting.parseEIT,
-                        parseNetworkStreams: setting.parseNetworkStreams,
-                        tsmfRelTs: filterRelTs
-                    });
                 }
-
-                Object.defineProperty(user, "streamInfo", {
-                    get: () => tsFilter.streamInfo
+                if (--tryCount <= 0) { break; }
+                await common.sleep(250);
+                continue;
+            }
+            let { device } = picked;
+            const { channel, candidate } = picked;
+            const isTlv = candidate.format === "tlv";
+            const { relTs } = candidate;
+            setting.channel = channel;
+            setting.tsmfRelTs = candidate.rawTsmf ? undefined : relTs !== channel.tsmfRelTs ? relTs : undefined;
+            // 選択時と同じ入力責務を使い、peerの設定変更後も配信中の同一入力へ合流する。
+            user._rawTsmf = this._needsRemoteRawTsmf(candidate, device, remoteChannelRelTs);
+            const remoteSplit = device.isRemote && relTs !== undefined && !user._rawTsmf;
+            setting.format = user._rawTsmf ? "ts" : candidate.format;
+            const filterRelTs = remoteSplit ? undefined : relTs;
+            log.debug(`📡 チューナー#${device.index} を選択しました (${Date.now() - startedAt}ms、user=${user.id})`);
+            const decoders: TSDecoder[] = [];
+            // 生TSMFにはリモート復号を適用せず、ローカルに設定されたコマンドで展開後に復号する。
+            const decoderCommand = user.disableDecoder === true ? null : user._rawTsmf ? (device.config.decoder || null) : device.decoder;
+            const tlvDecoderCommand = isTlv ? device.config.tlvDecoder : undefined;
+            const tlvToTsDecoderCommand = isTlv ? device.config.tlvToTsDecoder : undefined;
+            const remoteDecoder = device.isRemote;
+            let tsFilter: common.StreamFilter;
+            if (isTlv) {
+                const TLVFilter = (require("./TLVFilter") as typeof import("./TLVFilter")).default;
+                tsFilter = new TLVFilter({
+                    output: this._getTlvOutput(device, user, dest, decoders),
+                    networkId: setting.networkId, serviceId: setting.serviceId, eventId: setting.eventId,
+                    parseNIT: setting.parseNIT, parseSDT: setting.parseSDT, parseEIT: setting.parseEIT,
+                    tsmfRelTs: filterRelTs, tsmfCarriers: carriers.length + 1
                 });
-
-                try {
-                    // the tuners of the carriers are started at once, not to be picked by the other requests while starting the first one
-                    await Promise.all([
-                        device.startStream(user, tsFilter, setting.channel),
-                        ...carriers.map(({ device: carrierDevice, channel: carrierChannel }, i) => carrierDevice.startStream(
-                            { ...user, id: `${user.id}#carrier${i + 1}`, streamSetting: { channel: carrierChannel } },
-                            new CarrierSink(tsFilter as TLVFilter, i + 1),
-                            carrierChannel
-                        ))
-                    ]);
-                    return tsFilter;
-                } catch (err) {
-                    tsFilter.end();
-                    throw err;
+            } else {
+                let output = dest;
+                if (decoderCommand !== null) {
+                    const decoder = new TSDecoder({ output: dest!, command: decoderCommand });
+                    decoders.push(decoder);
+                    output = decoder;
                 }
+                tsFilter = new TSFilter({
+                    output: output!, networkId: setting.networkId, serviceId: setting.serviceId, eventId: setting.eventId,
+                    parseNIT: setting.parseNIT, parseSDT: setting.parseSDT, parseEIT: setting.parseEIT,
+                    parseNetworkStreams: setting.parseNetworkStreams, tsmfRelTs: filterRelTs, rawTsmf: candidate.rawTsmf
+                });
+            }
+            const releaseAttempt = () => {
+                tsFilter.close(false);
+                // 確保に失敗した試行が作成したdecoderだけを解放し、destの終了は呼出元に任せる。
+                for (const decoder of decoders) { decoder.close(false); }
+            };
+            let starts: Promise<void>[] = [];
+            try {
+                for (const decoder of decoders) { await decoder.waitForStart(); }
+
+                // decoder待機中の割込みを反映し、最終選択から確保開始まではawaitを挟まない。
+                if (decoders.length > 0) {
+                    const selected = pick();
+                    if (selected.picked && this._isDetectedByRemote(selected.picked.candidate, selected.picked.device)
+                        && !selected.picked.device.isRemoteChannelRelTsChecked(selected.picked.channel, selected.picked.candidate.relTs!)) {
+                        releaseAttempt();
+                        continue;
+                    }
+                    if (this._uncheckedRawTsmfDevices(selected.picked, selected.carriers, remoteChannelRelTs).length > 0) {
+                        releaseAttempt();
+                        continue;
+                    }
+                    const selectedDevice = selected.picked?.device;
+                    const sameTarget = selected.picked?.channel === channel && selected.picked.candidate.format === candidate.format && selected.picked.candidate.relTs === relTs;
+                    const knownRemoteInputs = selected.picked && [
+                        ...(selected.picked.candidate.relTs !== undefined && selected.picked.candidate.relTs === selected.picked.channel.tsmfRelTs ? [selected.picked] : []),
+                        ...(selected.carriers || [])
+                    ].every(({ device, channel }) => !device.isRemote || this._hasActiveRemoteRawInput(device, channel) || remoteChannels.get(device)?.has(channel));
+                    // 設定照会の結果が同じでも、待機中に生入力が始まると展開責務が変わるため作り直す。
+                    const sameRemoteInput = selectedDevice && selectedDevice.isRemote === remoteDecoder
+                        && (!remoteDecoder || remoteChannelRelTs(selectedDevice, channel) === remoteChannelRelTs(device, channel))
+                        && selected.picked && this._needsRemoteRawTsmf(selected.picked.candidate, selectedDevice, remoteChannelRelTs) === (user._rawTsmf === true);
+                    const sameDecoder = selectedDevice && (selectedDevice === device || (isTlv
+                        ? selectedDevice.config.tlvDecoder === tlvDecoderCommand && selectedDevice.config.tlvToTsDecoder === tlvToTsDecoderCommand && selectedDevice.isRemote === remoteDecoder
+                        : (user.disableDecoder === true ? null : user._rawTsmf ? (selectedDevice.config.decoder || null) : selectedDevice.decoder) === decoderCommand && selectedDevice.isRemote === remoteDecoder));
+                    if (!selected.picked || selected.carriers === null || selected.carriers.length !== carriers.length || !sameTarget || !sameDecoder || !sameRemoteInput || !knownRemoteInputs) {
+                        releaseAttempt(); --tryCount; continue;
+                    }
+                    device = selected.picked.device;
+                    carriers = selected.carriers;
+                }
+                if (dest && user.disableDecoder !== true
+                    && ((device.isRemote && user._rawTsmf && device.config.remoteMirakurunDecoder === true)
+                        || carriers.some(carrier => carrier.device.isRemote && carrier.device.config.remoteMirakurunDecoder === true))
+                    && !(isTlv ? device.config.tlvDecoder : device.config.decoder)) {
+                    log.warn(`⚠️ 生TSMFの取得ではリモート復号を使用できません。ローカルの${isTlv ? "tlvDecoder" : "decoder"}が未設定のため、未復号で出力します。`);
+                }
+                // 選択変更で破棄する試行にはgetterを登録せず、再試行での再定義を避ける。
+                Object.defineProperty(user, "streamInfo", { get: () => tsFilter.streamInfo });
+
+                const sinks = carriers.map((_, i) => new CarrierSink(tsFilter as TLVFilter, i + 1));
+                // 全搬送波の利用者を先に登録し、起動待ちの間に別の要求へ選択されないようにする。
+                starts = [device.startStream(user, tsFilter, channel), ...carriers.map((carrier, i) => carrier.device.startStream(
+                    { ...user, id: `${user.id}#carrier${i + 1}`, _rawTsmf: true, streamSetting: { channel: carrier.channel, format: "ts" } },
+                    sinks[i], carrier.channel
+                ))];
+                await Promise.all(starts);
+
+                return tsFilter;
+            } catch (err) {
+                releaseAttempt();
+                // 一方の失敗後も、別搬送波の起動処理が完了してから返す。
+                await Promise.allSettled(starts);
+                // 確保自体の拒否は優先度判定を尊重して返し、別デバイスへのtakeoverを重ねない。
+                throw err;
             }
         }
+        throw Object.assign(new Error("no available tuners"), { code: "ERR_TUNER_UNAVAILABLE" });
+    }
+
+    /** 既定相対TSを要求内で確認し、確認できないリモートを生搬送波とみなさない。 */
+    private _checkRemoteRelativeForRequest(device: TunerDevice, channel: ChannelItem, relTs: number,
+        queries: RemoteChannelQueries, signal?: AbortSignal): Promise<boolean> {
+        let query: RemoteChannelQuery | undefined;
+        return device.checkRemoteChannelRelTs(channel, relTs, signal,
+            () => { query = remoteChannelQuery(device, channel, queries, signal); return query.promise; },
+            error => reportRemoteChannelFailure(query?.reported, error));
+    }
+
+    private async _checkRemoteChannels(
+        targets: { device: TunerDevice, channel: ChannelItem }[],
+        states: RemoteChannelStates,
+        signal?: AbortSignal,
+        retryableLookups?: RemoteChannelFailures,
+        queries?: RemoteChannelQueries
+    ): Promise<boolean> {
+        // statesはready/acquisitionごとの所有物。同じ要求の後続選択でも照会済みの成否を共有する。
+        // Promiseや通信自体を要求間で共有せず、各要求のabortと停止の責任を維持する。
+        const checked = new Map<string, { configured: number | undefined | null; retryable: boolean }>();
+        for (const [device, channels] of states) {
+            for (const [channel, configured] of channels) {
+                checked.set(remoteChannelLookupKey(device, channel), { configured, retryable: retryableLookups?.get(device)?.has(channel) === true });
+            }
+        }
+        let changed = false;
+        for (const { device, channel } of targets) {
+            if (!device.isRemote || states.get(device)?.has(channel)) { continue; }
+            signal?.throwIfAborted();
+
+            const key = remoteChannelLookupKey(device, channel);
+            const previous = checked.get(key);
+            let configured: number | undefined | null;
+            let retryable = false;
+            if (previous) {
+                configured = previous.configured;
+                retryable = previous.retryable;
+            } else {
+                let query: RemoteChannelQuery | undefined;
+                try {
+                    query = queries && remoteChannelQuery(device, channel, queries, signal);
+                    const remote = await (query?.promise ?? device.getRemoteChannel(channel.type, channel.channel,
+                        signal ? AbortSignal.any([signal, AbortSignal.timeout(5000)]) : AbortSignal.timeout(5000)));
+                    configured = remote.tsmfRelTs || undefined;
+                    if (configured !== undefined && (!Number.isInteger(configured) || configured < 1 || configured > 15)) {
+                        throw Object.assign(new Error("リモートの相対TS設定が不正です。"), { code: "ERR_REMOTE_CHANNEL_RELTS_INVALID" });
+                    }
+                } catch (error) {
+                    signal?.throwIfAborted();
+                    if (reportRemoteChannelFailure(query?.reported, error)) { log.warn(`⚠️ リモートのチャンネル ${channel.type}/${channel.channel} の出力を確認できないため、チューナー#${device.index} を新規起動の候補から外します (${error instanceof Error ? error.message : String(error)})`); }
+                    configured = null;
+                    retryable = isRetryableRemoteLookupError(error);
+                }
+                checked.set(key, { configured, retryable });
+            }
+            signal?.throwIfAborted();
+
+            if (!states.has(device)) { states.set(device, new Map()); }
+            // 一時失敗の共有先も10秒後に失効させる。恒久不適合と取得要求は再照会しない。
+            if (retryable && retryableLookups) {
+                if (!retryableLookups.has(device)) { retryableLookups.set(device, new Set()); }
+                retryableLookups.get(device)!.add(channel);
+            }
+            states.get(device)!.set(channel, configured);
+            changed = true;
+        }
+        return changed;
+    }
+
+    /** 実際に受信中の一致する外側TSは、能力APIの失敗や遅い設定照会より優先して共有する。 */
+    private _hasActiveRemoteRawInput(device: TunerDevice, channel: ChannelItem): boolean {
+        return device.isRemote && device.isAvailable && device.channel === channel && device.remoteRawTsmf === true
+            && device.remoteRelTs === undefined && device.remoteFormat === "ts";
+    }
+
+    private _needsRemoteRawTsmf(candidate: TunerCandidate, device: TunerDevice, remoteChannelRelTs?: RemoteChannelRelTs): boolean {
+        if (candidate.rawTsmf === true) { return true; }
+        if (!device.isRemote || candidate.relTs === undefined || candidate.relTs !== candidate.channel.tsmfRelTs) { return false; }
+        if (this._hasActiveRemoteRawInput(device, candidate.channel)) { return true; }
+        // ローカルで設定相対TSを分離する場合は、単一搬送波でも原本を保証するrawTsmf対応が必要。
+        // 旧peerの通常TS出力を原本と推測せず、同じ設定相対TSをpeer側で展開済みの場合だけ分離を省く。
+        const configured = remoteChannelRelTs?.(device, candidate.channel);
+        if (configured !== undefined) { return false; }
+        // 設定が削除されても、配信中の同一相対TS・形式はそのまま共有できる。
+        // 入力が異なる場合の新規起動・takeoverには、生TSMFの能力確認とローカル展開を適用する。
+        return !(device.channel === candidate.channel && device.isAvailable && device.remoteRawTsmf === false
+            && device.remoteRelTs === this._getRemoteRelTs(candidate) && device.remoteFormat === candidate.format);
+    }
+
+    private _uncheckedRawTsmfDevices(
+        picked: { device: TunerDevice, candidate: TunerCandidate } | null,
+        carriers: { device: TunerDevice, channel: ChannelItem }[] | null,
+        remoteChannelRelTs: RemoteChannelRelTs
+    ): TunerDevice[] {
+        if (picked === null || carriers === null) { return []; }
+        return [
+            ...(this._needsRemoteRawTsmf(picked.candidate, picked.device, remoteChannelRelTs) ? [{ device: picked.device, channel: picked.candidate.channel }] : []),
+            ...carriers
+        ].filter(({ device, channel }) => device.isRemote && device.supportsRemoteRawTsmf === undefined
+            && !this._hasActiveRemoteRawInput(device, channel)).map(({ device }) => device);
+    }
+
+    private _canUseRemoteCandidate(candidate: TunerCandidate, device: TunerDevice, remoteChannelRelTs?: RemoteChannelRelTs): boolean {
+        if (!device.isRemote) { return true; }
+        if (this._needsRemoteRawTsmf(candidate, device, remoteChannelRelTs) && this._hasActiveRemoteRawInput(device, candidate.channel)) { return true; }
+        const configured = remoteChannelRelTs?.(device, candidate.channel);
+        if (configured === null) { return false; }
+        if (this._needsRemoteRawTsmf(candidate, device, remoteChannelRelTs) && device.supportsRemoteRawTsmf === false) { return false; }
+        if (this._isDetectedByRemote(candidate, device)) { return device.canReceiveRemoteRelTs(candidate.channel, candidate.relTs!); }
+        return candidate.relTs === undefined || configured === undefined || configured === candidate.relTs;
     }
 
     /**
@@ -1143,36 +1480,48 @@ export class Tuner {
     private _pickTunerDeviceWithCarriers(
         candidates: TunerCandidate[],
         priority: number,
-        excluded?: Set<TunerDevice>
+        excluded?: Set<TunerDevice>,
+        remoteChannelRelTs?: RemoteChannelRelTs
     ): { picked: { device: TunerDevice, channel: ChannelItem, candidate: TunerCandidate } | null, carriers: { device: TunerDevice, channel: ChannelItem }[] | null } {
+        candidates = candidates.map(candidate => ({
+            ...candidate,
+            devices: candidate.devices.filter(device => this._canUseRemoteCandidate(candidate, device, remoteChannelRelTs))
+        }));
         // the remote tuners for the relative stream detected come after the local tuners (taking over, and of the carriers),
         // the remote Mirakurun may not have detected it
-        const isDetectedByRemote = (candidate: TunerCandidate, device: TunerDevice): boolean => this._isDetectedByRemote(candidate, device);
+        const isDetectedByRemote = (candidate: TunerCandidate, device: TunerDevice): boolean => this._isDetectedByRemote(candidate, device)
+            || (device.isRemote && !this._hasActiveRemoteRawInput(device, candidate.channel) && candidate.relTs !== undefined && remoteChannelRelTs?.(device, candidate.channel) === candidate.relTs);
         const picked = this._pickTunerDevice(candidates.map(candidate => ({
             ...candidate,
             devices: candidate.devices.filter(device => !isDetectedByRemote(candidate, device))
-        })), priority);
-        const carriers = picked === null ? null : this._pickCarrierDevices(picked, priority, excluded);
+        })), priority, remoteChannelRelTs);
+        const carriers = picked === null ? null : this._pickCarrierDevices(picked, priority, excluded, remoteChannelRelTs);
         if (picked !== null && carriers !== null) {
             return { picked, carriers };
         }
-        const remote = this._pickTunerDevice(candidates.map(candidate => ({
+        const remoteCandidates = candidates.map(candidate => ({
             ...candidate,
             devices: candidate.devices.filter(device => isDetectedByRemote(candidate, device))
-        })), priority);
-        return remote === null ? { picked, carriers: null } : { picked: remote, carriers: this._pickCarrierDevices(remote, priority, excluded) };
+        })).filter(candidate => candidate.devices.length > 0);
+        const remote = remoteCandidates.length > 0 ? this._pickTunerDevice(remoteCandidates, priority, remoteChannelRelTs) : null;
+        return remote === null ? { picked, carriers: null } : { picked: remote, carriers: this._pickCarrierDevices(remote, priority, excluded, remoteChannelRelTs) };
     }
 
     /** whether the tuners exist for all the bonded carriers of the candidate (in use or not) */
-    private _hasCarrierDevices(candidate: TunerCandidate): boolean {
+    private _hasCarrierDevices(candidate: TunerCandidate, remoteChannelRelTs?: RemoteChannelRelTs): boolean {
+        const primaryDevices = candidate.devices.filter(device => this._canUseRemoteCandidate(candidate, device, remoteChannelRelTs));
+        if (primaryDevices.length === 0) { return false; }
         const channels = candidate.relTs && candidate.format === "tlv" ? candidate.channel.getBondedChannels() : null;
-        // the remote Mirakurun bonds the carriers of the relative stream detected by itself
-        if (channels === null || channels.length < 2 || candidate.devices.some(device => this._isDetectedByRemote(candidate, device))) {
+        // 検出済み・照会で一致した相対TSと、既に配信中の同一入力はリモート側で結合済み。
+        if (channels === null || channels.length < 2 || primaryDevices.some(device => device.isRemote
+            && candidate.relTs !== undefined && !this._needsRemoteRawTsmf(candidate, device, remoteChannelRelTs))) {
             return true;
         }
+        const detected = this._getRemoteRelTs(candidate) !== undefined;
         const devices = new Set<TunerDevice>();
         for (const channel of channels) {
-            const carrierDevices = channel === candidate.channel ? candidate.devices : this._getCandidate(channel, candidate.relTs, candidate.format).devices;
+            const carrierDevices = channel === candidate.channel ? primaryDevices : this._getDevicesByType(channel.type, channel.route)
+                .filter(device => !device.isRemote || (!detected && (this._hasActiveRemoteRawInput(device, channel) || remoteChannelRelTs?.(device, channel) !== null && device.supportsRemoteRawTsmf !== false)));
             if (carrierDevices.length === 0) {
                 return false;
             }
@@ -1188,12 +1537,14 @@ export class Tuner {
     private _pickCarrierDevices(
         { device, channel, candidate }: { device: TunerDevice, channel: ChannelItem, candidate: TunerCandidate },
         priority: number,
-        excluded: Set<TunerDevice> = new Set()
+        excluded: Set<TunerDevice> = new Set(),
+        remoteChannelRelTs?: RemoteChannelRelTs
     ): { device: TunerDevice, channel: ChannelItem }[] | null {
         // the relative stream detected is requested from the remote Mirakurun (bonds the carriers by itself, not of `tsmfRelTs` of channels.yml)
         const detected = this._getRemoteRelTs(candidate) !== undefined;
         // the TLV of the relative stream of TSMF
-        const channels = candidate.relTs && candidate.format === "tlv" && !(device.isRemote && detected) ? channel.getBondedChannels() : null;
+        const remoteSplit = device.isRemote && candidate.relTs !== undefined && !this._needsRemoteRawTsmf(candidate, device, remoteChannelRelTs);
+        const channels = candidate.relTs && candidate.format === "tlv" && !remoteSplit ? channel.getBondedChannels() : null;
         if (channels === null || channels.length < 2) {
             return [];
         }
@@ -1204,12 +1555,12 @@ export class Tuner {
             if (carrierChannel === channel) {
                 continue;
             }
-            // the tuners of the candidate (the carriers of the relative stream detected by the local tuners, as before)
-            const carrierCandidate = this._getCandidate(carrierChannel, candidate.relTs, candidate.format);
+            // rawTsmfはリモートの相対TS設定を適用しない。能力が未確認の候補は開始前に照会する。
             const carrier = this._pickTunerDevice([{
-                ...carrierCandidate,
-                devices: carrierCandidate.devices.filter(d => !(d.isRemote && detected) && used.has(d) === false)
-            }], priority);
+                channel: carrierChannel, relTs: carrierChannel.tsmfRelTs, format: "ts", rawTsmf: true,
+                devices: this._getDevicesByType(carrierChannel.type, carrierChannel.route).filter(d =>
+                    !(d.isRemote && (detected || !this._hasActiveRemoteRawInput(d, carrierChannel) && (remoteChannelRelTs?.(d, carrierChannel) === null || d.supportsRemoteRawTsmf === false))) && !used.has(d))
+            }], priority, remoteChannelRelTs);
             if (carrier === null) {
                 return null;
             }
@@ -1222,31 +1573,42 @@ export class Tuner {
     /**
      * TLV: TLVFilter -> [tlvDecoder] -> [tlvToTsDecoder] -> dest
      */
-    private _getTlvOutput(device: TunerDevice, user: common.User, dest?: Writable): Writable {
+    private _getTlvOutput(device: TunerDevice, user: common.User, dest?: Writable, decoders: TSDecoder[] = []): Writable | undefined {
         if (!dest) {
             return dest;
         }
 
         let output = dest;
-        if (user.outputFormat === "ts") {
-            // a stream in TS must not be continued in TLV
-            output = new TSDecoder({
-                output,
-                command: device.config.tlvToTsDecoder,
-                withArgs: true,
-                startupTimeout: TLV_DECODER_STARTUP_TIMEOUT,
-                passThroughOnFailure: false
-            });
+        const firstDecoder = decoders.length;
+        try {
+            if (user.outputFormat === "ts") {
+                // a stream in TS must not be continued in TLV
+                const decoder = new TSDecoder({
+                    output,
+                    command: device.config.tlvToTsDecoder!,
+                    withArgs: true,
+                    startupTimeout: TLV_DECODER_STARTUP_TIMEOUT,
+                    passThroughOnFailure: false
+                });
+                decoders.push(decoder);
+                output = decoder;
+            }
+            if (user.disableDecoder !== true && device.config.tlvDecoder && (!device.isRemote || user._rawTsmf)) {
+                const decoder = new TSDecoder({
+                    output,
+                    command: device.config.tlvDecoder,
+                    withArgs: true,
+                    startupTimeout: TLV_DECODER_STARTUP_TIMEOUT
+                });
+                decoders.push(decoder);
+                output = decoder;
+            }
+            return output;
+        } catch (error) {
+            // 後段の生成に失敗した場合も、この呼出しが作成したdecoderだけを解放する。
+            for (let i = firstDecoder; i < decoders.length; i++) { decoders[i].close(false); }
+            throw error;
         }
-        if (user.disableDecoder !== true && device.config.tlvDecoder && !device.isRemote) {
-            output = new TSDecoder({
-                output,
-                command: device.config.tlvDecoder,
-                withArgs: true,
-                startupTimeout: TLV_DECODER_STARTUP_TIMEOUT
-            });
-        }
-        return output;
     }
 
     /**
@@ -1283,13 +1645,18 @@ export class Tuner {
      */
     private _pickTunerDevice(
         candidates: TunerCandidate[],
-        priority: number
+        priority: number,
+        remoteChannelRelTs?: RemoteChannelRelTs
     ): { device: TunerDevice, channel: ChannelItem, candidate: TunerCandidate } | null {
+        candidates = candidates.map(candidate => ({ ...candidate, devices: candidate.devices.filter(device =>
+            !device.isRemote || !this._needsRemoteRawTsmf(candidate, device, remoteChannelRelTs) || device.supportsRemoteRawTsmf !== false || this._hasActiveRemoteRawInput(device, candidate.channel)) }));
         // 1. join to existing (the remote tuner outputs a relative stream of TSMF)
         for (const candidate of candidates) {
             for (const device of candidate.devices) {
+                const rawTsmf = this._needsRemoteRawTsmf(candidate, device, remoteChannelRelTs);
                 if (device.isAvailable === true && device.channel === candidate.channel &&
-                    (!device.isRemote || (device.remoteRelTs === this._getRemoteRelTs(candidate) && device.remoteFormat === candidate.format))) {
+                    (!device.isRemote || (device.remoteRelTs === this._getRemoteRelTs(candidate)
+                        && device.remoteFormat === (rawTsmf ? "ts" : candidate.format) && device.remoteRawTsmf === rawTsmf))) {
                     return { device, channel: candidate.channel, candidate };
                 }
             }
@@ -1343,7 +1710,7 @@ export class Tuner {
         // (the remote Mirakurun of 4.3.0 or before ignores it, and outputs the stream of the channel)
         if (relTs !== undefined && relTs !== channel.tsmfRelTs) {
             // the local tuners come first, and the TLV of the carriers discovered is bonded only if all the carriers are found (not as a single carrier)
-            // the remote Mirakurun of 4.3.0 or before outputs the stream of the channel (not the relative stream detected)
+            // 旧リモートの既定出力には別の相対TSが含まれることもあるため、判別済みの相対TSの代わりには使わない。
             const remote = devices.filter(device => device.isRemote && device.canReceiveRemoteRelTs(channel, relTs));
             devices = this._canReceiveDetectedCarriers(channel, relTs) ? [...devices.filter(device => !device.isRemote), ...remote] : remote;
         } else if (

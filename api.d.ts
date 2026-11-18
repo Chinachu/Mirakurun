@@ -46,6 +46,8 @@ export interface Channel {
     route?: ChannelRoute;
     /** the relative stream of TSMF of channels.yml */
     tsmfRelTs?: number;
+    format?: StreamFormat;
+    tsmfGroupId?: number;
     services?: Service[];
 }
 
@@ -234,6 +236,7 @@ export interface TunerUser {
     agent?: string;
     url?: string;
     disableDecoder?: boolean;
+    outputFormat?: StreamFormat;
     streamSetting?: StreamSetting;
     streamInfo?: StreamInfo;
 }

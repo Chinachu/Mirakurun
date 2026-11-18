@@ -30,7 +30,14 @@ export const get: Operation = async (req, res, next) => {
 
         const services: apid.Service[] = [];
 
-        for (const serviceItem of serviceItems.filter(sift(req.query))) {
+        const { "channel.type": channelType, "channel.channel": channelChannel, ...criteria } = req.query;
+        // 先頭の経路だけでなく、同じ受信経路が種別とチャンネル名の両条件に一致するか確認する。
+        const matchesChannel = channelType !== undefined || channelChannel !== undefined ? sift({
+            ...(channelType !== undefined ? { type: channelType } : {}),
+            ...(channelChannel !== undefined ? { channel: channelChannel } : {})
+        }) : null;
+        for (const serviceItem of serviceItems.filter(sift(criteria))) {
+            if (matchesChannel && !serviceItem.channels.some(matchesChannel)) { continue; }
             const service = serviceItem.export();
             service.hasLogoData = await Service.isLogoDataExists(serviceItem.networkId, serviceItem.logoId);
             services.push(service);
@@ -49,6 +56,7 @@ export const get: Operation = async (req, res, next) => {
 get.apiDoc = {
     tags: ["services"],
     operationId: "getServices",
+    description: "channel.type と channel.channel は、受信可能な同じ経路が両方の条件に一致するサービスを返します。片方だけの指定も可能です。",
     parameters: [
         {
             in: "query",

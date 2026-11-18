@@ -22,6 +22,8 @@ import * as apid from "../../api";
 export { parseCommandForSpawn } from "./command";
 
 export interface User {
+    /** リモートから未展開の搬送波TSを受け取る内部指定。 */
+    _rawTsmf?: boolean;
     readonly id: string;
     readonly priority: number;
     readonly agent?: string;
@@ -92,7 +94,7 @@ export function getEpgStreamKey(networkId: number, streamId: number): string {
     return `${networkId}/${streamId}`;
 }
 
-export const channelRoutes: apid.ChannelRoute[] = ["TER", "SAT", "SKY", "CATV", "FTTH"];
+export { channelRoutes, getDefaultChannelRoute } from "../channel-routes";
 
 // network_id of cable television (ARIB STD-B10)
 export const CATV_NETWORK_IDS = [
@@ -103,10 +105,6 @@ export const CATV_NETWORK_IDS = [
     0xFFFE, // digital broadcasting ReMUX
     0xFFFF // cable television
 ];
-
-export function getDefaultChannelRoute(type: apid.ChannelType): apid.ChannelRoute {
-    return type === "GR" ? "TER" : type === "SKY" ? "SKY" : type === "CATV" ? "CATV" : "SAT";
-}
 
 export class WhereQueryError extends Error {
     readonly code = "WHERE_QUERY";
