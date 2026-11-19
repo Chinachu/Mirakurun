@@ -245,6 +245,55 @@ export class Service {
         setTimeout(() => this._initJobs(), 10000);
     }
 
+    public requestCheckToAdd(channel: ChannelItem, serviceId: number): "queued" | "alreadyRegistered" | "notConfigured" | "disabled" {
+        const channelConfigs = _.config.channels.filter(
+            config => config.type === channel.type && config.channel === channel.channel && config.serviceId === serviceId
+        );
+        if (channelConfigs.length === 0) {
+            return "notConfigured";
+        }
+        if (channelConfigs.every(config => config.isDisabled)) {
+            return "disabled";
+        }
+        if (this.findByChannel(channel).some(service => service.serviceId === serviceId)) {
+            return "alreadyRegistered";
+        }
+
+        this._queueCheckToAdd(channel, serviceId);
+
+        return "queued";
+    }
+
+    public requestCheckToAddAll(): { type: ChannelItem["type"]; channel: string; serviceId: number }[] {
+        const queued: { type: ChannelItem["type"]; channel: string; serviceId: number }[] = [];
+        const queuedKeys = new Set<string>();
+
+        for (const channelConfig of _.config.channels) {
+            if (channelConfig.isDisabled || !channelConfig.serviceId) {
+                continue;
+            }
+            const channel = _.channel.get(channelConfig.type, channelConfig.channel);
+            if (!channel) {
+                continue;
+            }
+
+            const key = `${channel.type}.${channel.channel}.${channelConfig.serviceId}`;
+            if (queuedKeys.has(key)) {
+                continue;
+            }
+            if (this.requestCheckToAdd(channel, channelConfig.serviceId) === "queued") {
+                queuedKeys.add(key);
+                queued.push({
+                    type: channel.type,
+                    channel: channel.channel,
+                    serviceId: channelConfig.serviceId
+                });
+            }
+        }
+
+        return queued;
+    }
+
     private async _initJobs(): Promise<void> {
         log.debug("init service jobs...");
 

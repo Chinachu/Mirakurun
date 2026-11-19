@@ -125,6 +125,62 @@ definitions:
       channel:
         $ref: '#/definitions/Channel'
 
+  ServiceCheckTarget:
+    type: object
+    required:
+      - type
+      - channel
+      - serviceId
+    properties:
+      type:
+        $ref: '#/definitions/ChannelType'
+      channel:
+        type: string
+      serviceId:
+        $ref: '#/definitions/ServiceId'
+
+  ServiceCheckRequest:
+    type: object
+    properties:
+      targets:
+        type: array
+        items:
+          $ref: '#/definitions/ServiceCheckTarget'
+
+  ServiceCheckResult:
+    type: object
+    required:
+      - results
+    properties:
+      results:
+        type: array
+        items:
+          $ref: '#/definitions/ServiceCheckResultItem'
+
+  ServiceCheckResultItem:
+    type: object
+    required:
+      - type
+      - channel
+      - serviceId
+      - status
+    properties:
+      type:
+        $ref: '#/definitions/ChannelType'
+      channel:
+        type: string
+      serviceId:
+        $ref: '#/definitions/ServiceId'
+      status:
+        type: string
+        enum:
+          - queued
+          - alreadyRegistered
+          - notConfigured
+          - disabled
+      jobKey:
+        type: string
+
   # program -------------------------------------------------------------------
 
   Program:

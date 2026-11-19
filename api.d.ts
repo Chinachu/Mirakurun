@@ -61,6 +61,30 @@ export interface Service {
     channel?: Channel;
 }
 
+export interface ServiceCheckTarget {
+    type: ChannelType;
+    channel: string;
+    serviceId: ServiceId;
+}
+
+export interface ServiceCheckRequest {
+    targets?: ServiceCheckTarget[];
+}
+
+export type ServiceCheckStatus = "queued" | "alreadyRegistered" | "notConfigured" | "disabled";
+
+export interface ServiceCheckResultItem {
+    type: ChannelType;
+    channel: string;
+    serviceId: ServiceId;
+    status: ServiceCheckStatus;
+    jobKey?: string;
+}
+
+export interface ServiceCheckResult {
+    results: ServiceCheckResultItem[];
+}
+
 export interface Program {
     id: ProgramId;
     eventId: EventId;
