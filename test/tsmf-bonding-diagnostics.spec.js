@@ -13,7 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-require("reflect-metadata");
 const { it } = require("node:test");
 const assert = require("node:assert/strict");
 const util = require("node:util");

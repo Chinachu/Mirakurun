@@ -13,7 +13,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-require("reflect-metadata");
 const { beforeEach, after, it } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
